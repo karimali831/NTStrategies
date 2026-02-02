@@ -155,6 +155,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entryFillTime = DateTime.MinValue;
                 protectiveSeenSinceEntry = false;
                 entryBarIdx = -1;
+                lastFlatExecutionTime = time;
             }
         }
 

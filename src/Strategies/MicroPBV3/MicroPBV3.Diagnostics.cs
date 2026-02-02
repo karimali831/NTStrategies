@@ -458,9 +458,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    // ---- spacing ----
 		    s.SpacingOk = true;
-		    if (MinMinutesBetweenTrades > 0 && lastEntryExecutionTime != DateTime.MinValue)
+		    if (MinMinutesBetweenTrades > 0 && lastFlatExecutionTime != DateTime.MinValue)
 		    {
-		        var minsSinceLast = Time[sigEntry].Subtract(lastEntryExecutionTime).TotalMinutes;
+		        var minsSinceLast = Time[sigEntry].Subtract(lastFlatExecutionTime ).TotalMinutes;
 		        s.SpacingOk = minsSinceLast >= MinMinutesBetweenTrades;
 		    }
 

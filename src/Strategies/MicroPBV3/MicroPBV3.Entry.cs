@@ -166,9 +166,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                if (MinMinutesBetweenTrades > 0 && lastEntryExecutionTime != DateTime.MinValue)
+                if (MinMinutesBetweenTrades > 0 && lastFlatExecutionTime != DateTime.MinValue)
                 {
-                    var minsSinceLast = now.Subtract(lastEntryExecutionTime).TotalMinutes;
+                    var minsSinceLast = now.Subtract(lastFlatExecutionTime).TotalMinutes;
                     if (minsSinceLast < MinMinutesBetweenTrades)
                     {
                         ManageBreakEven();

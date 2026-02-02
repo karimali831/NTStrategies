@@ -322,6 +322,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Cooldown
         private DateTime lastEntryExecutionTime = DateTime.MinValue;
+        private DateTime lastFlatExecutionTime = DateTime.MinValue;
 
         // ===== Consistency rule state =====
         private bool strategyStartSet = false;
@@ -500,6 +501,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             sessionStart = time;
             prevSessionDate = time.Date;
             lastEntryExecutionTime = DateTime.MinValue;
+            lastFlatExecutionTime = DateTime.MinValue;
 
             entryBarIdx = -1;
             entryPriceHard = 0.0;
