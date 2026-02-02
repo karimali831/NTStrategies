@@ -381,11 +381,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        // ✅ NEW overload (add this ABOVE your existing ComputeEmaStructure)
+        // ADD: overload for diagnostics (and reporting) that returns ticks too
         private void ComputeEmaStructure(int sigSignal,
+            out double slopeTicks,
+            out double sepTicks,
             out bool slopeOk,
             out bool sepOk,
             out bool structureOk)
         {
+            slopeTicks = 0;
+            sepTicks = 0;
             slopeOk = true;
             sepOk = true;
 
@@ -413,9 +419,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             var eff = (pathTicks <= 1e-9) ? 0.0 : (netMoveTicks / pathTicks);
-            var slopeTicks = netMoveTicks * eff;
+            slopeTicks = netMoveTicks * eff;
 
-            var sepTicks = Math.Abs(emaFast[sigSignal] - emaSlow[sigSignal]) / TickSize;
+            sepTicks = Math.Abs(emaFast[sigSignal] - emaSlow[sigSignal]) / TickSize;
 
             slopeOk = (MinEmaSlopeTicks <= 0) || (slopeTicks >= MinEmaSlopeTicks);
             sepOk = (MinEmaSeparationTicks <= 0) || (sepTicks >= MinEmaSeparationTicks);
@@ -434,6 +440,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             structureOk = slopeOk && (sepOk || emaCrossover);
+        }
+
+        
+        private void ComputeEmaStructure(int sigSignal,
+            out bool slopeOk,
+            out bool sepOk,
+            out bool structureOk)
+        {
+            ComputeEmaStructure(sigSignal, out _, out _, out slopeOk, out sepOk, out structureOk);
         }
 
         private bool PassesWickFilter(int barsAgo)
