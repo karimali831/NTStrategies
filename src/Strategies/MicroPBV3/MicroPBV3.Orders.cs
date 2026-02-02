@@ -133,7 +133,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (isLongEntry || isShortEntry)
             {
                 entryBarIdx = CurrentBar;
-                lastEntryExecutionTime = time;
+                lastEntryExecutionTime = execution.Time;
 
                 entryPriceHard = execution.Price;
                 entryFillTime = time;
