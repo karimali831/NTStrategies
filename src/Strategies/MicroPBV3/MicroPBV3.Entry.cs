@@ -188,10 +188,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // var trendUp   = Close[sigClosed] > emaFast[sigClosed] && Close[sigClosed] > emaSlow[sigClosed];
-                // var trendDown = Close[sigClosed] < emaFast[sigClosed] && Close[sigClosed] < emaSlow[sigClosed];
-                var trendUp   = IsTrendUp(sigClosed, out _, out _);
-                var trendDown = IsTrendDown(sigClosed, out _, out _);
+                var ema = GetEmaStruct(sigClosed);
+
+                var trendUp   = ema.HasBars && ema.PriceAboveBoth && ema.StructureOk;
+                var trendDown = ema.HasBars && ema.PriceBelowBoth && ema.StructureOk;
 
                 if (!trendUp && !trendDown)
                 {
@@ -292,56 +292,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Centralized trend logic (use everywhere: entry logic + DIAG)
         private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
         {
-            emaSlopeTicks = 0;
-            emaSepTicks   = 0;
+            var m = GetEmaStruct(barsAgo);
 
-            var lb = Math.Max(1, EmaSlopeLookbackBars);
+            emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
+            emaSepTicks   = m.SepTicks;
 
-            // Need enough bars for slope measurement: barsAgo + lb must exist
-            if (CurrentBar < barsAgo + lb)
-                return false;
-
-            var emaNow = emaFast[barsAgo];
-            var emaPast = emaFast[barsAgo + lb];
-
-            // Positive slope for uptrend
-            emaSlopeTicks = (emaNow - emaPast) / TickSize;
-
-            // Separation (absolute distance between EMAs)
-            emaSepTicks = Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
-
-            var priceOk = Close[barsAgo] > emaFast[barsAgo] && Close[barsAgo] > emaSlow[barsAgo];
-            var slopeOk = MinEmaSlopeTicks <= 0 || emaSlopeTicks >= MinEmaSlopeTicks;
-            var sepOk   = MinEmaSeparationTicks <= 0 || emaSepTicks >= MinEmaSeparationTicks;
-
-            return priceOk && slopeOk && sepOk;
+            return m.HasBars && m.PriceAboveBoth && m.StructureOk;
         }
 
         private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
         {
-            emaSlopeTicks = 0;
-            emaSepTicks   = 0;
+            var m = GetEmaStruct(barsAgo);
 
-            var lb = Math.Max(1, EmaSlopeLookbackBars);
+            emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
+            emaSepTicks   = m.SepTicks;
 
-            if (CurrentBar < barsAgo + lb)
-                return false;
-
-            var emaNow = emaFast[barsAgo];
-            var emaPast = emaFast[barsAgo + lb];
-
-            // Negative slope for downtrend
-            emaSlopeTicks = (emaNow - emaPast) / TickSize;
-
-            emaSepTicks = Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
-
-            var priceOk = Close[barsAgo] < emaFast[barsAgo] && Close[barsAgo] < emaSlow[barsAgo];
-            var slopeOk = MinEmaSlopeTicks <= 0 || emaSlopeTicks <= -MinEmaSlopeTicks;
-            var sepOk   = MinEmaSeparationTicks <= 0 || emaSepTicks >= MinEmaSeparationTicks;
-
-            return priceOk && slopeOk && sepOk;
+            // For downtrends you still want structure, but price must be below both EMAs.
+            return m.HasBars && m.PriceBelowBoth && m.StructureOk;
         }
-
 
         private bool PassesEntryDistanceFilter(double entryTriggerPrice, int sigSignal, out double distTicks)
         {
@@ -423,7 +391,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var eff = pathTicks <= 1e-9 ? 0.0 : netMoveTicks / pathTicks;
             
+            // directional movement × straightness penalty
             slopeTicks = netMoveTicks * eff;
+            // how many ticks the EMA rose over N bars
+            // slopeTicks = netMoveTicks;
+            
             sepTicks = Math.Abs(emaFast[sigSignal] - emaSlow[sigSignal]) / TickSize;
             slopeOk = MinEmaSlopeTicks <= 0 || slopeTicks >= MinEmaSlopeTicks;
             sepOk = MinEmaSeparationTicks <= 0 || sepTicks >= MinEmaSeparationTicks;
@@ -498,6 +470,95 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             return true;
+        }
+
+        private EmaStruct GetEmaStruct(int barsAgo)
+        {
+            var r = new EmaStruct();
+
+            var lb = Math.Max(1, EmaSlopeLookbackBars);
+            if (CurrentBar < barsAgo + lb)
+            {
+                r.HasBars = false;
+                r.SlopeOk = false;
+                r.SepOk = false;
+                r.StructureOk = false;
+                return r;
+            }
+
+            r.HasBars = true;
+
+            // --- price vs EMAs ---
+            var c = Close[barsAgo];
+            var f0 = emaFast[barsAgo];
+            var s0 = emaSlow[barsAgo];
+
+            r.PriceAboveBoth = (c > f0) && (c > s0);
+            r.PriceBelowBoth = (c < f0) && (c < s0);
+
+            // --- separation (single source) ---
+            r.SepTicks = Math.Abs(f0 - s0) / TickSize;
+
+            // --- directional slope (single source) ---
+            var fPast = emaFast[barsAgo + lb];
+            r.SlopeDirTicks = (f0 - fPast) / TickSize;
+
+            // --- strength score (your “slopeTicks” used in DIAG/structure) ---
+            var netMoveTicks = Math.Abs(f0 - fPast) / TickSize;
+
+            var pathTicks = 0.0;
+            for (var i = 0; i < lb; i++)
+            {
+                var a = emaFast[barsAgo + i];
+                var b = emaFast[barsAgo + i + 1];
+                pathTicks += Math.Abs(a - b) / TickSize;
+            }
+
+            var eff = pathTicks <= 1e-9 ? 0.0 : netMoveTicks / pathTicks;
+            r.SlopeStrengthTicks = netMoveTicks * eff;
+
+            // NOTE: choose ONE metric to compare to MinEmaSlopeTicks.
+            // If MinEmaSlopeTicks was intended for your DIAG/strength score, keep this line:
+            // var slopeMetricForThreshold = r.SlopeStrengthTicks;
+
+            // If you intended MinEmaSlopeTicks to be “pure directional slope”, switch to:
+            var slopeMetricForThreshold = Math.Abs(r.SlopeDirTicks);
+
+            r.SlopeOk = MinEmaSlopeTicks <= 0 || slopeMetricForThreshold >= MinEmaSlopeTicks;
+            r.SepOk   = MinEmaSeparationTicks <= 0 || r.SepTicks >= MinEmaSeparationTicks;
+
+            // --- crossover within lookback (single source) ---
+            r.EmaCrossover = false;
+            for (var i = 0; i < lb; i++)
+            {
+                var d0 = emaFast[barsAgo + i] - emaSlow[barsAgo + i];
+                var d1 = emaFast[barsAgo + i + 1] - emaSlow[barsAgo + i + 1];
+
+                if (d0 == 0 || d1 == 0 || (d0 > 0 && d1 < 0) || (d0 < 0 && d1 > 0))
+                {
+                    r.EmaCrossover = true;
+                    break;
+                }
+            }
+
+            r.StructureOk = r.SlopeOk && (r.SepOk || r.EmaCrossover);
+            return r;
+        }
+
+        private sealed class EmaStruct
+        {
+            public bool HasBars;
+            public bool PriceAboveBoth;
+            public bool PriceBelowBoth;
+
+            public double SlopeDirTicks;      // directional: emaNow - emaPast (ticks)
+            public double SlopeStrengthTicks; // your netMove * eff (ticks, non-directional strength score)
+            public double SepTicks;
+
+            public bool SlopeOk;
+            public bool SepOk;
+            public bool EmaCrossover;
+            public bool StructureOk;
         }
     }
 }
