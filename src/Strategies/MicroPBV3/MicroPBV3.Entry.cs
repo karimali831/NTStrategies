@@ -1,4 +1,5 @@
 #region Using declarations
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -199,7 +200,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // EMA structure filter
-                ComputeEmaStructure(sigClosed, out _, out _, out var emaStructureOk);
+                ComputeEmaStructure(sigClosed, out _, out _, out _, out var emaStructureOk);
 
                 if (!emaStructureOk)
                 {
@@ -388,12 +389,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             out double sepTicks,
             out bool slopeOk,
             out bool sepOk,
+            out bool emaCrossover,
             out bool structureOk)
         {
             slopeTicks = 0;
             sepTicks = 0;
             slopeOk = true;
             sepOk = true;
+            emaCrossover = false;
 
             var lb = Math.Max(1, EmaSlopeLookbackBars);
 
@@ -418,15 +421,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pathTicks += Math.Abs(a - b) / TickSize;
             }
 
-            var eff = (pathTicks <= 1e-9) ? 0.0 : (netMoveTicks / pathTicks);
+            var eff = pathTicks <= 1e-9 ? 0.0 : netMoveTicks / pathTicks;
+            
             slopeTicks = netMoveTicks * eff;
-
             sepTicks = Math.Abs(emaFast[sigSignal] - emaSlow[sigSignal]) / TickSize;
+            slopeOk = MinEmaSlopeTicks <= 0 || slopeTicks >= MinEmaSlopeTicks;
+            sepOk = MinEmaSeparationTicks <= 0 || sepTicks >= MinEmaSeparationTicks;
 
-            slopeOk = (MinEmaSlopeTicks <= 0) || (slopeTicks >= MinEmaSlopeTicks);
-            sepOk = (MinEmaSeparationTicks <= 0) || (sepTicks >= MinEmaSeparationTicks);
-
-            var emaCrossover = false;
             for (var i = 0; i < lb; i++)
             {
                 var d0 = emaFast[sigSignal + i] - emaSlow[sigSignal + i];
@@ -446,9 +447,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ComputeEmaStructure(int sigSignal,
             out bool slopeOk,
             out bool sepOk,
+            out bool emaCrossover,
             out bool structureOk)
         {
-            ComputeEmaStructure(sigSignal, out _, out _, out slopeOk, out sepOk, out structureOk);
+            ComputeEmaStructure(sigSignal, out _, out _, out slopeOk, out sepOk, out emaCrossover, out structureOk);
         }
 
         private bool PassesWickFilter(int barsAgo)

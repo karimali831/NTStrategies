@@ -531,12 +531,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         // sigSignal = last CLOSED bar (safe for filters, diagnostics, confirmations)
         private int SigSignal()
         {
-            var isRealtime = (State == State.Realtime);
-            return (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
+            var isRealtime = State == State.Realtime;
+            return isRealtime && Calculate == Calculate.OnEachTick ? 1 : 0;
         }
 
         // sigEntry = current forming bar (used for entry logic + DIAG alignment)
-        private int SigEntry()
+        private static int SigEntry()
         {
             return 0;
         }

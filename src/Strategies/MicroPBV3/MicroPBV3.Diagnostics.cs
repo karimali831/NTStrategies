@@ -290,7 +290,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 	        if (!snap.TimeOk)
 	        {
-		        Print($"Out of time window: {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} (minFromOpen={minFromOpen}, inMainWindow={snap.InMainWindow}, midBreak={snap.InMidBreak})\n");
+		        Print($"Out of time window: {tSignal:yyyy-MM-dd HH:mm:ss} (minFromOpen={minFromOpen}, inMainWindow={snap.InMainWindow}, midBreak={snap.InMidBreak})\n");
 		        return;
 	        }
 
@@ -299,15 +299,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        "  a) PnL/DD/Trades Lock: {8}  (realizedToday={9:C2}, unrealizedNow={10:C2}, totalToday={11:C2}, dayLocked={12}, tradesToday={14})\n" +
 		        "  b) Other blocks/filters: {15}\n" +
 		        "  c) Wick ticks: {31}\n" +
-		        "  d) PB(prev) vs EMAFast: " +
-		        "touchBar={32:HH:mm:ss} ema={33:F2} distTicks={34:F1} pbLong={35} | " +
-		        "touchBar={36:HH:mm:ss} ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
-		        "  c) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
-		        "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) ok={46} structureOk={47}\n" +
-		        "  d) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-		        "  e) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+		        "  d) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
+		        "  e) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
+		        "  f) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
+		        "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
+		        "  h) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 		        "-------------------------------------------------------------------------------------------------------\n",
-		        Time[sigEntry], // 0
+		        tSignal, // 0
 		        accountName, // 1
 		        Contracts, // 2
 		        snap.TimeOk, // 3 (kept for stability)
@@ -341,12 +339,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        wickDiag, // 31
 
 		        // ---- PREVIOUS-BAR PULLBACK DIAG ----
-		        Time[sigSignal], // 32 long touch bar time
+		        false, // 32 
 		        snap.PbEmaLong, // 33
 		        snap.PbDistLong, // 34
 		        snap.LongPulledBack, // 35
 
-		        Time[sigSignal], // 36 short touch bar time
+		        snap.EmaCrossover, // 36 
 		        snap.PbEmaShort, // 37
 		        snap.PbDistShort, // 38
 		        snap.ShortPulledBack, // 39
@@ -485,6 +483,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        out s.EmaSepTicks,
 		        out s.EmaSlopeOk,
 		        out s.EmaSepOk,
+		        out s.EmaCrossover,
 		        out s.EmaStructureOk);
 
 		    // ---- trend ----
@@ -520,7 +519,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool WickOk, AtrOk, AdxOk, VolBlocked;
 	        public bool TrendUp, TrendDown;
 
-	        public bool EmaSlopeOk, EmaSepOk, EmaStructureOk;
+	        public bool EmaSlopeOk, EmaSepOk, EmaCrossover, EmaStructureOk;
 	        public double EmaSlopeTicks, EmaSepTicks;
 
 	        public bool LongPulledBack, ShortPulledBack;
