@@ -454,9 +454,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("[DUPLICATE] " + msg);
                         Log(msg, LogLevel.Error);
 
-                        try { Alert("DUPLICATE_" + _instanceGuid, Priority.High, msg, null, 0, null, null); }
-                        catch { }
-
+                        Alert("DUPLICATE_" + _instanceGuid, Priority.High, msg, null, 0, null, null);
                         TryDuplicateSafetyCleanup("Duplicate detected at realtime start");
                     }
                 }

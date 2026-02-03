@@ -519,10 +519,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // NOTE: choose ONE metric to compare to MinEmaSlopeTicks.
             // If MinEmaSlopeTicks was intended for your DIAG/strength score, keep this line:
-            // var slopeMetricForThreshold = r.SlopeStrengthTicks;
+            var slopeMetricForThreshold = r.SlopeStrengthTicks;
 
             // If you intended MinEmaSlopeTicks to be “pure directional slope”, switch to:
-            var slopeMetricForThreshold = Math.Abs(r.SlopeDirTicks);
+            // var slopeMetricForThreshold = Math.Abs(r.SlopeDirTicks);
 
             r.SlopeOk = MinEmaSlopeTicks <= 0 || slopeMetricForThreshold >= MinEmaSlopeTicks;
             r.SepOk   = MinEmaSeparationTicks <= 0 || r.SepTicks >= MinEmaSeparationTicks;
