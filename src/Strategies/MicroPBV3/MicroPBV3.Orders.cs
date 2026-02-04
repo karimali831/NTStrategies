@@ -143,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 _wasInPosition = true;
                 _entrySide = isLongEntry ? MarketPosition.Long : MarketPosition.Short;
-                _entryQty += execution.Quantity;
+                _entryQty = execution.Quantity;
 
                 _mfeTicks = 0.0;
                 _maeTicks = 0.0;
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (trades != null && trades.Count > 0)
                 {
                     var t = trades[trades.Count - 1];
-                    pnlCur = t.ProfitCurrency * _entryQty;
+                    pnlCur = t.ProfitCurrency * Contracts;
 
                     double profitPoints;
                     try
