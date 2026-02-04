@@ -253,6 +253,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // (submitted declared above for reporting)
                 var buf = TickSize;
                 var qty = GetEntryQty(sigEntry);
+                
+                // Fast EMA
+                var emaF = emaFast[sigSignal];
 
                 // ===== LONG =====
                 if (!submitted && EnableLongs && trendUp)
@@ -277,6 +280,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
 
                             ManageBreakEven();
+                            return;
+                        }
+                        
+                        if (!BodyMidpointOnCorrectSide(sigSignal, true, emaF))
+                        {
+                            if (DebugMode)
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG signal body midpoint not above EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
                             return;
                         }
 
@@ -311,6 +321,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
 
                             ManageBreakEven();
+                            return;
+                        }
+                        
+                        if (!BodyMidpointOnCorrectSide(sigSignal, false, emaF))
+                        {
+                            if (DebugMode)
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT signal body midpoint not below EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
                             return;
                         }
 
@@ -351,6 +368,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // For downtrends you still want structure, but price must be below both EMAs.
             return m.HasBars && m.PriceBelowBoth && m.StructureOk;
+        }
+        
+        private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)
+        {
+            var o = Open[barsAgo];
+            var c = Close[barsAgo];
+            var mid = (o + c) * 0.5;
+
+            return longSide ? (mid > ema) : (mid < ema);
         }
 
         private bool PassesEntryDistanceFilter(double entryTriggerPrice, int sigSignal, out double distTicks)
