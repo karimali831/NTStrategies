@@ -215,7 +215,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Avoid chop zones
-                var chopOk = ComputeChopOk(out var eff);
+                var chopOk = ComputeChopOk(out _, out _, out _,
+                    out _, out _, out _);
                 if (!chopOk)
                 {
                     ManageBreakEven();
@@ -613,18 +614,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-        private bool ComputeChopOk(out double eff)
+        private bool ComputeChopOk(out double eff, out int lbUsed, out bool hasBars, out bool bypassAdx, out bool bypassSlope, out string reason)
         {
             eff = 1.0;
+            lbUsed = 0;
+            hasBars = false;
+            bypassAdx = false;
+            bypassSlope = false;
+            reason = "chop=off";
 
             if (!EnableChopFilter)
                 return true;
 
-            var barsAgo = SigClosed();               // <-- always closed bar
+            var barsAgo = SigClosed();
             var lb = Math.Max(2, ChopLookbackBars);
+            lbUsed = lb;
 
             if (CurrentBar < barsAgo + lb)
+            {
+                // Not enough bars => auto-pass (important to log)
+                reason = $"chop=pass(not-enough-bars lb={lb})";
                 return true;
+            }
+
+            hasBars = true;
 
             var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
             var path = 0.0;
@@ -632,23 +645,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                 path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
 
             eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
-            var ok = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
 
-            // BYPASS: ADX (period 14)
+            var okByEff = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
+
+            // BYPASS: ADX
             if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
+            {
+                bypassAdx = true;
+                reason = $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) eff={eff:0.00} min={MinChopEfficiency:0.00} lb={lb}";
                 return true;
+            }
 
             // BYPASS: EMA slope strength
             if (ChopBypassEmaSlopeStrengthTicks > 0)
             {
                 var m = GetEmaStruct(barsAgo);
                 if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
+                {
+                    bypassSlope = true;
+                    reason = $"chop=bypass(slope {m.SlopeStrengthTicks:0.0} >= {ChopBypassEmaSlopeStrengthTicks:0.0}) eff={eff:0.00} min={MinChopEfficiency:0.00} lb={lb}";
                     return true;
+                }
             }
 
-            return ok;
-        }
+            if (okByEff)
+            {
+                reason = $"chop=ok(eff {eff:0.00} >= {MinChopEfficiency:0.00} lb={lb})";
+                return true;
+            }
 
+            reason = $"chop=block(eff {eff:0.00} < {MinChopEfficiency:0.00} lb={lb})";
+            return false;
+        }
 
         private sealed class EmaStruct
         {

@@ -189,18 +189,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         //     }
         // }
 
-        // private bool IsWithinTradingWindow()
-        // {
-        //     if (sessionStart == DateTime.MinValue)
-        //         return false;
-        //
-        //     var now = Time[0];
-        //     var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
-        //     if (MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin)
-        //         return false;
-        //
-        //     return minFromOpen >= MinMinutesFromOpen && minFromOpen <= MaxMinutesFromOpen;
-        // }
+        private bool IsWithinTradingWindow()
+        {
+            if (sessionStart == DateTime.MinValue)
+                return false;
+        
+            var now = Time[0];
+            var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
+            if (MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin)
+                return false;
+        
+            return minFromOpen >= MinMinutesFromOpen && minFromOpen <= MaxMinutesFromOpen;
+        }
 
         private void PrintDiagnostics(int minFromOpen)
         {
@@ -230,9 +230,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var realizedToday = GetRealizedToday();
 	        var dailyKill = GetDailyKillLimitUsd();
 	        var dailyMaxProfit = GetDailyProfitLimitUsd();
-	        
-	        var tradeCountLock = tradesToday >= MaxTradesPerDay;
-	        var pnlOrDdLock = !DayNotLocked() || tradeCountLock;
+	        var pnlOrDdLock = !DayNotLocked() || !snap.TradeCountOk;
 
 	        // Wick filter should match entry gating (use sigClosed)
 	        var wickDiag = BuildWickDiag(sigClosed);
@@ -269,26 +267,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var trend =
 		        snap.TrendUp  ? "trendUp=True" : snap.TrendDown ? "trendDown=True" : "trend=None";
 
-	        var notes = "";
-	        if (!snap.WickOk)                notes += "wick-filter;";
-	        if (!snap.HasSessionStart)       notes += "no-session-start;";
-	        if (!snap.InMainWindow)          notes += "outside-main-window;";
-	        if (snap.InMidBreak)             notes += "mid-break;";
-	        if (snap.VolBlocked)             notes += "atr-too-high;";
-	        if (!snap.AdxOk)                 notes += "adx-out-of-range;";
-	        if (!DayNotLocked())             notes += "dayLocked;";
-	        if (tradeCountLock)              notes += "max-trades-reached;";
-	        if (!flat)                       notes += "position-open;";
-	        if (!evalEntriesNow)             notes += "entry-gated-not-eval-now;";
-	        if (HasWorkingEntryOrder())      notes += "entry-order-working;";
-	        if (!snap.EmaStructureOk)        notes += "ema-structure;";
-	        if (!snap.EmaSlopeOk)            notes += "ema-slope;";
-	        if (!snap.EmaSepOk)              notes += "ema-separation;";
-	        if (!snap.ChopOk)                notes += "chop-filter;";
-	        if (!snap.EntryDistCooldownOk)   notes += $"entry-dist-cooldown({snap.EntryDistBlockBarsLeft});";
-
-	        notes += $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
-
+	        var entrySig = $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
 	        var unrealizedNow = flat ? 0.0 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
 	        var totalToday = realizedToday + unrealizedNow;
 
@@ -303,8 +282,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 	        if (pnlOrDdLock)
 	        {
-		        Print(string.Format("PnL/DD/Trades Lock: {0}  (realizedToday={1:C2}, unrealizedNow={2:C2}, totalToday={3:C2}, dayLocked={4}, tradesToday={5}\n", 
-			        pnlOrDdLock, 
+		        Print(string.Format("PnL/DD/Trades Locked: (realizedToday={0:C2}, unrealizedNow={1:C2}, totalToday={2:C2}, dayLocked={3}, tradesToday={4}\n", 
 			        realizedToday, 
 			        unrealizedNow, 
 			        totalToday,
@@ -320,14 +298,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  c) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
 			    "  d) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
-			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51})\n" +
+			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
 			    "  h) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
 			    Contracts,                  // 2
-			    snap.TimeOk,                // 3 (unused but kept)
+			    false,                      // 3 (unused but kept)
 			    minFromOpen,                // 4
 			    snap.InMainWindow,          // 5
 			    snap.InMidBreak,            // 6
@@ -339,7 +317,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    dayLocked.ToString(),       // 12
 			    dailyProfitRemaining,       // 13
 			    tradesToday,                // 14
-			    notes,                      // 15
+			    // notes,                   // 15
+			    snap.Blocks,                // 15
 			    snap.AdxOk,                 // 16
 			    snap.Adx,                   // 17
 			    ADXMin,                     // 18
@@ -372,12 +351,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    MinEmaSeparationTicks,      // 45
 			    snap.EmaSepOk,              // 46
 			    snap.EmaStructureOk,        // 47
-
 			    // --- NEW: Chop ---
-			    snap.ChopOk,                 // 48
-			    snap.ChopEff,                // 49
-			    MinChopEfficiency,           // 50
-			    ChopLookbackBars            // 51
+			    snap.ChopOk,                      // 48
+			    snap.ChopEff,                     // 49
+			    MinChopEfficiency,                // 50
+			    snap.ChopLbUsed,                  // 51
+			    snap.ChopReason,                  // 52
+			    snap.EntryDistCooldownOk,         // 53
+			    snap.EntryDistBlockBarsLeft,      // 54
+			    snap.EntryDistCooldownReason      // 55
 			));
         }
         
@@ -479,11 +461,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.TradeCountOk = tradesToday < MaxTradesPerDay;
 		    
 		    //-- Chop filter ---
+		    // -- Chop filter ---
+		    s.ChopEnabled = EnableChopFilter;
 		    s.ChopOk = true;
 		    s.ChopEff = 1.0;
+		    s.ChopLbUsed = 0;
+		    s.ChopHasBars = false;
+		    s.ChopBypassedAdx = false;
+		    s.ChopBypassedEmaSlope = false;
+		    s.ChopBlockedByEff = false;
+		    s.ChopReason = "chop=off";
+
 		    if (EnableChopFilter)
 		    {
-			    s.ChopOk = ComputeChopOk(out s.ChopEff);
+			    s.ChopOk = ComputeChopOk(out s.ChopEff, out s.ChopLbUsed, out s.ChopHasBars,
+				    out s.ChopBypassedAdx, out s.ChopBypassedEmaSlope, out s.ChopReason);
+
+			    s.ChopBlockedByEff = !s.ChopOk && s.ChopHasBars; // (best-effort flag)
+		    }
+
+			// -- Entry Dist Cooldown ---
+		    s.EntryDistCooldownEnabled = EntryDistCooldownBars > 0;
+		    s.EntryDistCooldownOk = true;
+		    s.EntryDistBlockBarsLeft = 0;
+		    s.EntryDistCooldownReason = "entry-dist-cooldown=off";
+
+		    if (EntryDistCooldownBars > 0)
+		    {
+			    if (_entryDistBlockLastBar >= 0 && CurrentBar <= _entryDistBlockLastBar)
+			    {
+				    s.EntryDistCooldownOk = false;
+				    s.EntryDistBlockBarsLeft = _entryDistBlockLastBar - CurrentBar + 1;
+				    s.EntryDistCooldownReason = $"entry-dist-cooldown=block(barsLeft={s.EntryDistBlockBarsLeft})";
+			    }
+			    else
+			    {
+				    s.EntryDistCooldownReason = "entry-dist-cooldown=ok";
+			    }
 		    }
 
 		    //-- Entry Dist Cooldown --
@@ -549,7 +563,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.LongCandidate  = EnableLongs  && s.TrendUp   && s.LongPulledBack  && s.LongReclaimed  && s.LongConfirm;
 		    s.ShortCandidate = EnableShorts && s.TrendDown && s.ShortPulledBack && s.ShortReclaimed && s.ShortConfirm;
 		    s.AnyCandidate   = s.LongCandidate || s.ShortCandidate;
+		    
+		    var blocks = new List<string>(16);
 
+		    if (!s.TimeOk) blocks.Add(s.InMidBreak ? "mid-break" : "outside-time-window");
+		    if (!s.DayOk) blocks.Add("dayLocked");
+		    if (!s.TradeCountOk) blocks.Add("max-trades");
+		    if (!s.SpacingOk) blocks.Add("min-minutes-between");
+		    if (!s.EntryDistCooldownOk) blocks.Add("entry-dist-cooldown");
+		    if (!s.WickOk) blocks.Add("wick-filter");
+		    if (!s.AtrOk) blocks.Add("atr-too-high");
+		    if (!s.AdxOk) blocks.Add("adx-out-of-range");
+		    if (!s.ChopOk) blocks.Add("chop-filter");
+
+		    if (!s.EmaStructureOk) blocks.Add("ema-structure");
+		    else
+		    {
+			    if (!s.EmaSlopeOk) blocks.Add("ema-slope");
+			    if (!s.EmaSepOk && !s.EmaCrossover) blocks.Add("ema-separation");
+		    }
+
+		    s.Blocks = blocks.Count == 0 ? "none" : string.Join(";", blocks);
+		    
 		    return s;
 		}	
         
@@ -576,6 +611,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public double ChopEff;
 	        public bool EntryDistCooldownOk;
 	        public int EntryDistBlockBarsLeft;
+	        
+	        public bool ChopEnabled;
+	        public int ChopLbUsed;
+	        public bool ChopHasBars;
+	        public bool ChopBypassedAdx;
+	        public bool ChopBypassedEmaSlope;
+	        public bool ChopBlockedByEff;      // true if eff < min AND no bypass
+	        public string ChopReason;          // single readable reason
+
+	        public bool EntryDistCooldownEnabled;
+	        public string EntryDistCooldownReason;
+
+	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
         }
     }
 }
