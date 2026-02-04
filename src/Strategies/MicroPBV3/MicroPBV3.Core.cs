@@ -311,6 +311,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int tradesToday;
         private DayLocked dayLocked = DayLocked.NoLock;
         private double cumAtSessionOpen;
+        
+        // ---- Trade outcome logging (flat) ----
+        private bool _wasInPosition = false;
+        private MarketPosition _entrySide = MarketPosition.Flat;
+        private int _entryQty = 0;
+
+        // optional running PnL extremes during the trade (for MAE/MFE)
+        private double _mfeTicks = 0.0;
+        private double _maeTicks = 0.0;
 
         // Orders
         private readonly Dictionary<string, DateTime> _entryOrderBirth = new Dictionary<string, DateTime>();

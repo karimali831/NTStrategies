@@ -141,21 +141,77 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 protectiveSeenSinceEntry = false;
 
+                _wasInPosition = true;
+                _entrySide = isLongEntry ? MarketPosition.Long : MarketPosition.Short;
+                _entryQty = execution.Quantity;
+
+                _mfeTicks = 0.0;
+                _maeTicks = 0.0;
+
                 if (DebugMode)
                 {
-                    Print($"[ENTRY FILL] {time:yyyy-MM-dd HH:mm:ss.fff} name={name} price={execution.Price} qty={execution.Quantity} emergencyTicks={EmergencyStopTicks}");
+                    Print(
+                        $"[ENTRY FILL] {time:yyyy-MM-dd HH:mm:ss.fff} name={name} price={execution.Price} qty={execution.Quantity} emergencyTicks={EmergencyStopTicks}");
                     lastDiagTime = DateTime.MinValue;
                 }
             }
 
-            if (Position.MarketPosition == MarketPosition.Flat)
+            if (_wasInPosition && Position.MarketPosition == MarketPosition.Flat &&
+                execution.Order.OrderState == OrderState.Filled)
             {
+                lastFlatExecutionTime = time;
+
+                var pnlCur = 0.0;
+                var pnlTicks = 0.0;
+
+                var trades = SystemPerformance?.AllTrades;
+                if (trades != null && trades.Count > 0)
+                {
+                    var t = trades[trades.Count - 1];
+                    pnlCur = t.ProfitCurrency;
+
+                    double profitPoints;
+                    try
+                    {
+                        profitPoints = t.ProfitPoints;
+                    }
+                    catch
+                    {
+                        profitPoints = 0.0;
+                    }
+
+                    if (profitPoints != 0.0)
+                        pnlTicks = profitPoints / TickSize;
+                    else
+                    {
+                        var dir = (_entrySide == MarketPosition.Long) ? 1.0 : -1.0;
+                        pnlTicks = dir * (execution.Price - entryPriceHard) / TickSize;
+                    }
+                }
+
+                var hold = (entryFillTime != DateTime.MinValue) ? (time - entryFillTime) : TimeSpan.Zero;
+                var outcome = pnlCur >= 0 ? "WIN" : "LOSS";
+
+                if (DebugMode)
+                {
+                    Print(
+                        $"[ENTRY FLAT] {time:yyyy-MM-dd HH:mm:ss.fff} outcome={outcome} " +
+                        $"pnl={pnlCur:0.00} ticks={pnlTicks:0.0} " +
+                        $"hold={hold.TotalSeconds:0}s " +
+                        $"mfeTicks={_mfeTicks:0.0} maeTicks={_maeTicks:0.0}"
+                    );
+                }
+
+                _wasInPosition = false;
+                _entrySide = MarketPosition.Flat;
+                _entryQty = 0;
+                _mfeTicks = 0.0;
+                _maeTicks = 0.0;
+
                 entryPriceHard = 0.0;
-                hardStopTriggered = false;
                 entryFillTime = DateTime.MinValue;
                 protectiveSeenSinceEntry = false;
                 entryBarIdx = -1;
-                lastFlatExecutionTime = time;
             }
         }
 

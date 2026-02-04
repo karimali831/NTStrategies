@@ -54,6 +54,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             // ===== POSITION MANAGEMENT (RUNS INTRABAR) =====
             if (Position.MarketPosition != MarketPosition.Flat)
             {
+                // track MFE/MAE first (so it runs even on early exits/locks)
+                if (entryPriceHard > 0 && Position.Quantity > 0)
+                {
+                    // var px = Close[0];
+                    var px = Position.MarketPosition == MarketPosition.Long ? GetCurrentBid() : GetCurrentAsk();
+                    if (px <= 0) px = Close[0];
+                    
+                    var dir = (Position.MarketPosition == MarketPosition.Long) ? 1.0 : -1.0;
+                    var pnlTicks = dir * (px - entryPriceHard) / TickSize;
+
+                    _mfeTicks = Math.Max(_mfeTicks, pnlTicks);
+                    _maeTicks = Math.Min(_maeTicks, pnlTicks);
+                }
+
                 if (EnforceDailyKill()) return;
                 if (EnforceDailyProfitLock()) return;
                 if (EnforceConsistencyRule()) return;
@@ -64,6 +78,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ManageBreakEven();
                 return;
             }
+
 
             // ----- flat: keep working orders tidy -----
             CancelStaleEntryOrders(Time[0]);
