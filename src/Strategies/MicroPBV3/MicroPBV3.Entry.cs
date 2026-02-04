@@ -605,7 +605,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
 
             eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
-            var ok = MinChopEfficiency <= 0 || (eff >= MinChopEfficiency);
+            var ok = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
 
             // -------------------------
             // BYPASS (momentum override)

@@ -282,16 +282,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool UseBreakEven { get; set; } = false;
 
         [NinjaScriptProperty]
-        [Display(Name = "Use aggressive BE preset", Order = 2, GroupName = "05-BE & Management")]
-        public bool UseAggressiveBE { get; set; } = true;
+        [Display(Name = "BE trigger (ticks in favour)", Order = 2, GroupName = "05-BE & Management")]
+        public int BE_TriggerTicks { get; set; } = 40;
 
         [NinjaScriptProperty]
-        [Display(Name = "BE trigger (ticks in favour)", Order = 3, GroupName = "05-BE & Management")]
-        public int BE_TriggerTicks { get; set; } = 12;
-
-        [NinjaScriptProperty]
-        [Display(Name = "BE plus ticks", Order = 4, GroupName = "05-BE & Management")]
-        public int BE_PlusTicks { get; set; } = 6;
+        [Display(Name = "BE plus ticks", Order = 3, GroupName = "05-BE & Management")]
+        public int BE_PlusTicks { get; set; } = 8;
 
         // ========== 99 – API Reporter ==========
         private TrailingDdApiReporter _tddApi;
@@ -417,13 +413,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EmergencyStopTicks = MaxStopTicks + 5;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.StopCancelCloseIgnoreRejects;
-
-                if (UseAggressiveBE)
-                {
-                    BE_TriggerTicks = 12;
-                    BE_PlusTicks = 6;
-                }
-
+                
                 if (EmergencyStopTicks < 1)
                     EmergencyStopTicks = MaxStopTicks + 5;
             }
