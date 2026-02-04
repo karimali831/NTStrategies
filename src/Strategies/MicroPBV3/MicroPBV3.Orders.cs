@@ -143,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 _wasInPosition = true;
                 _entrySide = isLongEntry ? MarketPosition.Long : MarketPosition.Short;
-                _entryQty = execution.Quantity;
+                _entryQty += execution.Quantity;
 
                 _mfeTicks = 0.0;
                 _maeTicks = 0.0;
@@ -165,27 +165,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var pnlTicks = 0.0;
 
                 var trades = SystemPerformance?.AllTrades;
-                if (trades != null && trades.Count > 0)
+                if (trades != null && trades.Count >= _entryQty)
                 {
-                    var t = trades[trades.Count - 1];
-                    pnlCur = t.ProfitCurrency;
+                    for (var i = trades.Count - _entryQty; i < trades.Count; i++)
+                    {
+                        var t = trades[i];
+                        pnlCur += t.ProfitCurrency;
 
-                    double profitPoints;
-                    try
-                    {
-                        profitPoints = t.ProfitPoints;
-                    }
-                    catch
-                    {
-                        profitPoints = 0.0;
-                    }
+                        var profitPoints = t.ProfitPoints; 
 
-                    if (profitPoints != 0.0)
-                        pnlTicks = profitPoints / TickSize;
-                    else
-                    {
-                        var dir = (_entrySide == MarketPosition.Long) ? 1.0 : -1.0;
-                        pnlTicks = dir * (execution.Price - entryPriceHard) / TickSize;
+                        if (profitPoints != 0.0)
+                            pnlTicks += profitPoints / TickSize;
+                        else
+                        {
+                            // fallback: compute from prices
+                            var dir = (_entrySide == MarketPosition.Long) ? 1.0 : -1.0;
+                            pnlTicks += dir * (t.Exit.Price - t.Entry.Price) / TickSize;
+                        }
                     }
                 }
 
