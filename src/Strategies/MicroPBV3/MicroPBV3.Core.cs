@@ -391,7 +391,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _duplicateCleanupDone = false;
         private string _instanceGuid = null;
         
-        private int _entryDistBlockUntilBar = -1;
+        private int _entryDistBlockLastBar = -1;
 
         protected override void OnStateChange()
         {
@@ -546,7 +546,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             hardStopTriggered = false;
             entryFillTime = DateTime.MinValue;
             protectiveSeenSinceEntry = false;
-            _entryDistBlockUntilBar = -1;
+            _entryDistBlockLastBar = -1;
 
             cumAtSessionOpen = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
         }

@@ -479,10 +479,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.EntryDistCooldownOk = true;
 		    s.EntryDistBlockBarsLeft = 0;
 
-		    if (EntryDistCooldownBars > 0 && _entryDistBlockUntilBar >= 0 && CurrentBar < _entryDistBlockUntilBar)
+		    if (EntryDistCooldownBars > 0 && _entryDistBlockLastBar >= 0 && CurrentBar < _entryDistBlockLastBar)
 		    {
 			    s.EntryDistCooldownOk = false;
-			    s.EntryDistBlockBarsLeft = _entryDistBlockUntilBar - CurrentBar;
+			    s.EntryDistBlockBarsLeft = _entryDistBlockLastBar - CurrentBar;
 		    }
 		    
 		    // ---- spacing ----

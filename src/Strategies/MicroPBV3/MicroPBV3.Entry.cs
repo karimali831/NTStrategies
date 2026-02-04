@@ -223,8 +223,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Cooldown after an "entry too far from EMA" rejection
-                if (EntryDistCooldownBars > 0 && _entryDistBlockUntilBar >= 0 && CurrentBar < _entryDistBlockUntilBar)
+                if (EntryDistCooldownBars > 0 && _entryDistBlockLastBar >= 0 && CurrentBar <= _entryDistBlockLastBar)
                 {
+                    if (DebugMode && IsFirstTickOfBar)
+                        Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} entry-dist-cooldown active (CurrentBar={CurrentBar}, blockThrough={_entryDistBlockLastBar})");
+
+                    
                     ManageBreakEven();
                     return;
                 }
@@ -267,7 +271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
                         {
                             if (EntryDistCooldownBars > 0)
-                                _entryDistBlockUntilBar = CurrentBar + EntryDistCooldownBars;
+                                _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                             if (DebugMode)
                                 Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
@@ -301,7 +305,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
                         {
                             if (EntryDistCooldownBars > 0)
-                                _entryDistBlockUntilBar = CurrentBar + EntryDistCooldownBars;
+                                _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                             if (DebugMode)
                                 Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
