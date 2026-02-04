@@ -434,9 +434,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var eff = pathTicks <= 1e-9 ? 0.0 : netMoveTicks / pathTicks;
             
             // directional movement × straightness penalty
-            slopeTicks = netMoveTicks * eff;
+            // slopeTicks = netMoveTicks * eff;
             // how many ticks the EMA rose over N bars
-            // slopeTicks = netMoveTicks;
+            slopeTicks = netMoveTicks;
             
             sepTicks = Math.Abs(emaFast[sigSignal] - emaSlow[sigSignal]) / TickSize;
             slopeOk = MinEmaSlopeTicks <= 0 || slopeTicks >= MinEmaSlopeTicks;
