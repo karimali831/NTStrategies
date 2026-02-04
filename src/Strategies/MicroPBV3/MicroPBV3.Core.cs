@@ -203,21 +203,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double MinChopEfficiency { get; set; } = 0.35;
         
         [NinjaScriptProperty]
-        [Display(Name="Chop min range ticks (0=off)", Order=10, GroupName="04-Chop")]
+        [Display(Name="Chop min range ticks (0=off)", Order=25, GroupName="03-Trend & Filters")]
         public int ChopMinRangeTicks { get; set; } = 80;   // NQ: 80 ticks = 20 points
 
         [NinjaScriptProperty]
-        [Display(Name="Chop max flip pct (0=off)", Order=11, GroupName="04-Chop")]
+        [Display(Name="Chop max flip pct (0=off)", Order=26, GroupName="03-Trend & Filters")]
         public double ChopMaxFlipPct { get; set; } = 0.65; // 65% flips = very choppy
         
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Chop bypass ADX (0=off)", Order = 25, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Chop bypass ADX (0=off)", Order = 27, GroupName = "03-Trend & Filters")]
         public double ChopBypassAdx { get; set; } = 30.0;
 
         [NinjaScriptProperty]
         [Range(0, 9999)]
-        [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 26, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 28, GroupName = "03-Trend & Filters")]
         public double ChopBypassEmaSlopeStrengthTicks { get; set; } = 25.0;
 
         // ========== 04 – Risk / Money Management ==========
