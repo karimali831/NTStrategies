@@ -181,30 +181,35 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Range(0, 2000)]
         [Display(Name = "Max entry distance from EMA fast (ticks, 0=off)", Order = 20, GroupName = "03-Trend & Filters")]
-        public int MaxEntryDistFromEmaFastTicks { get; set; } = 80;
+        public int MaxEntryDistFromEmaFastTicks { get; set; } = 200;
         
         [NinjaScriptProperty]
-        [Display(Name = "Enable chop filter", Order = 21, GroupName = "03-Trend & Filters")]
+        [Range(0, 20)]
+        [Display(Name = "Entry distance cooldown bars after rejection", Order = 21, GroupName = "03-Trend & Filters")]
+        public int EntryDistCooldownBars { get; set; } = 1;
+        
+        [NinjaScriptProperty]
+        [Display(Name = "Enable chop filter", Order = 22, GroupName = "03-Trend & Filters")]
         public bool EnableChopFilter { get; set; } = true;
         
         [NinjaScriptProperty]
         [Range(3, 50)]
-        [Display(Name = "Chop lookback bars", GroupName = "03-Trend & Filters", Order = 22)]
+        [Display(Name = "Chop lookback bars", GroupName = "03-Trend & Filters", Order = 23)]
         public int ChopLookbackBars { get; set; } = 8;
 
         [NinjaScriptProperty]
         [Range(0.01, 0.99)]
-        [Display(Name = "Min chop efficiency (higher = less chop)", Order = 23, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Min chop efficiency (higher = less chop)", Order = 24, GroupName = "03-Trend & Filters")]
         public double MinChopEfficiency { get; set; } = 0.35;
         
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "Chop bypass ADX (0=off)", Order = 24, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Chop bypass ADX (0=off)", Order = 25, GroupName = "03-Trend & Filters")]
         public double ChopBypassAdx { get; set; } = 30.0;
 
         [NinjaScriptProperty]
         [Range(0, 9999)]
-        [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 25, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 26, GroupName = "03-Trend & Filters")]
         public double ChopBypassEmaSlopeStrengthTicks { get; set; } = 25.0;
 
         // ========== 04 – Risk / Money Management ==========
@@ -385,6 +390,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _duplicateBlocked = false;
         private bool _duplicateCleanupDone = false;
         private string _instanceGuid = null;
+        
+        private int _entryDistBlockUntilBar = -1;
 
         protected override void OnStateChange()
         {
@@ -539,6 +546,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             hardStopTriggered = false;
             entryFillTime = DateTime.MinValue;
             protectiveSeenSinceEntry = false;
+            _entryDistBlockUntilBar = -1;
 
             cumAtSessionOpen = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
         }

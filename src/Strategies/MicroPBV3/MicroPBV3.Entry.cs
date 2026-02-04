@@ -221,6 +221,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ManageBreakEven();
                     return;
                 }
+                
+                // Cooldown after an "entry too far from EMA" rejection
+                if (EntryDistCooldownBars > 0 && _entryDistBlockUntilBar >= 0 && CurrentBar < _entryDistBlockUntilBar)
+                {
+                    ManageBreakEven();
+                    return;
+                }
 
                 // EMA structure filter
                 ComputeEmaStructure(sigClosed, out _, out _, out _, out var emaStructureOk);
@@ -259,8 +266,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
                         {
+                            if (EntryDistCooldownBars > 0)
+                                _entryDistBlockUntilBar = CurrentBar + EntryDistCooldownBars;
+
                             if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
+
                             ManageBreakEven();
                             return;
                         }
@@ -289,8 +300,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
                         {
+                            if (EntryDistCooldownBars > 0)
+                                _entryDistBlockUntilBar = CurrentBar + EntryDistCooldownBars;
+
                             if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
+
                             ManageBreakEven();
                             return;
                         }
@@ -586,8 +601,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
 
             eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
-
-            var ok = (MinChopEfficiency <= 0) || (eff >= MinChopEfficiency);
+            var ok = MinChopEfficiency <= 0 || (eff >= MinChopEfficiency);
 
             // -------------------------
             // BYPASS (momentum override)

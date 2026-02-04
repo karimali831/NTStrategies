@@ -147,10 +147,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!dailyProfitOk) reasons.Add("daily-profit");
             if (!consistencyOk) reasons.Add("consistency");
             if (!noWorkingEntryOrder) reasons.Add("entry-order-working");
-            
-            // Chop zone
             if (!snap.ChopOk) reasons.Add("chop-filter");
-
+            if (!snap.EntryDistCooldownOk) reasons.Add("entry-dist-cooldown");
             if (reasons.Count == 0) reasons.Add("other");
 
             DiagRecordDenied(reasons);
@@ -287,6 +285,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        if (!snap.EmaSlopeOk)            notes += "ema-slope;";
 	        if (!snap.EmaSepOk)              notes += "ema-separation;";
 	        if (!snap.ChopOk)                notes += "chop-filter;";
+	        if (!snap.EntryDistCooldownOk)   notes += $"entry-dist-cooldown({snap.EntryDistBlockBarsLeft});";
+
 	        notes += $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
 
 	        var unrealizedNow = flat ? 0.0 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
@@ -475,6 +475,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    s.ChopOk = ComputeChopOk(sigClosed, out s.ChopEff);
 		    }
 
+		    //-- Entry Dist Cooldown --
+		    s.EntryDistCooldownOk = true;
+		    s.EntryDistBlockBarsLeft = 0;
+
+		    if (EntryDistCooldownBars > 0 && _entryDistBlockUntilBar >= 0 && CurrentBar < _entryDistBlockUntilBar)
+		    {
+			    s.EntryDistCooldownOk = false;
+			    s.EntryDistBlockBarsLeft = _entryDistBlockUntilBar - CurrentBar;
+		    }
+		    
 		    // ---- spacing ----
 		    s.SpacingOk = true;
 		    if (MinMinutesBetweenTrades > 0 && lastFlatExecutionTime != DateTime.MinValue)
@@ -553,6 +563,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public double PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
 	        public bool ChopOk;
 	        public double ChopEff;
+	        public bool EntryDistCooldownOk;
+	        public int EntryDistBlockBarsLeft;
         }
     }
 }
