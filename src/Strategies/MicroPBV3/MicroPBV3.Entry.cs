@@ -215,7 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Avoid chop zones
-                var chopOk = ComputeChopOk(sigClosed, out var eff);
+                var chopOk = ComputeChopOk(out var eff);
                 if (!chopOk)
                 {
                     ManageBreakEven();
@@ -343,8 +343,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
-                if (EnableEndOfRunReport && haveMinFromOpen)
-                    TrackEntryDecisionForReport(sigSignal, sigEntry, sigClosed, minFromOpen, submitted);
+                // if (EnableEndOfRunReport && haveMinFromOpen)
+                //     TrackEntryDecisionForReport(sigSignal, sigEntry, sigClosed, minFromOpen, submitted);
             }
         }
         
@@ -613,90 +613,42 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-    private bool ComputeChopOk(int barsAgo, out double eff)
-    {
-        eff = 1.0;
-
-        if (!EnableChopFilter)
-            return true;
-
-        // -------------------------
-        // Adaptive lookback:
-        // - Use smaller lb early in the session (e.g. first ~30 min),
-        //   ramp up to ChopLookbackBars as bars accumulate.
-        // -------------------------
-        var lbMax = Math.Max(2, ChopLookbackBars);
-        var lbMin = 3; // good default; you can expose as a param later if you want
-        var lb = lbMax;
-
-        if (sessionStart != DateTime.MinValue)
+        private bool ComputeChopOk(out double eff)
         {
-            var openBar = Bars.GetBar(sessionStart);
-            if (openBar >= 0)
-            {
-                // barsSinceOpen counts closed bars since sessionStart, relative to barsAgo reference
-                var barsSinceOpen = CurrentBar - openBar - barsAgo;
+            eff = 1.0;
 
-                // If we don't yet have lbMax bars since open, shrink lb (but never below lbMin)
-                if (barsSinceOpen > 0 && barsSinceOpen < lbMax)
-                    lb = Math.Max(lbMin, barsSinceOpen);
-            }
-        }
-
-        // Still make sure lb is usable
-        lb = Math.Max(2, lb);
-
-        // Not enough bars -> don't block
-        if (CurrentBar < barsAgo + lb)
-            return true;
-
-        // -------------------------
-        // Efficiency ratio: net change vs total path (0..1)
-        // -------------------------
-        var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
-
-        var path = 0.0;
-        for (var i = 0; i < lb; i++)
-            path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
-
-        var baseEff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
-
-        // -------------------------
-        // Directional persistence penalty:
-        // - If the window alternates a lot (steps fight the net direction),
-        //   treat it as chop even if net/path looks OK.
-        // -------------------------
-        var dir = Close[barsAgo] - Close[barsAgo + lb];
-        var sign = dir >= 0 ? 1 : -1;
-
-        var agree = 0;
-        for (var i = 0; i < lb; i++)
-        {
-            var step = Close[barsAgo + i] - Close[barsAgo + i + 1];
-            if (step * sign > 0)
-                agree++;
-        }
-
-        var persistence = lb <= 0 ? 0.0 : (agree / (double)lb); // 0..1
-        eff = baseEff * persistence;                                // 0..1, penalized
-
-        var ok = MinChopEfficiency <= 0 || (eff >= MinChopEfficiency);
-
-        // -------------------------
-        // BYPASS (momentum override)
-        // -------------------------
-        if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
-            return true;
-
-        if (ChopBypassEmaSlopeStrengthTicks > 0)
-        {
-            var m = GetEmaStruct(barsAgo);
-            if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
+            if (!EnableChopFilter)
                 return true;
+
+            var barsAgo = SigClosed();               // <-- always closed bar
+            var lb = Math.Max(2, ChopLookbackBars);
+
+            if (CurrentBar < barsAgo + lb)
+                return true;
+
+            var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
+            var path = 0.0;
+            for (var i = 0; i < lb; i++)
+                path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
+
+            eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
+            var ok = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
+
+            // BYPASS: ADX (period 14)
+            if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
+                return true;
+
+            // BYPASS: EMA slope strength
+            if (ChopBypassEmaSlopeStrengthTicks > 0)
+            {
+                var m = GetEmaStruct(barsAgo);
+                if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
+                    return true;
+            }
+
+            return ok;
         }
 
-        return ok;
-    }
 
         private sealed class EmaStruct
         {

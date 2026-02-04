@@ -21,186 +21,186 @@ namespace NinjaTrader.NinjaScript.Strategies
         // =========================
         // End-of-run DIAG reporting
         // =========================
-        private int _diagEvalCount = 0;
-        private int _diagAcceptedCount = 0;
-        private int _diagDeniedCount = 0;
+        // private int _diagEvalCount = 0;
+        // private int _diagAcceptedCount = 0;
+        // private int _diagDeniedCount = 0;
+        //
+        // // reason -> count
+        // private readonly Dictionary<string, int> _diagDeniedByReason = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // reason -> count
-        private readonly Dictionary<string, int> _diagDeniedByReason = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-        private void DiagRecordAccepted()
-        {
-            _diagAcceptedCount++;
-        }
-
-        private void DiagRecordDenied(IEnumerable<string> reasons)
-        {
-            _diagDeniedCount++;
-            if (reasons == null)
-                return;
-
-            foreach (var r in reasons)
-            {
-                if (string.IsNullOrWhiteSpace(r))
-                    continue;
-
-                if (_diagDeniedByReason.TryGetValue(r, out var c))
-                    _diagDeniedByReason[r] = c + 1;
-                else
-                    _diagDeniedByReason[r] = 1;
-            }
-        }
+        // private void DiagRecordAccepted()
+        // {
+        //     _diagAcceptedCount++;
+        // }
+        //
+        // private void DiagRecordDenied(IEnumerable<string> reasons)
+        // {
+        //     _diagDeniedCount++;
+        //     if (reasons == null)
+        //         return;
+        //
+        //     foreach (var r in reasons)
+        //     {
+        //         if (string.IsNullOrWhiteSpace(r))
+        //             continue;
+        //
+        //         if (_diagDeniedByReason.TryGetValue(r, out var c))
+        //             _diagDeniedByReason[r] = c + 1;
+        //         else
+        //             _diagDeniedByReason[r] = 1;
+        //     }
+        // }
 
         /// <summary>
         /// Track accepted/denied trade *candidates* (not every bar).
         /// A "candidate" is a fully-formed setup (pullback+reclaim+confirm) that would be taken if all gating filters passed.
         /// </summary>
-        private void TrackEntryDecisionForReport(int sigSignal, int sigEntry, int sigClosed, int minFromOpen, bool submitted)
-        {
-            if (!EnableEndOfRunReport)
-                return;
+   //      private void TrackEntryDecisionForReport(int sigSignal, int sigEntry, int sigClosed, int minFromOpen, bool submitted)
+   //      {
+   //          if (!EnableEndOfRunReport)
+   //              return;
+   //
+   //          // Don't spam during optimizations/analyzer runs
+   //          if (IsInStrategyAnalyzer)
+   //              return;
+   //
+   //          // Only evaluate once per primary-series evaluation pass while flat
+   //          _diagEvalCount++;
+   //
+   //          if (submitted)
+   //          {
+   //              DiagRecordAccepted();
+   //              return;
+   //          }
+   //
+   //          var snap = EvaluateEntrySnapshot(sigSignal, sigEntry, sigClosed, minFromOpen);
+   //
+   //          if (!snap.AnyCandidate)
+	  //           return;
+   //
+   //          // Entry distance (approx: use same trigger logic)
+   //          var distOk = true;
+   //          if (MaxEntryDistFromEmaFastTicks > 0)
+   //          {
+	  //           var buf = TickSize;
+	  //           if (snap.LongCandidate)
+	  //           {
+		 //            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
+		 //            var trigger = NormalizeBuyStopPrice(rawTrigger);
+		 //            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
+	  //           }
+	  //           else if (snap.ShortCandidate)
+	  //           {
+		 //            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
+		 //            var trigger = NormalizeSellStopPrice(rawTrigger);
+		 //            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
+	  //           }
+   //          }
+   //          
+   //
+   //          // PnL locks (evaluate without side effects)
+   //          var dailyKillOk = true;
+   //          var dailyProfitOk = true;
+   //          var consistencyOk = true;
+   //          var dailyKill = GetDailyKillLimitUsd();
+   //          var dailyProfit = GetDailyProfitLimitUsd();
+   //          var realizedToday = GetRealizedToday();
+   //          var totalToday = GetTotalTodayPnlIncludingOpen();
+   //          if (dailyKill > 0 && totalToday <= -dailyKill)
+   //              dailyKillOk = false;
+   //          if (dailyProfit > 0 && realizedToday >= dailyProfit)
+   //              dailyProfitOk = false;
+   //          // consistency: reuse your existing logic without locking
+   //          var pct = GetConsistencyPct();
+   //          if (pct > 0)
+   //          {
+   //              var profitBeforeToday = GetProfitBeforeToday();
+   //              if (profitBeforeToday > 0 && realizedToday > 0)
+   //              {
+   //                  var maxToday = (pct / (1.0 - pct)) * profitBeforeToday;
+   //                  if (realizedToday > maxToday)
+   //                      consistencyOk = false;
+   //              }
+   //          }
+   //
+   //          // Working entry order blocks (you already treat this as a block in DIAG)
+   //          var noWorkingEntryOrder = !HasWorkingEntryOrder();
+   //
+   //          // Build denial reasons (multi)
+   //          var reasons = new List<string>(8);
+   //          if (!snap.TimeOk) reasons.Add((MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin) ? "mid-break" : "outside-time-window");
+   //          if (!snap.DayOk) reasons.Add("dayLocked");
+   //          if (!snap.TradeCountOk) reasons.Add("max-trades");
+   //          if (!snap.SpacingOk) reasons.Add("min-minutes-between");
+   //          if (!snap.WickOk) reasons.Add("wick-filter");
+   //          if (!snap.AtrOk) reasons.Add("atr-too-high");
+   //
+			// // EMA structure reasons
+			// if (!snap.EmaStructureOk) reasons.Add("ema-structure");
+			// if (!snap.EmaSlopeOk)     reasons.Add("ema-slope");
+			// if (!snap.EmaSepOk)       reasons.Add("ema-separation");
+   //
+   //          if (!snap.AdxOk) reasons.Add("adx-out-of-range");
+   //          if (!distOk) reasons.Add("ema-distance");
+			// // dailyKillOk/dailyProfitOk/consistencyOk
+   //          if (!dailyKillOk) reasons.Add("max-daily-loss");
+   //          if (!dailyProfitOk) reasons.Add("daily-profit");
+   //          if (!consistencyOk) reasons.Add("consistency");
+   //          if (!noWorkingEntryOrder) reasons.Add("entry-order-working");
+   //          if (!snap.ChopOk) reasons.Add("chop-filter");
+   //          if (!snap.EntryDistCooldownOk) reasons.Add("entry-dist-cooldown");
+   //          if (reasons.Count == 0) reasons.Add("other");
+   //
+   //          DiagRecordDenied(reasons);
+   //      }
 
-            // Don't spam during optimizations/analyzer runs
-            if (IsInStrategyAnalyzer)
-                return;
+        // private void PrintEndOfRunReport()
+        // {
+        //     if (!EnableEndOfRunReport)
+        //         return;
+        //
+        //     if (IsInStrategyAnalyzer)
+        //         return;
+        //
+        //     try
+        //     {
+        //         Print("================================================================================");
+        //         Print($"[DIAG REPORT] {Name}  evals={_diagEvalCount} accepted={_diagAcceptedCount} denied={_diagDeniedCount}");
+        //
+        //         if (_diagDeniedCount <= 0)
+        //         {
+        //             Print("[DIAG REPORT] No denied candidates recorded.");
+        //             Print("================================================================================");
+        //             return;
+        //         }
+        //
+        //         // sort reasons by count desc
+        //         foreach (var kv in _diagDeniedByReason.OrderByDescending(x => x.Value).ThenBy(x => x.Key))
+        //         {
+        //             Print($"[DIAG REPORT]   denied: {kv.Value,5}  reason={kv.Key}");
+        //         }
+        //
+        //         Print("================================================================================");
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         if (DebugMode)
+        //             Print("[DIAG REPORT] error: " + ex.Message);
+        //     }
+        // }
 
-            // Only evaluate once per primary-series evaluation pass while flat
-            _diagEvalCount++;
-
-            if (submitted)
-            {
-                DiagRecordAccepted();
-                return;
-            }
-
-            var snap = EvaluateEntrySnapshot(sigSignal, sigEntry, sigClosed, minFromOpen);
-
-            if (!snap.AnyCandidate)
-	            return;
-
-            // Entry distance (approx: use same trigger logic)
-            var distOk = true;
-            if (MaxEntryDistFromEmaFastTicks > 0)
-            {
-	            var buf = TickSize;
-	            if (snap.LongCandidate)
-	            {
-		            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
-		            var trigger = NormalizeBuyStopPrice(rawTrigger);
-		            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
-	            }
-	            else if (snap.ShortCandidate)
-	            {
-		            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
-		            var trigger = NormalizeSellStopPrice(rawTrigger);
-		            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
-	            }
-            }
-            
-
-            // PnL locks (evaluate without side effects)
-            var dailyKillOk = true;
-            var dailyProfitOk = true;
-            var consistencyOk = true;
-            var dailyKill = GetDailyKillLimitUsd();
-            var dailyProfit = GetDailyProfitLimitUsd();
-            var realizedToday = GetRealizedToday();
-            var totalToday = GetTotalTodayPnlIncludingOpen();
-            if (dailyKill > 0 && totalToday <= -dailyKill)
-                dailyKillOk = false;
-            if (dailyProfit > 0 && realizedToday >= dailyProfit)
-                dailyProfitOk = false;
-            // consistency: reuse your existing logic without locking
-            var pct = GetConsistencyPct();
-            if (pct > 0)
-            {
-                var profitBeforeToday = GetProfitBeforeToday();
-                if (profitBeforeToday > 0 && realizedToday > 0)
-                {
-                    var maxToday = (pct / (1.0 - pct)) * profitBeforeToday;
-                    if (realizedToday > maxToday)
-                        consistencyOk = false;
-                }
-            }
-
-            // Working entry order blocks (you already treat this as a block in DIAG)
-            var noWorkingEntryOrder = !HasWorkingEntryOrder();
-
-            // Build denial reasons (multi)
-            var reasons = new List<string>(8);
-            if (!snap.TimeOk) reasons.Add((MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin) ? "mid-break" : "outside-time-window");
-            if (!snap.DayOk) reasons.Add("dayLocked");
-            if (!snap.TradeCountOk) reasons.Add("max-trades");
-            if (!snap.SpacingOk) reasons.Add("min-minutes-between");
-            if (!snap.WickOk) reasons.Add("wick-filter");
-            if (!snap.AtrOk) reasons.Add("atr-too-high");
-
-			// EMA structure reasons
-			if (!snap.EmaStructureOk) reasons.Add("ema-structure");
-			if (!snap.EmaSlopeOk)     reasons.Add("ema-slope");
-			if (!snap.EmaSepOk)       reasons.Add("ema-separation");
-
-            if (!snap.AdxOk) reasons.Add("adx-out-of-range");
-            if (!distOk) reasons.Add("ema-distance");
-			// dailyKillOk/dailyProfitOk/consistencyOk
-            if (!dailyKillOk) reasons.Add("max-daily-loss");
-            if (!dailyProfitOk) reasons.Add("daily-profit");
-            if (!consistencyOk) reasons.Add("consistency");
-            if (!noWorkingEntryOrder) reasons.Add("entry-order-working");
-            if (!snap.ChopOk) reasons.Add("chop-filter");
-            if (!snap.EntryDistCooldownOk) reasons.Add("entry-dist-cooldown");
-            if (reasons.Count == 0) reasons.Add("other");
-
-            DiagRecordDenied(reasons);
-        }
-
-        private void PrintEndOfRunReport()
-        {
-            if (!EnableEndOfRunReport)
-                return;
-
-            if (IsInStrategyAnalyzer)
-                return;
-
-            try
-            {
-                Print("================================================================================");
-                Print($"[DIAG REPORT] {Name}  evals={_diagEvalCount} accepted={_diagAcceptedCount} denied={_diagDeniedCount}");
-
-                if (_diagDeniedCount <= 0)
-                {
-                    Print("[DIAG REPORT] No denied candidates recorded.");
-                    Print("================================================================================");
-                    return;
-                }
-
-                // sort reasons by count desc
-                foreach (var kv in _diagDeniedByReason.OrderByDescending(x => x.Value).ThenBy(x => x.Key))
-                {
-                    Print($"[DIAG REPORT]   denied: {kv.Value,5}  reason={kv.Key}");
-                }
-
-                Print("================================================================================");
-            }
-            catch (Exception ex)
-            {
-                if (DebugMode)
-                    Print("[DIAG REPORT] error: " + ex.Message);
-            }
-        }
-
-        private bool IsWithinTradingWindow()
-        {
-            if (sessionStart == DateTime.MinValue)
-                return false;
-
-            var now = Time[0];
-            var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
-            if (MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin)
-                return false;
-
-            return minFromOpen >= MinMinutesFromOpen && minFromOpen <= MaxMinutesFromOpen;
-        }
+        // private bool IsWithinTradingWindow()
+        // {
+        //     if (sessionStart == DateTime.MinValue)
+        //         return false;
+        //
+        //     var now = Time[0];
+        //     var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
+        //     if (MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin)
+        //         return false;
+        //
+        //     return minFromOpen >= MinMinutesFromOpen && minFromOpen <= MaxMinutesFromOpen;
+        // }
 
         private void PrintDiagnostics(int minFromOpen)
         {
@@ -483,7 +483,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.ChopEff = 1.0;
 		    if (EnableChopFilter)
 		    {
-			    s.ChopOk = ComputeChopOk(sigClosed, out s.ChopEff);
+			    s.ChopOk = ComputeChopOk(out s.ChopEff);
 		    }
 
 		    //-- Entry Dist Cooldown --

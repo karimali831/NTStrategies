@@ -505,12 +505,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _activeInstanceKeys.Remove(_instanceKey);
                 }
 
-                if (DebugMode)
-                    Print($"[INSTANCE] {_instanceGuid} terminated key={_instanceKey}");
+                // if (DebugMode)
+                //     Print($"[INSTANCE] {_instanceGuid} terminated key={_instanceKey}");
 
                 // Final diagnostics summary (useful for Market Replay / Strategy Analyzer / historical runs)
-                if (EnableEndOfRunReport)
-                    PrintEndOfRunReport();
+                // if (EnableEndOfRunReport)
+                //     PrintEndOfRunReport();
             }
         }
 
