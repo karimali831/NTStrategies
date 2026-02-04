@@ -203,6 +203,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double MinChopEfficiency { get; set; } = 0.35;
         
         [NinjaScriptProperty]
+        [Display(Name="Chop min range ticks (0=off)", Order=10, GroupName="04-Chop")]
+        public int ChopMinRangeTicks { get; set; } = 80;   // NQ: 80 ticks = 20 points
+
+        [NinjaScriptProperty]
+        [Display(Name="Chop max flip pct (0=off)", Order=11, GroupName="04-Chop")]
+        public double ChopMaxFlipPct { get; set; } = 0.65; // 65% flips = very choppy
+        
+        [NinjaScriptProperty]
         [Range(0, 100)]
         [Display(Name = "Chop bypass ADX (0=off)", Order = 25, GroupName = "03-Trend & Filters")]
         public double ChopBypassAdx { get; set; } = 30.0;

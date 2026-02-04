@@ -614,13 +614,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-        private bool ComputeChopOk(
-            out double eff,
-            out int lbUsed,
-            out bool hasBars,
-            out bool bypassAdx,
-            out bool bypassSlope,
-            out string reason)
+        private bool ComputeChopOk(out double eff, out int lbUsed, out bool hasBars, out bool bypassAdx, out bool bypassSlope, out string reason)
         {
             eff = 1.0;
             lbUsed = 0;
@@ -644,72 +638,99 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             hasBars = true;
 
-            // -----------------------------------------
-            // 1) CLOSE-based efficiency (your original)
-            // -----------------------------------------
-            double netClose = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
-            double pathClose = 0.0;
+            // -------------------------
+            // 1) RANGE (magnitude) gate
+            // -------------------------
+            double hh = High[barsAgo];
+            double ll = Low[barsAgo];
+            for (int i = 1; i <= lb; i++)
+            {
+                hh = Math.Max(hh, High[barsAgo + i]);
+                ll = Math.Min(ll, Low[barsAgo + i]);
+            }
+
+            var rangeTicks = (hh - ll) / TickSize;
+            if (ChopMinRangeTicks > 0 && rangeTicks < ChopMinRangeTicks)
+            {
+                reason = $"chop=block(range {rangeTicks:0.0} < minRange {ChopMinRangeTicks} lb={lb})";
+                return false;
+            }
+
+            // -------------------------
+            // 2) FLIP-RATE (alternation)
+            // -------------------------
+            if (ChopMaxFlipPct > 0)
+            {
+                int flips = 0;
+                int comps = 0;
+
+                // compare direction of consecutive closes (you can swap to Close-Open if you prefer)
+                for (int i = 0; i < lb; i++)
+                {
+                    var d0 = Close[barsAgo + i] - Close[barsAgo + i + 1];
+                    var d1 = Close[barsAgo + i + 1] - Close[barsAgo + i + 2];
+
+                    // ignore tiny/no-change to reduce noise
+                    if (Math.Abs(d0) < TickSize || Math.Abs(d1) < TickSize)
+                        continue;
+
+                    comps++;
+                    if ((d0 > 0 && d1 < 0) || (d0 < 0 && d1 > 0))
+                        flips++;
+                }
+
+                if (comps >= 3) // only judge if we had enough meaningful comparisons
+                {
+                    var flipPct = (double)flips / comps;
+                    if (flipPct >= ChopMaxFlipPct)
+                    {
+                        reason = $"chop=block(flipPct {flipPct:0.00} >= max {ChopMaxFlipPct:0.00} lb={lb} rangeTicks={rangeTicks:0.0})";
+                        return false;
+                    }
+                }
+            }
+
+            // -------------------------
+            // 3) EFFICIENCY (optional)
+            // -------------------------
+            var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
+            var path = 0.0;
             for (var i = 0; i < lb; i++)
-                pathClose += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
+                path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
 
-            var effClose = pathClose <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, netClose / pathClose);
-
-            // -----------------------------------------
-            // 2) EMAFAST-based efficiency (smoothed)
-            //    This avoids "strong trend + pullbacks"
-            //    being labeled as chop
-            // -----------------------------------------
-            double netEma = Math.Abs(emaFast[barsAgo] - emaFast[barsAgo + lb]);
-            double pathEma = 0.0;
-            for (var i = 0; i < lb; i++)
-                pathEma += Math.Abs(emaFast[barsAgo + i] - emaFast[barsAgo + i + 1]);
-
-            var effEma = pathEma <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, netEma / pathEma);
-
-            // Use the "best" signal of trendiness
-            eff = Math.Max(effClose, effEma);
-
+            eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
             var okByEff = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
 
-            // -------------------------
-            // BYPASS (momentum override)
-            // -------------------------
+            // BYPASS: ADX
             if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
             {
                 bypassAdx = true;
-                reason =
-                    $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) " +
-                    $"eff={eff:0.00} (close={effClose:0.00}, ema={effEma:0.00}) min={MinChopEfficiency:0.00} lb={lb}";
+                reason = $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) eff={eff:0.00} rangeTicks={rangeTicks:0.0} lb={lb}";
                 return true;
             }
 
+            // BYPASS: EMA slope strength
             if (ChopBypassEmaSlopeStrengthTicks > 0)
             {
                 var m = GetEmaStruct(barsAgo);
                 if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
                 {
                     bypassSlope = true;
-                    reason =
-                        $"chop=bypass(slope {m.SlopeStrengthTicks:0.0} >= {ChopBypassEmaSlopeStrengthTicks:0.0}) " +
-                        $"eff={eff:0.00} (close={effClose:0.00}, ema={effEma:0.00}) min={MinChopEfficiency:0.00} lb={lb}";
+                    reason = $"chop=bypass(slope {m.SlopeStrengthTicks:0.0} >= {ChopBypassEmaSlopeStrengthTicks:0.0}) eff={eff:0.00} rangeTicks={rangeTicks:0.0} lb={lb}";
                     return true;
                 }
             }
 
             if (okByEff)
             {
-                reason =
-                    $"chop=ok(eff {eff:0.00} >= {MinChopEfficiency:0.00} lb={lb} " +
-                    $"closeEff={effClose:0.00} emaEff={effEma:0.00})";
+                reason = $"chop=ok(eff {eff:0.00} >= {MinChopEfficiency:0.00} lb={lb} rangeTicks={rangeTicks:0.0})";
                 return true;
             }
 
-            reason =
-                $"chop=block(eff {eff:0.00} < {MinChopEfficiency:0.00} lb={lb} " +
-                $"closeEff={effClose:0.00} emaEff={effEma:0.00})";
-
+            reason = $"chop=block(eff {eff:0.00} < {MinChopEfficiency:0.00} lb={lb} rangeTicks={rangeTicks:0.0})";
             return false;
         }
+
 
         private sealed class EmaStruct
         {
