@@ -213,6 +213,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ManageBreakEven();
                     return;
                 }
+                
+                // Avoid chop zones
+                var chopOk = PassesChopFilter(sigClosed, out var eff);
+                if (!chopOk)
+                {
+                    ManageBreakEven();
+                    return;
+                }
 
                 // EMA structure filter
                 ComputeEmaStructure(sigClosed, out _, out _, out _, out var emaStructureOk);
@@ -559,6 +567,33 @@ namespace NinjaTrader.NinjaScript.Strategies
             r.StructureOk = r.SlopeOk && (r.SepOk || r.EmaCrossover);
             return r;
         }
+        
+        private bool PassesChopFilter(int barsAgo, out double efficiency)
+        {
+            efficiency = 0.0;
+
+            var lb = Math.Max(2, ChopLookbackBars);
+            if (CurrentBar < barsAgo + lb)
+                return false;
+
+            var start = Close[barsAgo + lb];
+            var end   = Close[barsAgo];
+
+            var netMove = Math.Abs(end - start);
+            var path = 0.0;
+
+            for (int i = 0; i < lb; i++)
+            {
+                path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
+            }
+
+            if (path <= TickSize)
+                return false;
+
+            efficiency = netMove / path;
+            return efficiency >= MinPriceEfficiency;
+        }
+
 
         private sealed class EmaStruct
         {

@@ -147,6 +147,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!dailyProfitOk) reasons.Add("daily-profit");
             if (!consistencyOk) reasons.Add("consistency");
             if (!noWorkingEntryOrder) reasons.Add("entry-order-working");
+            
+            // Chop zone
+            if (!snap.ChopOk) reasons.Add("chop-filter");
 
             if (reasons.Count == 0) reasons.Add("other");
 
@@ -237,8 +240,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var wickDiag = BuildWickDiag(sigClosed);
 	        
 	        // Base filters
-	        var baseLongFilter = EnableLongs && snap.TrendUp && snap.AdxOk && !snap.VolBlocked && !pnlOrDdLock && snap.TimeOk && snap.WickOk && snap.EmaStructureOk;
-	        var baseShortFilter = EnableShorts && snap.TrendDown && snap.AdxOk && !snap.VolBlocked && !pnlOrDdLock && snap.TimeOk && snap.WickOk && snap.EmaStructureOk;
+	        var baseLongFilter =
+		        EnableLongs && snap.TrendUp && snap.AdxOk && snap.ChopOk &&
+		        !snap.VolBlocked && !pnlOrDdLock && snap.TimeOk && snap.WickOk && snap.EmaStructureOk;
+
+	        var baseShortFilter =
+		        EnableShorts && snap.TrendDown && snap.AdxOk && snap.ChopOk &&
+		        !snap.VolBlocked && !pnlOrDdLock && snap.TimeOk && snap.WickOk && snap.EmaStructureOk;
 	        
 	        // Setups
 	        var longSetupOk = baseLongFilter && snap.LongPulledBack && snap.LongReclaimed && snap.LongConfirm;
@@ -264,22 +272,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        snap.TrendUp  ? "trendUp=True" : snap.TrendDown ? "trendDown=True" : "trend=None";
 
 	        var notes = "";
-	        if (!snap.WickOk) notes += "wick-filter;";
-	        if (!snap.HasSessionStart) notes += "no-session-start;";
-	        if (!snap.InMainWindow) notes += "outside-main-window;";
-	        if (snap.InMidBreak)    notes += "mid-break;";
-	        if (snap.VolBlocked) notes += "atr-too-high;";
-	        if (!snap.AdxOk) notes += "adx-out-of-range;";
-	        if (!DayNotLocked()) notes += "dayLocked;";
-	        if (tradeCountLock) notes += "max-trades-reached;";
-	        if (!flat) notes += "position-open;";
-	        if (!evalEntriesNow) notes += "entry-gated-not-eval-now;";
-	        if (HasWorkingEntryOrder()) notes += "entry-order-working;";
-	        if (string.IsNullOrEmpty(notes)) notes = "none";
-	        if (!snap.EmaStructureOk) notes += "ema-structure;";
-	        if (!snap.EmaSlopeOk)     notes += "ema-slope;";
-	        if (!snap.EmaSepOk)       notes += "ema-separation;";
-
+	        if (!snap.WickOk)                notes += "wick-filter;";
+	        if (!snap.HasSessionStart)       notes += "no-session-start;";
+	        if (!snap.InMainWindow)          notes += "outside-main-window;";
+	        if (snap.InMidBreak)             notes += "mid-break;";
+	        if (snap.VolBlocked)             notes += "atr-too-high;";
+	        if (!snap.AdxOk)                 notes += "adx-out-of-range;";
+	        if (!DayNotLocked())             notes += "dayLocked;";
+	        if (tradeCountLock)              notes += "max-trades-reached;";
+	        if (!flat)                       notes += "position-open;";
+	        if (!evalEntriesNow)             notes += "entry-gated-not-eval-now;";
+	        if (HasWorkingEntryOrder())      notes += "entry-order-working;";
+	        if (!snap.EmaStructureOk)        notes += "ema-structure;";
+	        if (!snap.EmaSlopeOk)            notes += "ema-slope;";
+	        if (!snap.EmaSepOk)              notes += "ema-separation;";
+	        if (!snap.ChopOk)                notes += "chop-filter;";
 	        notes += $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
 
 	        var unrealizedNow = flat ? 0.0 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
@@ -295,68 +302,72 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        }
 
 	        Print(string.Format(
-		        "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
-		        "  a) PnL/DD/Trades Lock: {8}  (realizedToday={9:C2}, unrealizedNow={10:C2}, totalToday={11:C2}, dayLocked={12}, tradesToday={14})\n" +
-		        "  b) Other blocks/filters: {15}\n" +
-		        "  c) Wick ticks: {31}\n" +
-		        "  d) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
-		        "  e) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
-		        "  f) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
-		        "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-		        "  h) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
-		        "-------------------------------------------------------------------------------------------------------\n",
-		        tSignal, // 0
-		        accountName, // 1
-		        Contracts, // 2
-		        snap.TimeOk, // 3 (kept for stability)
-		        minFromOpen, // 4
-		        snap.InMainWindow, // 5
-		        snap.InMidBreak, // 6
-		        effContracts, // 7
-		        pnlOrDdLock, // 8
-		        realizedToday, // 9
-		        unrealizedNow, // 10
-		        totalToday, // 11
-		        dayLocked.ToString(), // 12
-		        dailyProfitRemaining, // 13
-		        tradesToday, // 14
-		        notes, // 15
-		        snap.AdxOk, // 16
-		        snap.Adx, // 17
-		        ADXMin, // 18
-		        ADXMax, // 19
-		        snap.VolBlocked, // 20
-		        dailyKill, // 21
-		        bufferToKill, // 22
-		        pos, // 23
-		        OkIcon(wouldSubmitNow), // 24
-		        trend, // 25
-		        snap.TrendUp ? snap.LongPulledBack : snap.ShortPulledBack, // 26
-		        snap.TrendUp ? snap.LongReclaimed : snap.ShortReclaimed, // 27
-		        snap.TrendUp ? snap.LongConfirm : snap.ShortConfirm, // 28
-		        confirmFail, // 29
-		        dailyMaxProfit, // 30
-		        wickDiag, // 31
+			    "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
+			    "  a) PnL/DD/Trades Lock: {8}  (realizedToday={9:C2}, unrealizedNow={10:C2}, totalToday={11:C2}, dayLocked={12}, tradesToday={14})\n" +
+			    "  b) Other blocks/filters: {15}\n" +
+			    "  c) Wick ticks: {31}\n" +
+			    "  d) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
+			    "  e) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
+			    "  f) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
+			    "  g) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51})\n" +
+			    "  h) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
+			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    "-------------------------------------------------------------------------------------------------------\n",
+			    tSignal,                    // 0
+			    accountName,                // 1
+			    Contracts,                  // 2
+			    snap.TimeOk,                // 3 (unused but kept)
+			    minFromOpen,                // 4
+			    snap.InMainWindow,          // 5
+			    snap.InMidBreak,            // 6
+			    effContracts,               // 7
+			    pnlOrDdLock,                // 8
+			    realizedToday,              // 9
+			    unrealizedNow,              // 10
+			    totalToday,                 // 11
+			    dayLocked.ToString(),       // 12
+			    dailyProfitRemaining,       // 13
+			    tradesToday,                // 14
+			    notes,                      // 15
+			    snap.AdxOk,                 // 16
+			    snap.Adx,                   // 17
+			    ADXMin,                     // 18
+			    ADXMax,                     // 19
+			    snap.VolBlocked,            // 20
+			    dailyKill,                  // 21
+			    bufferToKill,               // 22
+			    pos,                        // 23
+			    OkIcon(wouldSubmitNow),     // 24
+			    trend,                      // 25
+			    snap.TrendUp ? snap.LongPulledBack : snap.ShortPulledBack, // 26
+			    snap.TrendUp ? snap.LongReclaimed  : snap.ShortReclaimed,  // 27
+			    snap.TrendUp ? snap.LongConfirm    : snap.ShortConfirm,    // 28
+			    confirmFail,                // 29
+			    dailyMaxProfit,             // 30
+			    wickDiag,                   // 31
+			    false,                      // 32 (still unused in your output)
+			    snap.PbEmaLong,             // 33
+			    snap.PbDistLong,            // 34
+			    snap.LongPulledBack,        // 35
+			    snap.EmaCrossover,          // 36
+			    snap.PbEmaShort,            // 37
+			    snap.PbDistShort,           // 38
+			    snap.ShortPulledBack,       // 39
+			    snap.EmaSlopeTicks,         // 40
+			    MinEmaSlopeTicks,           // 41
+			    EmaSlopeLookbackBars,       // 42
+			    snap.EmaSlopeOk,            // 43
+			    snap.EmaSepTicks,           // 44
+			    MinEmaSeparationTicks,      // 45
+			    snap.EmaSepOk,              // 46
+			    snap.EmaStructureOk,        // 47
 
-		        // ---- PREVIOUS-BAR PULLBACK DIAG ----
-		        false, // 32 
-		        snap.PbEmaLong, // 33
-		        snap.PbDistLong, // 34
-		        snap.LongPulledBack, // 35
-
-		        snap.EmaCrossover, // 36 
-		        snap.PbEmaShort, // 37
-		        snap.PbDistShort, // 38
-		        snap.ShortPulledBack, // 39
-		        snap.EmaSlopeTicks,           // 40
-		        MinEmaSlopeTicks,             // 41
-		        EmaSlopeLookbackBars,         // 42
-		        snap.EmaSlopeOk,              // 43
-		        snap.EmaSepTicks,             // 44
-		        MinEmaSeparationTicks,        // 45
-		        snap.EmaSepOk,                // 46
-		        snap.EmaStructureOk           // 47
-	        ));
+			    // --- NEW: Chop ---
+			    snap.ChopOk,                // 48
+			    snap.ChopEfficiency,        // 49
+			    MinPriceEfficiency,         // 50
+			    ChopLookbackBars            // 51
+			));
         }
         
         private static string OkIcon(bool ok) { return ok ? "✔" : "✖"; }
@@ -455,6 +466,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // ---- locks ----
 		    s.DayOk = DayNotLocked();
 		    s.TradeCountOk = tradesToday < MaxTradesPerDay;
+		    
+		    //-- Chop filter ---
+		    s.ChopOk = true;
+		    s.ChopEfficiency = 0.0;
+		    
+		    // Evaluate chop on the same "stable" bar as your other filters (sigClosed)
+		    if (ChopLookbackBars > 0 && MinPriceEfficiency > 0)
+		    {
+			    s.ChopOk = PassesChopFilter(sigClosed, out s.ChopEfficiency);
+		    }
 
 		    // ---- spacing ----
 		    s.SpacingOk = true;
@@ -532,6 +553,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public double AtrTicks;
 	        public double Adx;
 	        public double PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
+	        public bool ChopOk;
+	        public double ChopEfficiency;
         }
     }
 }

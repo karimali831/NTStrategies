@@ -182,6 +182,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 2000)]
         [Display(Name = "Max entry distance from EMA fast (ticks, 0=off)", Order = 20, GroupName = "03-Trend & Filters")]
         public int MaxEntryDistFromEmaFastTicks { get; set; } = 80;
+        
+        [NinjaScriptProperty]
+        [Range(3, 50)]
+        [Display(Name = "Chop lookback bars", GroupName = "03-Trend & Filters", Order = 30)]
+        public int ChopLookbackBars { get; set; } = 5;
+
+        [NinjaScriptProperty]
+        [Range(0.0, 1.0)]
+        [Display(Name = "Min price efficiency (chop filter)", GroupName = "03-Trend & Filters", Order = 31)]
+        public double MinPriceEfficiency { get; set; } = 0.35;
 
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]
