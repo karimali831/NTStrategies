@@ -143,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 _wasInPosition = true;
                 _entrySide = isLongEntry ? MarketPosition.Long : MarketPosition.Short;
-                _entryQty = execution.Quantity;
+                _entryQty += execution.Quantity;
 
                 _mfeTicks = 0.0;
                 _maeTicks = 0.0;
@@ -156,7 +156,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            if (Position.MarketPosition == MarketPosition.Flat &&
+            if (_wasInPosition && Position.MarketPosition == MarketPosition.Flat &&
                 execution.Order.OrderState == OrderState.Filled)
             {
                 lastFlatExecutionTime = time;
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (trades != null && trades.Count > 0)
                 {
                     var t = trades[trades.Count - 1];
-                    pnlCur = t.ProfitCurrency;
+                    pnlCur = t.ProfitCurrency * _entryQty;
 
                     double profitPoints;
                     try
@@ -184,12 +184,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pnlTicks = profitPoints / TickSize;
                     else
                     {
-                        var dir = (_entrySide == MarketPosition.Long) ? 1.0 : -1.0;
+                        var dir = _entrySide == MarketPosition.Long ? 1.0 : -1.0;
                         pnlTicks = dir * (execution.Price - entryPriceHard) / TickSize;
                     }
                 }
 
-                var hold = (entryFillTime != DateTime.MinValue) ? (time - entryFillTime) : TimeSpan.Zero;
+                var hold = entryFillTime != DateTime.MinValue ? (time - entryFillTime) : TimeSpan.Zero;
                 var outcome = pnlCur >= 0 ? "WIN" : "LOSS";
 
                 if (DebugMode)
