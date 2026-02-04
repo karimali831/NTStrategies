@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     var px = Position.MarketPosition == MarketPosition.Long ? GetCurrentBid() : GetCurrentAsk();
                     if (px <= 0) px = Close[0];
                     
-                    var dir = (Position.MarketPosition == MarketPosition.Long) ? 1.0 : -1.0;
+                    var dir = Position.MarketPosition == MarketPosition.Long ? 1.0 : -1.0;
                     var pnlTicks = dir * (px - entryPriceHard) / TickSize;
 
                     _mfeTicks = Math.Max(_mfeTicks, pnlTicks);

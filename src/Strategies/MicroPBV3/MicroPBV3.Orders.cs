@@ -170,15 +170,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     for (var i = trades.Count - _entryQty; i < trades.Count; i++)
                     {
                         var t = trades[i];
-                        pnlCur += t.ProfitCurrency;
+                        pnlCur = t.ProfitCurrency;
 
-                        var profitPoints = t.ProfitPoints; 
+                        double profitPoints;
+                        try
+                        {
+                            profitPoints = t.ProfitPoints;
+                        }
+                        catch
+                        {
+                            profitPoints = 0.0;
+                        }
 
                         if (profitPoints != 0.0)
                             pnlTicks += profitPoints / TickSize;
                         else
                         {
-                            // fallback: compute from prices
                             var dir = (_entrySide == MarketPosition.Long) ? 1.0 : -1.0;
                             pnlTicks += dir * (t.Exit.Price - t.Entry.Price) / TickSize;
                         }
