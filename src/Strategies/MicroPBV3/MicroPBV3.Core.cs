@@ -184,14 +184,28 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MaxEntryDistFromEmaFastTicks { get; set; } = 80;
         
         [NinjaScriptProperty]
+        [Display(Name = "Enable chop filter", Order = 21, GroupName = "03-Trend & Filters")]
+        public bool EnableChopFilter { get; set; } = true;
+        
+        [NinjaScriptProperty]
         [Range(3, 50)]
-        [Display(Name = "Chop lookback bars", GroupName = "03-Trend & Filters", Order = 30)]
-        public int ChopLookbackBars { get; set; } = 5;
+        [Display(Name = "Chop lookback bars", GroupName = "03-Trend & Filters", Order = 22)]
+        public int ChopLookbackBars { get; set; } = 8;
 
         [NinjaScriptProperty]
-        [Range(0.0, 1.0)]
-        [Display(Name = "Min price efficiency (chop filter)", GroupName = "03-Trend & Filters", Order = 31)]
-        public double MinPriceEfficiency { get; set; } = 0.35;
+        [Range(0.01, 0.99)]
+        [Display(Name = "Min chop efficiency (higher = less chop)", Order = 23, GroupName = "03-Trend & Filters")]
+        public double MinChopEfficiency { get; set; } = 0.35;
+        
+        [NinjaScriptProperty]
+        [Range(0, 100)]
+        [Display(Name = "Chop bypass ADX (0=off)", Order = 24, GroupName = "03-Trend & Filters")]
+        public double ChopBypassAdx { get; set; } = 30.0;
+
+        [NinjaScriptProperty]
+        [Range(0, 9999)]
+        [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 25, GroupName = "03-Trend & Filters")]
+        public double ChopBypassEmaSlopeStrengthTicks { get; set; } = 25.0;
 
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]

@@ -215,7 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Avoid chop zones
-                var chopOk = PassesChopFilter(sigClosed, out var eff);
+                var chopOk = ComputeChopOk(sigClosed, out var eff);
                 if (!chopOk)
                 {
                     ManageBreakEven();
@@ -568,30 +568,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-        private bool PassesChopFilter(int barsAgo, out double efficiency)
+        private bool ComputeChopOk(int barsAgo, out double eff)
         {
-            efficiency = 0.0;
+            eff = 1.0;
+
+            if (!EnableChopFilter)
+                return true;
 
             var lb = Math.Max(2, ChopLookbackBars);
             if (CurrentBar < barsAgo + lb)
-                return false;
+                return true; // not enough bars -> don't block
 
-            var start = Close[barsAgo + lb];
-            var end   = Close[barsAgo];
-
-            var netMove = Math.Abs(end - start);
+            // Efficiency ratio: net change vs total path (0..1)
+            var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
             var path = 0.0;
-
-            for (int i = 0; i < lb; i++)
-            {
+            for (var i = 0; i < lb; i++)
                 path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
+
+            eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
+
+            var ok = (MinChopEfficiency <= 0) || (eff >= MinChopEfficiency);
+
+            // -------------------------
+            // BYPASS (momentum override)
+            // -------------------------
+            // If ADX is strong, do NOT block (prevents killing pullbacks in momentum trends)
+            if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
+                return true;
+
+            // If EMA slope strength is strong, do NOT block
+            if (ChopBypassEmaSlopeStrengthTicks > 0)
+            {
+                var m = GetEmaStruct(barsAgo);
+                if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
+                    return true;
             }
 
-            if (path <= TickSize)
-                return false;
-
-            efficiency = netMove / path;
-            return efficiency >= MinPriceEfficiency;
+            return ok;
         }
 
 

@@ -363,9 +363,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    snap.EmaStructureOk,        // 47
 
 			    // --- NEW: Chop ---
-			    snap.ChopOk,                // 48
-			    snap.ChopEfficiency,        // 49
-			    MinPriceEfficiency,         // 50
+			    snap.ChopOk,                 // 48
+			    snap.ChopEff,                // 49
+			    MinChopEfficiency,           // 50
 			    ChopLookbackBars            // 51
 			));
         }
@@ -469,12 +469,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    
 		    //-- Chop filter ---
 		    s.ChopOk = true;
-		    s.ChopEfficiency = 0.0;
-		    
-		    // Evaluate chop on the same "stable" bar as your other filters (sigClosed)
-		    if (ChopLookbackBars > 0 && MinPriceEfficiency > 0)
+		    s.ChopEff = 1.0;
+		    if (EnableChopFilter)
 		    {
-			    s.ChopOk = PassesChopFilter(sigClosed, out s.ChopEfficiency);
+			    s.ChopOk = ComputeChopOk(sigClosed, out s.ChopEff);
 		    }
 
 		    // ---- spacing ----
@@ -554,7 +552,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public double Adx;
 	        public double PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
 	        public bool ChopOk;
-	        public double ChopEfficiency;
+	        public double ChopEff;
         }
     }
 }
