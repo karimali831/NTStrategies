@@ -614,7 +614,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-        private bool ComputeChopOk(out double eff, out int lbUsed, out bool hasBars, out bool bypassAdx, out bool bypassSlope, out string reason)
+        private bool ComputeChopOk(
+            out double eff,
+            out int lbUsed,
+            out bool hasBars,
+            out bool bypassAdx,
+            out bool bypassSlope,
+            out string reason)
         {
             eff = 1.0;
             lbUsed = 0;
@@ -626,55 +632,82 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableChopFilter)
                 return true;
 
-            var barsAgo = SigClosed();
+            var barsAgo = SigClosed();                 // always closed bar
             var lb = Math.Max(2, ChopLookbackBars);
             lbUsed = lb;
 
             if (CurrentBar < barsAgo + lb)
             {
-                // Not enough bars => auto-pass (important to log)
                 reason = $"chop=pass(not-enough-bars lb={lb})";
                 return true;
             }
 
             hasBars = true;
 
-            var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
-            var path = 0.0;
+            // -----------------------------------------
+            // 1) CLOSE-based efficiency (your original)
+            // -----------------------------------------
+            double netClose = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]);
+            double pathClose = 0.0;
             for (var i = 0; i < lb; i++)
-                path += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
+                pathClose += Math.Abs(Close[barsAgo + i] - Close[barsAgo + i + 1]);
 
-            eff = path <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, net / path);
+            var effClose = pathClose <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, netClose / pathClose);
+
+            // -----------------------------------------
+            // 2) EMAFAST-based efficiency (smoothed)
+            //    This avoids "strong trend + pullbacks"
+            //    being labeled as chop
+            // -----------------------------------------
+            double netEma = Math.Abs(emaFast[barsAgo] - emaFast[barsAgo + lb]);
+            double pathEma = 0.0;
+            for (var i = 0; i < lb; i++)
+                pathEma += Math.Abs(emaFast[barsAgo + i] - emaFast[barsAgo + i + 1]);
+
+            var effEma = pathEma <= TickSize * 1e-9 ? 0.0 : Math.Min(1.0, netEma / pathEma);
+
+            // Use the "best" signal of trendiness
+            eff = Math.Max(effClose, effEma);
 
             var okByEff = MinChopEfficiency <= 0 || eff >= MinChopEfficiency;
 
-            // BYPASS: ADX
+            // -------------------------
+            // BYPASS (momentum override)
+            // -------------------------
             if (ChopBypassAdx > 0 && adx[barsAgo] >= ChopBypassAdx)
             {
                 bypassAdx = true;
-                reason = $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) eff={eff:0.00} min={MinChopEfficiency:0.00} lb={lb}";
+                reason =
+                    $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) " +
+                    $"eff={eff:0.00} (close={effClose:0.00}, ema={effEma:0.00}) min={MinChopEfficiency:0.00} lb={lb}";
                 return true;
             }
 
-            // BYPASS: EMA slope strength
             if (ChopBypassEmaSlopeStrengthTicks > 0)
             {
                 var m = GetEmaStruct(barsAgo);
                 if (m.HasBars && m.SlopeStrengthTicks >= ChopBypassEmaSlopeStrengthTicks)
                 {
                     bypassSlope = true;
-                    reason = $"chop=bypass(slope {m.SlopeStrengthTicks:0.0} >= {ChopBypassEmaSlopeStrengthTicks:0.0}) eff={eff:0.00} min={MinChopEfficiency:0.00} lb={lb}";
+                    reason =
+                        $"chop=bypass(slope {m.SlopeStrengthTicks:0.0} >= {ChopBypassEmaSlopeStrengthTicks:0.0}) " +
+                        $"eff={eff:0.00} (close={effClose:0.00}, ema={effEma:0.00}) min={MinChopEfficiency:0.00} lb={lb}";
                     return true;
                 }
             }
 
             if (okByEff)
             {
-                reason = $"chop=ok(eff {eff:0.00} >= {MinChopEfficiency:0.00} lb={lb})";
+                reason =
+                    $"chop=ok(eff {eff:0.00} >= {MinChopEfficiency:0.00} lb={lb} " +
+                    $"closeEff={effClose:0.00} emaEff={effEma:0.00})";
                 return true;
             }
 
-            reason = $"chop=block(eff {eff:0.00} < {MinChopEfficiency:0.00} lb={lb})";
+            reason =
+                $"chop=block(eff {eff:0.00} < {MinChopEfficiency:0.00} lb={lb} " +
+                $"closeEff={effClose:0.00} emaEff={effEma:0.00})";
+
             return false;
         }
 
