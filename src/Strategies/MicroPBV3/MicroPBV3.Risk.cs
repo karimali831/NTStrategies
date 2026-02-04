@@ -48,6 +48,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!UseBreakEven)
                 return;
 
+            var sigClosed = SigClosed();
+
+            // Safety: ensure indicator has that bar
+            if (CurrentBar < sigClosed)
+                return;
+
+            // Disable BE in strong momentum
+            if (DisableBeAboveAdx > 0 && adx[sigClosed] >= DisableBeAboveAdx)
+                return;
+
             if (Position.MarketPosition == MarketPosition.Flat)
                 return;
 

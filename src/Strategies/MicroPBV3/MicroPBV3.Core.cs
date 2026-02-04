@@ -288,6 +288,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "BE plus ticks", Order = 3, GroupName = "05-BE & Management")]
         public int BE_PlusTicks { get; set; } = 8;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Disable BE Above ADX", Order = 4, GroupName="05-BE & Management")]
+        public double DisableBeAboveAdx { get; set; } = 30;
 
         // ========== 99 – API Reporter ==========
         private TrailingDdApiReporter _tddApi;
