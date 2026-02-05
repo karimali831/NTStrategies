@@ -641,9 +641,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             // -------------------------
             // 1) RANGE (magnitude) gate
             // -------------------------
-            double hh = High[barsAgo];
-            double ll = Low[barsAgo];
-            for (int i = 1; i <= lb; i++)
+            var hh = High[barsAgo];
+            var ll = Low[barsAgo];
+            for (var i = 1; i <= lb; i++)
             {
                 hh = Math.Max(hh, High[barsAgo + i]);
                 ll = Math.Min(ll, Low[barsAgo + i]);
@@ -661,11 +661,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             // -------------------------
             if (ChopMaxFlipPct > 0)
             {
-                int flips = 0;
-                int comps = 0;
+                var flips = 0;
+                var comps = 0;
 
                 // compare direction of consecutive closes (you can swap to Close-Open if you prefer)
-                for (int i = 0; i < lb; i++)
+                for (var i = 0; i < lb; i++)
                 {
                     var d0 = Close[barsAgo + i] - Close[barsAgo + i + 1];
                     var d1 = Close[barsAgo + i + 1] - Close[barsAgo + i + 2];
@@ -708,6 +708,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 reason = $"chop=bypass(adx {adx[barsAgo]:0.00} >= {ChopBypassAdx}) eff={eff:0.00} rangeTicks={rangeTicks:0.0} lb={lb}";
                 return true;
             }
+            
+            // BYPASS: RangeTicks
+            if (rangeTicks > 220)
+                return true;
 
             // BYPASS: EMA slope strength
             if (ChopBypassEmaSlopeStrengthTicks > 0)
