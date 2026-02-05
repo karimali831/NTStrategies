@@ -219,6 +219,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 9999)]
         [Display(Name = "Chop bypass EMA slope strength ticks (0=off)", Order = 28, GroupName = "03-Trend & Filters")]
         public double ChopBypassEmaSlopeStrengthTicks { get; set; } = 25.0;
+        
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Momentum Filter", Order = 29, GroupName = "03-Trend & Filters")]
+        public bool EnableMomentumFilter { get; set; } = true;
 
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]

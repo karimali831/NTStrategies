@@ -68,6 +68,7 @@
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Core.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Diagnostics.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Entry.cs" />
+        <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Filters.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Orders.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Risk.cs" />
     </ItemGroup>

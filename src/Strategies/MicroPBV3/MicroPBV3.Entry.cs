@@ -291,6 +291,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             return;
                         }
 
+                        if (EnableMomentumFilter && !HasMomentum(true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        {
+                            if (DebugMode)
+                                Print($"{Time[0]} MOMO=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
+                            return;
+                        }
+
                         lastEntryAttemptBar = CurrentBar;
                         EnterLongStopMarket(qty, trigger, tag);
                         tradesToday++;
@@ -329,6 +336,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             if (DebugMode)
                                 Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT signal body midpoint not below EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
+                            return;
+                        }
+                        
+                        if (EnableMomentumFilter && !HasMomentum(false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        {
+                            if (DebugMode)
+                                Print($"{Time[0]} MOMO=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
                             return;
                         }
 
