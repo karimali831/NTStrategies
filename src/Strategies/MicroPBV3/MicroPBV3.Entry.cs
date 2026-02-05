@@ -709,10 +709,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
             
-            // BYPASS: RangeTicks
-            if (rangeTicks > 180)
-                return true;
-
             // BYPASS: EMA slope strength
             if (ChopBypassEmaSlopeStrengthTicks > 0)
             {
