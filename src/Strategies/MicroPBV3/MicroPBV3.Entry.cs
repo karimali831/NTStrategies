@@ -710,7 +710,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             
             // BYPASS: RangeTicks
-            if (rangeTicks > 220)
+            if (rangeTicks > 180)
                 return true;
 
             // BYPASS: EMA slope strength
