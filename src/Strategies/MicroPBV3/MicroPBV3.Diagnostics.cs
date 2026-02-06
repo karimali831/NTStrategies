@@ -298,9 +298,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  c) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
 			    "  d) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
-			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
+			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) {23} Entry {24} ({25}, pulledBack={26}, minTicks={12}, upTicks={3}, downTicks={32} reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    "  h) Trend Ticks: (range={11:C0}, rangeUp={14:C0}, rangeDown={56} \n" +
+			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
@@ -313,11 +314,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    pnlOrDdLock,                // 8
 			    realizedToday,              // 9
 			    unrealizedNow,              // 10
-			    false,                      // 11
+			    snap.RangeTicks,            // 11
 			    ChopMinRangeTicks,          // 12
 			    dailyProfitRemaining,       // 13
-			    false,                      // 14
-			    // notes,                   // 15
+			    snap.RangeUpTicks,          // 14
 			    snap.Blocks,                // 15
 			    snap.AdxOk,                 // 16
 			    snap.Adx,                   // 17
@@ -359,7 +359,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    snap.ChopReason,                  // 52
 			    snap.EntryDistCooldownOk,         // 53
 			    snap.EntryDistBlockBarsLeft,      // 54
-			    snap.EntryDistCooldownReason      // 55
+			    snap.EntryDistCooldownReason,     // 55
+			    snap.RangeDownTicks				  // 56
 			));
         }
         
@@ -460,7 +461,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.DayOk = DayNotLocked();
 		    s.TradeCountOk = tradesToday < MaxTradesPerDay;
 		    
-		    //-- Chop filter ---
 		    // -- Chop filter ---
 		    s.ChopEnabled = EnableChopFilter;
 		    s.ChopOk = true;
@@ -543,6 +543,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // ---- trend ----
 		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _);
 		    s.TrendDown = IsTrendDown(sigClosed, out _, out _);
+		    
+		    TrendTicks(30, out _, out _, out s.RangeTicks, out s.RangeUpTicks, out s.RangeDownTicks);
 
 			// ---- setup components (signal bar) ----
 		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true, out s.PbEmaLong,  out  s.PbDistLong);
@@ -615,6 +617,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool ChopBlockedByEff;      // true if eff < min AND no bypass
 	        public double ChopUpTicks;
 	        public double ChopDownTicks;
+	        public double RangeUpTicks;
+	        public double RangeDownTicks;
+	        public double RangeTicks;
 	        public string ChopReason;          // single readable reason
 
 	        public bool EntryDistCooldownEnabled;
