@@ -161,7 +161,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             var now = Time[sigEntry];
             var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
             
-            var lb = Math.Max(2, minFromOpen <= MinMinutesFromOpen ? 3 :  ChopLookbackBars);
+            // var lb = Math.Max(2, minFromOpen <= MinMinutesFromOpen ? 3 :  ChopLookbackBars);
+            var lb = Math.Max(2, ChopLookbackBars);
             lbUsed = lb;
 
             if (CurrentBar < barsAgo + lb)
