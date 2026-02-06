@@ -377,10 +377,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             emaSepTicks   = m.SepTicks;
             
             ComputeChopOk(out _, out _, out _,
-                out _, out _, out var upTicks, out var downTicks, out _);
+                out _, out _, out var upTicksChop, out _, out _);
+            
+            TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out _);
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
-            return m.HasBars && m.PriceAboveFast && upTicks >= ChopMinRangeTicks;
+            return m.HasBars && m.PriceAboveFast && upTicksChop >= ChopMinRangeTicks && upTicksLongRange >= 300;
         }
 
         private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
@@ -391,10 +393,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             emaSepTicks   = m.SepTicks;
 
             ComputeChopOk(out _, out _, out _,
-                out _, out _, out var upTicks, out var downTicks, out _);
+                out _, out _, out var upTicks, out var downTicksChop, out _);
+            
+            TrendTicks(30, out _, out _, out _, out _, out var downTicksLongRange);
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
-            return m.HasBars && m.PriceBelowFast && downTicks >= ChopMinRangeTicks;
+            return m.HasBars && m.PriceBelowFast && downTicksChop >= ChopMinRangeTicks && downTicksLongRange >= 300;
         }
         
         private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)

@@ -159,60 +159,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             hasBars = false;
             bypassAdx = false;
             bypassSlope = false;
-            reason = "chop=off";
             upTicks = 0;
             downTicks = 0;
+            reason = "chop=off";
+
 
             if (!EnableChopFilter)
                 return true;
 
-            var barsAgo  = SigClosed(); 
+            TrendTicks(ChopLookbackBars, out var lb, out hasBars, out var rangeTicks, out var upTicksT, out var downTicksT);
+
+            int barsAgo;
+            upTicks = upTicksT;
+            downTicks = downTicksT;
             
-            var closedBarsSinceOpen = 0;
-            if (_sessionStartBarIdx >= 0)
-                closedBarsSinceOpen = Math.Max(0, (CurrentBar - _sessionStartBarIdx) - barsAgo);
             
-            var minutesPerBar = BarsPeriod.BarsPeriodType == BarsPeriodType.Minute ? BarsPeriod.Value : 1;
-            var minFromOpen = closedBarsSinceOpen * minutesPerBar;
-
-            var lb = minFromOpen < MinMinutesFromOpen ? closedBarsSinceOpen : // 0,1,2,3...
-                Math.Min(ChopLookbackBars, closedBarsSinceOpen);
-
-            lbUsed = lb;
-            
-            if (_sessionStartBarIdx < 0 || lb < 2)
-            {
-                reason = $"chop=pass(not-enough-bars lb={lb} closedSinceOpen={closedBarsSinceOpen} minFromOpen={minFromOpen})";
-                return true;
-            }
-
-            hasBars = true;
-
-            var hh = High[barsAgo];
-            var ll = Low[barsAgo];
-
-            for (var i = 1; i <= lb; i++)
-            {
-                hh = Math.Max(hh, High[barsAgo + i]);
-                ll = Math.Min(ll, Low[barsAgo + i]);
-            }
-
-            var rangeTicks = (hh - ll) / TickSize;
-            
-            upTicks = 0.0;
-            downTicks = 0.0;
-
-            for (var i = 0; i < lb; i++)
-            {
-                var d = Close[barsAgo + i] - Close[barsAgo + i + 1];
-                var ticks = Math.Abs(d) / TickSize;
-
-                if (d > 0)
-                    upTicks += ticks;
-                else if (d < 0)
-                    downTicks += ticks;
-            }
-
             if (ChopMinRangeTicks > 0 && rangeTicks <= ChopMinRangeTicks)
             {
                 reason = $"chop=block(range {rangeTicks:0.0} < minRange {ChopMinRangeTicks} lb={lb})";
