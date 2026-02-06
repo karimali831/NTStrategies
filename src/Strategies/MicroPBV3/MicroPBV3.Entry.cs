@@ -372,7 +372,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
             emaSepTicks   = m.SepTicks;
             
-            var chopOk = ComputeChopOk(out _, out _, out _,
+            ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
 
             return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
@@ -385,7 +385,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
             emaSepTicks   = m.SepTicks;
 
-            var chopOk = ComputeChopOk(out _, out _, out _,
+            ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
             
             return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
