@@ -379,10 +379,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
             
-            // calcTicks = upTicks - downTicks;
-            return upTicks >= ChopMinRangeTicks;
-
-            return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
+            // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
+            return m.HasBars && m.PriceAboveFast && upTicks >= ChopMinRangeTicks;
         }
 
         private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
@@ -395,10 +393,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
             
-            // calcTicks = downTicks - upTicks;
-            return downTicks >= ChopMinRangeTicks;
-            
-            return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
+            // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
+            return m.HasBars && m.PriceBelowFast && downTicks >= ChopMinRangeTicks;
         }
         
         private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)
@@ -593,9 +589,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             var c = Close[barsAgo];
             var f0 = emaFast[barsAgo];
             var s0 = emaSlow[barsAgo];
-
-            r.PriceAboveBoth = c > f0 && c > s0;
-            r.PriceBelowBoth = c < f0 && c < s0;
+            
+            r.PriceAboveFast = c > f0;
+            r.PriceBelowFast = c < f0;
+            r.PriceAboveBoth = r.PriceAboveFast && c > s0;
+            r.PriceBelowBoth = r.PriceBelowFast && c < s0;
 
             // --- separation (single source) ---
             r.SepTicks = Math.Abs(f0 - s0) / TickSize;
@@ -651,6 +649,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             public bool HasBars;
             public bool PriceAboveBoth;
             public bool PriceBelowBoth;
+            public bool PriceAboveFast;
+            public bool PriceBelowFast;
 
             public double SlopeDirTicks;      // directional: emaNow - emaPast (ticks)
             public double SlopeStrengthTicks; // your netMove * eff (ticks, non-directional strength score)
