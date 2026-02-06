@@ -209,8 +209,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Determine trend
-                var trendUp   = IsTrendUp(sigClosed, out _, out _, out _, out _);
-                var trendDown = IsTrendDown(sigClosed, out _, out _, out _, out _);
+                var trendUp   = IsTrendUp(sigClosed, out _, out _, out _);
+                var trendDown = IsTrendDown(sigClosed, out _, out _, out _);
                 
                 // Avoid chop zones
                 var chopOk = ComputeChopOk(out _, out _, out _,
@@ -369,7 +369,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
         // Centralized trend logic (use everywhere: entry logic + DIAG)
-        private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out int minTicks, out double calcTicks)
+        private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double calcTicks)
         {
             var m = GetEmaStruct(barsAgo);
 
@@ -378,16 +378,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
-
-            minTicks = 500; 
+            
             calcTicks = upTicks - downTicks;
-
-            return calcTicks >= minTicks;
+            return calcTicks >= ChopMinRangeTicks;
 
             return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
         }
 
-        private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out int minTicks, out double calcTicks)
+        private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double calcTicks)
         {
             var m = GetEmaStruct(barsAgo);
 
@@ -397,10 +395,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
             
-            minTicks = 500;
             calcTicks = downTicks - upTicks;
-
-            return calcTicks >= minTicks;
+            return calcTicks >= ChopMinRangeTicks;
             
             return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
         }

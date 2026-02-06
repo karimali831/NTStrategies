@@ -314,7 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    realizedToday,              // 9
 			    unrealizedNow,              // 10
 			    snap.DownCalcTicks,         // 11
-			    snap.MinTicks,              // 12
+			    ChopMinRangeTicks,          // 12
 			    dailyProfitRemaining,       // 13
 			    snap.UpCalcTicks,           // 14
 			    // notes,                   // 15
@@ -541,8 +541,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        out s.EmaStructureOk);
 
 		    // ---- trend ----
-		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _, out s.MinTicks, out s.UpCalcTicks);
-		    s.TrendDown = IsTrendDown(sigClosed, out _, out _, out _, out s.DownCalcTicks);
+		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _, out s.UpCalcTicks);
+		    s.TrendDown = IsTrendDown(sigClosed, out _, out _, out s.DownCalcTicks);
 
 			// ---- setup components (signal bar) ----
 		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  sigSignal, out s.PbEmaLong,  out  s.PbDistLong);
@@ -621,7 +621,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public string EntryDistCooldownReason;
 
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
-	        public int MinTicks;
 	        public double UpCalcTicks;
 	        public double DownCalcTicks;
         }
