@@ -348,6 +348,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private DateTime prevSessionDate = DateTime.MinValue;
         private DateTime _currentSessionBegin = DateTime.MinValue;
         private DateTime _currentSessionEnd = DateTime.MinValue;
+        private int _sessionStartBarIdx = -1;
 
         private int tradesToday;
         private DayLocked dayLocked = DayLocked.NoLock;

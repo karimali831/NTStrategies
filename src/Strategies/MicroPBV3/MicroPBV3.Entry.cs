@@ -21,6 +21,11 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         protected override void OnBarUpdate()
         {
+            if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
+            {
+                _sessionStartBarIdx = CurrentBar;
+            }
+            
             if (_duplicateBlocked)
             {
                 TryDuplicateSafetyCleanup("OnBarUpdate while duplicate-blocked");
