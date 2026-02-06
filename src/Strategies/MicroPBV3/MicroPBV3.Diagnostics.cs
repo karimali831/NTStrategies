@@ -300,7 +300,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) Trend Ticks: (range={11:C0}, rangeUp={14:C0}, rangeDown={56} \n" +
+			    "  h) Trend Ticks: (range={11:F1}, rangeUp={14:F1}, rangeDown={56:F1} \n" +
 			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
