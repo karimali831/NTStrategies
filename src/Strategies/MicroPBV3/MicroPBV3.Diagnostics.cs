@@ -300,7 +300,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) {23} Entry {24} ({25}, pulledBack={26}, minTicks={12}, upCalcTicks={14} downCalcTicks={11} upTicks={3}, downTicks={32} reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    "  h) {23} Entry {24} ({25}, pulledBack={26}, minTicks={12}, upTicks={3}, downTicks={32} reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
@@ -313,10 +313,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    pnlOrDdLock,                // 8
 			    realizedToday,              // 9
 			    unrealizedNow,              // 10
-			    snap.DownCalcTicks,         // 11
+			    false,                      // 11
 			    ChopMinRangeTicks,          // 12
 			    dailyProfitRemaining,       // 13
-			    snap.UpCalcTicks,           // 14
+			    false,                      // 14
 			    // notes,                   // 15
 			    snap.Blocks,                // 15
 			    snap.AdxOk,                 // 16
@@ -541,8 +541,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        out s.EmaStructureOk);
 
 		    // ---- trend ----
-		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _, out s.UpCalcTicks);
-		    s.TrendDown = IsTrendDown(sigClosed, out _, out _, out s.DownCalcTicks);
+		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _);
+		    s.TrendDown = IsTrendDown(sigClosed, out _, out _);
 
 			// ---- setup components (signal bar) ----
 		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  sigSignal, out s.PbEmaLong,  out  s.PbDistLong);
@@ -621,8 +621,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public string EntryDistCooldownReason;
 
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
-	        public double UpCalcTicks;
-	        public double DownCalcTicks;
         }
     }
 }
