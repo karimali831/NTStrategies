@@ -398,7 +398,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
-            return m.HasBars && m.PriceBelowFast && downTicksChop >= ChopMinRangeTicks && downTicksLongRange < upTicksLongRange;
+            return m.HasBars && m.PriceBelowFast && downTicksChop >= ChopMinRangeTicks && downTicksLongRange > upTicksLongRange;
         }
         
         private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)
