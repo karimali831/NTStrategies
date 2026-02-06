@@ -295,7 +295,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
 			    "  a) Blocks/filters: {15}\n" +
 			    "  b) Wick ticks: {31}\n" +
-			    "  c) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
+			    "  c) PB(prev) vs EMAFast: pbDist={33:F2} pbLong={35} | pbShort={39}\n" +
 			    "  d) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
@@ -336,12 +336,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    dailyMaxProfit,             // 30
 			    wickDiag,                   // 31
 			    snap.ChopDownTicks,         // 32
-			    snap.PbEmaLong,             // 33
-			    snap.PbDistLong,            // 34
+			    snap.PbDist,                // 33
+				false,						// 34
 			    snap.LongPulledBack,        // 35
 			    snap.EmaCrossover,          // 36
-			    snap.PbEmaShort,            // 37
-			    snap.PbDistShort,           // 38
+			    false,                      // 37
+			    false,                      // 38
 			    snap.ShortPulledBack,       // 39
 			    snap.EmaSlopeTicks,         // 40
 			    MinEmaSlopeTicks,           // 41
@@ -545,8 +545,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.TrendDown = IsTrendDown(sigClosed, out _, out _);
 
 			// ---- setup components (signal bar) ----
-		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true, out s.PbEmaLong,  out  s.PbDistLong);
-		    s.ShortPulledBack = PullbackTouchedFastEmaPrevBar(false, out  s.PbEmaShort, out s.PbDistShort);
+		    s.LongPulledBack  = PullbackTouchedFastEmaRecently(true, out s.PbDist);
+		    s.ShortPulledBack = PullbackTouchedFastEmaRecently(false, out  s.PbDist);
 		    
 		    s.LongReclaimed  = Close[sigSignal] > emaFast[sigSignal];
 		    s.ShortReclaimed = Close[sigSignal] < emaFast[sigSignal];
@@ -601,7 +601,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 	        public double AtrTicks;
 	        public double Adx;
-	        public double PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
+	        public double PbDist;
 	        public bool ChopOk;
 	        public double ChopEff;
 	        public bool EntryDistCooldownOk;
