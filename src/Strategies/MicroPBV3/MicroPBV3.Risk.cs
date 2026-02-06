@@ -464,11 +464,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (longSide)
             {
-                // if (!(Close[refBar] > emaFast[refBar] && Close[refBar] > emaSlow[refBar]))
-                // {
-                //     failReason = "close-not-above-both-emas";
-                //     return false;
-                // }
+                if (emaSlow[refBar] < emaFast[refBar])
+                {
+                    if (!(Close[refBar] > emaFast[refBar] && Close[refBar] > emaSlow[refBar]))
+                    {
+                        failReason = "close-not-above-both-emas";
+                        return false;
+                    }
+                }
 
                 if (!(Close[refBar] >= Open[refBar]))
                 {
@@ -486,11 +489,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                // if (!(Close[refBar] < emaFast[refBar] && Close[refBar] < emaSlow[refBar]))
-                // {
-                //     failReason = "close-not-below-both-emas";
-                //     return false;
-                // }
+                if (emaSlow[refBar] > emaFast[refBar])
+                {
+                    if (!(Close[refBar] < emaFast[refBar] && Close[refBar] < emaSlow[refBar]))
+                    {
+                        failReason = "close-not-below-both-emas";
+                        return false;
+                    }
+                }
 
                 if (!(Close[refBar] <= Open[refBar]))
                 {
@@ -510,5 +516,4 @@ namespace NinjaTrader.NinjaScript.Strategies
             return true;
         }
     }
-
 }
