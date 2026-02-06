@@ -223,6 +223,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Enable Momentum Filter", Order = 29, GroupName = "03-Trend & Filters")]
         public bool EnableMomentumFilter { get; set; } = true;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Range ticks diff (0=off)", Order=30, GroupName="03-Trend & Filters")]
+        public int RangeTicksDiff { get; set; } = 120; 
 
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]

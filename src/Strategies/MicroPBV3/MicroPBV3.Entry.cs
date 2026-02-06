@@ -209,8 +209,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Determine trend
-                var trendUp   = IsTrendUp(sigClosed, out _, out _);
-                var trendDown = IsTrendDown(sigClosed, out _, out _);
+                var trendUp   = IsTrendUp(sigClosed, out _, out _, out _);
+                var trendDown = IsTrendDown(sigClosed, out _, out _, out _);
                 
                 // Avoid chop zones
                 var chopOk = ComputeChopOk(out _, out _, out _,
@@ -369,7 +369,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
         // Centralized trend logic (use everywhere: entry logic + DIAG)
-        private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double rangeTicksDiff)
         {
             var m = GetEmaStruct(barsAgo);
 
@@ -380,12 +380,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 out _, out _, out var upTicksChop, out _, out _);
             
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
+
+            rangeTicksDiff = downTicksLongRange - upTicksLongRange;
+            if (rangeTicksDiff <= RangeTicksDiff) 
+                return false;
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
             return m.HasBars && m.PriceAboveFast && upTicksChop >= ChopMinRangeTicks && upTicksLongRange > downTicksLongRange;
         }
 
-        private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double rangeTicksDiff)
         {
             var m = GetEmaStruct(barsAgo);
 
@@ -396,6 +400,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 out _, out _, out var upTicks, out var downTicksChop, out _);
             
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
+
+            rangeTicksDiff = downTicksLongRange - upTicksLongRange;
+            if (rangeTicksDiff <= RangeTicksDiff) 
+                return false;
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
             return m.HasBars && m.PriceBelowFast && downTicksChop >= ChopMinRangeTicks && downTicksLongRange > upTicksLongRange;
