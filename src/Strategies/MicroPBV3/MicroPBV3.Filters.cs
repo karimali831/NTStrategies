@@ -167,42 +167,45 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var barsAgo = SigClosed();                 // always closed bar
             var sigEntry = SigEntry();
-            
+
             var now = Time[sigEntry];
             var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
             var closedBarsSinceOpen = Math.Max(0, CurrentBar - barsAgo);
 
-            var lb = minFromOpen < MinMinutesFromOpen ? Math.Min(closedBarsSinceOpen, ChopLookbackBars) : ChopLookbackBars;
+            var lb = minFromOpen < MinMinutesFromOpen
+                ? Math.Min(closedBarsSinceOpen, ChopLookbackBars)
+                : ChopLookbackBars;
+
             lbUsed = lb;
 
-            if (CurrentBar < barsAgo + lb)
+// guard: not enough bars to evaluate chop
+            if (lb < 2 || CurrentBar < barsAgo + lb)
             {
                 reason = $"chop=pass(not-enough-bars lb={lb})";
                 return true;
             }
 
             hasBars = true;
-
-            // -------------------------
-            // 1) RANGE (magnitude) gate
-            // -------------------------
+            
             var startPrice = Open[barsAgo + lb]; // window start
             var hh = High[barsAgo];
             var ll = Low[barsAgo];
+
             for (var i = 1; i <= lb; i++)
             {
                 hh = Math.Max(hh, High[barsAgo + i]);
                 ll = Math.Min(ll, Low[barsAgo + i]);
             }
-            
+
             upTicks   = Math.Max(0.0, (hh - startPrice) / TickSize);
             downTicks = Math.Max(0.0, (startPrice - ll) / TickSize);
 
             var rangeTicks = (hh - ll) / TickSize;
-            if (ChopMinRangeTicks > 0 && rangeTicks >= ChopMinRangeTicks)
+
+            if (ChopMinRangeTicks > 0 && rangeTicks < ChopMinRangeTicks)
             {
                 reason = $"chop=block(range {rangeTicks:0.0} < minRange {ChopMinRangeTicks} lb={lb})";
-                return true;
+                return false;
             }
 
             // -------------------------
