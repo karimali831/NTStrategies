@@ -475,7 +475,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (EnableChopFilter)
 		    {
 			    s.ChopOk = ComputeChopOk(out s.ChopEff, out s.ChopLbUsed, out s.ChopHasBars,
-				    out s.ChopBypassedAdx, out s.ChopBypassedEmaSlope, out s.ChopReason);
+				    out s.ChopBypassedAdx, out s.ChopBypassedEmaSlope, out s.ChopUpTicks, out s.ChopDownTicks, out s.ChopReason);
 
 			    s.ChopBlockedByEff = !s.ChopOk && s.ChopHasBars; // (best-effort flag)
 		    }
@@ -618,6 +618,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool ChopBypassedAdx;
 	        public bool ChopBypassedEmaSlope;
 	        public bool ChopBlockedByEff;      // true if eff < min AND no bypass
+	        public double ChopUpTicks;
+	        public double ChopDownTicks;
 	        public string ChopReason;          // single readable reason
 
 	        public bool EntryDistCooldownEnabled;

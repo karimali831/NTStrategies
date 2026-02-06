@@ -202,22 +202,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ManageBreakEven();
                     return;
                 }
-
-                var ema = GetEmaStruct(sigClosed);
-
-                var trendUp   = ema.HasBars && ema.PriceAboveBoth && ema.StructureOk;
-                var trendDown = ema.HasBars && ema.PriceBelowBoth && ema.StructureOk;
-
-                if (!trendUp && !trendDown)
+                
+                // Avoid chop zones
+                var chopOk = ComputeChopOk(out _, out _, out _,
+                    out _, out _, out var upTicks, out var downTicks, out _);
+                if (!chopOk)
                 {
                     ManageBreakEven();
                     return;
                 }
                 
-                // Avoid chop zones
-                var chopOk = ComputeChopOk(out _, out _, out _,
-                    out _, out _, out _);
-                if (!chopOk)
+                // Determine trend
+                var ema = GetEmaStruct(sigClosed);
+
+                var trendUp   = ema.HasBars && ema.PriceAboveBoth && ema.StructureOk && upTicks > downTicks;
+                var trendDown = ema.HasBars && ema.PriceBelowBoth && ema.StructureOk && downTicks < upTicks;
+
+                if (!trendUp && !trendDown)
                 {
                     ManageBreakEven();
                     return;

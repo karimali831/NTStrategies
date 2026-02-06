@@ -143,7 +143,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             return true;
         }
        
-        private bool ComputeChopOk(out double eff, out int lbUsed, out bool hasBars, out bool bypassAdx, out bool bypassSlope, out string reason)
+        private bool ComputeChopOk(
+            out double eff, 
+            out int lbUsed, 
+            out bool hasBars, 
+            out bool bypassAdx, 
+            out bool bypassSlope, 
+            out double upTicks,
+            out double downTicks,
+            out string reason)
         {
             eff = 1.0;
             lbUsed = 0;
@@ -151,6 +159,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             bypassAdx = false;
             bypassSlope = false;
             reason = "chop=off";
+            upTicks = 0;
+            downTicks = 0;
 
             if (!EnableChopFilter)
                 return true;
@@ -176,6 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // -------------------------
             // 1) RANGE (magnitude) gate
             // -------------------------
+            var startPrice = Open[barsAgo + lb]; // window start
             var hh = High[barsAgo];
             var ll = Low[barsAgo];
             for (var i = 1; i <= lb; i++)
@@ -183,6 +194,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 hh = Math.Max(hh, High[barsAgo + i]);
                 ll = Math.Min(ll, Low[barsAgo + i]);
             }
+            
+            upTicks   = Math.Max(0.0, (hh - startPrice) / TickSize);
+            downTicks = Math.Max(0.0, (startPrice - ll) / TickSize);
 
             var rangeTicks = (hh - ll) / TickSize;
             if (ChopMinRangeTicks > 0 && rangeTicks >= ChopMinRangeTicks)
