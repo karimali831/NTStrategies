@@ -267,6 +267,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var trend =
 		        snap.TrendUp  ? "trendUp=True" : snap.TrendDown ? "trendDown=True" : "trend=None";
 
+	        trend += $"(upTicksRange={snap.ChopUpTicks}, downTicksRange={snap.ChopDownTicks})";
+
 	        var entrySig = $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
 	        var unrealizedNow = flat ? 0.0 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
 	        var totalToday = realizedToday + unrealizedNow;
@@ -300,12 +302,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    "  h) {23} Entry {24} ({25}, pulledBack={26}, upTicksRange={3}, downTicksRange={32} reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
 			    Contracts,                  // 2
-			    false,                      // 3 (unused but kept)
+			    snap.ChopUpTicks,           // 3
 			    minFromOpen,                // 4
 			    snap.InMainWindow,          // 5
 			    snap.InMidBreak,            // 6
@@ -335,7 +337,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    confirmFail,                // 29
 			    dailyMaxProfit,             // 30
 			    wickDiag,                   // 31
-			    false,                      // 32 (still unused in your output)
+			    snap.ChopDownTicks,         // 32
 			    snap.PbEmaLong,             // 33
 			    snap.PbDistLong,            // 34
 			    snap.LongPulledBack,        // 35
