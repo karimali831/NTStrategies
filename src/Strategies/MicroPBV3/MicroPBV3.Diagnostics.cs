@@ -545,8 +545,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.TrendDown = IsTrendDown(sigClosed, out _, out _);
 
 			// ---- setup components (signal bar) ----
-		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  sigSignal, out s.PbEmaLong,  out  s.PbDistLong);
-		    s.ShortPulledBack = PullbackTouchedFastEmaPrevBar(false, sigSignal, out  s.PbEmaShort, out s.PbDistShort);
+		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true, out s.PbEmaLong,  out  s.PbDistLong);
+		    s.ShortPulledBack = PullbackTouchedFastEmaPrevBar(false, out  s.PbEmaShort, out s.PbDistShort);
 		    
 		    s.LongReclaimed  = Close[sigSignal] > emaFast[sigSignal];
 		    s.ShortReclaimed = Close[sigSignal] < emaFast[sigSignal];

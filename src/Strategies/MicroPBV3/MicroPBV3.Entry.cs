@@ -266,12 +266,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ===== LONG =====
                 if (!submitted && EnableLongs && trendUp)
                 {
-                    var pulledBack = PullbackTouchedFastEmaPrevBar(true, sigSignal, out _, out _);
+                    var pulledBack = PullbackTouchedFastEmaPrevBar(true, out _, out _);
                     var reclaimed  = Close[sigSignal] > emaFast[sigSignal];
 
                     if (pulledBack && reclaimed && TrendConfirm(ConfirmBars, true, sigSignal))
                     {
-                        var tag = "MPB_LONG_" + (++entrySeq);
+                        var tag = "MPB_LONG_" + ++entrySeq;
                         PrepareBracket(tag, atrNow);
 
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
@@ -314,12 +314,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ===== SHORT =====
                 if (!submitted && EnableShorts && trendDown)
                 {
-                    var pulledBack = PullbackTouchedFastEmaPrevBar(false, sigSignal, out _, out _);
+                    var pulledBack = PullbackTouchedFastEmaPrevBar(false, out _, out _);
                     var reclaimed  = Close[sigSignal] < emaFast[sigSignal];
 
                     if (pulledBack && reclaimed && TrendConfirm(ConfirmBars, false, sigSignal))
                     {
-                        var tag = "MPB_SHORT_" + (++entrySeq);
+                        var tag = "MPB_SHORT_" + ++entrySeq;
                         PrepareBracket(tag, atrNow);
 
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
@@ -425,27 +425,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             return distTicks <= MaxEntryDistFromEmaFastTicks;
         }
 
-        private bool PullbackTouchedFastEmaPrevBar(bool longSide, int sigSignal, out double emaTouch, out double distTicks)
+        private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
         {
             emaTouch = 0;
             distTicks = double.NaN;
 
-            if (CurrentBar < sigSignal)
+            var sig = SigClosed();
+
+            if (CurrentBar < sig)
                 return false;
 
-            emaTouch = emaFast[sigSignal];
+            emaTouch = emaFast[sig];
 
             if (longSide)
             {
                 var prox = Math.Max(0, LongTouchTicks) * TickSize;
-                distTicks = (Low[sigSignal] - emaTouch) / TickSize;
-                return Low[sigSignal] <= (emaTouch + prox);
+                distTicks = (Low[sig] - emaTouch) / TickSize;
+                return Low[sig] <= (emaTouch + prox);
             }
             else
             {
                 var prox = Math.Max(0, ShortTouchTicks) * TickSize;
-                distTicks = (High[sigSignal] - emaTouch) / TickSize;
-                return High[sigSignal] >= (emaTouch - prox);
+                distTicks = (High[sig] - emaTouch) / TickSize;
+                return High[sig] >= (emaTouch - prox);
             }
         }
 
