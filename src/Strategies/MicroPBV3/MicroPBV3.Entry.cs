@@ -383,7 +383,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
 
             rangeTicksDiff = upTicksLongRange - downTicksLongRange;
-            if (rangeTicksDiff <= RangeTicksDiff || adx[sigClosed] >= ChopBypassAdx) 
+            if (rangeTicksDiff <= RangeTicksDiff && adx[sigClosed] < ChopBypassAdx) 
                 return false;
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
@@ -404,7 +404,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
 
             rangeTicksDiff = downTicksLongRange - upTicksLongRange;
-            if (rangeTicksDiff <= RangeTicksDiff || adx[sigClosed] >= ChopBypassAdx) 
+            if (rangeTicksDiff <= RangeTicksDiff && adx[sigClosed] < ChopBypassAdx) 
                 return false;
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
