@@ -300,7 +300,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, diff={57:0.001} \n" +
+			    "  h) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, upDiff={57:0.001}, downDiff={58:0.00}) \n" +
 			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
@@ -361,7 +361,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    snap.EntryDistBlockBarsLeft,      // 54
 			    snap.EntryDistCooldownReason,     // 55
 			    snap.RangeDownTicks,			  // 56
-			    snap.RangeTicksDiff				  // 57
+			    snap.RangeTicksUpDiff,			  // 57
+			    snap.RangeTicksDownDiff			  // 58
 			));
         }
         
@@ -542,8 +543,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        out s.EmaStructureOk);
 
 		    // ---- trend ----
-		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _, out s.RangeTicksDiff);
-		    s.TrendDown = IsTrendDown(sigClosed, out _, out _, out s.RangeTicksDiff);
+		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _, out s.RangeTicksUpDiff);
+		    s.TrendDown = IsTrendDown(sigClosed, out _, out _, out s.RangeTicksDownDiff);
 		    
 		    TrendTicks(30, out _, out _, out s.RangeTicks, out s.RangeUpTicks, out s.RangeDownTicks);
 
@@ -621,7 +622,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public double RangeUpTicks;
 	        public double RangeDownTicks;
 	        public double RangeTicks;
-	        public double RangeTicksDiff;
+	        public double RangeTicksUpDiff;
+	        public double RangeTicksDownDiff;
 	        public string ChopReason;          // single readable reason
 
 	        public bool EntryDistCooldownEnabled;
