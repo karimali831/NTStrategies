@@ -267,7 +267,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var trend =
 		        snap.TrendUp  ? "trendUp=True" : snap.TrendDown ? "trendDown=True" : "trend=None";
 
-	        trend += $"(upTicksRange={snap.ChopUpTicks}, downTicksRange={snap.ChopDownTicks})";
+	        trend += $", upTicksRange={snap.ChopUpTicks}, downTicksRange={snap.ChopDownTicks}";
 
 	        var entrySig = $" idx(sigSignal={sigSignal}@{tSignal:HH:mm:ss}, sigEntry={sigEntry}@{tEntry:HH:mm:ss});";
 	        var unrealizedNow = flat ? 0.0 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
