@@ -6,6 +6,8 @@ namespace NinjaTrader.NinjaScript.Strategies
     public partial class MicroPBV3 : Strategy
     {
        private bool HasMomentum(
+            int bip,                 // which series to use (0 = primary 5m)
+            int barsAgo,             // evaluate bar (1 = last closed bar)
             bool longSide,
             out string failReason,
             out double er,
@@ -15,74 +17,53 @@ namespace NinjaTrader.NinjaScript.Strategies
             out double clv)
         {
             failReason = "ok";
-            er = 0;
-            avgOverlap = 0;
-            bodyTicks = 0;
-            wickBody = 0;
-            clv = 0;
+            er = 0; avgOverlap = 0; bodyTicks = 0; wickBody = 0; clv = 0;
 
             if (!EnableMomentumFilter)
                 return true;
 
-            const int    structureBars   = 6;     // bars used for HH/HL check (current logic)
-            const int    erLookback      = 10;
-            const double minER           = 0.38;
-            const int    overlapLookback = 10;
-            const double maxAvgOverlap   = 0.55;
-            const int    minBodyTicksReq = 10;
-            const double maxWickBodyReq  = 1.2;
-            const double minClvAbsReq    = 0.35;
+            const int    erLookback       = 10;
+            const double minER            = 0.38;
+            const int    overlapLookback  = 10;
+            const double maxAvgOverlap    = 0.55;
+            const int    minBodyTicksReq  = 10;
+            const double maxWickBodyReq   = 1.2;
+            const double minClvAbsReq     = 0.35;
 
-            if (CurrentBar < Math.Max(erLookback, overlapLookback) + structureBars + 2)
+            // Make sure requested series has enough bars
+            if (CurrentBars.Length <= bip)
+            {
+                failReason = "invalid-bip";
+                return false;
+            }
+
+            int cb = CurrentBars[bip];
+            int needed = barsAgo + Math.Max(erLookback, overlapLookback) + 2;
+            if (cb < needed)
             {
                 failReason = "insufficient-bars";
                 return false;
             }
 
-            // =========================================================
-            // 1) STRUCTURE: (your existing bar-to-bar check)
-            // =========================================================
-            var structureOk = true;
-
-            for (var i = 0; i < structureBars - 1; i++)
-            {
-                if (longSide)
-                {
-                    if (!(High[i] > High[i + 1] || Low[i] > Low[i + 1]))
-                    {
-                        structureOk = false;
-                        break;
-                    }
-                }
-                else
-                {
-                    if (!(High[i] < High[i + 1] || Low[i] < Low[i + 1]))
-                    {
-                        structureOk = false;
-                        break;
-                    }
-                }
-            }
-
-            if (!structureOk)
-            {
-                failReason = longSide ? "structure-fail-long" : "structure-fail-short";
-                return false;
-            }
+            // Helpers for series access
+            double O(int ba) => Opens[bip][ba];
+            double H(int ba) => Highs[bip][ba];
+            double L(int ba) => Lows[bip][ba];
+            double C(int ba) => Closes[bip][ba];
 
             // =========================================================
-            // 2) EFFICIENCY RATIO (kills chop)
+            // 1) ER (efficiency) on the intended bar window
+            //    Use barsAgo offset so you're not accidentally measuring the forming bar
             // =========================================================
-            var net = Math.Abs(Close[0] - Close[erLookback]);
+            double net = Math.Abs(C(barsAgo) - C(barsAgo + erLookback));
             double sum = 0;
 
-            for (var i = 0; i < erLookback; i++)
-                sum += Math.Abs(Close[i] - Close[i + 1]);
+            for (int i = 0; i < erLookback; i++)
+                sum += Math.Abs(C(barsAgo + i) - C(barsAgo + i + 1));
 
             if (sum <= TickSize)
             {
                 failReason = "er-sum-too-small";
-                er = 0;
                 return false;
             }
 
@@ -94,21 +75,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // =========================================================
-            // 3) BAR OVERLAP (compression / grind)
+            // 2) Overlap / compression
             // =========================================================
             double overlapSum = 0;
 
             for (int i = 0; i < overlapLookback; i++)
             {
-                var h0 = High[i];
-                var l0 = Low[i];
-                var h1 = High[i + 1];
-                var l1 = Low[i + 1];
+                double h0 = H(barsAgo + i);
+                double l0 = L(barsAgo + i);
+                double h1 = H(barsAgo + i + 1);
+                double l1 = L(barsAgo + i + 1);
 
-                var overlap = Math.Min(h0, h1) - Math.Max(l0, l1);
+                double overlap = Math.Min(h0, h1) - Math.Max(l0, l1);
                 if (overlap < 0) overlap = 0;
 
-                var range = Math.Max(TickSize, Math.Max(h0 - l0, h1 - l1));
+                double range = Math.Max(TickSize, Math.Max(h0 - l0, h1 - l1));
                 overlapSum += overlap / range;
             }
 
@@ -120,14 +101,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // =========================================================
-            // 4) IMPULSE BAR (kills tiny wicks / dojis)
+            // 3) Impulse on the signal bar
             // =========================================================
-            var o = Open[0];
-            var h = High[0];
-            var l = Low[0];
-            var c = Close[0];
+            double o = O(barsAgo);
+            double h = H(barsAgo);
+            double l = L(barsAgo);
+            double c = C(barsAgo);
 
-            var body = Math.Abs(c - o);
+            double body = Math.Abs(c - o);
             bodyTicks = body / TickSize;
 
             if (bodyTicks < minBodyTicksReq)
@@ -136,9 +117,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            var upperWick = h - Math.Max(o, c);
-            var lowerWick = Math.Min(o, c) - l;
-            var wicks = Math.Max(0, upperWick) + Math.Max(0, lowerWick);
+            double upperWick = h - Math.Max(o, c);
+            double lowerWick = Math.Min(o, c) - l;
+            double wicks = Math.Max(0, upperWick) + Math.Max(0, lowerWick);
 
             wickBody = wicks / Math.Max(TickSize, body);
             if (wickBody > maxWickBodyReq)
@@ -147,9 +128,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            // Close location value (-1..+1)
-            var rangeBar = Math.Max(TickSize, h - l);
-            clv = ((c - l) - (h - c)) / rangeBar;
+            double rangeBar = Math.Max(TickSize, h - l);
+            clv = ((c - l) - (h - c)) / rangeBar; // -1..+1
 
             if (Math.Abs(clv) < minClvAbsReq)
             {
@@ -157,20 +137,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            if (longSide && clv < 0)
-            {
-                failReason = "clv-wrong-side-long";
-                return false;
-            }
+            if (longSide && clv < 0) { failReason = "clv-wrong-side-long"; return false; }
+            if (!longSide && clv > 0) { failReason = "clv-wrong-side-short"; return false; }
 
-            if (!longSide && clv > 0)
-            {
-                failReason = "clv-wrong-side-short";
-                return false;
-            }
-
-            failReason = "ok";
             return true;
         }
+
     }
 }

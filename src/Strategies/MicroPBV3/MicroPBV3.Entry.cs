@@ -291,10 +291,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             return;
                         }
 
-                        if (EnableMomentumFilter && !HasMomentum(true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
                             if (DebugMode)
-                                Print($"{Time[0]} MOMO=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} MOMentum=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
                             return;
                         }
 
@@ -339,10 +339,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             return;
                         }
                         
-                        if (EnableMomentumFilter && !HasMomentum(false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
                             if (DebugMode)
-                                Print($"{Time[0]} MOMO=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} MOMentum=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
                             return;
                         }
 
