@@ -486,11 +486,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                if (!(Close[refBar] < emaFast[refBar] && Close[refBar] < emaSlow[refBar]))
-                {
-                    failReason = "close-not-below-both-emas";
-                    return false;
-                }
+                // if (!(Close[refBar] < emaFast[refBar] && Close[refBar] < emaSlow[refBar]))
+                // {
+                //     failReason = "close-not-below-both-emas";
+                //     return false;
+                // }
 
                 if (!(Close[refBar] <= Open[refBar]))
                 {

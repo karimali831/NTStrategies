@@ -289,12 +289,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                             return;
                         }
                         
-                        if (!BodyMidpointOnCorrectSide(sigSignal, true, emaF))
-                        {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG signal body midpoint not above EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
-                            return;
-                        }
+                        // if (!BodyMidpointOnCorrectSide(sigSignal, true, emaF))
+                        // {
+                        //     if (DebugMode)
+                        //         Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG signal body midpoint not above EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
+                        //     return;
+                        // }
 
                         if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
@@ -337,12 +337,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                             return;
                         }
                         
-                        if (!BodyMidpointOnCorrectSide(sigSignal, false, emaF))
-                        {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT signal body midpoint not below EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
-                            return;
-                        }
+                        // if (!BodyMidpointOnCorrectSide(sigSignal, false, emaF))
+                        // {
+                        //     if (DebugMode)
+                        //         Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT signal body midpoint not below EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
+                        //     return;
+                        // }
                         
                         if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
@@ -407,7 +407,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var c = Close[barsAgo];
             var mid = (o + c) * 0.5;
 
-            return longSide ? (mid > ema) : (mid < ema);
+            return longSide ? mid > ema : mid < ema;
         }
 
         private bool PassesEntryDistanceFilter(double entryTriggerPrice, int sigSignal, out double distTicks)
