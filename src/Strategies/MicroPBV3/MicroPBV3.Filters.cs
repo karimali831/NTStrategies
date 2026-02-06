@@ -1,4 +1,5 @@
 ﻿using System;
+using NinjaTrader.Data;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -165,23 +166,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableChopFilter)
                 return true;
 
-            var barsAgo  = SigClosed();   // 0 on OnBarClose, 1 on intrabar
-            var sigEntry = SigEntry();
-
-            var now = Time[sigEntry];
-            var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
-
+            var barsAgo  = SigClosed(); 
+            
             var closedBarsSinceOpen = 0;
             if (_sessionStartBarIdx >= 0)
                 closedBarsSinceOpen = Math.Max(0, (CurrentBar - _sessionStartBarIdx) - barsAgo);
+            
+            var minutesPerBar = BarsPeriod.BarsPeriodType == BarsPeriodType.Minute ? BarsPeriod.Value : 1;
+            var minFromOpen = closedBarsSinceOpen * minutesPerBar;
 
-            var lb = (minFromOpen < MinMinutesFromOpen)
-                ? Math.Min(closedBarsSinceOpen, ChopLookbackBars)
-                : ChopLookbackBars;
+            var lb = minFromOpen < MinMinutesFromOpen ? closedBarsSinceOpen : // 0,1,2,3...
+                Math.Min(ChopLookbackBars, closedBarsSinceOpen);
 
             lbUsed = lb;
-
-            if (_sessionStartBarIdx < 0 || lb < 2 || closedBarsSinceOpen < lb)
+            
+            if (_sessionStartBarIdx < 0 || lb < 2)
             {
                 reason = $"chop=pass(not-enough-bars lb={lb} closedSinceOpen={closedBarsSinceOpen} minFromOpen={minFromOpen})";
                 return true;
@@ -205,8 +204,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             for (int i = 0; i < lb; i++)
             {
-                double d = Close[barsAgo + i] - Close[barsAgo + i + 1];
-                double ticks = Math.Abs(d) / TickSize;
+                var d = Close[barsAgo + i] - Close[barsAgo + i + 1];
+                var ticks = Math.Abs(d) / TickSize;
 
                 if (d > 0)
                     upTicks += ticks;
@@ -214,11 +213,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     downTicks += ticks;
             }
 
-            if (ChopMinRangeTicks > 0 && rangeTicks < ChopMinRangeTicks)
+            if (ChopMinRangeTicks > 0 && rangeTicks <= ChopMinRangeTicks)
             {
                 reason = $"chop=block(range {rangeTicks:0.0} < minRange {ChopMinRangeTicks} lb={lb})";
                 return false;
             }
+
+            return true;
 
             // -------------------------
             // 2) FLIP-RATE (alternation)
