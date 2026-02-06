@@ -489,7 +489,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                if (emaSlow[refBar] > emaFast[refBar])
+                if (emaSlow[refBar] < emaFast[refBar])
                 {
                     if (!(Close[refBar] < emaFast[refBar] && Close[refBar] < emaSlow[refBar]))
                     {
