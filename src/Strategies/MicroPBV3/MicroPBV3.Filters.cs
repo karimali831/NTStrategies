@@ -202,7 +202,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             upTicks = 0.0;
             downTicks = 0.0;
 
-            for (int i = 0; i < lb; i++)
+            for (var i = 0; i < lb; i++)
             {
                 var d = Close[barsAgo + i] - Close[barsAgo + i + 1];
                 var ticks = Math.Abs(d) / TickSize;

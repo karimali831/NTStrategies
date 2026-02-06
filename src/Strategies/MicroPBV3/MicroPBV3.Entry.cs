@@ -211,7 +211,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Determine trend
                 var trendUp   = IsTrendUp(sigClosed, out _, out _);
                 var trendDown = IsTrendDown(sigClosed, out _, out _);
-
                 
                 // Avoid chop zones
                 var chopOk = ComputeChopOk(out _, out _, out _,
@@ -380,6 +379,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
 
+            return upTicks - downTicks >= 500;
+
             return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
         }
 
@@ -392,6 +393,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             ComputeChopOk(out _, out _, out _,
                 out _, out _, out var upTicks, out var downTicks, out _);
+            
+            return downTicks - upTicks >= 500;
             
             return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
         }
@@ -587,8 +590,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             var f0 = emaFast[barsAgo];
             var s0 = emaSlow[barsAgo];
 
-            r.PriceAboveBoth = (c > f0) && (c > s0);
-            r.PriceBelowBoth = (c < f0) && (c < s0);
+            r.PriceAboveBoth = c > f0 && c > s0;
+            r.PriceBelowBoth = c < f0 && c < s0;
 
             // --- separation (single source) ---
             r.SepTicks = Math.Abs(f0 - s0) / TickSize;
