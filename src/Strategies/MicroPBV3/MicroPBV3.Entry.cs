@@ -385,6 +385,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             rangeTicksDiff = upTicksLongRange - downTicksLongRange;
             if (rangeTicksDiff <= RangeTicksDiff && adx[sigClosed] < ChopBypassAdx) 
                 return false;
+
+            // ugly 
+            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff < RangeTicksDiff / 50.0)
+                return false;
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
             return m.HasBars && m.PriceAboveFast && upTicksChop >= ChopMinRangeTicks && upTicksLongRange > downTicksLongRange;
@@ -405,6 +409,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             rangeTicksDiff = downTicksLongRange - upTicksLongRange;
             if (rangeTicksDiff <= RangeTicksDiff && adx[sigClosed] < ChopBypassAdx) 
+                return false;
+            
+            // ugly 
+            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff < RangeTicksDiff / 50.0)
                 return false;
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
