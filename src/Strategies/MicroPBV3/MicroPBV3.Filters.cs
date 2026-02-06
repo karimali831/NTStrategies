@@ -185,10 +185,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             var rangeTicks = (hh - ll) / TickSize;
-            if (ChopMinRangeTicks > 0 && rangeTicks < ChopMinRangeTicks)
+            if (ChopMinRangeTicks > 0 && rangeTicks >= ChopMinRangeTicks)
             {
                 reason = $"chop=block(range {rangeTicks:0.0} < minRange {ChopMinRangeTicks} lb={lb})";
-                return false;
+                return true;
             }
 
             // -------------------------
