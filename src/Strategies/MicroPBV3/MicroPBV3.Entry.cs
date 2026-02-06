@@ -203,21 +203,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
                 
+                // Determine trend
+                var trendUp   = IsTrendUp(sigClosed, out _, out _);
+                var trendDown = IsTrendDown(sigClosed, out _, out _);
+
+                
                 // Avoid chop zones
                 var chopOk = ComputeChopOk(out _, out _, out _,
-                    out _, out _, out var upTicks, out var downTicks, out _);
+                    out _, out _, out _, out _, out _);
+                
                 if (!chopOk)
                 {
                     ManageBreakEven();
                     return;
                 }
                 
-                // Determine trend
-                var ema = GetEmaStruct(sigClosed);
-
-                var trendUp   = ema.HasBars && ema.PriceAboveBoth && ema.StructureOk && upTicks > downTicks;
-                var trendDown = ema.HasBars && ema.PriceBelowBoth && ema.StructureOk && downTicks < upTicks;
-
                 if (!trendUp && !trendDown)
                 {
                     ManageBreakEven();
@@ -371,8 +371,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
             emaSepTicks   = m.SepTicks;
+            
+            var chopOk = ComputeChopOk(out _, out _, out _,
+                out _, out _, out var upTicks, out var downTicks, out _);
 
-            return m.HasBars && m.PriceAboveBoth && m.StructureOk;
+            return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
         }
 
         private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
@@ -382,8 +385,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
             emaSepTicks   = m.SepTicks;
 
-            // For downtrends you still want structure, but price must be below both EMAs.
-            return m.HasBars && m.PriceBelowBoth && m.StructureOk;
+            var chopOk = ComputeChopOk(out _, out _, out _,
+                out _, out _, out var upTicks, out var downTicks, out _);
+            
+            return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
         }
         
         private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)
