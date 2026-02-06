@@ -371,6 +371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Centralized trend logic (use everywhere: entry logic + DIAG)
         private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double rangeTicksDiff)
         {
+            var sigClosed = SigClosed();
             var m = GetEmaStruct(barsAgo);
 
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
@@ -381,8 +382,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
 
-            rangeTicksDiff = downTicksLongRange - upTicksLongRange;
-            if (rangeTicksDiff <= RangeTicksDiff) 
+            rangeTicksDiff = upTicksLongRange - downTicksLongRange;
+            if (rangeTicksDiff <= RangeTicksDiff || adx[sigClosed] >= ChopBypassAdx) 
                 return false;
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
@@ -391,6 +392,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks, out double rangeTicksDiff)
         {
+            var sigClosed = SigClosed();
             var m = GetEmaStruct(barsAgo);
 
             emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
@@ -402,7 +404,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrendTicks(30, out _, out _, out _, out var upTicksLongRange, out var downTicksLongRange);
 
             rangeTicksDiff = downTicksLongRange - upTicksLongRange;
-            if (rangeTicksDiff <= RangeTicksDiff) 
+            if (rangeTicksDiff <= RangeTicksDiff || adx[sigClosed] >= ChopBypassAdx) 
                 return false;
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
