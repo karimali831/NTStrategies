@@ -165,24 +165,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableChopFilter)
                 return true;
 
-            var barsAgo = SigClosed();                 // always closed bar
+            var barsAgo = SigClosed();   // 0 or 1
             var sigEntry = SigEntry();
 
             var now = Time[sigEntry];
             var minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
-            var closedBarsSinceOpen = Math.Max(0, CurrentBar - barsAgo);
+            
+            var closedBarsSinceOpen = 0;
+            if (entryBarIdx >= 0)
+                closedBarsSinceOpen = Math.Max(0, (CurrentBar - entryBarIdx) - barsAgo);
 
-            var lb = minFromOpen < MinMinutesFromOpen
+            var lb = (minFromOpen < MinMinutesFromOpen)
                 ? Math.Min(closedBarsSinceOpen, ChopLookbackBars)
                 : ChopLookbackBars;
 
             lbUsed = lb;
-            
-            if (lb < 2 || CurrentBar < barsAgo + lb)
+
+            if (lb < 2 || entryBarIdx < 0 || CurrentBar < barsAgo + lb)
             {
-                reason = $"chop=pass(not-enough-bars lb={lb})";
+                reason = $"chop=pass(not-enough-bars lb={lb} closedSinceOpen={closedBarsSinceOpen} minFromOpen={minFromOpen})";
                 return true;
             }
+
 
             hasBars = true;
 
