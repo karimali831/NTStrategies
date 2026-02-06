@@ -177,8 +177,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 : ChopLookbackBars;
 
             lbUsed = lb;
-
-// guard: not enough bars to evaluate chop
+            
             if (lb < 2 || CurrentBar < barsAgo + lb)
             {
                 reason = $"chop=pass(not-enough-bars lb={lb})";
@@ -186,8 +185,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             hasBars = true;
-            
-            var startPrice = Open[barsAgo + lb]; // window start
+
             var hh = High[barsAgo];
             var ll = Low[barsAgo];
 
@@ -197,10 +195,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ll = Math.Min(ll, Low[barsAgo + i]);
             }
 
-            upTicks   = Math.Max(0.0, (hh - startPrice) / TickSize);
-            downTicks = Math.Max(0.0, (startPrice - ll) / TickSize);
-
             var rangeTicks = (hh - ll) / TickSize;
+            
+            upTicks = 0.0;
+            downTicks = 0.0;
+
+            for (int i = 0; i < lb; i++)
+            {
+                double d = Close[barsAgo + i] - Close[barsAgo + i + 1];
+                double ticks = Math.Abs(d) / TickSize;
+
+                if (d > 0)
+                    upTicks += ticks;
+                else if (d < 0)
+                    downTicks += ticks;
+            }
 
             if (ChopMinRangeTicks > 0 && rangeTicks < ChopMinRangeTicks)
             {
