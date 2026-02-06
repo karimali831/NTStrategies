@@ -464,11 +464,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (longSide)
             {
-                if (!(Close[refBar] > emaFast[refBar] && Close[refBar] > emaSlow[refBar]))
-                {
-                    failReason = "close-not-above-both-emas";
-                    return false;
-                }
+                // if (!(Close[refBar] > emaFast[refBar] && Close[refBar] > emaSlow[refBar]))
+                // {
+                //     failReason = "close-not-above-both-emas";
+                //     return false;
+                // }
 
                 if (!(Close[refBar] >= Open[refBar]))
                 {
