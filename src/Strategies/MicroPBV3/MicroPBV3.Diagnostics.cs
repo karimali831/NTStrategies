@@ -297,8 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  b) Wick ticks: {31}\n" +
 			    "  c) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
 			    "  d) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
-			    "  e) Trend: slowSlopeTicks={11}, fastSlopeTicks={14}" +
-			    // "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
+			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
 			    "  f) Chop: ok={48} eff={49:0.00} (min={50:0.00}, lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
 			    "  h) {23} Entry {24} ({25}, pulledBack={26}, minTicks={12}, upTicks={3}, downTicks={32} reclaimed={27}, confirm={28}, confirmFail={29})\n" +
@@ -314,10 +313,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    pnlOrDdLock,                // 8
 			    realizedToday,              // 9
 			    unrealizedNow,              // 10
-			    snap.SlowSlopeTicks,        // 11
+			    false,                      // 11
 			    ChopMinRangeTicks,          // 12
 			    dailyProfitRemaining,       // 13
-			    snap.FastSlopeTicks,        // 14
+			    false,                      // 14
 			    // notes,                   // 15
 			    snap.Blocks,                // 15
 			    snap.AdxOk,                 // 16
@@ -542,8 +541,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        out s.EmaStructureOk);
 
 		    // ---- trend ----
-		    s.TrendUp   = IsTrendUp(sigClosed, out s.FastSlopeTicks, out s.SlowSlopeTicks);
-		    s.TrendDown = IsTrendDown(sigClosed, out s.FastSlopeTicks, out s.SlowSlopeTicks);
+		    s.TrendUp   = IsTrendUp(sigClosed, out _, out _);
+		    s.TrendDown = IsTrendDown(sigClosed, out _, out _);
 
 			// ---- setup components (signal bar) ----
 		    s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true, out s.PbEmaLong,  out  s.PbDistLong);
@@ -589,7 +588,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool TimeOk, InMainWindow, InMidBreak, HasSessionStart, DayOk, TradeCountOk, SpacingOk;
 	        public bool WickOk, AtrOk, AdxOk, VolBlocked;
 	        public bool TrendUp, TrendDown;
-	        public double FastSlopeTicks, SlowSlopeTicks;
 
 	        public bool EmaSlopeOk, EmaSepOk, EmaCrossover, EmaStructureOk;
 	        public double EmaSlopeTicks, EmaSepTicks;
