@@ -266,7 +266,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ===== LONG =====
                 if (!submitted && EnableLongs && trendUp)
                 {
-                    var pulledBack = PullbackTouchedFastEmaRecently(true, out _);
+                    var pulledBack = PullbackTouchedFastEmaPrevBar(true, out _, out _);
                     var reclaimed  = Close[sigSignal] > emaFast[sigSignal];
 
                     if (pulledBack && reclaimed && TrendConfirm(ConfirmBars, true, sigSignal))
@@ -314,7 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ===== SHORT =====
                 if (!submitted && EnableShorts && trendDown)
                 {
-                    var pulledBack = PullbackTouchedFastEmaRecently(false, out _);
+                    var pulledBack = PullbackTouchedFastEmaPrevBar(false, out _, out _);
                     var reclaimed  = Close[sigSignal] < emaFast[sigSignal];
 
                     if (pulledBack && reclaimed && TrendConfirm(ConfirmBars, false, sigSignal))
@@ -425,64 +425,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             return distTicks <= MaxEntryDistFromEmaFastTicks;
         }
 
-        private bool PullbackTouchedFastEmaRecently(
-            bool longSide,
-            out double bestDistTicks)
+        private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
         {
-            var lookbackBars = 3;
-            bestDistTicks = double.MaxValue;
+            emaTouch = 0;
+            distTicks = double.NaN;
 
-            if (CurrentBar < lookbackBars)
+            var sig = SigClosed();
+
+            if (CurrentBar < sig)
                 return false;
 
-            double emaNow = emaFast[0];
-            double proxTicks = longSide ? LongTouchTicks : ShortTouchTicks;
+            emaTouch = emaFast[sig];
 
-            for (int i = 1; i <= lookbackBars; i++)
+            if (longSide)
             {
-                double ema = emaFast[i];
-                double dist;
-
-                if (longSide)
-                    dist = (Low[i] - ema) / TickSize;
-                else
-                    dist = (ema - High[i]) / TickSize;
-
-                bestDistTicks = Math.Min(bestDistTicks, dist);
-
-                if (dist <= proxTicks)
-                    return true;
+                var prox = Math.Max(0, LongTouchTicks) * TickSize;
+                distTicks = (Low[sig] - emaTouch) / TickSize;
+                return Low[sig] <= (emaTouch + prox);
             }
-
-            return false;
+            else
+            {
+                var prox = Math.Max(0, ShortTouchTicks) * TickSize;
+                distTicks = (High[sig] - emaTouch) / TickSize;
+                return High[sig] >= (emaTouch - prox);
+            }
         }
-
-        
-        // private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
-        // {
-        //     emaTouch = 0;
-        //     distTicks = double.NaN;
-        //
-        //     var sig = SigClosed();
-        //
-        //     if (CurrentBar < sig)
-        //         return false;
-        //
-        //     emaTouch = emaFast[sig];
-        //
-        //     if (longSide)
-        //     {
-        //         var prox = Math.Max(0, LongTouchTicks) * TickSize;
-        //         distTicks = (Low[sig] - emaTouch) / TickSize;
-        //         return Low[sig] <= (emaTouch + prox);
-        //     }
-        //     else
-        //     {
-        //         var prox = Math.Max(0, ShortTouchTicks) * TickSize;
-        //         distTicks = (High[sig] - emaTouch) / TickSize;
-        //         return High[sig] >= (emaTouch - prox);
-        //     }
-        // }
 
         // ✅ NEW overload (add this ABOVE your existing ComputeEmaStructure)
         // ADD: overload for diagnostics (and reporting) that returns ticks too
