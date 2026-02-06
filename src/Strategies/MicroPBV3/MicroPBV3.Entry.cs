@@ -369,37 +369,121 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
         // Centralized trend logic (use everywhere: entry logic + DIAG)
-        private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        // private bool IsTrendUp(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        // {
+        //     var m = GetEmaStruct(barsAgo);
+        //
+        //     emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
+        //     emaSepTicks   = m.SepTicks;
+        //     
+        //     ComputeChopOk(out _, out _, out _,
+        //         out _, out _, out var upTicks, out var downTicks, out _);
+        //     
+        //     // calcTicks = upTicks - downTicks;
+        //     return upTicks >= ChopMinRangeTicks;
+        //
+        //     return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
+        // }
+        //
+        // private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        // {
+        //     var m = GetEmaStruct(barsAgo);
+        //
+        //     emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
+        //     emaSepTicks   = m.SepTicks;
+        //
+        //     ComputeChopOk(out _, out _, out _,
+        //         out _, out _, out var upTicks, out var downTicks, out _);
+        //     
+        //     // calcTicks = downTicks - upTicks;
+        //     return downTicks >= ChopMinRangeTicks;
+        //     
+        //     return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
+        // }
+        
+        private bool IsTrendUp(
+            int barsAgo,
+            out double fastSlopeTicks,
+            out double slowSlopeTicks)
         {
-            var m = GetEmaStruct(barsAgo);
-
-            emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks if that’s what you want to expose
-            emaSepTicks   = m.SepTicks;
+            fastSlopeTicks = 0;
+            slowSlopeTicks = 0;
             
-            ComputeChopOk(out _, out _, out _,
-                out _, out _, out var upTicks, out var downTicks, out _);
-            
-            // calcTicks = upTicks - downTicks;
-            return upTicks >= ChopMinRangeTicks;
+            var TrendSlopeLookbackBars = 12;
+            var MinTrendSlopeTicks    = 5;
+            var MaxCounterTrendPullbackTicks = 20;
 
-            return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
+            // need enough bars for slope
+            if (CurrentBar < barsAgo + TrendSlopeLookbackBars)
+                return false;
+
+            // EMA alignment
+            if (emaFast[barsAgo] <= emaSlow[barsAgo])
+                return false;
+
+            // slope over lookback
+            double fastNow  = emaFast[barsAgo];
+            double fastPast = emaFast[barsAgo + TrendSlopeLookbackBars];
+            double slowNow  = emaSlow[barsAgo];
+            double slowPast = emaSlow[barsAgo + TrendSlopeLookbackBars];
+
+            fastSlopeTicks = (fastNow - fastPast) / TickSize;
+            slowSlopeTicks = (slowNow - slowPast) / TickSize;
+
+            if (fastSlopeTicks <= MinTrendSlopeTicks)
+                return false;
+
+            if (slowSlopeTicks <= MinTrendSlopeTicks)
+                return false;
+
+            // optional: price location filter (prevents countertrend shorts near fast EMA)
+            double priceDistTicks = (Close[barsAgo] - emaFast[barsAgo]) / TickSize;
+            if (priceDistTicks < -MaxCounterTrendPullbackTicks)
+                return false;
+
+            return true;
         }
 
-        private bool IsTrendDown(int barsAgo, out double emaSlopeTicks, out double emaSepTicks)
+        
+        private bool IsTrendDown(
+            int barsAgo,
+            out double fastSlopeTicks,
+            out double slowSlopeTicks)
         {
-            var m = GetEmaStruct(barsAgo);
+            fastSlopeTicks = 0;
+            slowSlopeTicks = 0;
 
-            emaSlopeTicks = m.SlopeStrengthTicks; // or m.SlopeDirTicks
-            emaSepTicks   = m.SepTicks;
+            var TrendSlopeLookbackBars = 12;
+            var MinTrendSlopeTicks    = 5;
+            var MaxCounterTrendPullbackTicks = 20;
+            
+            if (CurrentBar < barsAgo + TrendSlopeLookbackBars)
+                return false;
 
-            ComputeChopOk(out _, out _, out _,
-                out _, out _, out var upTicks, out var downTicks, out _);
-            
-            // calcTicks = downTicks - upTicks;
-            return downTicks >= ChopMinRangeTicks;
-            
-            return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
+            if (emaFast[barsAgo] >= emaSlow[barsAgo])
+                return false;
+
+            double fastNow  = emaFast[barsAgo];
+            double fastPast = emaFast[barsAgo + TrendSlopeLookbackBars];
+            double slowNow  = emaSlow[barsAgo];
+            double slowPast = emaSlow[barsAgo + TrendSlopeLookbackBars];
+
+            fastSlopeTicks = (fastPast - fastNow) / TickSize;
+            slowSlopeTicks = (slowPast - slowNow) / TickSize;
+
+            if (fastSlopeTicks <= MinTrendSlopeTicks)
+                return false;
+
+            if (slowSlopeTicks <= MinTrendSlopeTicks)
+                return false;
+
+            double priceDistTicks = (emaFast[barsAgo] - Close[barsAgo]) / TickSize;
+            if (priceDistTicks < -MaxCounterTrendPullbackTicks)
+                return false;
+
+            return true;
         }
+
         
         private bool BodyMidpointOnCorrectSide(int barsAgo, bool longSide, double ema)
         {
