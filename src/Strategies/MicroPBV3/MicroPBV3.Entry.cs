@@ -387,7 +387,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
 
             // ugly 
-            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff < RangeTicksDiff / 2.0)
+            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff <= 50)
                 return false;
             
             // return m.HasBars && m.PriceAboveBoth && m.StructureOk && upTicks > downTicks;
@@ -412,7 +412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             
             // ugly 
-            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff < RangeTicksDiff / 2.0)
+            if (adx[sigClosed] >= ChopBypassAdx && rangeTicksDiff <= 50)
                 return false;
             
             // return m.HasBars && m.PriceBelowBoth && m.StructureOk && downTicks > upTicks;
