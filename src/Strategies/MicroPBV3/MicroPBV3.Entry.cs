@@ -277,13 +277,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
                         var trigger = NormalizeBuyStopPrice(rawTrigger);
 
-                        if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
+                        if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
                         {
                             if (EntryDistCooldownBars > 0)
                                 _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                             if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG prior bar too large: rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars}");
 
                             ManageBreakEven();
                             return;
@@ -325,13 +325,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
                         var trigger = NormalizeSellStopPrice(rawTrigger);
 
-                        if (!PassesEntryDistanceFilter(trigger, sigSignal, out var distTicksToEma))
+                        if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
                         {
                             if (EntryDistCooldownBars > 0)
                                 _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                             if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT trigger too far from EMAFast: distTicks={distTicksToEma:0.0} > max={MaxEntryDistFromEmaFastTicks} cooldownBars={EntryDistCooldownBars}");
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT prior bar too large: rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars}");
 
                             ManageBreakEven();
                             return;
@@ -428,19 +428,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             return longSide ? mid > ema : mid < ema;
         }
 
-        private bool PassesEntryDistanceFilter(double entryTriggerPrice, int sigSignal, out double distTicks)
+        private bool PassesEntryDistanceFilter(out double distTicks)
         {
             distTicks = 0;
+            var sigSignal = SigSignal();
 
-            if (MaxEntryDistFromEmaFastTicks <= 0)
+            if (MaxPriorBarRangeTicks <= 0)
                 return true;
 
-            var ema = emaFast[sigSignal];
-            if (ema <= 0 || double.IsNaN(ema) || double.IsInfinity(ema))
+            var barsAgo = Math.Max(1, sigSignal + 1);
+
+            if (CurrentBar < barsAgo)
                 return true;
 
-            distTicks = Math.Abs(entryTriggerPrice - ema) / TickSize;
-            return distTicks <= MaxEntryDistFromEmaFastTicks;
+            var barHigh = High[barsAgo];
+            var barLow  = Low[barsAgo];
+
+            distTicks = (barHigh - barLow) / TickSize;
+
+            return distTicks <= MaxPriorBarRangeTicks;
         }
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)

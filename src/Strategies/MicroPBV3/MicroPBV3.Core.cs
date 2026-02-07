@@ -180,8 +180,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(0, 2000)]
-        [Display(Name = "Max entry distance from EMA fast (ticks, 0=off)", Order = 20, GroupName = "03-Trend & Filters")]
-        public int MaxEntryDistFromEmaFastTicks { get; set; } = 200;
+        [Display(
+            Name = "Max prior bar range (ticks, 0=off)",
+            Description = "Blocks entry if the previous bar range exceeds this value",
+            Order = 20,
+            GroupName = "03-Trend & Filters")]
+        public int MaxPriorBarRangeTicks { get; set; } = 200;
         
         [NinjaScriptProperty]
         [Range(0, 20)]
