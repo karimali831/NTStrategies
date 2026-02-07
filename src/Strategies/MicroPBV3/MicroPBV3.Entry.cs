@@ -259,9 +259,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // (submitted declared above for reporting)
                 var buf = TickSize;
                 var qty = GetEntryQty(sigEntry);
-                
-                // Fast EMA
-                var emaF = emaFast[sigSignal];
 
                 // ===== LONG =====
                 if (!submitted && EnableLongs && trendUp)
@@ -431,13 +428,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool PassesEntryDistanceFilter(out double distTicks)
         {
             distTicks = 0;
-            var sigSignal = SigSignal();
 
             if (MaxPriorBarRangeTicks <= 0)
                 return true;
 
-            var barsAgo = Math.Max(1, sigSignal + 1);
-
+            var barsAgo = SigClosed();        // last CLOSED bar (0 on OBC, 1 intrabar)
             if (CurrentBar < barsAgo)
                 return true;
 
@@ -445,9 +440,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var barLow  = Low[barsAgo];
 
             distTicks = (barHigh - barLow) / TickSize;
-
             return distTicks <= MaxPriorBarRangeTicks;
         }
+
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
         {
