@@ -273,6 +273,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
                         var trigger = NormalizeBuyStopPrice(rawTrigger);
+                        
+                        if (!IsMarketEfficient(out var erNow))
+                        {
+                            if (DebugMode)
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG market inefficient: er={erNow:0.00} < min=0.32 lb=10");
+                            return;
+                        }
 
                         if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
                         {
@@ -285,13 +292,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ManageBreakEven();
                             return;
                         }
-                        
-                        // if (!BodyMidpointOnCorrectSide(sigSignal, true, emaF))
-                        // {
-                        //     if (DebugMode)
-                        //         Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG signal body midpoint not above EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
-                        //     return;
-                        // }
 
                         if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
@@ -321,6 +321,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
                         var trigger = NormalizeSellStopPrice(rawTrigger);
+                        
+                        if (!IsMarketEfficient(out var erNow))
+                        {
+                            if (DebugMode)
+                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG market inefficient: er={erNow:0.00} < min=0.32 lb=10");
+                            return;
+                        }
 
                         if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
                         {
@@ -333,13 +340,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ManageBreakEven();
                             return;
                         }
-                        
-                        // if (!BodyMidpointOnCorrectSide(sigSignal, false, emaF))
-                        // {
-                        //     if (DebugMode)
-                        //         Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT signal body midpoint not below EMAFast (mid={(Open[sigSignal]+Close[sigSignal])*0.5:F2}, ema={emaF:F2})");
-                        //     return;
-                        // }
                         
                         if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
                         {
@@ -443,6 +443,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             return distTicks <= MaxPriorBarRangeTicks;
         }
 
+        public bool IsMarketEfficient(out double er)
+        {
+            const int erLookbackBars = 10;
+            const double erMin = 0.32;
+
+            er = 0;
+
+            var barsAgo = SigClosed();   // ALWAYS last closed bar
+
+            if (CurrentBar < barsAgo + erLookbackBars)
+                return true; // fail-open during warmup
+
+            var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + erLookbackBars]);
+
+            double grossMove = 0;
+            for (var i = barsAgo; i < barsAgo + erLookbackBars; i++)
+                grossMove += Math.Abs(Close[i] - Close[i + 1]);
+
+            if (grossMove <= TickSize)
+                return false;
+
+            er = netMove / grossMove;
+            return er >= erMin;
+        }
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
         {
