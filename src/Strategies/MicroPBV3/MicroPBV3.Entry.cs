@@ -440,6 +440,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             trendOverride = false;
             trendOverrideReason = "";
 
+            if (!EnableMarketTradeable)
+                return true;
+
             const double ADX_OVERRIDE_MIN_IMPULSE = 30;
             const double ADX_OVERRIDE_MIN_PULLBACK = 20;   // key change
             const double MIN_SLOPE_TICKS = 20;

@@ -132,7 +132,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
 			    "  h) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, diff={57:0.00}) \n" +
-			    "  i) Market Tradeable: (er={58:0.00}, lookback={59}, erMin={60:F1}, override={61} overrideReason={62}) \n" +
+			    "  i) Market Tradeable: {63} (er={58:0.00}, lookback={59}, erMin={60:F1}, override={61} overrideReason={62}) \n" +
 			    "  j) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
@@ -198,7 +198,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				lookback,						  // 59
 			    erMin,							  // 60
 			    trendOverride,                    // 61
-			    trendOverrideReason               // 62
+			    trendOverrideReason,              // 62
+			    !EnableMarketTradeable            // 63
+				    ? "Disabled" : tradeable 
+					    ? "True" : "False" 
 			));
         }
         

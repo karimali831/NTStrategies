@@ -232,6 +232,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Range ticks diff (0=off)", Order=30, GroupName="03-Trend & Filters")]
         public int RangeTicksDiff { get; set; } = 120; 
 
+        [NinjaScriptProperty]
+        [Display(Name="Is market tradeable (0=off)", Order=31, GroupName="03-Trend & Filters")]
+        public bool EnableMarketTradeable { get; set; } = true; 
+
+        
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]
         [Range(1, int.MaxValue)]
