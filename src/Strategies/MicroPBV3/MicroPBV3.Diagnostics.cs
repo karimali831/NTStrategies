@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        var pnlOrDdLock = !DayNotLocked() || !snap.TradeCountOk;
 
 	        // Wick filter should match entry gating (use sigClosed)
-	        var wickDiag = BuildWickDiag(sigClosed);
+	        // var wickDiag = BuildWickDiag(sigClosed);
 	        
 	        // Base filters
 	        var baseLongFilter =
@@ -122,14 +122,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        Print(string.Format(
 			    "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
 			    "  a) Blocks/filters: {15}\n" +
-			    "  b) Wick ticks: {31}\n" +
-			    "  c) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
-			    "  d) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
-			    "  e) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
-			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
-			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
-			    "  h) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, diff={57:0.00}) \n" +
-			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    // "  b) Wick ticks: {31}\n" +
+			    "  b) PB(prev) vs EMAFast: ema={33:F2} distTicks={34:F1} pbLong={35} | ema={37:F2} distTicks={38:F1} pbShort={39}\n" +
+			    "  c) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
+			    "  d) EMA structure: slopeTicks={40:F1} (min={41:F1}, lb={42}) ok={43} | sepTicks={44:F1} (min={45:F1}) | emaCrossover={36}, ok={46} structureOk={47}\n" +
+			    "  e) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
+			    "  f) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
+			    "  g) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, diff={57:0.00}) \n" +
+			    "  h) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
@@ -162,7 +162,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    snap.TrendUp ? snap.LongConfirm    : snap.ShortConfirm,    // 28
 			    confirmFail,                // 29
 			    dailyMaxProfit,             // 30
-			    wickDiag,                   // 31
+			    false, //wickDiag,                   // 31
 			    snap.ChopDownTicks,         // 32
 			    snap.PbEmaLong,             // 33
 			    snap.PbDistLong,            // 34
@@ -195,65 +195,65 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private static string OkIcon(bool ok) { return ok ? "✔" : "✖"; }
         
-        private string BuildWickDiag(int sigClosed)
-        {
-	        if (WickFilterLookback <= 0)
-		        return "wick=off";
+        // private string BuildWickDiag(int sigClosed)
+        // {
+	       //  if (WickFilterLookback <= 0)
+		      //   return "wick=off";
+        //
+	       //  // Report the same bars your wick filter checks
+	       //  if (WickOnlyPreviousBar)
+	       //  {
+		      //   GetWickTickStats(sigClosed, out var u, out var l, out var bp);
+        //
+		      //   var pass = PassesWickFilter(sigClosed);
+		      //   return $"wick[b{sigClosed}]=U{u:0.0} L{l:0.0} body%={bp:0.00} pass={pass}";
+	       //  }
+        //
+	       //  var max = Math.Min(WickFilterLookback, CurrentBar - sigClosed);
+	       //  if (max <= 0)
+		      //   return "wick=insufficient-bars";
+        //
+	       //  var sb = new StringBuilder();
+	       //  sb.Append("wick[");
+        //
+	       //  for (var i = 0; i < max; i++)
+	       //  {
+		      //   var barsAgo = sigClosed + i;
+        //
+		      //   GetWickTickStats(barsAgo, out var u, out var l, out var bp);
+		      //   
+		      //   var pass = PassesWickFilter(barsAgo);
+        //
+		      //   if (i > 0) sb.Append(" | ");
+		      //   sb.Append($"b{barsAgo}:U{u:0.0} L{l:0.0} body%={bp:0.00} {(pass ? "OK" : "BLOCK")}");
+	       //  }
+        //
+	       //  sb.Append("]");
+	       //  return sb.ToString();
+        // }
 
-	        // Report the same bars your wick filter checks
-	        if (WickOnlyPreviousBar)
-	        {
-		        GetWickTickStats(sigClosed, out var u, out var l, out var bp);
-
-		        var pass = PassesWickFilter(sigClosed);
-		        return $"wick[b{sigClosed}]=U{u:0.0} L{l:0.0} body%={bp:0.00} pass={pass}";
-	        }
-
-	        var max = Math.Min(WickFilterLookback, CurrentBar - sigClosed);
-	        if (max <= 0)
-		        return "wick=insufficient-bars";
-
-	        var sb = new StringBuilder();
-	        sb.Append("wick[");
-
-	        for (var i = 0; i < max; i++)
-	        {
-		        var barsAgo = sigClosed + i;
-
-		        GetWickTickStats(barsAgo, out var u, out var l, out var bp);
-		        
-		        var pass = PassesWickFilter(barsAgo);
-
-		        if (i > 0) sb.Append(" | ");
-		        sb.Append($"b{barsAgo}:U{u:0.0} L{l:0.0} body%={bp:0.00} {(pass ? "OK" : "BLOCK")}");
-	        }
-
-	        sb.Append("]");
-	        return sb.ToString();
-        }
-
-        private void GetWickTickStats(int barsAgo, out double upperTicks, out double lowerTicks, out double bodyPctOfRange)
-        {
-            upperTicks = 0;
-            lowerTicks = 0;
-            bodyPctOfRange = 0;
-
-            var o = Open[barsAgo];
-            var c = Close[barsAgo];
-            var h = High[barsAgo];
-            var l = Low[barsAgo];
-
-            var range = Math.Max(h - l, TickSize);
-            var body = Math.Abs(c - o);
-
-            var upperWick = h - Math.Max(o, c);
-            var lowerWick = Math.Min(o, c) - l;
-
-            upperTicks = upperWick / TickSize;
-            lowerTicks = lowerWick / TickSize;
-
-            bodyPctOfRange = body / range;
-        }
+        // private void GetWickTickStats(int barsAgo, out double upperTicks, out double lowerTicks, out double bodyPctOfRange)
+        // {
+        //     upperTicks = 0;
+        //     lowerTicks = 0;
+        //     bodyPctOfRange = 0;
+        //
+        //     var o = Open[barsAgo];
+        //     var c = Close[barsAgo];
+        //     var h = High[barsAgo];
+        //     var l = Low[barsAgo];
+        //
+        //     var range = Math.Max(h - l, TickSize);
+        //     var body = Math.Abs(c - o);
+        //
+        //     var upperWick = h - Math.Max(o, c);
+        //     var lowerWick = Math.Min(o, c) - l;
+        //
+        //     upperTicks = upperWick / TickSize;
+        //     lowerTicks = lowerWick / TickSize;
+        //
+        //     bodyPctOfRange = body / range;
+        // }
 
         private bool HasWorkingEntryOrder()
         {
@@ -347,7 +347,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    }
 
 		    // ---- wick ----
-		    s.WickOk = RecentBarsAreCleanForEntry(sigClosed);
+		    // s.WickOk = RecentBarsAreCleanForEntry(sigClosed);
+		    s.WickOk = PassesWickQualityFilter(out var avgWickPct);
 		    
 		    //-- Market Tradeable/Efficient --//
 		    s.IsMarketTradable = IsMarketTradable(out var erNow, out var trendOverride);
@@ -416,7 +417,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (!s.TradeCountOk) blocks.Add("max-trades");
 		    if (!s.SpacingOk) blocks.Add("min-minutes-between");
 		    if (!s.EntryDistCooldownOk) blocks.Add("entry-dist-cooldown");
-		    if (!s.WickOk) blocks.Add("wick-filter");
+		    if (!s.WickOk) blocks.Add("wick-filter " + $"(avgWickPct={avgWickPct:0.00} lb=4)");
 		    if (!s.AtrOk) blocks.Add("atr-too-high");
 		    if (!s.AdxOk) blocks.Add("adx-out-of-range");
 		    if (EnableChopFilter && !s.ChopOk)
