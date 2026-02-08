@@ -118,6 +118,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			        tradesToday));
 		        return;
 	        }
+	        
+	        // out double er, out int lookback, out double erMin, out bool trendOverride
+	        var tradeable = IsMarketTradable(out var er, out var lookback, out var erMin, out var trendOverride, out var trendOverrideReason);
 
 	        Print(string.Format(
 			    "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
@@ -129,7 +132,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    "  f) Chop: ok={48} eff={49:0.00} (minEff={50:0.00}, minTicks={12}, upTicks={3}, downTicks={32} lb={51}) reason={52}\n"  +
 			    "  g) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
 			    "  h) Trend Ticks: (range={11:0.00}, rangeUp={14:0.00}, rangeDown={56:0.00}, diff={57:0.00}) \n" +
-			    "  i) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
+			    "  i) Market Tradeable: (er={58:0.00}, lookback={59}, erMin={60:F1}, override={61} overrideReason={62}) \n" +
+			    "  j) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
 			    "-------------------------------------------------------------------------------------------------------\n",
 			    tSignal,                    // 0
 			    accountName,                // 1
@@ -189,7 +193,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    snap.EntryDistBlockBarsLeft,      // 54
 			    snap.EntryDistCooldownReason,     // 55
 			    snap.RangeDownTicks,			  // 56
-			    snap.RangeTicksDiff 			  // 57
+			    snap.RangeTicksDiff, 			  // 57
+				er,								  // 58
+				lookback,						  // 59
+			    erMin,							  // 60
+			    trendOverride,                    // 61
+			    trendOverrideReason               // 62
 			));
         }
         
@@ -350,7 +359,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.WickOk = RecentBarsAreCleanForEntry(sigClosed);
 		    
 		    //-- Market Tradeable/Efficient --//
-		    s.IsMarketTradable = IsMarketTradable(out var erNow, out var trendOverride);
+		    s.IsMarketTradable = IsMarketTradable(out _, out _, out _, out _, out _);
 		    
 		    // ---- ATR ----
 		    var atrNow = Math.Max(atr[sigClosed], TickSize);
@@ -428,7 +437,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    {
 			    blocks.Add($"no-momentum: (reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00})");
 		    }
-		    if (!s.IsMarketTradable) blocks.Add("regime-volatile: " + $"(er={erNow:0.00} override={(trendOverride ? "YES" : "NO")} " + $"adx={adx[SigClosed()]:0.0})");
+		    if (!s.IsMarketTradable) blocks.Add("regime-volatile");
 		    if (!s.PasseEntryDistance) blocks.Add($"long-prior-bar-too-large: (rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars})");
 
 

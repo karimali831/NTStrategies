@@ -273,7 +273,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
                         var trigger = NormalizeBuyStopPrice(rawTrigger);
 
-                        if (!IsMarketTradable(out _, out _))
+                        if (!IsMarketTradable(out _, out _, out _ , out _, out _ ))
                         {
                             ManageBreakEven();
                             return;
@@ -316,7 +316,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
                         var trigger = NormalizeSellStopPrice(rawTrigger);
                         
-                        if (!IsMarketTradable(out _, out _))
+                        if (!IsMarketTradable(out _, out _, out _ , out _, out _ ))
                         {
                             ManageBreakEven();
                             return;
@@ -432,35 +432,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             return distTicks <= MaxPriorBarRangeTicks;
         }
 
-        private bool IsMarketTradable(out double er, out bool trendOverride)
+        private bool IsMarketTradable(out double er, out int lookback, out double erMin, out bool trendOverride, out string trendOverrideReason)
         {
-            const int    ER_LOOKBACK = 10;
-            const double ER_MIN = 0.32;
+            lookback = 10;
+            erMin = 0.32;
+            er = 0;
+            trendOverride = false;
+            trendOverrideReason = "";
 
             const double ADX_OVERRIDE_MIN_IMPULSE = 30;
             const double ADX_OVERRIDE_MIN_PULLBACK = 20;   // key change
             const double MIN_SLOPE_TICKS = 20;
             const double MIN_SEP_TICKS   = 12;
 
-            er = 0;
-            trendOverride = false;
-
             var barsAgo = SigClosed();
 
-            if (CurrentBar < barsAgo + ER_LOOKBACK)
+            if (CurrentBar < barsAgo + lookback)
                 return true;
             
             // ---- Efficiency ----
-            var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + ER_LOOKBACK]);
+            var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + lookback]);
 
             double grossMove = 0;
-            for (var i = barsAgo; i < barsAgo + ER_LOOKBACK; i++)
+            for (var i = barsAgo; i < barsAgo + lookback; i++)
                 grossMove += Math.Abs(Close[i] - Close[i + 1]);
 
             if (grossMove > TickSize)
                 er = netMove / grossMove;
 
-            var erOk = er >= ER_MIN;
+            var erOk = er >= erMin;
 
             // ---- Trend override ----
             var adxVal = adx[barsAgo];
@@ -468,7 +468,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var sepTicks   = Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
 
             // Impulse override (strong trend)
-            bool overrideImpulse =
+            var overrideImpulse =
                 adxVal >= ADX_OVERRIDE_MIN_IMPULSE &&
                 slopeTicks >= MIN_SLOPE_TICKS &&
                 sepTicks   >= MIN_SEP_TICKS;
@@ -482,6 +482,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             // final
             trendOverride = overrideImpulse || overridePullback;
 
+            if (overrideImpulse)
+            {
+                trendOverrideReason = "override-impulse";
+            }
+
+            if (overridePullback)
+            {
+                trendOverrideReason = "override-pullback";
+            }
+            
             return erOk || trendOverride;
         }
 
