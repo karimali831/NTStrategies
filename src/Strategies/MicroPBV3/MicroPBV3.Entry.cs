@@ -180,13 +180,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // if (!RecentBarsAreCleanForEntry(sigClosed))
-                // {
-                //     ManageBreakEven();
-                //     return;
-                // }
-                
-                if (!PassesWickQualityFilter(out _))
+                if (!RecentBarsAreCleanForEntry(sigClosed))
                 {
                     ManageBreakEven();
                     return;
@@ -284,7 +278,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ManageBreakEven();
                             return;
                         }
-                        
+
                         if (!PassesEntryDistanceFilter(out _))
                         {
                             if (EntryDistCooldownBars > 0)
@@ -436,58 +430,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             distTicks = (barHigh - barLow) / TickSize;
             return distTicks <= MaxPriorBarRangeTicks;
-        }
-        
-        private bool PassesWickQualityFilter(out double avgWickPct)
-        {
-            const int LOOKBACK = 4;
-            const double MAX_AVG_WICK_PCT = 0.60;
-            const double MAX_SINGLE_WICK_PCT = 0.70;
-
-            avgWickPct = 0;
-
-            var barsAgo = SigClosed();
-
-            if (CurrentBar < barsAgo + LOOKBACK)
-                return true;
-
-            double wickPctSum = 0;
-            var barsUsed = 0;
-            var singleBarViolation = false;
-
-            for (var i = barsAgo; i < barsAgo + LOOKBACK; i++)
-            {
-                var high  = High[i];
-                var low   = Low[i];
-                var open  = Open[i];
-                var close = Close[i];
-
-                var range = high - low;
-                if (range <= TickSize)
-                    continue;
-
-                var body = Math.Abs(close - open);
-                var wick = range - body;
-
-                var wickPct = wick / range;
-
-                wickPctSum += wickPct;
-                barsUsed++;
-
-                if (wickPct >= MAX_SINGLE_WICK_PCT)
-                    singleBarViolation = true;
-            }
-
-            if (barsUsed == 0)
-                return true;
-
-            avgWickPct = wickPctSum / barsUsed;
-
-            // block conditions AFTER avg is computed
-            if (singleBarViolation)
-                return false;
-
-            return avgWickPct <= MAX_AVG_WICK_PCT;
         }
 
         private bool IsMarketTradable(out double er, out bool trendOverride)
@@ -644,52 +586,52 @@ namespace NinjaTrader.NinjaScript.Strategies
             ComputeEmaStructure(sigSignal, out _, out _, out slopeOk, out sepOk, out emaCrossover, out structureOk);
         }
 
-        // private bool PassesWickFilter(int barsAgo)
-        // {
-        //     var o = Open[barsAgo];
-        //     var c = Close[barsAgo];
-        //     var h = High[barsAgo];
-        //     var l = Low[barsAgo];
-        //
-        //     var range = Math.Max(h - l, TickSize);
-        //     var body = Math.Abs(c - o);
-        //
-        //     var upperWick = h - Math.Max(o, c);
-        //     var lowerWick = Math.Min(o, c) - l;
-        //
-        //     var upperTicks = upperWick / TickSize;
-        //     var lowerTicks = lowerWick / TickSize;
-        //
-        //     if (MaxBothWicksTicks > 0 && upperTicks >= MaxBothWicksTicks && lowerTicks >= MaxBothWicksTicks)
-        //         return false;
-        //
-        //     if (WickBlockSingleWick && MaxSingleWickTicks > 0 && (upperTicks >= MaxSingleWickTicks || lowerTicks >= MaxSingleWickTicks))
-        //         return false;
-        //
-        //     if (WickBlockSmallBody && MinBodyPctOfRange > 0 && (body / range) < MinBodyPctOfRange)
-        //         return false;
-        //
-        //     return true;
-        // }
+        private bool PassesWickFilter(int barsAgo)
+        {
+            var o = Open[barsAgo];
+            var c = Close[barsAgo];
+            var h = High[barsAgo];
+            var l = Low[barsAgo];
 
-        // private bool RecentBarsAreCleanForEntry(int sig)
-        // {
-        //     if (WickFilterLookback <= 0)
-        //         return true;
-        //
-        //     if (WickOnlyPreviousBar)
-        //         return PassesWickFilter(sig);
-        //
-        //     var max = Math.Min(WickFilterLookback, CurrentBar - sig);
-        //     for (var i = 0; i < max; i++)
-        //     {
-        //         var barsAgo = sig + i;
-        //         if (!PassesWickFilter(barsAgo))
-        //             return false;
-        //     }
-        //
-        //     return true;
-        // }
+            var range = Math.Max(h - l, TickSize);
+            var body = Math.Abs(c - o);
+
+            var upperWick = h - Math.Max(o, c);
+            var lowerWick = Math.Min(o, c) - l;
+
+            var upperTicks = upperWick / TickSize;
+            var lowerTicks = lowerWick / TickSize;
+
+            if (MaxBothWicksTicks > 0 && upperTicks >= MaxBothWicksTicks && lowerTicks >= MaxBothWicksTicks)
+                return false;
+
+            if (WickBlockSingleWick && MaxSingleWickTicks > 0 && (upperTicks >= MaxSingleWickTicks || lowerTicks >= MaxSingleWickTicks))
+                return false;
+
+            if (WickBlockSmallBody && MinBodyPctOfRange > 0 && (body / range) < MinBodyPctOfRange)
+                return false;
+
+            return true;
+        }
+
+        private bool RecentBarsAreCleanForEntry(int sig)
+        {
+            if (WickFilterLookback <= 0)
+                return true;
+
+            if (WickOnlyPreviousBar)
+                return PassesWickFilter(sig);
+
+            var max = Math.Min(WickFilterLookback, CurrentBar - sig);
+            for (var i = 0; i < max; i++)
+            {
+                var barsAgo = sig + i;
+                if (!PassesWickFilter(barsAgo))
+                    return false;
+            }
+
+            return true;
+        }
 
         private EmaStruct GetEmaStruct(int barsAgo)
         {
