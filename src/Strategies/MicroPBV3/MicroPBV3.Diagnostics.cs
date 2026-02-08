@@ -15,180 +15,8 @@ using NinjaTrader.NinjaScript.Indicators;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-
     public partial class MicroPBV3 : Strategy
     {
-        // =========================
-        // End-of-run DIAG reporting
-        // =========================
-        // private int _diagEvalCount = 0;
-        // private int _diagAcceptedCount = 0;
-        // private int _diagDeniedCount = 0;
-        //
-        // // reason -> count
-        // private readonly Dictionary<string, int> _diagDeniedByReason = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-        // private void DiagRecordAccepted()
-        // {
-        //     _diagAcceptedCount++;
-        // }
-        //
-        // private void DiagRecordDenied(IEnumerable<string> reasons)
-        // {
-        //     _diagDeniedCount++;
-        //     if (reasons == null)
-        //         return;
-        //
-        //     foreach (var r in reasons)
-        //     {
-        //         if (string.IsNullOrWhiteSpace(r))
-        //             continue;
-        //
-        //         if (_diagDeniedByReason.TryGetValue(r, out var c))
-        //             _diagDeniedByReason[r] = c + 1;
-        //         else
-        //             _diagDeniedByReason[r] = 1;
-        //     }
-        // }
-
-        /// <summary>
-        /// Track accepted/denied trade *candidates* (not every bar).
-        /// A "candidate" is a fully-formed setup (pullback+reclaim+confirm) that would be taken if all gating filters passed.
-        /// </summary>
-   //      private void TrackEntryDecisionForReport(int sigSignal, int sigEntry, int sigClosed, int minFromOpen, bool submitted)
-   //      {
-   //          if (!EnableEndOfRunReport)
-   //              return;
-   //
-   //          // Don't spam during optimizations/analyzer runs
-   //          if (IsInStrategyAnalyzer)
-   //              return;
-   //
-   //          // Only evaluate once per primary-series evaluation pass while flat
-   //          _diagEvalCount++;
-   //
-   //          if (submitted)
-   //          {
-   //              DiagRecordAccepted();
-   //              return;
-   //          }
-   //
-   //          var snap = EvaluateEntrySnapshot(sigSignal, sigEntry, sigClosed, minFromOpen);
-   //
-   //          if (!snap.AnyCandidate)
-	  //           return;
-   //
-   //          // Entry distance (approx: use same trigger logic)
-   //          var distOk = true;
-   //          if (MaxEntryDistFromEmaFastTicks > 0)
-   //          {
-	  //           var buf = TickSize;
-	  //           if (snap.LongCandidate)
-	  //           {
-		 //            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
-		 //            var trigger = NormalizeBuyStopPrice(rawTrigger);
-		 //            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
-	  //           }
-	  //           else if (snap.ShortCandidate)
-	  //           {
-		 //            var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
-		 //            var trigger = NormalizeSellStopPrice(rawTrigger);
-		 //            distOk = PassesEntryDistanceFilter(trigger, sigSignal, out _);
-	  //           }
-   //          }
-   //          
-   //
-   //          // PnL locks (evaluate without side effects)
-   //          var dailyKillOk = true;
-   //          var dailyProfitOk = true;
-   //          var consistencyOk = true;
-   //          var dailyKill = GetDailyKillLimitUsd();
-   //          var dailyProfit = GetDailyProfitLimitUsd();
-   //          var realizedToday = GetRealizedToday();
-   //          var totalToday = GetTotalTodayPnlIncludingOpen();
-   //          if (dailyKill > 0 && totalToday <= -dailyKill)
-   //              dailyKillOk = false;
-   //          if (dailyProfit > 0 && realizedToday >= dailyProfit)
-   //              dailyProfitOk = false;
-   //          // consistency: reuse your existing logic without locking
-   //          var pct = GetConsistencyPct();
-   //          if (pct > 0)
-   //          {
-   //              var profitBeforeToday = GetProfitBeforeToday();
-   //              if (profitBeforeToday > 0 && realizedToday > 0)
-   //              {
-   //                  var maxToday = (pct / (1.0 - pct)) * profitBeforeToday;
-   //                  if (realizedToday > maxToday)
-   //                      consistencyOk = false;
-   //              }
-   //          }
-   //
-   //          // Working entry order blocks (you already treat this as a block in DIAG)
-   //          var noWorkingEntryOrder = !HasWorkingEntryOrder();
-   //
-   //          // Build denial reasons (multi)
-   //          var reasons = new List<string>(8);
-   //          if (!snap.TimeOk) reasons.Add((MidBreakEndMin > MidBreakStartMin && minFromOpen >= MidBreakStartMin && minFromOpen < MidBreakEndMin) ? "mid-break" : "outside-time-window");
-   //          if (!snap.DayOk) reasons.Add("dayLocked");
-   //          if (!snap.TradeCountOk) reasons.Add("max-trades");
-   //          if (!snap.SpacingOk) reasons.Add("min-minutes-between");
-   //          if (!snap.WickOk) reasons.Add("wick-filter");
-   //          if (!snap.AtrOk) reasons.Add("atr-too-high");
-   //
-			// // EMA structure reasons
-			// if (!snap.EmaStructureOk) reasons.Add("ema-structure");
-			// if (!snap.EmaSlopeOk)     reasons.Add("ema-slope");
-			// if (!snap.EmaSepOk)       reasons.Add("ema-separation");
-   //
-   //          if (!snap.AdxOk) reasons.Add("adx-out-of-range");
-   //          if (!distOk) reasons.Add("ema-distance");
-			// // dailyKillOk/dailyProfitOk/consistencyOk
-   //          if (!dailyKillOk) reasons.Add("max-daily-loss");
-   //          if (!dailyProfitOk) reasons.Add("daily-profit");
-   //          if (!consistencyOk) reasons.Add("consistency");
-   //          if (!noWorkingEntryOrder) reasons.Add("entry-order-working");
-   //          if (!snap.ChopOk) reasons.Add("chop-filter");
-   //          if (!snap.EntryDistCooldownOk) reasons.Add("entry-dist-cooldown");
-   //          if (reasons.Count == 0) reasons.Add("other");
-   //
-   //          DiagRecordDenied(reasons);
-   //      }
-
-        // private void PrintEndOfRunReport()
-        // {
-        //     if (!EnableEndOfRunReport)
-        //         return;
-        //
-        //     if (IsInStrategyAnalyzer)
-        //         return;
-        //
-        //     try
-        //     {
-        //         Print("================================================================================");
-        //         Print($"[DIAG REPORT] {Name}  evals={_diagEvalCount} accepted={_diagAcceptedCount} denied={_diagDeniedCount}");
-        //
-        //         if (_diagDeniedCount <= 0)
-        //         {
-        //             Print("[DIAG REPORT] No denied candidates recorded.");
-        //             Print("================================================================================");
-        //             return;
-        //         }
-        //
-        //         // sort reasons by count desc
-        //         foreach (var kv in _diagDeniedByReason.OrderByDescending(x => x.Value).ThenBy(x => x.Key))
-        //         {
-        //             Print($"[DIAG REPORT]   denied: {kv.Value,5}  reason={kv.Key}");
-        //         }
-        //
-        //         Print("================================================================================");
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         if (DebugMode)
-        //             Print("[DIAG REPORT] error: " + ex.Message);
-        //     }
-        // }
-
         private bool IsWithinTradingWindow()
         {
             if (sessionStart == DateTime.MinValue)
@@ -463,7 +291,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.TradeCountOk = tradesToday < MaxTradesPerDay;
 		    
 		    // -- Chop filter ---
-		    s.ChopEnabled = EnableChopFilter;
 		    s.ChopOk = true;
 		    s.ChopEff = 1.0;
 		    s.ChopLbUsed = 0;
@@ -480,7 +307,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			    s.ChopBlockedByEff = !s.ChopOk && s.ChopHasBars; // (best-effort flag)
 		    }
-
+		    
 			// -- Entry Dist Cooldown ---
 		    s.EntryDistCooldownEnabled = EntryDistCooldownBars > 0;
 		    s.EntryDistCooldownOk = true;
@@ -521,7 +348,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    // ---- wick ----
 		    s.WickOk = RecentBarsAreCleanForEntry(sigClosed);
-
+		    
+		    //-- Market Tradeable/Efficient --//
+		    s.IsMarketTradable = IsMarketTradable(out var erNow, out var trendOverride);
+		    
 		    // ---- ATR ----
 		    var atrNow = Math.Max(atr[sigClosed], TickSize);
 		    s.AtrTicks = atrNow / TickSize;
@@ -531,6 +361,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // ---- ADX ----
 		    s.Adx = adx[sigClosed];
 		    s.AdxOk = s.Adx >= ADXMin && s.Adx <= ADXMax;
+		    
+		    //-- ENTRY DISTANCE ----
+		    s.PasseEntryDistance = PassesEntryDistanceFilter(out var priorBarRangeTicks);
 
 		    // ---- EMA structure (DETAILS) ----
 		    ComputeEmaStructure(sigClosed,
@@ -572,7 +405,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.ShortCandidate = EnableShorts && s.TrendDown && s.ShortPulledBack && s.ShortReclaimed && s.ShortConfirm;
 		    s.AnyCandidate   = s.LongCandidate || s.ShortCandidate;
 		    
-		    var blocks = new List<string>(16);
+			// Momentum filter
+			s.HasMomentum = HasMomentum(0, SigClosed(), false, out var momFail, out var er,
+			    out var ov, out var bodyT, out var wb, out var clv);
+
+			var blocks = new List<string>(16);
 
 		    if (!s.TimeOk) blocks.Add(s.InMidBreak ? "mid-break" : "outside-time-window");
 		    if (!s.DayOk) blocks.Add("dayLocked");
@@ -582,9 +419,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (!s.WickOk) blocks.Add("wick-filter");
 		    if (!s.AtrOk) blocks.Add("atr-too-high");
 		    if (!s.AdxOk) blocks.Add("adx-out-of-range");
-		    if (!s.ChopOk) blocks.Add("chop-filter");
+		    if (EnableChopFilter && !s.ChopOk)
+		    {
+			    blocks.Add("chop-filter");
+		    }
 
-		    if (!s.EmaStructureOk) blocks.Add("ema-structure");
+		    if (EnableMomentumFilter && !s.HasMomentum)
+		    {
+			    blocks.Add($"no-momentum: (reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00})");
+		    }
+		    if (!s.IsMarketTradable) blocks.Add("regime-volatile: " + $"(er={erNow:0.00} override={(trendOverride ? "YES" : "NO")} " + $"adx={adx[SigClosed()]:0.0})");
+		    if (!s.PasseEntryDistance) blocks.Add($"long-prior-bar-too-large: (rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars})");
+
+
+		    if (!s.EmaStructureOk)
+		    {
+			    blocks.Add("ema-structure");
+		    }
 		    else
 		    {
 			    if (!s.EmaSlopeOk) blocks.Add("ema-slope");
@@ -620,7 +471,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool EntryDistCooldownOk;
 	        public int EntryDistBlockBarsLeft;
 	        
-	        public bool ChopEnabled;
 	        public int ChopLbUsed;
 	        public bool ChopHasBars;
 	        public bool ChopBypassedAdx;
@@ -636,7 +486,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 	        public bool EntryDistCooldownEnabled;
 	        public string EntryDistCooldownReason;
-
+			public bool IsMarketTradable { get; set; }
+	        public bool PasseEntryDistance { get; set; }
+	        public bool HasMomentum { get; set; }
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
         }
     }

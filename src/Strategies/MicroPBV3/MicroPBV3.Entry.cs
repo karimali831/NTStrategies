@@ -233,7 +233,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (DebugMode && IsFirstTickOfBar)
                         Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} entry-dist-cooldown active (CurrentBar={CurrentBar}, blockThrough={_entryDistBlockLastBar})");
-
                     
                     ManageBreakEven();
                     return;
@@ -273,30 +272,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sigSignal] + buf, High[sigSignal] + buf));
                         var trigger = NormalizeBuyStopPrice(rawTrigger);
-                        
-                        if (!IsMarketEfficient(out var erNow))
+
+                        if (!IsMarketTradable(out _, out _))
                         {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG market inefficient: er={erNow:0.00} < min=0.32 lb=10");
-                            return;
-                        }
-
-                        if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
-                        {
-                            if (EntryDistCooldownBars > 0)
-                                _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
-
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG prior bar too large: rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars}");
-
                             ManageBreakEven();
                             return;
                         }
 
-                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), true, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        if (!PassesEntryDistanceFilter(out _))
                         {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} MOMentum=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
+                            if (EntryDistCooldownBars > 0)
+                                _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
+                            
+                            ManageBreakEven();
+                            return;
+                        }
+
+                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), true, out _, out _, out _, out _, out _, out _))
+                        {
+                            ManageBreakEven();
                             return;
                         }
 
@@ -322,29 +316,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         var rawTrigger = Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sigSignal] - buf, Low[sigSignal] - buf));
                         var trigger = NormalizeSellStopPrice(rawTrigger);
                         
-                        if (!IsMarketEfficient(out var erNow))
+                        if (!IsMarketTradable(out _, out _))
                         {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} LONG market inefficient: er={erNow:0.00} < min=0.32 lb=10");
+                            ManageBreakEven();
                             return;
                         }
 
-                        if (!PassesEntryDistanceFilter(out var priorBarRangeTicks))
+                        if (!PassesEntryDistanceFilter(out _))
                         {
                             if (EntryDistCooldownBars > 0)
                                 _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
-
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} SHORT prior bar too large: rangeTicks={priorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks} cooldownBars={EntryDistCooldownBars}");
 
                             ManageBreakEven();
                             return;
                         }
                         
-                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), false, out var momFail, out var er, out var ov, out var bodyT, out var wb, out var clv))
+                        if (EnableMomentumFilter && !HasMomentum(0, SigClosed(), false, out _, out _, out _, out _, out _, out _))
                         {
-                            if (DebugMode)
-                                Print($"[ENTRY BLOCKED] {Time[sigEntry]:yyyy-MM-dd HH:mm:ss} MOMentum=FALSE reason={momFail} er={er:0.00} ov={ov:0.00} bodyT={bodyT:0.0} wb={wb:0.00} clv={clv:0.00}");
+                            ManageBreakEven();
                             return;
                         }
 
@@ -443,29 +432,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             return distTicks <= MaxPriorBarRangeTicks;
         }
 
-        public bool IsMarketEfficient(out double er)
+        private bool IsMarketTradable(out double er, out bool trendOverride)
         {
-            const int erLookbackBars = 10;
-            const double erMin = 0.32;
+            const int    ER_LOOKBACK = 10;
+            const double ER_MIN = 0.32;
+
+            const double ADX_OVERRIDE_MIN = 30;
+            const double MIN_SLOPE_TICKS  = 20;   // tune
+            const double MIN_SEP_TICKS    = 12;   // tune
 
             er = 0;
+            trendOverride = false;
 
-            var barsAgo = SigClosed();   // ALWAYS last closed bar
+            var barsAgo = SigClosed();
 
-            if (CurrentBar < barsAgo + erLookbackBars)
-                return true; // fail-open during warmup
+            if (CurrentBar < barsAgo + ER_LOOKBACK)
+                return true;
 
-            var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + erLookbackBars]);
+            // ---- Efficiency ----
+            var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + ER_LOOKBACK]);
 
             double grossMove = 0;
-            for (var i = barsAgo; i < barsAgo + erLookbackBars; i++)
+            for (var i = barsAgo; i < barsAgo + ER_LOOKBACK; i++)
                 grossMove += Math.Abs(Close[i] - Close[i + 1]);
 
-            if (grossMove <= TickSize)
-                return false;
+            if (grossMove > TickSize)
+                er = netMove / grossMove;
 
-            er = netMove / grossMove;
-            return er >= erMin;
+            var erOk = er >= ER_MIN;
+
+            // ---- Trend override ----
+            var adxVal = adx[barsAgo];
+
+            var slopeTicks =
+                Math.Abs(emaFast[barsAgo] - emaFast[barsAgo + 5]) / TickSize;
+
+            var sepTicks =
+                Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
+
+            trendOverride =
+                adxVal >= ADX_OVERRIDE_MIN &&
+                slopeTicks >= MIN_SLOPE_TICKS &&
+                sepTicks >= MIN_SEP_TICKS;
+
+            return erOk || trendOverride;
         }
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
