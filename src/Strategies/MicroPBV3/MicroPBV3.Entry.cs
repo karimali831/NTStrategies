@@ -437,9 +437,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             const int    ER_LOOKBACK = 10;
             const double ER_MIN = 0.32;
 
-            const double ADX_OVERRIDE_MIN = 30;
-            const double MIN_SLOPE_TICKS  = 20;   // tune
-            const double MIN_SEP_TICKS    = 12;   // tune
+            const double ADX_OVERRIDE_MIN_IMPULSE = 30;
+            const double ADX_OVERRIDE_MIN_PULLBACK = 20;   // key change
+            const double MIN_SLOPE_TICKS = 20;
+            const double MIN_SEP_TICKS   = 12;
 
             er = 0;
             trendOverride = false;
@@ -448,7 +449,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (CurrentBar < barsAgo + ER_LOOKBACK)
                 return true;
-
+            
             // ---- Efficiency ----
             var netMove = Math.Abs(Close[barsAgo] - Close[barsAgo + ER_LOOKBACK]);
 
@@ -463,17 +464,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // ---- Trend override ----
             var adxVal = adx[barsAgo];
+            var slopeTicks = Math.Abs(emaFast[barsAgo] - emaFast[barsAgo + 5]) / TickSize;
+            var sepTicks   = Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
 
-            var slopeTicks =
-                Math.Abs(emaFast[barsAgo] - emaFast[barsAgo + 5]) / TickSize;
-
-            var sepTicks =
-                Math.Abs(emaFast[barsAgo] - emaSlow[barsAgo]) / TickSize;
-
-            trendOverride =
-                adxVal >= ADX_OVERRIDE_MIN &&
+            // Impulse override (strong trend)
+            bool overrideImpulse =
+                adxVal >= ADX_OVERRIDE_MIN_IMPULSE &&
                 slopeTicks >= MIN_SLOPE_TICKS &&
-                sepTicks >= MIN_SEP_TICKS;
+                sepTicks   >= MIN_SEP_TICKS;
+
+            // Pullback override (trend intact but ADX cooled)
+            var overridePullback =
+                adxVal >= ADX_OVERRIDE_MIN_PULLBACK &&
+                slopeTicks >= MIN_SLOPE_TICKS * 0.8 &&
+                sepTicks   >= MIN_SEP_TICKS;
+
+            // final
+            trendOverride = overrideImpulse || overridePullback;
 
             return erOk || trendOverride;
         }
