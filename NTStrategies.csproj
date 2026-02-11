@@ -72,6 +72,16 @@
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Orders.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Risk.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Trend.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Core.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Diagnostics.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.EmaStruct.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Entry.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Filters.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.MarketRegime.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Orders.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Risk.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Summary.cs" />
+        <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
     </ItemGroup>
     <ItemGroup>
       <None Include="packages.config" />
