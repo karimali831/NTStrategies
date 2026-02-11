@@ -104,11 +104,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // transition penalty
             // ---- crossover recency (time-limited penalty) ----
-            const int CROSS_PENALTY_BARS = 6;     // start here
+            const int crossPenaltyBars = 6;     // start here
             var barsSinceCross = BarsSinceEmaCross(50);
 
             r.BarsSinceCross = barsSinceCross;
-            r.CrossPenaltyActive = barsSinceCross <= CROSS_PENALTY_BARS;
+            r.CrossPenaltyActive = barsSinceCross <= crossPenaltyBars;
             
             // transition penalty (only when cross is RECENT, and slope is not strong)
             if (r.CrossPenaltyActive && r.EmaSlopeTicks < 120)

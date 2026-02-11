@@ -25,8 +25,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             var alignedUp   = emaFast[0] > emaSlow[0];
             var alignedDown = emaFast[0] < emaSlow[0];
 
-            var slopeUpOk   = m.SlopeDirTicks >= TrendSlopeMinTicks;
-            var slopeDownOk = (-m.SlopeDirTicks) >= TrendSlopeMinTicks;
+            var slopeUpOk   = TrendSlopeMinTicks == 0 || m.SlopeDirTicks >= TrendSlopeMinTicks;
+            var slopeDownOk = TrendSlopeMinTicks == 0 || -m.SlopeDirTicks >= TrendSlopeMinTicks;
 
             trendUp   = alignedUp   && slopeUpOk   && m.PriceAboveFast;
             trendDown = alignedDown && slopeDownOk && m.PriceBelowFast;
@@ -36,9 +36,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!alignedUp && !alignedDown)
                     failReason = "emas-flat-or-crossed";
                 else if (alignedUp && !slopeUpOk)
-                    failReason = $"ema-slope-too-weak-up(<{TrendSlopeMinTicks})";
+                    failReason = $"ema-slope-too-weak-up ({m.SlopeDirTicks} < {TrendSlopeMinTicks})";
                 else if (alignedDown && !slopeDownOk)
-                    failReason = $"ema-slope-too-weak-down(<{TrendSlopeMinTicks})";
+                    failReason = $"ema-slope-too-weak-down ({-m.SlopeDirTicks} < {TrendSlopeMinTicks})";
                 else if (alignedUp && !m.PriceAboveFast)
                     failReason = "price-not-above-fast-ema";
                 else if (alignedDown && !m.PriceBelowFast)
@@ -69,7 +69,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bodyTicks = Math.Abs(Close[0] - Open[0]) / TickSize;
             if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
             {
-                failReason = "body-too-small";
+                failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
                 return false;
             }
 
@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bodyTicks = Math.Abs(Close[0] - Open[0]) / TickSize;
             if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
             {
-                failReason = "body-too-small";
+                failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
                 return false;
             }
 
