@@ -275,15 +275,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.SigShortAgo = confirmDelay + s.ShortExtraDelay;
 
 			//-- ENTRY DISTANCE (per-side, using the signal barsAgo)
-		    s.EntryDistLongOk  = PassesEntryDistanceFilter(s.SigLongAgo,  out var longDistTicks);
-		    s.EntryDistShortOk = PassesEntryDistanceFilter(s.SigShortAgo, out var shortDistTicks);
-		    s.PriorBarRangeTicksLong  = longDistTicks;
-		    s.PriorBarRangeTicksShort = shortDistTicks;
+			s.EntryDistLongOk  = PassesEntryDistanceFilter(s.SigLongAgo,  out var longPriorRangeTicks);
+			s.EntryDistShortOk = PassesEntryDistanceFilter(s.SigShortAgo, out var shortPriorRangeTicks);
 
-			// optional: keep legacy single fields for UI/printing
-		    s.PasseEntryDistance = s.TrendUp ? s.EntryDistLongOk : !s.TrendDown || s.EntryDistShortOk;
-		    s.PriorBarRangeTicks = s.TrendUp ? s.PriorBarRangeTicksLong : s.TrendDown ? s.PriorBarRangeTicksShort : 0;
-		    
+			s.PriorBarRangeTicksLong  = longPriorRangeTicks;
+			s.PriorBarRangeTicksShort = shortPriorRangeTicks;
+
+			// Pick the one that matches the active candidate (for DIAG line i)
+			if (s.LongCandidate)
+			{
+				s.PriorBarRangeTicks = s.PriorBarRangeTicksLong;
+				s.PasseEntryDistance = s.EntryDistLongOk;
+			}
+			else if (s.ShortCandidate)
+			{
+				s.PriorBarRangeTicks = s.PriorBarRangeTicksShort;
+				s.PasseEntryDistance = s.EntryDistShortOk;
+			}
+			
 		    // ---- TREND ----
 		    TrendConfirm(out var trendFail, out var trendUp, out var trendDown);
 		    s.TrendUp = trendUp;

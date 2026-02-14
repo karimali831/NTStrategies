@@ -176,6 +176,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var fails = new List<string>();
             var idx = Math.Max(0, sigBarsAgo);
+            
+            var esSig = GetEmaStruct(EmaSlopeMetric.Strength, idx);
+
+            r.EmaSlopeTicks = esSig.SlopeMetricTicks;
+            r.EmaSepTicks   = esSig.SepTicks;
+            r.EmaEff        = esSig.Eff;
 
             // Alignment AS-OF signal (do not use [0] here)
             r.Aligned = longSide

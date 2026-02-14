@@ -44,82 +44,97 @@ namespace NinjaTrader.NinjaScript.Strategies
             DirectionalAbs  // abs(signed slope)
         }
         
-        private EmaStruct GetEmaStruct(EmaSlopeMetric slopeMetricMode = EmaSlopeMetric.NetMove)
+     // Keep your existing enum + struct types as-is.
+    private EmaStruct GetEmaStruct(EmaSlopeMetric slopeMetricMode = EmaSlopeMetric.NetMove)
+    {
+        return GetEmaStruct(slopeMetricMode, 0);
+    }
+
+    // NEW: compute EMA structure AS-OF a specific bar (barsAgo)
+    private EmaStruct GetEmaStruct(EmaSlopeMetric slopeMetricMode, int barsAgo)
+    {
+        var r = new EmaStruct();
+
+        var idx = Math.Max(0, barsAgo);
+        var lb  = Math.Max(1, EmaSlopeLookbackBars);
+
+        // We access: idx, idx+lb, and (idx+i+1) inside loops
+        if (CurrentBar < idx + lb + 1)
         {
-            var r = new EmaStruct();
-
-            var lb = Math.Max(1, EmaSlopeLookbackBars);
-            if (CurrentBar <  lb)
-            {
-                r.HasBars = false;
-                r.SlopeOk = false;
-                r.SepOk = false;
-                r.StructureOk = false;
-                return r;
-            }
-
-            r.HasBars = true;
-
-            var c  = Close[0];
-            var f0 = emaFast[0];
-            var s0 = emaSlow[0];
-
-            r.PriceAboveFast = c > f0;
-            r.PriceBelowFast = c < f0;
-            r.PriceAboveBoth = r.PriceAboveFast && c > s0;
-            r.PriceBelowBoth = r.PriceBelowFast && c < s0;
-
-            r.SepTicks = Math.Abs(f0 - s0) / TickSize;
-
-            var fPast = emaFast[lb];
-            r.SlopeDirTicks = (f0 - fPast) / TickSize;
-            r.NetMoveTicks  = Math.Abs(f0 - fPast) / TickSize;
-
-            r.PathTicks = 0.0;
-            for (var i = 0; i < lb; i++)
-            {
-                var a = emaFast[i];
-                var b = emaFast[i + 1];
-                r.PathTicks += Math.Abs(a - b) / TickSize;
-            }
-
-            r.Eff = r.PathTicks <= 1e-9 ? 0.0 : (r.NetMoveTicks / r.PathTicks);
-            r.SlopeStrengthTicks = r.NetMoveTicks * r.Eff;
-
-            switch (slopeMetricMode)
-            {
-                case EmaSlopeMetric.Strength:
-                    r.SlopeMetricTicks = r.SlopeStrengthTicks;
-                    break;
-                case EmaSlopeMetric.DirectionalAbs:
-                    r.SlopeMetricTicks = Math.Abs(r.SlopeDirTicks);
-                    break;
-                case EmaSlopeMetric.NetMove:
-                default:
-                    r.SlopeMetricTicks = r.NetMoveTicks;
-                    break;
-            }
-
-            r.SlopeOk = MinEmaSlopeTicks <= 0 || r.SlopeMetricTicks >= MinEmaSlopeTicks;
-            r.SepOk   = MinEmaSeparationTicks <= 0 || r.SepTicks >= MinEmaSeparationTicks;
-
-            r.EmaCrossover = false;
-            for (var i = 0; i < lb; i++)
-            {
-                var d0 = emaFast[i] - emaSlow[i];
-                var d1 = emaFast[i + 1] - emaSlow[i + 1];
-
-                if (d0 == 0 || d1 == 0 || (d0 > 0 && d1 < 0) || (d0 < 0 && d1 > 0))
-                {
-                    r.EmaCrossover = true;
-                    break;
-                }
-            }
-
-            // CLEAN SLATE structure logic for pullback trend-following:
-            r.StructureOk = r.SlopeOk && r.SepOk && !r.EmaCrossover;
+            r.HasBars     = false;
+            r.SlopeOk     = false;
+            r.SepOk       = false;
+            r.StructureOk = false;
             return r;
         }
+
+        r.HasBars = true;
+
+        // as-of idx
+        var c  = Close[idx];
+        var f0 = emaFast[idx];
+        var s0 = emaSlow[idx];
+
+        r.PriceAboveFast = c > f0;
+        r.PriceBelowFast = c < f0;
+        r.PriceAboveBoth = r.PriceAboveFast && c > s0;
+        r.PriceBelowBoth = r.PriceBelowFast && c < s0;
+
+        r.SepTicks = Math.Abs(f0 - s0) / TickSize;
+
+        // slope over lookback: idx -> idx+lb
+        var fPast = emaFast[idx + lb];
+        r.SlopeDirTicks = (f0 - fPast) / TickSize;
+        r.NetMoveTicks  = Math.Abs(f0 - fPast) / TickSize;
+
+        // path over lookback: sum of |emaFast[idx+i] - emaFast[idx+i+1]|
+        r.PathTicks = 0.0;
+        for (var i = 0; i < lb; i++)
+        {
+            var a = emaFast[idx + i];
+            var b = emaFast[idx + i + 1];
+            r.PathTicks += Math.Abs(a - b) / TickSize;
+        }
+
+        r.Eff = r.PathTicks <= 1e-9 ? 0.0 : (r.NetMoveTicks / r.PathTicks);
+        r.SlopeStrengthTicks = r.NetMoveTicks * r.Eff;
+
+        switch (slopeMetricMode)
+        {
+            case EmaSlopeMetric.Strength:
+                r.SlopeMetricTicks = r.SlopeStrengthTicks;
+                break;
+            case EmaSlopeMetric.DirectionalAbs:
+                r.SlopeMetricTicks = Math.Abs(r.SlopeDirTicks);
+                break;
+            case EmaSlopeMetric.NetMove:
+            default:
+                r.SlopeMetricTicks = r.NetMoveTicks;
+                break;
+        }
+
+        r.SlopeOk = MinEmaSlopeTicks <= 0 || r.SlopeMetricTicks >= MinEmaSlopeTicks;
+        r.SepOk   = MinEmaSeparationTicks <= 0 || r.SepTicks >= MinEmaSeparationTicks;
+
+        // Crossover detection within the lookback window as-of idx:
+        // compare fast-slow at (idx+i) vs (idx+i+1)
+        r.EmaCrossover = false;
+        for (var i = 0; i < lb; i++)
+        {
+            var d0 = emaFast[idx + i]     - emaSlow[idx + i];
+            var d1 = emaFast[idx + i + 1] - emaSlow[idx + i + 1];
+
+            if (d0 == 0 || d1 == 0 || (d0 > 0 && d1 < 0) || (d0 < 0 && d1 > 0))
+            {
+                r.EmaCrossover = true;
+                break;
+            }
+        }
+
+        // CLEAN SLATE structure logic for pullback trend-following:
+        r.StructureOk = r.SlopeOk && r.SepOk && !r.EmaCrossover;
+        return r;
+    }
         
         private int BarsSinceEmaCrossAsOf(int lookback, int barsAgo)
         {

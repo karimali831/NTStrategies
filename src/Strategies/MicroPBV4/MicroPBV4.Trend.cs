@@ -116,17 +116,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             return TrendConfirm(out _);
         }
         
-        private bool IsTrendUpSimple()
-        {
-            var m = GetEmaStruct();
-            return m.HasBars && m.PriceAboveFast && emaFast[0] > emaSlow[0];
-        }
-
-        private bool IsTrendDownSimple()
-        {
-            var m = GetEmaStruct();
-            return m.HasBars && m.PriceBelowFast && emaFast[0] < emaSlow[0];
-        }
 
         private void TrendTicks(
             int lookbackBars,
