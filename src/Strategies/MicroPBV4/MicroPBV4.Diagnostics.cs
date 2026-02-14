@@ -281,16 +281,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 			s.PriorBarRangeTicksLong  = longPriorRangeTicks;
 			s.PriorBarRangeTicksShort = shortPriorRangeTicks;
 
-			// Pick the one that matches the active candidate (for DIAG line i)
-			if (s.LongCandidate)
+			// Which side matters "right now"?
+			if (s.TrendUp || s.LongPulledBack)   // long context
 			{
 				s.PriorBarRangeTicks = s.PriorBarRangeTicksLong;
 				s.PasseEntryDistance = s.EntryDistLongOk;
 			}
-			else if (s.ShortCandidate)
+			else if (s.TrendDown || s.ShortPulledBack) // short context
 			{
 				s.PriorBarRangeTicks = s.PriorBarRangeTicksShort;
 				s.PasseEntryDistance = s.EntryDistShortOk;
+			}
+			else
+			{
+				// neutral -> don't confuse DIAG
+				s.PriorBarRangeTicks = 0;
+				s.PasseEntryDistance = true;
 			}
 			
 		    // ---- TREND ----
