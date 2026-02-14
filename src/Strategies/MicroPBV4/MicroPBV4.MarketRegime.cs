@@ -216,11 +216,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var minScore = RegimeScoreMin;
 
+            // strong structure => relax score gate
             if (r.StrongStructure)
-                minScore = Math.Max(35, RegimeScoreMin - 20);
+                minScore = Math.Max(0, RegimeScoreMin - 20);
 
+            // very strong slope + ER => relax even more
             if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45)
-                minScore = Math.Min(minScore, 45);
+                minScore = Math.Min(minScore, 10);   // or 0 / 5 depending how aggressive you want
 
             // Displacement override: allow some marginal regimes if signal bar shows real impulse
             var dispOverrideOk =
