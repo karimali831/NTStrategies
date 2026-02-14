@@ -131,8 +131,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        sb.AppendLine(
 		        $"  i) PriorBarRangeTicks={snap.PriorBarRangeTicks:0.0} " +
 		        $"maxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
-		        $"pass={OkIcon(snap.PasseEntryDistance)}");
-
+		        $"pass={OkIcon(snap.PassesEntryDistance)}");
+	        
+	        Print($"DBG: TrendUp={snap.TrendUp} LongCandidate={snap.LongCandidate} PriorLong={snap.PriorBarRangeTicksLong:0.0} PriorActive={snap.PriorBarRangeTicks:0.0}");
+	        
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
 		        $"({trend}, pulledBack=" +
@@ -285,18 +287,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (s.TrendUp || s.LongPulledBack)   // long context
 			{
 				s.PriorBarRangeTicks = s.PriorBarRangeTicksLong;
-				s.PasseEntryDistance = s.EntryDistLongOk;
+				s.PassesEntryDistance = s.EntryDistLongOk;
 			}
 			else if (s.TrendDown || s.ShortPulledBack) // short context
 			{
 				s.PriorBarRangeTicks = s.PriorBarRangeTicksShort;
-				s.PasseEntryDistance = s.EntryDistShortOk;
+				s.PassesEntryDistance = s.EntryDistShortOk;
 			}
 			else
 			{
 				// neutral -> don't confuse DIAG
 				s.PriorBarRangeTicks = 0;
-				s.PasseEntryDistance = true;
+				s.PassesEntryDistance = true;
 			}
 			
 		    // ---- TREND ----
@@ -409,7 +411,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public int EntryDistBlockBarsLeft;
 	        
 	        public string EntryDistCooldownReason;
-	        public bool PasseEntryDistance { get; set; }
+	        public bool PassesEntryDistance { get; set; }
 	        public RegimeSnapshot Regime;
 	        public int SigLongAgo, SigShortAgo;
 	        public int LongExtraDelay, ShortExtraDelay;
