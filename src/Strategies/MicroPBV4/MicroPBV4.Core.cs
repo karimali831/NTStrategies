@@ -233,7 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int RegimeScoreMin { get; set; } = 20;   // used later as filter if you want
 
         [NinjaScriptProperty]
-        [Range(1, 100)]
+        [Range(1, 300)]
         [Display(Name="RegimeAtrMinTicks", GroupName="06-Regime", Order = 3)]
         public int RegimeAtrMinTicks { get; set; } = 60;
 
