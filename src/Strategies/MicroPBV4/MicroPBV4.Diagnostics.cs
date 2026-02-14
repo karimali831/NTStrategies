@@ -130,7 +130,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        
 	        sb.AppendLine(
 		        $"  i) MaxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
-		        $"PriorBarLongRangeTicks={snap.PriorBarRangeTicksLong:0:0}" +
+		        $"PriorBarLongRangeTicks={snap.PriorBarRangeTicksLong:0.0}" +
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	
