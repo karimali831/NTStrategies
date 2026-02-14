@@ -129,12 +129,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"deferLongAtBar={snap.EntryDistDeferLongBar} deferShortAtBar={snap.EntryDistDeferShortBar}");
 	        
 	        sb.AppendLine(
-		        $"  i) PriorBarRangeTicks={snap.PriorBarRangeTicks:0.0} " +
-		        $"maxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
+		        $"  i) MaxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
+		        $"PriorBarLongRangeTicks={snap.PriorBarRangeTicksLong:0:0}" +
+		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
-	        
-	        Print($"DBG: TrendUp={snap.TrendUp} LongCandidate={snap.LongCandidate} PriorLong={snap.PriorBarRangeTicksLong:0.0} PriorActive={snap.PriorBarRangeTicks:0.0}");
-	        
+	
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
 		        $"({trend}, pulledBack=" +
@@ -286,18 +285,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Which side matters "right now"?
 			if (s.TrendUp || s.LongPulledBack)   // long context
 			{
-				s.PriorBarRangeTicks = s.PriorBarRangeTicksLong;
 				s.PassesEntryDistance = s.EntryDistLongOk;
 			}
 			else if (s.TrendDown || s.ShortPulledBack) // short context
 			{
-				s.PriorBarRangeTicks = s.PriorBarRangeTicksShort;
 				s.PassesEntryDistance = s.EntryDistShortOk;
 			}
 			else
 			{
-				// neutral -> don't confuse DIAG
-				s.PriorBarRangeTicks = 0;
 				s.PassesEntryDistance = true;
 			}
 			
@@ -417,8 +412,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public int LongExtraDelay, ShortExtraDelay;
 
 	        public int EntryDistDeferLongBar, EntryDistDeferShortBar;
-
-	        public double PriorBarRangeTicks;
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
         }
     }
