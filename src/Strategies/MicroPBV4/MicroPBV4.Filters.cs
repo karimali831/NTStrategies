@@ -6,23 +6,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public partial class MicroPBV4 : Strategy
     {
-        private bool PassesEntryDistanceFilter(int barsAgo, out double distTicks)
+        private bool PassesEntryDistanceFilter(int sigBarsAgo, out double distTicks)
         {
             distTicks = 0;
 
             if (MaxPriorBarRangeTicks <= 0)
                 return true;
 
-            if (CurrentBar < barsAgo)
+            var priorBarsAgo = sigBarsAgo + 1;
+            if (CurrentBar < priorBarsAgo)
                 return true;
 
-            var barHigh = High[barsAgo];
-            var barLow  = Low[barsAgo];
-
-            distTicks = (barHigh - barLow) / TickSize;
+            distTicks = (High[priorBarsAgo] - Low[priorBarsAgo]) / TickSize;
             return distTicks <= MaxPriorBarRangeTicks;
         }
 
+        
 
         private bool PassesWickFilter()
         {
