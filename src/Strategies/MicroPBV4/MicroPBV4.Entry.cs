@@ -159,116 +159,120 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Trend
             TrendConfirm(out _, out var trendUp, out var trendDown);
 
-            // ===== LONG =====
-            if (!submitted && EnableLongs && trendUp)
-            {
-                var extraDelay = CurrentBar == _entryDistDeferLongBar ? 1 : 0;
-                var sig = confirmDelay + extraDelay;
+         // ===== LONG =====
+        if (!submitted && EnableLongs && trendUp)
+        {
+            var extraDelay = CurrentBar == _entryDistDeferLongBar ? 1 : 0;
+            var sig = confirmDelay + extraDelay;
 
-                if (CurrentBar < sig)
+            if (CurrentBar < sig)
+            {
+                ManageBreakEven();
+                return;
+            }
+
+            var pulledBack = PullbackTouchedFastEmaPrevBar(true, sig, out _, out _);
+            var reclaimed  = Close[sig] > emaFast[sig];
+
+            if (pulledBack && reclaimed && ConfirmLongEntry(sig, out _))
+            {
+                var tag = $"MPB_LONG__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
+                PrepareBracket(tag, atrNow);
+
+                var rawTrigger =
+                    Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sig] + buf, High[sig] + buf));
+                var trigger = NormalizeBuyStopPrice(rawTrigger);
+
+                // Defer ONLY when the prior-bar-range check fails on first attempt
+                if (extraDelay == 0 && !PassesEntryDistanceFilter(sig, out var distTicks))
                 {
+                    _entryDistDeferLongBar = CurrentBar + 1;
                     ManageBreakEven();
                     return;
                 }
 
-                var pulledBack = PullbackTouchedFastEmaPrevBar(true, sig, out _, out _);
-                var reclaimed  = Close[sig] > emaFast[sig];
+                // clear defer if we are consuming it
+                if (extraDelay == 1)
+                    _entryDistDeferLongBar = -1;
 
-                if (pulledBack && reclaimed && ConfirmLongEntry(sig, out _))  // ConfirmLongEntry uses [0] today; see NOTE below
+                // regime gate must evaluate at the SAME sig barsAgo as the entry logic
+                if (!PassesMarketRegimeGate(true, sig, out var r))
                 {
-                    var tag = $"MPB_LONG__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
-                    PrepareBracket(tag, atrNow);
+                    if (DebugMode)
+                        Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} market-regime " +
+                              $"fail={r.Fail} score={r.Score:0.#} minScore={r.MinScoreUsed:0.#} " +
+                              $"ER={r.Er:0.###} minER={RegimeErMin:0.###} " +
+                              $"crossPenalty={r.CrossPenaltyActive} barsSinceCross={r.BarsSinceCross} " +
+                              $"label={r.Label}");
 
-                    var rawTrigger =
-                        Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sig] + buf, High[sig] + buf));
-                    var trigger = NormalizeBuyStopPrice(rawTrigger);
-
-                    if (extraDelay == 0 && !PassesEntryDistanceFilter(sig, out var distTicks))
-                    {
-                        _entryDistDeferLongBar = CurrentBar + 1;
-                        ManageBreakEven();
-                        return;
-                    }
-                    
-                    // clear defer if we are consuming it
-                    if (extraDelay == 1)
-                        _entryDistDeferLongBar = -1;
-
-                    if (!PassesMarketRegimeGate(true, out var r))
-                    {
-                        if (DebugMode)
-                            Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} market-regime " +
-                                  $"fail={r.Fail} score={r.Score:0.#} minScore={r.MinScoreUsed:0.#} " +
-                                  $"ER={r.Er:0.###} minER={RegimeErMin:0.###} " +
-                                  $"crossPenalty={r.CrossPenaltyActive} barsSinceCross={r.BarsSinceCross} " +
-                                  $"label={r.Label}");
-
-                        ManageBreakEven();
-                        return;
-                    }
-
-                    RememberRegimeForTag(tag, r.Json);
-                    EnterLongStopMarket(qty, trigger, tag);
-                    tradesToday++;
-                    lastEntryTag = tag;
-                    submitted = true;
-                }
-            }
-
-            // ===== SHORT =====
-            if (!submitted && EnableShorts && trendDown)
-            {
-                var extraDelay = CurrentBar == _entryDistDeferShortBar ? 1 : 0;
-                var sig = confirmDelay + extraDelay;
-
-                if (CurrentBar < sig)
-                {
                     ManageBreakEven();
                     return;
                 }
 
-                var pulledBack = PullbackTouchedFastEmaPrevBar(false, sig, out _, out _);
-                var reclaimed  = Close[sig] < emaFast[sig];
-
-                if (pulledBack && reclaimed && ConfirmShortEntry(sig, out _)) // ConfirmShortEntry uses [0] today; see NOTE below
-                {
-                    var tag = $"MPB_SHORT__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
-                    PrepareBracket(tag, atrNow);
-
-                    var rawTrigger =
-                        Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sig] - buf, Low[sig] - buf));
-                    var trigger = NormalizeSellStopPrice(rawTrigger);
-
-                    if (extraDelay == 0 && !PassesEntryDistanceFilter(sig, out var distTicks))
-                    {
-                        _entryDistDeferShortBar = CurrentBar + 1;
-                        ManageBreakEven();
-                        return;
-                    }
-
-                    if (extraDelay == 1)
-                        _entryDistDeferShortBar = -1;
-
-                    if (!PassesMarketRegimeGate(false, out var r))
-                    {
-                        if (DebugMode)
-                            Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} market-regime " +
-                                  $"fail={r.Fail} score={r.Score:0.#} minScore={r.MinScoreUsed:0.#} " +
-                                  $"ER={r.Er:0.###} minER={RegimeErMin:0.###} " +
-                                  $"crossPenalty={r.CrossPenaltyActive} barsSinceCross={r.BarsSinceCross} " +
-                                  $"label={r.Label}");
-
-                        ManageBreakEven();
-                        return;
-                    }
-
-                    RememberRegimeForTag(tag, r.Json);
-                    EnterShortStopMarket(qty, trigger, tag);
-                    tradesToday++;
-                    lastEntryTag = tag;
-                    submitted = true;
-                }
+                RememberRegimeForTag(tag, r.Json);
+                EnterLongStopMarket(qty, trigger, tag);
+                tradesToday++;
+                lastEntryTag = tag;
+                submitted = true;
             }
+        }
+
+        // ===== SHORT =====
+        if (!submitted && EnableShorts && trendDown)
+        {
+            var extraDelay = CurrentBar == _entryDistDeferShortBar ? 1 : 0;
+            var sig = confirmDelay + extraDelay;
+
+            if (CurrentBar < sig)
+            {
+                ManageBreakEven();
+                return;
+            }
+
+            var pulledBack = PullbackTouchedFastEmaPrevBar(false, sig, out _, out _);
+            var reclaimed  = Close[sig] < emaFast[sig];
+
+            if (pulledBack && reclaimed && ConfirmShortEntry(sig, out _))
+            {
+                var tag = $"MPB_SHORT__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
+                PrepareBracket(tag, atrNow);
+
+                var rawTrigger =
+                    Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sig] - buf, Low[sig] - buf));
+                var trigger = NormalizeSellStopPrice(rawTrigger);
+
+                // Defer ONLY when the prior-bar-range check fails on first attempt
+                if (extraDelay == 0 && !PassesEntryDistanceFilter(sig, out var distTicks))
+                {
+                    _entryDistDeferShortBar = CurrentBar + 1;
+                    ManageBreakEven();
+                    return;
+                }
+
+                if (extraDelay == 1)
+                    _entryDistDeferShortBar = -1;
+
+                // regime gate must evaluate at the SAME sig barsAgo as the entry logic
+                if (!PassesMarketRegimeGate(false, sig, out var r))
+                {
+                    if (DebugMode)
+                        Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} market-regime " +
+                              $"fail={r.Fail} score={r.Score:0.#} minScore={r.MinScoreUsed:0.#} " +
+                              $"ER={r.Er:0.###} minER={RegimeErMin:0.###} " +
+                              $"crossPenalty={r.CrossPenaltyActive} barsSinceCross={r.BarsSinceCross} " +
+                              $"label={r.Label}");
+
+                    ManageBreakEven();
+                    return;
+                }
+
+                RememberRegimeForTag(tag, r.Json);
+                EnterShortStopMarket(qty, trigger, tag);
+                tradesToday++;
+                lastEntryTag = tag;
+                submitted = true;
+            }
+        }
 
             ManageBreakEven();
         }

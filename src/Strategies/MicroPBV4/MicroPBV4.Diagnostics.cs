@@ -86,9 +86,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"     ADX   = {snap.Regime.Adx:0.##} " +
 		        $"(sweet [{RegimeAdxSweetLow},{RegimeAdxSweetHigh}])");
 
+	        // ---- RegimeMetrics DIAG line (replace the old absolute ATR range line) ----
 	        sb.AppendLine(
 		        $"     ATRt  = {snap.Regime.AtrTicks:0.##} " +
-		        $"(range [{RegimeAtrMinTicks},{RegimeAtrMaxTicks}])");
+		        $"pct={snap.Regime.AtrPct:0.###} (lb={RegimeAtrPctLookbackBars}, gate [{RegimeAtrPctMin:0.###},{RegimeAtrPctMax:0.###}]) " +
+		        $"med={snap.Regime.AtrMedian:0.##} ratio={snap.Regime.AtrRatio:0.###}"
+	        );
 
 	        sb.AppendLine(
 		        $"     ER    = {snap.Regime.Er:0.###} " +
@@ -330,12 +333,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    s.ShortPulledBack &&
 			    s.ShortReclaimed;
 
-			// ---- Regime gate only if candidate ----
+		    // ---- Regime gate only if candidate ----
+			// IMPORTANT: gate must use the SAME sigBarsAgo you used for pulledBack/reclaimed/confirm,
+			// otherwise DIAG and actual behavior will diverge.
 		    s.Tradeable = true; // default true when not applicable
 		    if (s.LongCandidate)
-			    s.Tradeable = PassesMarketRegimeGate(true, out s.Regime);
+			    s.Tradeable = PassesMarketRegimeGate(true, s.SigLongAgo, out s.Regime);
 		    else if (s.ShortCandidate)
-			    s.Tradeable = PassesMarketRegimeGate(false, out s.Regime);
+			    s.Tradeable = PassesMarketRegimeGate(false, s.SigShortAgo, out s.Regime);
 
 			// ---- Would submit ----
 		    s.WouldSubmitLongNow  = s.Flat && s.LongCandidate  && s.Tradeable;

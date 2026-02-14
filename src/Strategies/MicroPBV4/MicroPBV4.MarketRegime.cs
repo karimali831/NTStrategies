@@ -33,6 +33,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             public bool Aligned;
             public bool StrongStructure;
             public double MinScoreUsed;
+            
+            public double AtrPct;     // 0..1 percentile rank vs lookback
+            public double AtrMedian;
+            public double AtrRatio;   // atrTicks / median
+
+            public double RangeTicks;
+            public double BodyPct;
+            public double Clv;
+            public bool   Displacement;
+
 
             public double StrongSlopeMinUsed;
             public double StrongSepMinUsed;
@@ -46,9 +56,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string Fail;
             public string Json;
         }
-
         
-        // 1) Keep ONE base builder (replaces your current ComputeMarketRegime body)
+        // Regime (NOW) + Gate (NOW), while allowing disp at SIG
+        // =====================================================
+
+        // 1) Base regime snapshot: ALWAYS computed at bar 0 (now).
+        //    This keeps score/ER/ATR percentile/cross-penalty consistent.
         private void ComputeMarketRegime(out RegimeSnapshot r)
         {
             r = new RegimeSnapshot
@@ -68,26 +81,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // ---- Raw values (closed bar) ----
+            // ---- Raw values (CLOSED bar 0) ----
             var adxNow   = adx[0];
             var atrTicks = atr[0] / TickSize;
             var er       = GetEfficiencyRatio();
 
             var es = GetEmaStruct(EmaSlopeMetric.Strength);
 
-            r.Adx          = adxNow;
-            r.AtrTicks     = atrTicks;
-            r.Er           = er;
+            r.Adx           = adxNow;
+            r.AtrTicks      = atrTicks;
+            r.Er            = er;
             r.EmaSlopeTicks = es.SlopeMetricTicks;
             r.EmaSepTicks   = es.SepTicks;
             r.EmaCrossover  = es.EmaCrossover;
             r.EmaEff        = es.Eff;
-            
 
             // ---- Subscores (0..1) ----
             var sAdx = SweetSpot01(adxNow, RegimeAdxSweetLow, RegimeAdxSweetHigh);
-            var sAtr = Scale01(atrTicks, RegimeAtrMinTicks, RegimeAtrMaxTicks);
-            var sEr  = Scale01(er, RegimeErMin, 1.0);
+
+            // ATR regime (adaptive): percentile + median ratio
+            var atrPct = ComputeAtrPercentile(RegimeAtrPctLookbackBars, out var atrMed, out var atrRatio);
+
+            r.AtrPct    = atrPct;
+            r.AtrMedian = atrMed;
+            r.AtrRatio  = atrRatio;
+
+            // Score ATR based on percentile (not absolute ticks)
+            var sAtr = Scale01(atrPct, RegimeAtrPctMin, RegimeAtrPctMax);
+
+            var sEr = Scale01(er, RegimeErMin, 1.0);
 
             const double MIN_SLOPE_TICKS = 20;
             const double MAX_SLOPE_TICKS = 250;
@@ -102,23 +124,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             const double wAdx = 0.25, wAtr = 0.20, wEr = 0.30, wStruct = 0.25;
             var score01 = wAdx * sAdx + wAtr * sAtr + wEr * sEr + wStruct * sStruct;
 
-            // transition penalty
             // ---- crossover recency (time-limited penalty) ----
-            const int crossPenaltyBars = 6;     // start here
-            var barsSinceCross = BarsSinceEmaCross(50);
+            const int crossPenaltyBars = 6;
+            var barsSinceCross = BarsSinceEmaCross(50); // NOW
 
-            r.BarsSinceCross = barsSinceCross;
-            r.CrossPenaltyActive = barsSinceCross <= crossPenaltyBars;
-            
+            r.BarsSinceCross      = barsSinceCross;
+            r.CrossPenaltyActive  = barsSinceCross <= crossPenaltyBars;
+
             // transition penalty (only when cross is RECENT, and slope is not strong)
-            if (r.CrossPenaltyActive && r.EmaSlopeTicks < 120)
+            if (r.CrossPenaltyActive && Math.Abs(r.EmaSlopeTicks) < 120)
                 score01 = Clamp01(score01 - 0.15);
-            
+
             // Pullback-friendly regime lift
-            if (r.EmaSlopeTicks >= 150 && r.Er >= 0.45 && r.Adx >= 25)
-            {
+            if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45 && r.Adx >= 25)
                 score01 = Math.Max(score01, 0.60); // floor at 60
-            }
 
             r.Score = Math.Round(score01 * 100.0, 1);
 
@@ -127,7 +146,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (r.Score >= 55) r.Label = "OK";
             else if (r.Score >= 40) r.Label = "TRANSITION";
             else                    r.Label = "CHOP_RISK";
-            
 
             // Base regime is not a gate
             r.Ok = true;
@@ -142,27 +160,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.EmaSepTicks,
                 r.Score,
                 r.Label,
-                r.CrossPenaltyActive, // <-- instead of r.EmaCrossover
+                r.CrossPenaltyActive,
                 r.EmaEff
             );
         }
 
-        // 2) Refactor PassesMarketRegimeGate to reuse ComputeMarketRegime (no duplication)
-        private bool PassesMarketRegimeGate(bool longSide, out RegimeSnapshot r)
+
+        // 2) Gate: regime is NOW, alignment/structure are NOW.
+        //    Displacement is evaluated at sigBarsAgo and can bypass SOME fails.
+        private bool PassesMarketRegimeGate(bool longSide, int sigBarsAgo, out RegimeSnapshot r)
         {
-            // build base regime snapshot (always)
+            // Build base regime snapshot (always NOW)
             ComputeMarketRegime(out r);
 
-            // Warmup (or other base invalid) -> hard block
+            // Warmup -> hard block
             if (r.Label == "WARMUP" || !r.Ok)
             {
                 r.Ok = false;
                 r.Fail = string.IsNullOrEmpty(r.Fail) ? "warmup" : r.Fail;
                 return false;
             }
-
-            // Directional adjustments can be added here later using longSide
-            // (for now, score is direction-agnostic)
 
             var fails = new List<string>();
 
@@ -173,9 +190,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             r.StrongSlopeMinUsed = STRONG_SLOPE_TICKS;
             r.StrongSepMinUsed   = STRONG_SEP_TICKS;
 
-            // must set aligned first (directional)
-            r.Aligned = longSide ? emaFast[0] > emaSlow[0]
-                : emaFast[0] < emaSlow[0];
+            // IMPORTANT: Alignment is NOW (matches slope/sep/cross penalty/score)
+            r.Aligned = longSide ? emaFast[0] > emaSlow[0] : emaFast[0] < emaSlow[0];
 
             r.StrongSlopeOk   = Math.Abs(r.EmaSlopeTicks) >= STRONG_SLOPE_TICKS;
             r.StrongSepOk     = Math.Abs(r.EmaSepTicks)   >= STRONG_SEP_TICKS;
@@ -193,35 +209,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!r.StrongSepOk)   parts.Add($"sep<{STRONG_SEP_TICKS:0}");
                 r.StrongFail = string.Join("|", parts);
             }
-            
-            r.Aligned = longSide ? emaFast[0] > emaSlow[0] : emaFast[0] < emaSlow[0];
 
-            var strongStructure =
-                r.Aligned &&
-                Math.Abs(r.EmaSlopeTicks) >= STRONG_SLOPE_TICKS &&
-                Math.Abs(r.EmaSepTicks)   >= STRONG_SEP_TICKS;
+            // Directional displacement check (AS-OF sigBarsAgo)
+            // Use atrMedian from NOW regime snapshot (stable baseline)
+            var disp = IsDisplacementBar(longSide, sigBarsAgo, r.AtrMedian, out _, out _, out _);
 
             var minScore = RegimeScoreMin;
 
             if (r.StrongStructure)
                 minScore = Math.Max(35, RegimeScoreMin - 20);
 
-            if (r.EmaSlopeTicks >= 150 && r.Er >= 0.45)
+            if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45)
                 minScore = Math.Min(minScore, 45);
 
-            if (r.Score < minScore)
+            // Displacement override: allow some marginal regimes if signal bar shows real impulse
+            var dispOverrideOk =
+                disp &&
+                r.Er >= DispOverrideErMin &&
+                r.Aligned;
+
+            if (r.Score < minScore && !dispOverrideOk)
                 fails.Add($"regime-score-low(<{minScore})");
-            
-            // ER hard fail only when structure is NOT strong
-            if (r.Er < RegimeErMin && !r.StrongStructure)
+
+            // ER hard fail only when structure is NOT strong (and no disp override)
+            if (r.Er < RegimeErMin && !r.StrongStructure && !dispOverrideOk)
                 fails.Add("er-too-low");
 
             // --- SOFT crossover gate ---
-            // Recent EMA cross is often unstable, but allow it when trend quality is clearly strong.
-            // Override criteria: high ER + "near-strong" structure (slope or sep close to strong mins).
             const double CROSS_OVERRIDE_ER = 0.65;
-            const double CROSS_OVERRIDE_SLOPE_FRAC = 0.75; // 75% of strong slope min
-            const double CROSS_OVERRIDE_SEP_FRAC   = 0.75; // 75% of strong sep min
+            const double CROSS_OVERRIDE_SLOPE_FRAC = 0.75;
+            const double CROSS_OVERRIDE_SEP_FRAC   = 0.75;
 
             var absSlope = Math.Abs(r.EmaSlopeTicks);
             var absSep   = Math.Abs(r.EmaSepTicks);
@@ -231,13 +248,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (absSlope >= STRONG_SLOPE_TICKS * CROSS_OVERRIDE_SLOPE_FRAC ||
                  absSep   >= STRONG_SEP_TICKS   * CROSS_OVERRIDE_SEP_FRAC);
 
-            // Only hard-fail crossover when we DON'T have the override
-            if (r.CrossPenaltyActive && !crossOverrideOk)
+            var crossBypassOk = crossOverrideOk || dispOverrideOk;
+
+            if (r.CrossPenaltyActive && !crossBypassOk)
                 fails.Add($"ema-crossover-soft(barsSince={r.BarsSinceCross})");
 
             r.CrossOverrideOk = crossOverrideOk;
-            r.MinScoreUsed = minScore;
-            
+            r.MinScoreUsed    = minScore;
+
+            // Refresh JSON (still "now")
             r.Json = BuildRegimeJson(
                 Time[0],
                 r.Adx,
@@ -247,12 +266,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.EmaSepTicks,
                 r.Score,
                 r.Label,
-                r.CrossPenaltyActive, // <-- instead of r.EmaCrossover
+                r.CrossPenaltyActive,
                 r.EmaEff
-                
             );
-            
-            r.Ok = fails.Count == 0;
+
+            r.Ok   = fails.Count == 0;
             r.Fail = r.Ok ? "none" : string.Join("|", fails);
 
             return r.Ok;
@@ -351,6 +369,94 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             _regimeJsonByTag.Remove(tag);
+        }
+        
+        private double GetAtrTicks(int barsAgo)
+        {
+            return atr[barsAgo] / TickSize;
+        }
+
+        private double ComputeMedian(double[] tmp, int n)
+        {
+            Array.Sort(tmp, 0, n);
+            if (n <= 0) return 0;
+            if ((n & 1) == 1) return tmp[n / 2];
+            return 0.5 * (tmp[(n / 2) - 1] + tmp[n / 2]);
+        }
+
+        // Percentile rank of current vs past N bars (0..1)
+        // Uses "strictly less than" count; ties sit around middle naturally on average.
+        private double ComputeAtrPercentile(int lookbackBars, out double median, out double ratio)
+        {
+            median = 0;
+            ratio = 1;
+
+            var lb = Math.Max(10, lookbackBars);
+            if (CurrentBar < lb + 1)
+                return 0.5;
+
+            var cur = GetAtrTicks(0);
+
+            // Collect history (closed bars)
+            var n = lb;
+            var arr = new double[n];
+            for (int i = 0; i < n; i++)
+                arr[i] = GetAtrTicks(i);
+
+            median = ComputeMedian(arr, n);
+            if (median > 1e-9)
+                ratio = cur / median;
+
+            int less = 0;
+            for (int i = 0; i < n; i++)
+                if (arr[i] < cur) less++;
+
+            return Clamp01(less / (double)Math.Max(1, n - 1));
+        }
+
+        private void ComputeBarShape(int barsAgo, out double rangeTicks, out double bodyPct, out double clv)
+        {
+            var h = High[barsAgo];
+            var l = Low[barsAgo];
+            var o = Open[barsAgo];
+            var c = Close[barsAgo];
+
+            var range = Math.Max(TickSize, h - l);
+            rangeTicks = range / TickSize;
+
+            var body = Math.Abs(c - o);
+            bodyPct = Clamp01(body / range);
+
+            // CLV: 0..1 where close sits in the bar (1=at high, 0=at low)
+            clv = Clamp01((c - l) / range);
+        }
+
+        private bool IsDisplacementBar(bool longSide, int barsAgo, double atrMedianTicks,
+            out double rangeTicks, out double bodyPct, out double clv)
+        {
+            ComputeBarShape(barsAgo, out rangeTicks, out bodyPct, out clv);
+
+            // must have usable median
+            if (atrMedianTicks <= 1e-9)
+                return false;
+
+            var rangeOk = rangeTicks >= (DispRangeAtrMult * atrMedianTicks);
+            var bodyOk  = bodyPct   >= DispBodyPctMin;
+
+            // close location
+            var clvOk = longSide ? (clv >= DispClvMinBull) : (clv <= DispClvMaxBear);
+
+            // simple breakout confirmation (optional)
+            var breakoutOk = true;
+            if (DispBreakoutTicks > 0)
+            {
+                var bt = DispBreakoutTicks * TickSize;
+                breakoutOk = longSide
+                    ? Close[barsAgo] >= High[barsAgo + 1] + bt
+                    : Close[barsAgo] <= Low[barsAgo + 1]  - bt;
+            }
+
+            return rangeOk && bodyOk && clvOk && breakoutOk;
         }
     }
 }

@@ -229,32 +229,79 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name="RegimeScoreMin", GroupName="06-Regime", Order= 2)]
+        [Display(Name="RegimeScoreMin", GroupName="06-Regime", Order = 2)]
         public int RegimeScoreMin { get; set; } = 20;   // used later as filter if you want
 
         [NinjaScriptProperty]
-        [Range(1, 300)]
-        [Display(Name="RegimeAtrMinTicks", GroupName="06-Regime", Order = 3)]
-        public int RegimeAtrMinTicks { get; set; } = 60;
+        [Range(30, 500)]
+        [Display(Name="ATR Percentile Lookback Bars", Order = 3, GroupName = "06-Regime")]
+        public int RegimeAtrPctLookbackBars { get; set; } = 120;
 
         [NinjaScriptProperty]
-        [Range(1, 500)]
-        [Display(Name="RegimeAtrMaxTicks", GroupName="06-Regime", Order = 4)]
-        public int RegimeAtrMaxTicks { get; set; } = 200;
+        [Range(0.0, 1.0)]
+        [Display(Name="ATR Percentile Min", Order = 4, GroupName = "06-Regime")]
+        public double RegimeAtrPctMin { get; set; } = 0.25;   // below this = too quiet vs recent history
+
+        [NinjaScriptProperty]
+        [Range(0.0, 1.0)]
+        [Display(Name="ATR Percentile Max", Order = 5, GroupName = "06-Regime")]
+        public double RegimeAtrPctMax { get; set; } = 0.90;   // above this = very hot/volatile
+        
+        [NinjaScriptProperty]
+        [Range(20, 500)]
+        [Display(Name="ATR Median Lookback Bars", Order=6, GroupName = "06-Regime")]
+        public int RegimeAtrMedianLookbackBars { get; set; } = 120;
+
+        // Displacement / momentum detector
+        [NinjaScriptProperty]
+        [Range(1.0, 5.0)]
+        [Display(Name="Disp Range ATR Mult", Order=7, GroupName="Momentum")]
+        public double DispRangeAtrMult { get; set; } = 1.25;
+
+        [NinjaScriptProperty]
+        [Range(0.10, 0.95)]
+        [Display(Name="Disp Body % Min", Order=8, GroupName="Momentum")]
+        public double DispBodyPctMin { get; set; } = 0.55;
+
+        [NinjaScriptProperty]
+        [Range(0.50, 1.00)]
+        [Display(Name="Disp CLV Min (bull)", Order=9, GroupName="Momentum")]
+        public double DispClvMinBull { get; set; } = 0.80;
+
+        [NinjaScriptProperty]
+        [Range(0.00, 0.50)]
+        [Display(Name="Disp CLV Max (bear)", Order=10, GroupName="Momentum")]
+        public double DispClvMaxBear { get; set; } = 0.20;
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(Name="Disp Breakout Ticks", Order=11, GroupName="Momentum")]
+        public int DispBreakoutTicks { get; set; } = 2;
+
+// How displacement overrides regime
+        [NinjaScriptProperty]
+        [Range(0.0, 1.0)]
+        [Display(Name="Disp Override ER Min", Order=12, GroupName="Momentum")]
+        public double DispOverrideErMin { get; set; } = 0.45;
+
+        [NinjaScriptProperty]
+        [Range(0, 30)]
+        [Display(Name="Disp Override Cross Bars", Order=13, GroupName="Momentum")]
+        public int DispOverrideCrossBars { get; set; } = 6;
 
         [NinjaScriptProperty]
         [Range(1, 50)]
-        [Display(Name="RegimeAdxSweetLow", GroupName="06-Regime", Order = 5)]
+        [Display(Name="RegimeAdxSweetLow", GroupName="06-Regime", Order = 14)]
         public int RegimeAdxSweetLow { get; set; } = 18;
 
         [NinjaScriptProperty]
         [Range(1, 80)]
-        [Display(Name="RegimeAdxSweetHigh", GroupName="06-Regime", Order = 6)]
+        [Display(Name="RegimeAdxSweetHigh", GroupName="06-Regime", Order = 15)]
         public int RegimeAdxSweetHigh { get; set; } = 35;
 
         [NinjaScriptProperty]
         [Range(0.0, 1.0)]
-        [Display(Name="RegimeErMin", GroupName="06-Regime", Order = 7)]
+        [Display(Name="RegimeErMin", GroupName="06-Regime", Order = 16)]
         public double RegimeErMin { get; set; } = 0.30;
         
         private double _lastRegimeScore = 0;
