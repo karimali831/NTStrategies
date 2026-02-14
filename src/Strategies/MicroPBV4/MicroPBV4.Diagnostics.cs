@@ -270,12 +270,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.EntryDistDeferLongBar  = _entryDistDeferLongBar;
 		    s.EntryDistDeferShortBar = _entryDistDeferShortBar;
 
-		    s.LongExtraDelay  = _entryDistDeferLongBar  >= 0 && CurrentBar == _entryDistDeferLongBar  ? 1 : 0;
-		    s.ShortExtraDelay = _entryDistDeferShortBar >= 0 && CurrentBar == _entryDistDeferShortBar ? 1 : 0;
+		    s.SigLongAgo  = confirmDelay;
+		    s.SigShortAgo = confirmDelay;
 
-		    s.SigLongAgo  = confirmDelay + s.LongExtraDelay;
-		    s.SigShortAgo = confirmDelay + s.ShortExtraDelay;
-
+		    s.EntryDistDeferLongBar  = _entryDistDeferLongBar;
+		    s.EntryDistDeferShortBar = _entryDistDeferShortBar;
+		    
 			//-- ENTRY DISTANCE (per-side, using the signal barsAgo)
 			s.EntryDistLongOk  = PassesEntryDistanceFilter(s.SigLongAgo,  out var longPriorRangeTicks);
 			s.EntryDistShortOk = PassesEntryDistanceFilter(s.SigShortAgo, out var shortPriorRangeTicks);
