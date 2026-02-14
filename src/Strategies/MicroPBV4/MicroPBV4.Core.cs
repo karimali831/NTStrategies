@@ -251,58 +251,63 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(20, 500)]
         [Display(Name="ATR Median Lookback Bars", Order=6, GroupName = "06-Regime")]
         public int RegimeAtrMedianLookbackBars { get; set; } = 120;
-
-        // Displacement / momentum detector
-        [NinjaScriptProperty]
-        [Range(1.0, 5.0)]
-        [Display(Name="Disp Range ATR Mult", Order=7, GroupName="Momentum")]
-        public double DispRangeAtrMult { get; set; } = 1.25;
-
-        [NinjaScriptProperty]
-        [Range(0.10, 0.95)]
-        [Display(Name="Disp Body % Min", Order=8, GroupName="Momentum")]
-        public double DispBodyPctMin { get; set; } = 0.55;
-
-        [NinjaScriptProperty]
-        [Range(0.50, 1.00)]
-        [Display(Name="Disp CLV Min (bull)", Order=9, GroupName="Momentum")]
-        public double DispClvMinBull { get; set; } = 0.80;
-
-        [NinjaScriptProperty]
-        [Range(0.00, 0.50)]
-        [Display(Name="Disp CLV Max (bear)", Order=10, GroupName="Momentum")]
-        public double DispClvMaxBear { get; set; } = 0.20;
-
-        [NinjaScriptProperty]
-        [Range(0, 20)]
-        [Display(Name="Disp Breakout Ticks", Order=11, GroupName="Momentum")]
-        public int DispBreakoutTicks { get; set; } = 2;
-
-// How displacement overrides regime
-        [NinjaScriptProperty]
-        [Range(0.0, 1.0)]
-        [Display(Name="Disp Override ER Min", Order=12, GroupName="Momentum")]
-        public double DispOverrideErMin { get; set; } = 0.45;
-
-        [NinjaScriptProperty]
-        [Range(0, 30)]
-        [Display(Name="Disp Override Cross Bars", Order=13, GroupName="Momentum")]
-        public int DispOverrideCrossBars { get; set; } = 6;
-
+        
         [NinjaScriptProperty]
         [Range(1, 50)]
-        [Display(Name="RegimeAdxSweetLow", GroupName="06-Regime", Order = 14)]
+        [Display(Name="RegimeAdxSweetLow", GroupName="06-Regime", Order = 7)]
         public int RegimeAdxSweetLow { get; set; } = 18;
 
         [NinjaScriptProperty]
         [Range(1, 80)]
-        [Display(Name="RegimeAdxSweetHigh", GroupName="06-Regime", Order = 15)]
+        [Display(Name="RegimeAdxSweetHigh", GroupName="06-Regime", Order = 8)]
         public int RegimeAdxSweetHigh { get; set; } = 35;
 
         [NinjaScriptProperty]
         [Range(0.0, 1.0)]
-        [Display(Name="RegimeErMin", GroupName="06-Regime", Order = 16)]
+        [Display(Name="RegimeErMin", GroupName="06-Regime", Order = 9)]
         public double RegimeErMin { get; set; } = 0.30;
+        
+        [NinjaScriptProperty]
+        [Display(Name="RegimeErDecay", Order = 10, GroupName = "06-Regime")]
+        public double RegimeErDecay { get; set; } = 0.90;   // 0.85..0.95 typical
+
+        
+        // Displacement / momentum detector
+        [NinjaScriptProperty]
+        [Range(1.0, 5.0)]
+        [Display(Name="Disp Range ATR Mult", Order=1, GroupName="07-Momentum")]
+        public double DispRangeAtrMult { get; set; } = 1.25;
+
+        [NinjaScriptProperty]
+        [Range(0.10, 0.95)]
+        [Display(Name="Disp Body % Min", Order=2, GroupName="07-Momentum")]
+        public double DispBodyPctMin { get; set; } = 0.55;
+
+        [NinjaScriptProperty]
+        [Range(0.50, 1.00)]
+        [Display(Name="Disp CLV Min (bull)", Order=3, GroupName="07-Momentum")]
+        public double DispClvMinBull { get; set; } = 0.80;
+
+        [NinjaScriptProperty]
+        [Range(0.00, 0.50)]
+        [Display(Name="Disp CLV Max (bear)", Order=4, GroupName="07-Momentum")]
+        public double DispClvMaxBear { get; set; } = 0.20;
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(Name="Disp Breakout Ticks", Order=5, GroupName="07-Momentum")]
+        public int DispBreakoutTicks { get; set; } = 2;
+
+        // How displacement overrides regime
+        [NinjaScriptProperty]
+        [Range(0.0, 1.0)]
+        [Display(Name="Disp Override ER Min", Order=6, GroupName="07-Momentum")]
+        public double DispOverrideErMin { get; set; } = 0.45;
+
+        [NinjaScriptProperty]
+        [Range(0, 30)]
+        [Display(Name="Disp Override Cross Bars", Order=7, GroupName="07-Momentum")]
+        public int DispOverrideCrossBars { get; set; } = 6;
         
         private double _lastRegimeScore = 0;
         private string _lastRegimeJson = "";

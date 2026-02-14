@@ -286,16 +286,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < lb + 1)
                 return 0;
 
+            // Net move over the window (unchanged)
             var net = Math.Abs(Close[0] - Close[lb]) / TickSize;
 
+            // Weighted path: recent bars matter more
             double path = 0;
-            for (var i = 0; i < lb; i++)
-                path += Math.Abs(Close[i] - Close[i + 1]) / TickSize;
+            double wSum = 0;
 
-            if (path <= 1e-9)
+            // i=0 is most recent step (Close[0] vs Close[1])
+            // i increases -> older steps
+            for (var i = 0; i < lb; i++)
+            {
+                var step = Math.Abs(Close[i] - Close[i + 1]) / TickSize;
+
+                // weight 1.0 for most recent, decays for older
+                var w = Math.Pow(RegimeErDecay, i);
+
+                path += step * w;
+                wSum += w;
+            }
+
+            if (path <= 1e-9 || wSum <= 1e-9)
                 return 0;
 
-            return Math.Max(0, Math.Min(1, net / path));
+            // Optional normalization so ER stays comparable across decay values
+            // (makes path roughly "average weighted step * lb")
+            var pathNorm = path / wSum * lb;
+
+            var er = net / pathNorm;
+            return Math.Max(0, Math.Min(1, er));
         }
         
         private static double Clamp01(double v) => v < 0 ? 0 : (v > 1 ? 1 : v);
