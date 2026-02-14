@@ -183,7 +183,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sig] + buf, High[sig] + buf));
                     var trigger = NormalizeBuyStopPrice(rawTrigger);
 
-                    if (!PassesEntryDistanceFilter(out var distTicks))
+                    if (!PassesEntryDistanceFilter(sig, out var distTicks))
                     {
                         // If the ONLY reason is "prior bar too large", defer to ConfirmBars+1 (one-shot)
                         if (MaxPriorBarRangeTicks > 0 && distTicks > MaxPriorBarRangeTicks)
@@ -249,7 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sig] - buf, Low[sig] - buf));
                     var trigger = NormalizeSellStopPrice(rawTrigger);
 
-                    if (!PassesEntryDistanceFilter(out var distTicks))
+                    if (!PassesEntryDistanceFilter(sig, out var distTicks))
                     {
                         if (MaxPriorBarRangeTicks > 0 && distTicks > MaxPriorBarRangeTicks)
                         {

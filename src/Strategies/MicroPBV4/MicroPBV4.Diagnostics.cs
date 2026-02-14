@@ -258,10 +258,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    // ---- WICK FITLER ----
 		    s.WickOk = RecentBarsAreCleanForEntry();
-
-		    //-- ENTRY DISTANCE ----
-		    s.PasseEntryDistance = PassesEntryDistanceFilter(out var priorBarRangeTicks);
-		    s.PriorBarRangeTicks = priorBarRangeTicks;
 		    
 		    //-- CONFIRM BARS
 		    var confirmDelay = Math.Max(0, ConfirmBars - 1);
@@ -274,6 +270,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    s.SigLongAgo  = confirmDelay + s.LongExtraDelay;
 		    s.SigShortAgo = confirmDelay + s.ShortExtraDelay;
+
+			//-- ENTRY DISTANCE (per-side, using the signal barsAgo)
+		    s.EntryDistLongOk  = PassesEntryDistanceFilter(s.SigLongAgo,  out var longDistTicks);
+		    s.EntryDistShortOk = PassesEntryDistanceFilter(s.SigShortAgo, out var shortDistTicks);
+		    s.PriorBarRangeTicksLong  = longDistTicks;
+		    s.PriorBarRangeTicksShort = shortDistTicks;
+
+			// optional: keep legacy single fields for UI/printing
+		    s.PasseEntryDistance = s.TrendUp ? s.EntryDistLongOk : !s.TrendDown || s.EntryDistShortOk;
+		    s.PriorBarRangeTicks = s.TrendUp ? s.PriorBarRangeTicksLong : s.TrendDown ? s.PriorBarRangeTicksShort : 0;
 		    
 		    // ---- TREND ----
 		    TrendConfirm(out var trendFail, out var trendUp, out var trendDown);
@@ -344,17 +350,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (!s.SpacingOk) blocks.Add("min-minutes-between");
 		    if (!s.EntryDistCooldownOk) blocks.Add("entry-dist-cooldown");
 		    if (!s.WickOk) blocks.Add("wick-filter");
-		    if (!s.PasseEntryDistance)
+		    if (s.TrendUp && !s.EntryDistLongOk)
 		    {
-			    var side = s.TrendUp ? "long" : s.TrendDown ? "short" : "na";
-			    var willDeferNext =
-				    (side == "long"  && s.EntryDistDeferLongBar  == CurrentBar + 1) ||
-				    (side == "short" && s.EntryDistDeferShortBar == CurrentBar + 1);
-
+			    var willDeferNext = s.EntryDistDeferLongBar == CurrentBar + 1;
 			    blocks.Add(
-				    $"{side}-prior-bar-too-large: (rangeTicks={s.PriorBarRangeTicks:0.0} > max={MaxPriorBarRangeTicks:0.0}, " +
+				    $"long-prior-bar-too-large: (rangeTicks={s.PriorBarRangeTicksLong:0.0} > max={MaxPriorBarRangeTicks:0.0}, " +
 				    $"cooldownBars={EntryDistCooldownBars}, willDeferNext={willDeferNext})");
 		    }
+		    else if (s.TrendDown && !s.EntryDistShortOk)
+		    {
+			    var willDeferNext = s.EntryDistDeferShortBar == CurrentBar + 1;
+			    blocks.Add(
+				    $"short-prior-bar-too-large: (rangeTicks={s.PriorBarRangeTicksShort:0.0} > max={MaxPriorBarRangeTicks:0.0}, " +
+				    $"cooldownBars={EntryDistCooldownBars}, willDeferNext={willDeferNext})");
+		    }
+
 		    if ((s.LongCandidate || s.ShortCandidate) && !s.Tradeable)
 			    blocks.Add("market-regime-block");
 		    
@@ -374,8 +384,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool LongReclaimed, ShortReclaimed;
 	        public bool Flat, LongCandidate, ShortCandidate, WouldSubmitLongNow, WouldSubmitShortNow, WouldSubmitNow;
 	        
-	        public double PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
-	        public bool EntryDistCooldownOk, EntryDistCooldownEnabled;
+	        public double PriorBarRangeTicksLong, PriorBarRangeTicksShort, PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
+	        public bool EntryDistLongOk, EntryDistShortOk, EntryDistCooldownOk, EntryDistCooldownEnabled;
 	        public int EntryDistBlockBarsLeft;
 	        
 	        public string EntryDistCooldownReason;
