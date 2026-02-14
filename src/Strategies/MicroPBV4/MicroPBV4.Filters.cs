@@ -13,14 +13,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (MaxPriorBarRangeTicks <= 0)
                 return true;
 
-            var priorBarsAgo = sigBarsAgo + 1;
-            if (CurrentBar < priorBarsAgo)
+            if (CurrentBar < sigBarsAgo)
                 return true;
 
-            distTicks = (High[priorBarsAgo] - Low[priorBarsAgo]) / TickSize;
+            distTicks = (High[sigBarsAgo] - Low[sigBarsAgo]) / TickSize;
             return distTicks <= MaxPriorBarRangeTicks;
         }
-
         
 
         private bool PassesWickFilter()
