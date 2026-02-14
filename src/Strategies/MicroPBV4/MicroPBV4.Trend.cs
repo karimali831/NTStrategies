@@ -22,24 +22,33 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // -------- Trend context (single source of truth) --------
-            var alignedUp   = emaFast[0] > emaSlow[0];
-            var alignedDown = emaFast[0] < emaSlow[0];
+            // var alignedUp   = emaFast[0] > emaSlow[0];
+            // var alignedDown = emaFast[0] < emaSlow[0];
 
             // ✅ For pullback strategies: do NOT use slope as a hard trend gate.
-            trendUp   = alignedUp   && m.PriceAboveFast;
-            trendDown = alignedDown && m.PriceBelowFast;
+            // trendUp   = alignedUp   && m.PriceAboveFast;
+            // trendDown = alignedDown && m.PriceBelowFast;
 
-            if (!trendUp && !trendDown)
-            {
-                if (!alignedUp && !alignedDown)
-                    failReason = "emas-flat-or-crossed";
-                else if (alignedUp && !m.PriceAboveFast)
-                    failReason = "price-not-above-fast-ema";
-                else if (alignedDown && !m.PriceBelowFast)
-                    failReason = "price-not-below-fast-ema";
-                else
-                    failReason = "trend-unknown";
-            }
+            // trendUp = m.PriceAboveFast;
+            // trendDown = m.PriceBelowFast;
+
+            TrendTicks(10, out var lb, out var bars, out var ticks, out var upTicks,
+                out var downTicks);
+
+            trendUp = upTicks > downTicks;
+            trendDown = downTicks > upTicks;
+
+            // if (!trendUp && !trendDown)
+            // {
+            //     if (!alignedUp && !alignedDown)
+            //         failReason = "emas-flat-or-crossed";
+            //     else if (alignedUp && !m.PriceAboveFast)
+            //         failReason = "price-not-above-fast-ema";
+            //     else if (alignedDown && !m.PriceBelowFast)
+            //         failReason = "price-not-below-fast-ema";
+            //     else
+            //         failReason = "trend-unknown";
+            // }
 
             return trendUp || trendDown;
         }
