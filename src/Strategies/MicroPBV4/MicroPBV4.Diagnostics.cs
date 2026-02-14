@@ -383,7 +383,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool LongPulledBack, ShortPulledBack;
 	        public bool LongReclaimed, ShortReclaimed;
 	        public bool Flat, LongCandidate, ShortCandidate, WouldSubmitLongNow, WouldSubmitShortNow, WouldSubmitNow;
-	        
+
 	        public double PriorBarRangeTicksLong, PriorBarRangeTicksShort, PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
 	        public bool EntryDistLongOk, EntryDistShortOk, EntryDistCooldownOk, EntryDistCooldownEnabled;
 	        public int EntryDistBlockBarsLeft;

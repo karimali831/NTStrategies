@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public double EmaSepTicks;
             public bool   EmaCrossover;   // keep for JSON (we’ll redefine as "recent cross")
             public double EmaEff;
-
+            public bool CrossOverrideOk;
             public int    BarsSinceCross;
             public bool   CrossPenaltyActive;
             
@@ -216,9 +216,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (r.Er < RegimeErMin && !r.StrongStructure)
                 fails.Add("er-too-low");
 
-            if (r.CrossPenaltyActive)
-                fails.Add($"ema-crossover-penalty(barsSince={r.BarsSinceCross})");
+            // --- SOFT crossover gate ---
+            // Recent EMA cross is often unstable, but allow it when trend quality is clearly strong.
+            // Override criteria: high ER + "near-strong" structure (slope or sep close to strong mins).
+            const double CROSS_OVERRIDE_ER = 0.65;
+            const double CROSS_OVERRIDE_SLOPE_FRAC = 0.75; // 75% of strong slope min
+            const double CROSS_OVERRIDE_SEP_FRAC   = 0.75; // 75% of strong sep min
 
+            var absSlope = Math.Abs(r.EmaSlopeTicks);
+            var absSep   = Math.Abs(r.EmaSepTicks);
+
+            var crossOverrideOk =
+                r.Er >= CROSS_OVERRIDE_ER &&
+                (absSlope >= STRONG_SLOPE_TICKS * CROSS_OVERRIDE_SLOPE_FRAC ||
+                 absSep   >= STRONG_SEP_TICKS   * CROSS_OVERRIDE_SEP_FRAC);
+
+            // Only hard-fail crossover when we DON'T have the override
+            if (r.CrossPenaltyActive && !crossOverrideOk)
+                fails.Add($"ema-crossover-soft(barsSince={r.BarsSinceCross})");
+
+            r.CrossOverrideOk = crossOverrideOk;
             r.MinScoreUsed = minScore;
             
             r.Json = BuildRegimeJson(
@@ -232,6 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.Label,
                 r.CrossPenaltyActive, // <-- instead of r.EmaCrossover
                 r.EmaEff
+                
             );
             
             r.Ok = fails.Count == 0;
