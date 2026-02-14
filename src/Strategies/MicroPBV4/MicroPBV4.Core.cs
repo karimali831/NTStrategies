@@ -297,6 +297,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int entryBarIdx = -1;
         private readonly Dictionary<string, DateTime> _entryOrderBirth = new Dictionary<string, DateTime>();
 
+        // --- one-shot deferral when entry-distance fails due to huge prior-bar range ---
+        private int _entryDistDeferLongBar  = -1;
+        private int _entryDistDeferShortBar = -1;
+        
         // Break-even throttle
         private int lastBEBar = -1;
         private double lastBEPrice = 0.0;

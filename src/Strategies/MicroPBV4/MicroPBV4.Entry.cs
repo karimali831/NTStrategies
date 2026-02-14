@@ -50,6 +50,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             CancelStaleEntryOrders(Time[0]);
             var submitted = false;
             
+            // ---- confirm bars
+            var confirmDelay = Math.Max(0, ConfirmBars - 1);
+
+            // expire missed deferrals (only valid for the exact bar)
+            if (_entryDistDeferLongBar >= 0 && CurrentBar > _entryDistDeferLongBar)  _entryDistDeferLongBar = -1;
+            if (_entryDistDeferShortBar >= 0 && CurrentBar > _entryDistDeferShortBar) _entryDistDeferShortBar = -1;
+            
             // ===== DAY / SESSION SETUP (true session begin via SessionIterator) =====
             var now = Time[0];
             var sessionChanged = UpdateSessionTimes(now);
@@ -155,27 +162,48 @@ namespace NinjaTrader.NinjaScript.Strategies
             // ===== LONG =====
             if (!submitted && EnableLongs && trendUp)
             {
-                var pulledBack = PullbackTouchedFastEmaPrevBar(true, out _, out _);
-                var reclaimed = Close[0] > emaFast[0];
+                var extraDelay = CurrentBar == _entryDistDeferLongBar ? 1 : 0;
+                var sig = confirmDelay + extraDelay;   // barsAgo we evaluate entry on
 
-                if (pulledBack && reclaimed && ConfirmLongEntry(out _))
+                if (CurrentBar < sig)
+                {
+                    ManageBreakEven();
+                    return;
+                }
+
+                var pulledBack = PullbackTouchedFastEmaPrevBar(true, sig, out _, out _);
+                var reclaimed  = Close[sig] > emaFast[sig];
+
+                if (pulledBack && reclaimed && ConfirmLongEntry(sig, out _))  // ConfirmLongEntry uses [0] today; see NOTE below
                 {
                     var tag = $"MPB_LONG__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
                     PrepareBracket(tag, atrNow);
 
                     var rawTrigger =
-                        Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[0] + buf, High[0] + buf));
+                        Instrument.MasterInstrument.RoundToTickSize(Math.Max(Close[sig] + buf, High[sig] + buf));
                     var trigger = NormalizeBuyStopPrice(rawTrigger);
 
-                    if (!PassesEntryDistanceFilter(out _))
+                    if (!PassesEntryDistanceFilter(out var distTicks))
                     {
+                        // If the ONLY reason is "prior bar too large", defer to ConfirmBars+1 (one-shot)
+                        if (MaxPriorBarRangeTicks > 0 && distTicks > MaxPriorBarRangeTicks)
+                        {
+                            _entryDistDeferLongBar = CurrentBar + 1;
+                            ManageBreakEven();
+                            return;
+                        }
+
                         if (EntryDistCooldownBars > 0)
                             _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                         ManageBreakEven();
                         return;
                     }
-                    
+
+                    // clear defer if we are consuming it
+                    if (extraDelay == 1)
+                        _entryDistDeferLongBar = -1;
+
                     if (!PassesMarketRegimeGate(true, out var r))
                     {
                         if (DebugMode)
@@ -200,27 +228,46 @@ namespace NinjaTrader.NinjaScript.Strategies
             // ===== SHORT =====
             if (!submitted && EnableShorts && trendDown)
             {
-                var pulledBack = PullbackTouchedFastEmaPrevBar(false, out _, out _);
-                var reclaimed = Close[0] < emaFast[0];
+                var extraDelay = CurrentBar == _entryDistDeferShortBar ? 1 : 0;
+                var sig = confirmDelay + extraDelay;
 
-                if (pulledBack && reclaimed && ConfirmShortEntry(out _))
+                if (CurrentBar < sig)
+                {
+                    ManageBreakEven();
+                    return;
+                }
+
+                var pulledBack = PullbackTouchedFastEmaPrevBar(false, sig, out _, out _);
+                var reclaimed  = Close[sig] < emaFast[sig];
+
+                if (pulledBack && reclaimed && ConfirmShortEntry(sig, out _)) // ConfirmShortEntry uses [0] today; see NOTE below
                 {
                     var tag = $"MPB_SHORT__{Time[0]:yyMMddHHmmss}_{++entrySeq:000}";
                     PrepareBracket(tag, atrNow);
 
                     var rawTrigger =
-                        Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[0] - buf, Low[0] - buf));
+                        Instrument.MasterInstrument.RoundToTickSize(Math.Min(Close[sig] - buf, Low[sig] - buf));
                     var trigger = NormalizeSellStopPrice(rawTrigger);
 
-                    if (!PassesEntryDistanceFilter(out _))
+                    if (!PassesEntryDistanceFilter(out var distTicks))
                     {
+                        if (MaxPriorBarRangeTicks > 0 && distTicks > MaxPriorBarRangeTicks)
+                        {
+                            _entryDistDeferShortBar = CurrentBar + 1;
+                            ManageBreakEven();
+                            return;
+                        }
+
                         if (EntryDistCooldownBars > 0)
                             _entryDistBlockLastBar = CurrentBar + EntryDistCooldownBars;
 
                         ManageBreakEven();
                         return;
                     }
-                    
+
+                    if (extraDelay == 1)
+                        _entryDistDeferShortBar = -1;
+
                     if (!PassesMarketRegimeGate(false, out var r))
                     {
                         if (DebugMode)
@@ -233,7 +280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ManageBreakEven();
                         return;
                     }
-                    
+
                     RememberRegimeForTag(tag, r.Json);
                     EnterShortStopMarket(qty, trigger, tag);
                     tradesToday++;
@@ -263,27 +310,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             return true;
         }
         
-        private bool PullbackTouchedFastEmaPrevBar(bool longSide, out double emaTouch, out double distTicks)
+        private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
         {
             emaTouch = 0;
             distTicks = double.NaN;
 
-            if (CurrentBar < 0)
+            if (CurrentBar < barsAgo)
                 return false;
 
-            emaTouch = emaFast[0];
+            emaTouch = emaFast[barsAgo];
 
             if (longSide)
             {
                 var prox = Math.Max(0, LongTouchTicks) * TickSize;
-                distTicks = (Low[0] - emaTouch) / TickSize;
-                return Low[0] <= (emaTouch + prox);
+                distTicks = (Low[barsAgo] - emaTouch) / TickSize;
+                return Low[barsAgo] <= (emaTouch + prox);
             }
             else
             {
                 var prox = Math.Max(0, ShortTouchTicks) * TickSize;
-                distTicks = (High[0] - emaTouch) / TickSize;
-                return High[0] >= (emaTouch - prox);
+                distTicks = (High[barsAgo] - emaTouch) / TickSize;
+                return High[barsAgo] >= (emaTouch - prox);
             }
         }
     }

@@ -50,23 +50,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             return trendUp || trendDown;
         }
         
-        private bool ConfirmLongEntry(out string failReason)
+        private bool ConfirmLongEntry(int barsAgo, out string failReason)
         {
             failReason = "none";
 
-            if (!(Close[0] > emaFast[0] && Close[0] > emaSlow[0]))
+            if (!(Close[barsAgo] > emaFast[barsAgo] && Close[barsAgo] > emaSlow[barsAgo]))
             {
                 failReason = "close-not-above-both-emas";
                 return false;
             }
 
-            if (Close[0] < Open[0])
+            if (Close[barsAgo] < Open[barsAgo])
             {
                 failReason = "not-bullish-candle";
                 return false;
             }
 
-            var bodyTicks = Math.Abs(Close[0] - Open[0]) / TickSize;
+            var bodyTicks = Math.Abs(Close[barsAgo] - Open[barsAgo]) / TickSize;
             if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
             {
                 failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
@@ -76,23 +76,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             return true;
         }
 
-        private bool ConfirmShortEntry(out string failReason)
+        private bool ConfirmShortEntry(int barsAgo, out string failReason)
         {
             failReason = "none";
 
-            if (!(Close[0] < emaFast[0] && Close[0] < emaSlow[0]))
+            if (!(Close[barsAgo] < emaFast[barsAgo] && Close[barsAgo] < emaSlow[barsAgo]))
             {
                 failReason = "close-not-below-both-emas";
                 return false;
             }
 
-            if (Close[0] > Open[0])
+            if (Close[barsAgo] > Open[barsAgo])
             {
                 failReason = "not-bearish-candle";
                 return false;
             }
 
-            var bodyTicks = Math.Abs(Close[0] - Open[0]) / TickSize;
+            var bodyTicks = Math.Abs(Close[barsAgo] - Open[barsAgo]) / TickSize;
             if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
             {
                 failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
