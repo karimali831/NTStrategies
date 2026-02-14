@@ -25,20 +25,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             var alignedUp   = emaFast[0] > emaSlow[0];
             var alignedDown = emaFast[0] < emaSlow[0];
 
-            var slopeUpOk   = TrendSlopeMinTicks == 0 || m.SlopeDirTicks >= TrendSlopeMinTicks;
-            var slopeDownOk = TrendSlopeMinTicks == 0 || -m.SlopeDirTicks >= TrendSlopeMinTicks;
-
-            trendUp   = alignedUp   && slopeUpOk   && m.PriceAboveFast;
-            trendDown = alignedDown && slopeDownOk && m.PriceBelowFast;
+            // ✅ For pullback strategies: do NOT use slope as a hard trend gate.
+            trendUp   = alignedUp   && m.PriceAboveFast;
+            trendDown = alignedDown && m.PriceBelowFast;
 
             if (!trendUp && !trendDown)
             {
                 if (!alignedUp && !alignedDown)
                     failReason = "emas-flat-or-crossed";
-                else if (alignedUp && !slopeUpOk)
-                    failReason = $"ema-slope-too-weak-up ({m.SlopeDirTicks} < {TrendSlopeMinTicks})";
-                else if (alignedDown && !slopeDownOk)
-                    failReason = $"ema-slope-too-weak-down ({-m.SlopeDirTicks} < {TrendSlopeMinTicks})";
                 else if (alignedUp && !m.PriceAboveFast)
                     failReason = "price-not-above-fast-ema";
                 else if (alignedDown && !m.PriceBelowFast)
