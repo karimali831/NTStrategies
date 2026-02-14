@@ -84,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // ---- Raw values (CLOSED bar 0) ----
             var adxNow   = adx[0];
             var atrTicks = atr[0] / TickSize;
-            var er       = GetEfficiencyRatio();
+            var er       = GetEfficiencyRatio(0);   // <-- explicit
 
             var es = GetEmaStruct(EmaSlopeMetric.Strength);
 
@@ -106,10 +106,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             r.AtrMedian = atrMed;
             r.AtrRatio  = atrRatio;
 
-            // Score ATR based on percentile (not absolute ticks)
             var sAtr = Scale01(atrPct, RegimeAtrPctMin, RegimeAtrPctMax);
-
-            var sEr = Scale01(er, RegimeErMin, 1.0);
+            var sEr  = Scale01(er, RegimeErMin, 1.0);
 
             const double MIN_SLOPE_TICKS = 20;
             const double MAX_SLOPE_TICKS = 250;
@@ -124,30 +122,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             const double wAdx = 0.25, wAtr = 0.20, wEr = 0.30, wStruct = 0.25;
             var score01 = wAdx * sAdx + wAtr * sAtr + wEr * sEr + wStruct * sStruct;
 
-            // ---- crossover recency (time-limited penalty) ----
+            // ---- crossover recency (NOW) ----
             const int crossPenaltyBars = 6;
-            var barsSinceCross = BarsSinceEmaCross(50); // NOW
 
-            r.BarsSinceCross      = barsSinceCross;
-            r.CrossPenaltyActive  = barsSinceCross <= crossPenaltyBars;
+            // keep your existing NOW method
+            var barsSinceCross = BarsSinceEmaCrossNow(50);
 
-            // transition penalty (only when cross is RECENT, and slope is not strong)
+            r.BarsSinceCross     = barsSinceCross;
+            r.CrossPenaltyActive = barsSinceCross <= crossPenaltyBars;
+
             if (r.CrossPenaltyActive && Math.Abs(r.EmaSlopeTicks) < 120)
                 score01 = Clamp01(score01 - 0.15);
 
-            // Pullback-friendly regime lift
             if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45 && r.Adx >= 25)
-                score01 = Math.Max(score01, 0.60); // floor at 60
+                score01 = Math.Max(score01, 0.60);
 
             r.Score = Math.Round(score01 * 100.0, 1);
 
-            // ---- Regime label (facts only) ----
             if (r.Score >= 70)      r.Label = "TREND_TRADEABLE";
             else if (r.Score >= 55) r.Label = "OK";
             else if (r.Score >= 40) r.Label = "TRANSITION";
             else                    r.Label = "CHOP_RISK";
 
-            // Base regime is not a gate
             r.Ok = true;
             r.Fail = "none";
 
@@ -164,16 +160,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.EmaEff
             );
         }
-
-
+      
         // 2) Gate: regime is NOW, alignment/structure are NOW.
         //    Displacement is evaluated at sigBarsAgo and can bypass SOME fails.
         private bool PassesMarketRegimeGate(bool longSide, int sigBarsAgo, out RegimeSnapshot r)
         {
-            // Build base regime snapshot (always NOW)
             ComputeMarketRegime(out r);
 
-            // Warmup -> hard block
             if (r.Label == "WARMUP" || !r.Ok)
             {
                 r.Ok = false;
@@ -182,16 +175,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             var fails = new List<string>();
+            var idx = Math.Max(0, sigBarsAgo);
 
-            // --- strong structure override (pullback-friendly) ---
+            // Alignment AS-OF signal (do not use [0] here)
+            r.Aligned = longSide
+                ? emaFast[idx] > emaSlow[idx]
+                : emaFast[idx] < emaSlow[idx];
+
+            // ER AS-OF signal (this is the big fix)
+            r.Er = GetEfficiencyRatio(idx);
+
+            // Cross penalty AS-OF signal
+            const int crossPenaltyBars = 6;
+            r.BarsSinceCross = BarsSinceEmaCrossAsOf(50, idx);
+            r.CrossPenaltyActive = r.BarsSinceCross <= crossPenaltyBars;
+
+            // --- strong structure override (still uses slope/sep from ComputeMarketRegime "now") ---
             const double STRONG_SLOPE_TICKS = 120;
             const double STRONG_SEP_TICKS   = 80;
 
             r.StrongSlopeMinUsed = STRONG_SLOPE_TICKS;
             r.StrongSepMinUsed   = STRONG_SEP_TICKS;
-
-            // IMPORTANT: Alignment is NOW (matches slope/sep/cross penalty/score)
-            r.Aligned = longSide ? emaFast[0] > emaSlow[0] : emaFast[0] < emaSlow[0];
 
             r.StrongSlopeOk   = Math.Abs(r.EmaSlopeTicks) >= STRONG_SLOPE_TICKS;
             r.StrongSepOk     = Math.Abs(r.EmaSepTicks)   >= STRONG_SEP_TICKS;
@@ -210,21 +214,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.StrongFail = string.Join("|", parts);
             }
 
-            // Directional displacement check (AS-OF sigBarsAgo)
-            // Use atrMedian from NOW regime snapshot (stable baseline)
-            var disp = IsDisplacementBar(longSide, sigBarsAgo, r.AtrMedian, out _, out _, out _);
+            // Displacement override evaluated at signal bar
+            var disp = IsDisplacementBar(longSide, idx, r.AtrMedian, out _, out _, out _);
 
             var minScore = RegimeScoreMin;
 
-            // strong structure => relax score gate
             if (r.StrongStructure)
                 minScore = Math.Max(0, RegimeScoreMin - 20);
 
-            // very strong slope + ER => relax even more
+            // If you want "very strong" to relax, don’t set minScore to 10 (it already is 10 often).
+            // Keep it as a no-op or push lower:
             if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45)
-                minScore = Math.Min(minScore, 10);   // or 0 / 5 depending how aggressive you want
+                minScore = Math.Min(minScore, 0);
 
-            // Displacement override: allow some marginal regimes if signal bar shows real impulse
             var dispOverrideOk =
                 disp &&
                 r.Er >= DispOverrideErMin &&
@@ -233,11 +235,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (r.Score < minScore && !dispOverrideOk)
                 fails.Add($"regime-score-low(<{minScore})");
 
-            // ER hard fail only when structure is NOT strong (and no disp override)
-            if (r.Er < RegimeErMin && !r.StrongStructure && !dispOverrideOk)
+            var softErBypassOk =
+                dispOverrideOk ||
+                (r.Aligned && Math.Abs(r.EmaSepTicks) >= 80 && Math.Abs(r.EmaSlopeTicks) >= 70);
+
+            if (r.Er < RegimeErMin && !r.StrongStructure && !softErBypassOk)
                 fails.Add("er-too-low");
 
-            // --- SOFT crossover gate ---
+            // Crossover soft gate
             const double CROSS_OVERRIDE_ER = 0.65;
             const double CROSS_OVERRIDE_SLOPE_FRAC = 0.75;
             const double CROSS_OVERRIDE_SEP_FRAC   = 0.75;
@@ -258,7 +263,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             r.CrossOverrideOk = crossOverrideOk;
             r.MinScoreUsed    = minScore;
 
-            // Refresh JSON (still "now")
+            // JSON is still "now" time; OK for tagging/debug, but ER has been replaced with as-of-sig value.
             r.Json = BuildRegimeJson(
                 Time[0],
                 r.Adx,
@@ -280,42 +285,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                         
         private double GetEfficiencyRatio()
         {
+            return GetEfficiencyRatio(0);
+        }
+
+        private double GetEfficiencyRatio(int barsAgo)
+        {
             var lb = Math.Max(2, RegimeErLookbackBars);
 
-            // we read Close[lb] and Close[i+1] up to lb
-            if (CurrentBar < lb + 1)
+            // Need Close[barsAgo + lb] and Close[i+1] up to barsAgo+lb
+            if (CurrentBar < barsAgo + lb + 1)
                 return 0;
 
-            // Net move over the window (unchanged)
-            var net = Math.Abs(Close[0] - Close[lb]) / TickSize;
+            var net = Math.Abs(Close[barsAgo] - Close[barsAgo + lb]) / TickSize;
 
-            // Weighted path: recent bars matter more
             double path = 0;
-            double wSum = 0;
+            for (var i = barsAgo; i < barsAgo + lb; i++)
+                path += Math.Abs(Close[i] - Close[i + 1]) / TickSize;
 
-            // i=0 is most recent step (Close[0] vs Close[1])
-            // i increases -> older steps
-            for (var i = 0; i < lb; i++)
-            {
-                var step = Math.Abs(Close[i] - Close[i + 1]) / TickSize;
-
-                // weight 1.0 for most recent, decays for older
-                var w = Math.Pow(RegimeErDecay, i);
-
-                path += step * w;
-                wSum += w;
-            }
-
-            if (path <= 1e-9 || wSum <= 1e-9)
+            if (path <= 1e-9)
                 return 0;
 
-            // Optional normalization so ER stays comparable across decay values
-            // (makes path roughly "average weighted step * lb")
-            var pathNorm = path / wSum * lb;
-
-            var er = net / pathNorm;
-            return Math.Max(0, Math.Min(1, er));
+            return Math.Max(0, Math.Min(1, net / path));
         }
+        
         
         private static double Clamp01(double v) => v < 0 ? 0 : (v > 1 ? 1 : v);
 

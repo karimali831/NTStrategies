@@ -121,28 +121,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             return r;
         }
         
-        private int BarsSinceEmaCross(int maxLookbackBars)
+        private int BarsSinceEmaCrossAsOf(int lookback, int barsAgo)
         {
-            // Need i+1 indexing, so cap to CurrentBar-1
-            var max = Math.Min(maxLookbackBars, CurrentBar - 1);
-            if (max < 1)
-                return int.MaxValue;
+            var idx = Math.Max(0, barsAgo);
+            var max = Math.Min(CurrentBar - idx - 1, lookback);
 
-            for (var i = 0; i <= max; i++)
+            for (int i = 0; i <= max; i++)
             {
-                var fastNow  = emaFast[i];
-                var slowNow  = emaSlow[i];
-                var fastPrev = emaFast[i + 1];
-                var slowPrev = emaSlow[i + 1];
+                int b = idx + i;
 
-                var crossedUp   = fastNow > slowNow && fastPrev <= slowPrev;
-                var crossedDown = fastNow < slowNow && fastPrev >= slowPrev;
+                var diffNow  = emaFast[b]     - emaSlow[b];
+                var diffPrev = emaFast[b + 1] - emaSlow[b + 1];
 
-                if (crossedUp || crossedDown)
-                    return i; // barsAgo
+                if (diffNow == 0)
+                    return i;
+
+                if (Math.Sign(diffNow) != Math.Sign(diffPrev))
+                    return i;
             }
 
-            return int.MaxValue;
+            return lookback + 1;
         }
+
+        private int BarsSinceEmaCrossNow(int lookback)
+        {
+            return BarsSinceEmaCrossAsOf(lookback, 0);
+        }
+
     }
 }
