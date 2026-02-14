@@ -12,14 +12,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (MaxPriorBarRangeTicks <= 0)
                 return true;
-
-            // "Prior bar" relative to the signal bar
-            var b = Math.Max(1, sigBarsAgo + 1);   // guarantees closed bar (>=1)
-
-            if (CurrentBar < b)
+            
+            if (CurrentBar < sigBarsAgo)
                 return true;
 
-            priorBarRangeTicks = (High[b] - Low[b]) / TickSize;
+            priorBarRangeTicks = (High[sigBarsAgo] - Low[sigBarsAgo]) / TickSize;
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
 
