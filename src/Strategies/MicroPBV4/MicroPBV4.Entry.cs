@@ -180,14 +180,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (pulledBack && reclaimed && ConfirmLongEntry(confirmDelay, out _))
                 {
-                    // block if SIGNAL BAR is huge -> defer until bar AFTER next
-                    if (!PassesEntryDistanceFilter(confirmDelay + 1, out _))
+                    if (!PassesEntryDistanceFilter(confirmDelay, out var priorRangeTicks))
                     {
+                        // if you want “enter on the bar after next”, skip next bar:
                         _entryDistDeferLongBar = CurrentBar + 2;
+                        if (DebugMode)
+                            Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} long-prior-bar-too-large (priorRangeTicks={priorRangeTicks:0.0} > max={MaxPriorBarRangeTicks:0.0}) deferUntilBar={_entryDistDeferLongBar}");
+
                         ManageBreakEven();
                         return;
                     }
-                    // if we’ve reached/cleared the cooldown, reset
+                    
+                    // also respect defer (so you don't enter on the skipped bar)
+                    if (_entryDistDeferLongBar >= 0 && CurrentBar < _entryDistDeferLongBar)
+                    {
+                        ManageBreakEven();
+                        return;
+                    }
+
+                    // consume defer once reached
                     if (_entryDistDeferLongBar >= 0 && CurrentBar >= _entryDistDeferLongBar)
                         _entryDistDeferLongBar = -1;
 
@@ -239,13 +250,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (pulledBack && reclaimed && ConfirmShortEntry(confirmDelay, out _))
                 {
-                    if (!PassesEntryDistanceFilter(confirmDelay + 1, out _))
+                    if (!PassesEntryDistanceFilter(confirmDelay, out var priorRangeTicks))
                     {
+                        // if you want “enter on the bar after next”, skip next bar:
                         _entryDistDeferShortBar = CurrentBar + 2;
+                        if (DebugMode)
+                            Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} Short -prior-bar-too-large (priorRangeTicks={priorRangeTicks:0.0} > max={MaxPriorBarRangeTicks:0.0}) deferUntilBar={_entryDistDeferShortBar}");
+
                         ManageBreakEven();
                         return;
                     }
 
+                    // also respect defer (so you don't enter on the skipped bar)
+                    if (_entryDistDeferShortBar >= 0 && CurrentBar < _entryDistDeferShortBar)
+                    {
+                        ManageBreakEven();
+                        return;
+                    }
+
+                    // consume defer once reached
                     if (_entryDistDeferShortBar >= 0 && CurrentBar >= _entryDistDeferShortBar)
                         _entryDistDeferShortBar = -1;
 
