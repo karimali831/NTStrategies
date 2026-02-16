@@ -103,7 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrendConfirm(out _, out var trendUp, out var trendDown);
             TrendTicks(lookBackBars, out _, out _, out _, out var longRangeTicks, out var shortRangeTicks);
 
-            strongMinTicks = 120;
+            strongMinTicks = 200;
 
             if (trendUp)
             {
