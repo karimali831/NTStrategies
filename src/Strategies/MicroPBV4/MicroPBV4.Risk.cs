@@ -51,9 +51,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Safety: ensure indicator has that bar
             if (CurrentBar < 0)
                 return;
+            
+            // Position
+            var longSide = Position.MarketPosition == MarketPosition.Long;
 
             // Disable BE in strong momentum
-            if (DisableBeAboveAdx > 0 && adx[0] >= DisableBeAboveAdx)
+            StrongTrend(longSide, out var trendStrengthTicks, out _, out _);
+            
+            if (DisableBeAboveAdx > 0 && adx[0] >= DisableBeAboveAdx && trendStrengthTicks >= 200)
                 return;
 
             if (Position.MarketPosition == MarketPosition.Flat)
@@ -70,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             int upTicks;
-            if (Position.MarketPosition == MarketPosition.Long)
+            if (longSide)
                 upTicks = (int)Math.Floor((Close[0] - entryPrice) / TickSize);
             else
                 upTicks = (int)Math.Floor((entryPrice - Close[0]) / TickSize);
@@ -78,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (upTicks < BE_TriggerTicks)
                 return;
 
-            var newStop = Position.MarketPosition == MarketPosition.Long
+            var newStop = longSide
                 ? entryPrice + BE_PlusTicks * TickSize
                 : entryPrice - BE_PlusTicks * TickSize;
 
