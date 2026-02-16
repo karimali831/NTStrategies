@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	        
-	        sb.AppendLine($"  i3) TrendStrengthTicks={snap.TrendStrengthTicks:0.0}, TrendStrengthMinTicks={snap.TrendStrengthMinTicks:0.0}, TrendStrengthTicksLbBars={snap.TrendStrengthTicksLbBars}, LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}");
+	        sb.AppendLine($"  i3) TrendStrengthTicks={snap.TrendStrengthTicks}, TrendStrengthMinTicks={snap.TrendStrengthMinTicks}, TrendStrengthTicksLbBars={snap.TrendStrengthTicksLbBars}, LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}");
 	        
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
