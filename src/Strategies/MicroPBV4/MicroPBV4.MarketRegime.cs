@@ -174,6 +174,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
+            return true;
+
             var fails = new List<string>();
             var idx = Math.Max(0, sigBarsAgo);
             
