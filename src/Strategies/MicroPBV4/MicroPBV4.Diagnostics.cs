@@ -271,11 +271,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.EntryDistDeferLongBar  = _entryDistDeferLongBar;
 		    s.EntryDistDeferShortBar = _entryDistDeferShortBar;
 
-		    s.SigLongAgo  = confirmDelay;
-		    s.SigShortAgo = confirmDelay;
-
-		    s.EntryDistDeferLongBar  = _entryDistDeferLongBar;
-		    s.EntryDistDeferShortBar = _entryDistDeferShortBar;
+		    s.LongExtraDelay  = _entryDistDeferLongBar  >= 0 && CurrentBar < _entryDistDeferLongBar  ? 1 : 0;
+		    s.ShortExtraDelay = _entryDistDeferShortBar >= 0 && CurrentBar < _entryDistDeferShortBar ? 1 : 0;
+		    s.SigLongAgo  = confirmDelay + s.LongExtraDelay;
+		    s.SigShortAgo = confirmDelay + s.ShortExtraDelay;
 		    
 			//-- ENTRY DISTANCE (per-side, using the signal barsAgo)
 			s.EntryDistLongOk  = PassesEntryDistanceFilter(true, s.SigLongAgo,  out var longPriorRangeTicks);
@@ -284,19 +283,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			s.PriorBarRangeTicksLong  = longPriorRangeTicks;
 			s.PriorBarRangeTicksShort = shortPriorRangeTicks;
 
-			// Which side matters "right now"?
-			if (s.TrendUp || s.LongPulledBack)   // long context
-			{
-				s.PassesEntryDistance = s.EntryDistLongOk;
-			}
-			else if (s.TrendDown || s.ShortPulledBack) // short context
-			{
-				s.PassesEntryDistance = s.EntryDistShortOk;
-			}
-			else
-			{
-				s.PassesEntryDistance = true;
-			}
 			
 		    // ---- TREND ----
 		    TrendConfirm(out var trendFail, out var trendUp, out var trendDown);
@@ -319,8 +305,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 			s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  s.SigLongAgo,  out s.PbEmaLong,  out s.PbDistLong);
 			s.ShortPulledBack = PullbackTouchedFastEmaPrevBar(false, s.SigShortAgo, out s.PbEmaShort, out s.PbDistShort);
 
-			s.LongReclaimed  = Close[s.SigLongAgo]  > emaFast[s.SigLongAgo];
-			s.ShortReclaimed = Close[s.SigShortAgo] < emaFast[s.SigShortAgo];
+			s.LongReclaimed  = Reclaimed(true, s.SigLongAgo);
+			s.ShortReclaimed = Reclaimed(false, s.SigShortAgo);
+			
+			// Which side matters "right now"?
+			if (s.TrendUp || s.LongPulledBack)
+			{
+			    s.PassesEntryDistance = s.EntryDistLongOk;
+			    var bLong = Math.Max(1, s.SigLongAgo + 1);
+			    s.TrendQualityScore = ComputeTrendQuality(true, bLong).Score;
+			}
+			else if (s.TrendDown || s.ShortPulledBack)
+			{
+			    s.PassesEntryDistance = s.EntryDistShortOk;
+			    var bShort = Math.Max(1, s.SigShortAgo + 1);
+			    s.TrendQualityScore = ComputeTrendQuality(false, bShort).Score;
+			}
+			else
+			{
+			    s.PassesEntryDistance = true;
+			    s.TrendQualityScore = 0;
+			}
 
 		    // ---- Base regime snapshot (always populated for DIAG) ----
 		    ComputeMarketRegime(out s.Regime);
@@ -351,19 +356,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// IMPORTANT: gate must use the SAME sigBarsAgo you used for pulledBack/reclaimed/confirm,
 			// otherwise DIAG and actual behavior will diverge.
 		    s.Tradeable = true; // default true when not applicable
-		    var bLong  = Math.Max(1, s.SigLongAgo  + 1);
-		    var bShort = Math.Max(1, s.SigShortAgo + 1);
 		    if (s.LongCandidate)
-		    {
 			    s.Tradeable = PassesMarketRegimeGate(true, s.SigLongAgo, out s.Regime);
-			    s.TrendQualityScore = ComputeTrendQuality(true,  bLong).Score;
-		    }
-		    
 		    else if (s.ShortCandidate)
-		    {
 			    s.Tradeable = PassesMarketRegimeGate(false, s.SigShortAgo, out s.Regime);
-			    s.TrendQualityScore = ComputeTrendQuality(false, bShort).Score;
-		    }
 
 		    // ---- Would submit ----
 		    s.WouldSubmitLongNow  = s.Flat && s.LongCandidate  && s.Tradeable;
@@ -378,16 +374,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (!s.SpacingOk) blocks.Add("min-minutes-between");
 		    if (!s.EntryDistCooldownOk) blocks.Add("entry-dist-cooldown");
 		    if (!s.WickOk) blocks.Add("wick-filter");
-		    if (s.TrendUp && !s.EntryDistLongOk)
+		    if ((s.TrendUp || s.LongPulledBack) && !s.EntryDistLongOk)
 		    {
-			    var willDeferNext = s.EntryDistDeferLongBar == CurrentBar + 1;
+			    var willDeferNext = s.EntryDistDeferLongBar == CurrentBar + 2;
 			    blocks.Add(
 				    $"long-prior-bar-too-large: (rangeTicks={s.PriorBarRangeTicksLong:0.0} > max={MaxPriorBarRangeTicks:0.0}, " +
 				    $"cooldownBars={EntryDistCooldownBars}, willDeferNext={willDeferNext})");
 		    }
-		    else if (s.TrendDown && !s.EntryDistShortOk)
+		    else if ((s.TrendDown || s.ShortPulledBack) && !s.EntryDistShortOk)
 		    {
-			    var willDeferNext = s.EntryDistDeferShortBar == CurrentBar + 1;
+			    var willDeferNext = s.EntryDistDeferShortBar == CurrentBar + 2;
 			    blocks.Add(
 				    $"short-prior-bar-too-large: (rangeTicks={s.PriorBarRangeTicksShort:0.0} > max={MaxPriorBarRangeTicks:0.0}, " +
 				    $"cooldownBars={EntryDistCooldownBars}, willDeferNext={willDeferNext})");

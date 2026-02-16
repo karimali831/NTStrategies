@@ -50,9 +50,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             CancelStaleEntryOrders(Time[0]);
             var submitted = false;
             
-            // ---- confirm bars
-            var confirmDelay = Math.Max(0, ConfirmBars - 1);
-
             // expire cooldown if we've reached/passed it
             if (_entryDistDeferLongBar >= 0 && CurrentBar >= _entryDistDeferLongBar)  _entryDistDeferLongBar = -1;
             if (_entryDistDeferShortBar >= 0 && CurrentBar >= _entryDistDeferShortBar) _entryDistDeferShortBar = -1;
@@ -159,6 +156,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Trend
             TrendConfirm(out _, out var trendUp, out var trendDown);
 
+            var confirmDelay = Math.Max(0, ConfirmBars - 1);
+
+            
             // ===== LONG =====
             if (!submitted && EnableLongs && trendUp)
             {
@@ -176,9 +176,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 var pulledBack = PullbackTouchedFastEmaPrevBar(true, confirmDelay, out _, out _);
-                var reclaimed  = Close[confirmDelay] > emaFast[confirmDelay];
-
-                if (pulledBack && reclaimed && ConfirmLongEntry(confirmDelay, out _))
+           
+                if (pulledBack && Reclaimed(true, confirmDelay) && ConfirmLongEntry(confirmDelay, out _))
                 {
                     if (!PassesEntryDistanceFilter(true, confirmDelay, out var priorRangeTicks))
                     {
@@ -187,13 +186,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (DebugMode)
                             Print($"[ENTRY BLOCKED] {Time[0]:yyyy-MM-dd HH:mm:ss} long-prior-bar-too-large (priorRangeTicks={priorRangeTicks:0.0} > max={MaxPriorBarRangeTicks:0.0}) deferUntilBar={_entryDistDeferLongBar}");
 
-                        ManageBreakEven();
-                        return;
-                    }
-                    
-                    // also respect defer (so you don't enter on the skipped bar)
-                    if (_entryDistDeferLongBar >= 0 && CurrentBar < _entryDistDeferLongBar)
-                    {
                         ManageBreakEven();
                         return;
                     }
@@ -246,9 +238,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 var pulledBack = PullbackTouchedFastEmaPrevBar(false, confirmDelay, out _, out _);
-                var reclaimed  = Close[confirmDelay] < emaFast[confirmDelay];
-
-                if (pulledBack && reclaimed && ConfirmShortEntry(confirmDelay, out _))
+        
+                if (pulledBack && Reclaimed(false, confirmDelay) && ConfirmShortEntry(confirmDelay, out _))
                 {
                     if (!PassesEntryDistanceFilter(false, confirmDelay, out var priorRangeTicks))
                     {
@@ -260,13 +251,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ManageBreakEven();
                         return;
                     }
-
-                    // also respect defer (so you don't enter on the skipped bar)
-                    if (_entryDistDeferShortBar >= 0 && CurrentBar < _entryDistDeferShortBar)
-                    {
-                        ManageBreakEven();
-                        return;
-                    }
+                    
 
                     // consume defer once reached
                     if (_entryDistDeferShortBar >= 0 && CurrentBar >= _entryDistDeferShortBar)

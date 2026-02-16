@@ -162,6 +162,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             return BarsSinceEmaCrossAsOf(lookback, 0);
         }
+        
+        public bool Reclaimed(bool longSide, int barsAgo)
+        {
+            if (longSide)
+            {
+                return Close[barsAgo] >= emaFast[barsAgo] - TickSize * 2;
+            }
+
+            return Close[barsAgo] <= emaFast[barsAgo] + TickSize * 2;
+        }
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
         {
