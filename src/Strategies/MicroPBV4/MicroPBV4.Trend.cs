@@ -95,17 +95,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool StrongTrend(out double rangeTicks, out int lookBackBars, out double strongMinTicks)
+        private bool StrongTrend(bool longSide, out double rangeTicks, out int lookBackBars, out double strongMinTicks)
         {
             rangeTicks = 0;
             lookBackBars = 3;   
        
-            TrendConfirm(out _, out var trendUp, out var trendDown);
             TrendTicks(lookBackBars, out _, out _, out _, out var longRangeTicks, out var shortRangeTicks);
 
             strongMinTicks = 200;
 
-            if (trendUp)
+            if (longSide)
             {
                 rangeTicks = longRangeTicks;
                 if (longRangeTicks >= strongMinTicks)
@@ -113,7 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return true;
                 }
             }
-            else if (trendDown)
+            else
             {
                 rangeTicks = shortRangeTicks;
                 if (shortRangeTicks >= strongMinTicks)

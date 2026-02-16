@@ -308,17 +308,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			s.LongReclaimed  = Reclaimed(true, s.SigLongAgo);
 			s.ShortReclaimed = Reclaimed(false, s.SigShortAgo);
 			
-			// Trend strength
-			StrongTrend(out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
-
 			// Which side matters "right now"?
 			if (s.TrendUp || s.LongPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistLongOk;
+			    StrongTrend(true, out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
 			}
 			else if (s.TrendDown || s.ShortPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistShortOk;
+			    StrongTrend(false, out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
 			}
 			else
 			{
