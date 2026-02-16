@@ -98,7 +98,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool StrongTrend(bool longSide, out double rangeTicks, out int lookBackBars, out double strongMinTicks)
         {
             rangeTicks = 0;
-            lookBackBars = 3;   
+            lookBackBars = 5;   
        
             TrendTicks(lookBackBars, out _, out _, out _, out var longRangeTicks, out var shortRangeTicks);
 
