@@ -195,16 +195,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             const int crossPenaltyBars = 6;
             r.BarsSinceCross = BarsSinceEmaCrossAsOf(50, idx);
             r.CrossPenaltyActive = r.BarsSinceCross <= crossPenaltyBars;
+            
+            // recompute score/label AS-OF signal
+            var score01Sig = ComputeRegimeScore01(r.Adx, r.AtrPct, r.Er, r.EmaSlopeTicks, r.EmaSepTicks);
 
-            // --- strong structure override (still uses slope/sep from ComputeMarketRegime "now") ---
-            const double STRONG_SLOPE_TICKS = 120;
-            const double STRONG_SEP_TICKS   = 80;
+            // apply same cross penalty logic (as-of signal)
+            if (r.CrossPenaltyActive && Math.Abs(r.EmaSlopeTicks) < 120)
+                score01Sig = Clamp01(score01Sig - 0.15);
 
-            r.StrongSlopeMinUsed = STRONG_SLOPE_TICKS;
-            r.StrongSepMinUsed   = STRONG_SEP_TICKS;
+            if (Math.Abs(r.EmaSlopeTicks) >= 150 && r.Er >= 0.45 && r.Adx >= 25)
+                score01Sig = Math.Max(score01Sig, 0.60);
 
-            r.StrongSlopeOk   = Math.Abs(r.EmaSlopeTicks) >= STRONG_SLOPE_TICKS;
-            r.StrongSepOk     = Math.Abs(r.EmaSepTicks)   >= STRONG_SEP_TICKS;
+            r.Score = Math.Round(score01Sig * 100.0, 1);
+            r.Label = RegimeLabelFromScore(r.Score);
+            
+            const double strongSlopeTicks = 120;
+            const double strongSepTicks   = 80;
+
+            r.StrongSlopeMinUsed = strongSlopeTicks;
+            r.StrongSepMinUsed   = strongSepTicks;
+
+            r.StrongSlopeOk   = Math.Abs(r.EmaSlopeTicks) >= strongSlopeTicks;
+            r.StrongSepOk     = Math.Abs(r.EmaSepTicks)   >= strongSepTicks;
             r.StrongStructure = r.Aligned && r.StrongSlopeOk && r.StrongSepOk;
 
             if (r.StrongStructure)
@@ -215,8 +227,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 var parts = new List<string>(3);
                 if (!r.Aligned)       parts.Add("not-aligned");
-                if (!r.StrongSlopeOk) parts.Add($"slope<{STRONG_SLOPE_TICKS:0}");
-                if (!r.StrongSepOk)   parts.Add($"sep<{STRONG_SEP_TICKS:0}");
+                if (!r.StrongSlopeOk) parts.Add($"slope<{strongSlopeTicks:0}");
+                if (!r.StrongSepOk)   parts.Add($"sep<{strongSepTicks:0}");
                 r.StrongFail = string.Join("|", parts);
             }
 
@@ -258,8 +270,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var crossOverrideOk =
                 r.Er >= CROSS_OVERRIDE_ER &&
-                (absSlope >= STRONG_SLOPE_TICKS * CROSS_OVERRIDE_SLOPE_FRAC ||
-                 absSep   >= STRONG_SEP_TICKS   * CROSS_OVERRIDE_SEP_FRAC);
+                (absSlope >= strongSlopeTicks * CROSS_OVERRIDE_SLOPE_FRAC ||
+                 absSep   >= strongSepTicks   * CROSS_OVERRIDE_SEP_FRAC);
 
             var crossBypassOk = crossOverrideOk || dispOverrideOk;
 
@@ -271,7 +283,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // JSON is still "now" time; OK for tagging/debug, but ER has been replaced with as-of-sig value.
             r.Json = BuildRegimeJson(
-                Time[0],
+                Time[idx],
                 r.Adx,
                 r.AtrTicks,
                 r.Er,
@@ -288,6 +300,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return r.Ok;
         }
+        
+        private double ComputeRegimeScore01(double adxNow, double atrPct, double er, double slopeTicks, double sepTicks)
+        {
+            var sAdx = SweetSpot01(adxNow, RegimeAdxSweetLow, RegimeAdxSweetHigh);
+            var sAtr = Scale01(atrPct, RegimeAtrPctMin, RegimeAtrPctMax);
+            var sEr  = Scale01(er, RegimeErMin, 1.0);
+
+            const double MIN_SLOPE_TICKS = 20, MAX_SLOPE_TICKS = 250;
+            const double MIN_SEP_TICKS   = 20, MAX_SEP_TICKS   = 250;
+
+            var sSlope  = Scale01(Math.Abs(slopeTicks), MIN_SLOPE_TICKS, MAX_SLOPE_TICKS);
+            var sSep    = Scale01(Math.Abs(sepTicks),   MIN_SEP_TICKS,   MAX_SEP_TICKS);
+            var sStruct = 0.7 * sSlope + 0.3 * sSep;
+
+            const double wAdx = 0.25, wAtr = 0.20, wEr = 0.30, wStruct = 0.25;
+            return Clamp01(wAdx * sAdx + wAtr * sAtr + wEr * sEr + wStruct * sStruct);
+        }
+
+        private string RegimeLabelFromScore(double scorePct)
+        {
+            if (scorePct >= 70) return "TREND_TRADEABLE";
+            if (scorePct >= 55) return "OK";
+            if (scorePct >= 40) return "TRANSITION";
+            return "CHOP_RISK";
+        }
+
                         
         private double GetEfficiencyRatio()
         {
