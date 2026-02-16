@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	        
-	        sb.AppendLine($"  i2) LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}, TrendQualityScore={snap.TrendQualityScore:0.0} bypass>={TrendQualityBypassScore:0.0}");
+	        sb.AppendLine($"  i3) TrendStrengthTicks={snap.TrendStrengthTicks:0.0}, TrendStrengthMinTicks={snap.TrendStrengthMinTicks:0.0}, TrendStrengthTicksLbBars={snap.TrendStrengthTicksLbBars}, LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}");
 	        
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
@@ -308,23 +308,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 			s.LongReclaimed  = Reclaimed(true, s.SigLongAgo);
 			s.ShortReclaimed = Reclaimed(false, s.SigShortAgo);
 			
+			// Trend strength
+			StrongTrend(out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
+
 			// Which side matters "right now"?
 			if (s.TrendUp || s.LongPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistLongOk;
-			    var bLong = Math.Max(1, s.SigLongAgo + 1);
-			    s.TrendQualityScore = ComputeTrendQuality(true, bLong).Score;
 			}
 			else if (s.TrendDown || s.ShortPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistShortOk;
-			    var bShort = Math.Max(1, s.SigShortAgo + 1);
-			    s.TrendQualityScore = ComputeTrendQuality(false, bShort).Score;
 			}
 			else
 			{
 			    s.PassesEntryDistance = true;
-			    s.TrendQualityScore = 0;
 			}
 
 		    // ---- Base regime snapshot (always populated for DIAG) ----
@@ -417,9 +415,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public RegimeSnapshot Regime;
 	        public int SigLongAgo, SigShortAgo;
 	        public int LongExtraDelay, ShortExtraDelay;
-	        public double TrendQualityScore;
-			public double LongRangeTicks, ShortRangeTicks;
-	        public int EntryDistDeferLongBar, EntryDistDeferShortBar;
+	        public double TrendStrengthTicks, TrendStrengthMinTicks, LongRangeTicks, ShortRangeTicks;
+	        public int TrendStrengthTicksLbBars, EntryDistDeferLongBar, EntryDistDeferShortBar;
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
         }
     }

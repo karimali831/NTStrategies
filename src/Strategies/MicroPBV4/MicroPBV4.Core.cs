@@ -154,14 +154,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Entry distance cooldown bars after rejection", Order = 22, GroupName = "03-Trend & Filters")]
         public int EntryDistCooldownBars { get; set; } = 1;
         
-        [NinjaScriptProperty]
-        [Display(Name="TQ Lookback Bars", Order=50, GroupName="03-Trend & Filters")]
-        public int TrendQualityLookbackBars { get; set; } = 6;
-        
-        [NinjaScriptProperty]
-        [Display(Name="TQ Bypass Score", Order=51, GroupName="03-Trend & Filters")]
-        public double TrendQualityBypassScore { get; set; } = 70;
-        
         // ========== 04 – Risk / Money Management ==========
         [NinjaScriptProperty]
         [Range(1, int.MaxValue)]

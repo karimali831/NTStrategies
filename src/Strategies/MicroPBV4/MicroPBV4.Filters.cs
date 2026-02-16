@@ -39,9 +39,8 @@ namespace NinjaTrader.NinjaScript.Strategies
  
             priorBarRangeTicks = (High[b] - Low[b]) / TickSize;
             
-            var tq = ComputeTrendQuality(longSide, b);
-             if (tq.Score >= TrendQualityBypassScore)
-                     return true;
+            if (StrongTrend(out _, out _, out _))
+                return true;
         
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
