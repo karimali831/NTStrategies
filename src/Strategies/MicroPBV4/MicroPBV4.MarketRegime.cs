@@ -177,6 +177,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var fails = new List<string>();
             var idx = Math.Max(0, sigBarsAgo);
             
+            var adxSig = adx[idx];
+            r.Adx = adxSig;
+            
             var esSig = GetEmaStruct(EmaSlopeMetric.Strength, idx);
 
             r.EmaSlopeTicks = esSig.SlopeMetricTicks;
@@ -208,6 +211,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             r.Score = Math.Round(score01Sig * 100.0, 1);
             r.Label = RegimeLabelFromScore(r.Score);
+            
+            const double regimeBypassAdx = 30.0;   // or make this a NinjaScriptProperty
+            if (r.Adx >= regimeBypassAdx)
+            {
+                // Keep snapshot metrics (for DIAG / tagging), but skip gating fails
+                r.MinScoreUsed = RegimeScoreMin;
+                r.CrossOverrideOk = true; // effectively bypasses cross soft gate for this decision
+
+                r.Json = BuildRegimeJson(
+                Time[0],
+                r.Adx,
+                r.AtrTicks,
+                r.Er,
+                r.EmaSlopeTicks,
+                r.EmaSepTicks,
+                r.Score,
+                r.Label + "_BYPASS_ADX",
+                r.CrossPenaltyActive,
+                r.EmaEff
+                );
+
+                r.Ok = true;
+                r.Fail = "none";
+                return true;
+            }
             
             const double strongSlopeTicks = 120;
             const double strongSepTicks   = 80;

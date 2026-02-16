@@ -9,21 +9,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool PassesEntryDistanceFilter(int sigBarsAgo, out double priorBarRangeTicks)
         {
             priorBarRangeTicks = 0;
-
-            // bypass when trend strength is high (as-of the signal bar)
-            if (sigBarsAgo >= 0 && CurrentBar >= sigBarsAgo && adx[sigBarsAgo] >= 30)
-                return true;
-
+            
             if (MaxPriorBarRangeTicks <= 0)
                 return true;
-
+ 
             // "prior bar" relative to the signal bar
             var b = Math.Max(1, sigBarsAgo + 1);
-
+ 
             if (CurrentBar < b)
                 return true;
-
+ 
             priorBarRangeTicks = (High[b] - Low[b]) / TickSize;
+            
+            // bypass when trend strength is high (align it with the same bar we measured)
+                if (adx[b] >= 30)
+                return true;
+            
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
 
