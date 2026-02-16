@@ -99,29 +99,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             rangeTicks = 0;
             lookBackBars = 5;   
-       
+            strongMinTicks = 200;       
+            
             TrendTicks(lookBackBars, out _, out _, out _, out var longRangeTicks, out var shortRangeTicks);
-
-            strongMinTicks = 200;
 
             if (longSide)
             {
                 rangeTicks = longRangeTicks;
-                if (longRangeTicks >= strongMinTicks)
-                {
-                    return true;
-                }
-            }
-            else
-            {
-                rangeTicks = shortRangeTicks;
-                if (shortRangeTicks >= strongMinTicks)
-                {
-                    return true;
-                }
+                return longRangeTicks >= strongMinTicks;
             }
 
-            return false;
+            rangeTicks = shortRangeTicks;
+            return shortRangeTicks >= strongMinTicks;
         }
     }
 }

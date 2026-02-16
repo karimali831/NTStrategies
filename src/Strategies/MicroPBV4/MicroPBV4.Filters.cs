@@ -38,10 +38,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
  
             priorBarRangeTicks = (High[b] - Low[b]) / TickSize;
-            
-            if (StrongTrend(longSide, out _, out _, out _))
+
+            if (StrongTrend(longSide, out var rangeTicks, out _, out _))
+            {
+                Print("TEST strength range ticks: " + rangeTicks );
                 return true;
-        
+            }
+
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
         
