@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	        
-	        sb.AppendLine($"  i2) TrendQualityScore={snap.TrendQualityScore:0.0} bypass>={TrendQualityBypassScore:0.0}");
+	        sb.AppendLine($"  i2) LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}, TrendQualityScore={snap.TrendQualityScore:0.0} bypass>={TrendQualityBypassScore:0.0}");
 	        
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
@@ -299,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    else if (s.TrendDown)
 			    s.ConfirmFailReason = confirmShort ? "none" : shortFailReason;
 		    
-		    TrendTicks(30, out _, out _, out _, out _, out _);
+		    TrendTicks(30, out _, out _, out _, out s.LongRangeTicks, out s.ShortRangeTicks);
 
 			// ---- setup components (signal bar) ----
 			s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  s.SigLongAgo,  out s.PbEmaLong,  out s.PbDistLong);
@@ -418,7 +418,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public int SigLongAgo, SigShortAgo;
 	        public int LongExtraDelay, ShortExtraDelay;
 	        public double TrendQualityScore;
-
+			public double LongRangeTicks, ShortRangeTicks;
 	        public int EntryDistDeferLongBar, EntryDistDeferShortBar;
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc
         }

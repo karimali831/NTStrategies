@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
             
-            TrendTicks(10, out var lb, out var bars, out var ticks, out var upTicks,
+            TrendTicks(30, out var lb, out var bars, out var ticks, out var upTicks,
                 out var downTicks);
 
             trendUp = upTicks > downTicks;
