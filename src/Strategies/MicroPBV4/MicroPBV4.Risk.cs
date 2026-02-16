@@ -57,9 +57,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Disable BE in strong momentum
             StrongTrend(longSide, out var trendStrengthTicks, out _, out _);
-            
+
             if (DisableBeAboveAdx > 0 && adx[0] >= DisableBeAboveAdx && trendStrengthTicks >= 200)
+            {
+                Print("[BE BYPASS] Adx: " + adx[0] + ", TrendStrengthTicks: " + trendStrengthTicks);
                 return;
+            }
 
             if (Position.MarketPosition == MarketPosition.Flat)
                 return;
