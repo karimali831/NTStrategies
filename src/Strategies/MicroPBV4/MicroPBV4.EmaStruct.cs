@@ -167,10 +167,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (longSide)
             {
-                return Close[barsAgo] >= emaFast[barsAgo] - TickSize * 2;
+                return Close[barsAgo] >= emaFast[barsAgo] ;
             }
 
-            return Close[barsAgo] <= emaFast[barsAgo] + TickSize * 2;
+            return Close[barsAgo] <= emaFast[barsAgo];
         }
 
         private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
