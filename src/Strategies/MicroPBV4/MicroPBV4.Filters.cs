@@ -6,7 +6,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public partial class MicroPBV4 : Strategy
     {
-        private bool PassesEntryDistanceFilter(int sigBarsAgo, out double priorBarRangeTicks)
+        private bool RecentBarsAreCleanForEntry()
+        {
+            if (WickFilterLookback <= 0)
+                return true;
+
+            if (WickOnlyPreviousBar)
+                return PassesWickFilter();
+
+            var max = Math.Min(WickFilterLookback, CurrentBar);
+            for (var i = 0; i < max; i++)
+            {
+                if (!PassesWickFilter())
+                    return false;
+            }
+
+            return true;
+        }
+        
+        private bool PassesEntryDistanceFilter(bool longSide, int sigBarsAgo, out double priorBarRangeTicks)
         {
             priorBarRangeTicks = 0;
             
@@ -21,14 +39,14 @@ namespace NinjaTrader.NinjaScript.Strategies
  
             priorBarRangeTicks = (High[b] - Low[b]) / TickSize;
             
-            // bypass when trend strength is high (align it with the same bar we measured)
-                if (adx[b] >= 30)
-                return true;
-            
+            var tq = ComputeTrendQuality(longSide, b);
+             if (tq.Score >= TrendQualityBypassScore)
+                     return true;
+        
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
-
-
+        
+        
         private bool PassesWickFilter()
         {
             var o = Open[0];

@@ -163,5 +163,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             return BarsSinceEmaCrossAsOf(lookback, 0);
         }
 
+        private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
+        {
+            emaTouch = 0;
+            distTicks = double.NaN;
+
+            if (CurrentBar < barsAgo)
+                return false;
+
+            emaTouch = emaFast[barsAgo];
+
+            if (longSide)
+            {
+                var prox = Math.Max(0, LongTouchTicks) * TickSize;
+                distTicks = (Low[barsAgo] - emaTouch) / TickSize;
+                return Low[barsAgo] <= (emaTouch + prox);
+            }
+            else
+            {
+                var prox = Math.Max(0, ShortTouchTicks) * TickSize;
+                distTicks = (High[barsAgo] - emaTouch) / TickSize;
+                return High[barsAgo] >= (emaTouch - prox);
+            }
+        }
     }
 }

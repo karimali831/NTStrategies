@@ -134,6 +134,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	        
+	        sb.AppendLine($"  i2) TrendQualityScore={snap.TrendQualityScore:0.0} bypass>={TrendQualityBypassScore:0.0}");
+	        
 	        sb.AppendLine(
 		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
 		        $"({trend}, pulledBack=" +
@@ -276,8 +278,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.EntryDistDeferShortBar = _entryDistDeferShortBar;
 		    
 			//-- ENTRY DISTANCE (per-side, using the signal barsAgo)
-			s.EntryDistLongOk  = PassesEntryDistanceFilter(s.SigLongAgo,  out var longPriorRangeTicks);
-			s.EntryDistShortOk = PassesEntryDistanceFilter(s.SigShortAgo, out var shortPriorRangeTicks);
+			s.EntryDistLongOk  = PassesEntryDistanceFilter(true, s.SigLongAgo,  out var longPriorRangeTicks);
+			s.EntryDistShortOk = PassesEntryDistanceFilter(false, s.SigShortAgo, out var shortPriorRangeTicks);
 
 			s.PriorBarRangeTicksLong  = longPriorRangeTicks;
 			s.PriorBarRangeTicksShort = shortPriorRangeTicks;
@@ -344,17 +346,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    s.TrendDown &&
 			    s.ShortPulledBack &&
 			    s.ShortReclaimed;
-
+		    
 		    // ---- Regime gate only if candidate ----
 			// IMPORTANT: gate must use the SAME sigBarsAgo you used for pulledBack/reclaimed/confirm,
 			// otherwise DIAG and actual behavior will diverge.
 		    s.Tradeable = true; // default true when not applicable
+		    var bLong  = Math.Max(1, s.SigLongAgo  + 1);
+		    var bShort = Math.Max(1, s.SigShortAgo + 1);
 		    if (s.LongCandidate)
+		    {
 			    s.Tradeable = PassesMarketRegimeGate(true, s.SigLongAgo, out s.Regime);
+			    s.TrendQualityScore = ComputeTrendQuality(true,  bLong).Score;
+		    }
+		    
 		    else if (s.ShortCandidate)
+		    {
 			    s.Tradeable = PassesMarketRegimeGate(false, s.SigShortAgo, out s.Regime);
+			    s.TrendQualityScore = ComputeTrendQuality(false, bShort).Score;
+		    }
 
-			// ---- Would submit ----
+		    // ---- Would submit ----
 		    s.WouldSubmitLongNow  = s.Flat && s.LongCandidate  && s.Tradeable;
 		    s.WouldSubmitShortNow = s.Flat && s.ShortCandidate && s.Tradeable;
 		    s.WouldSubmitNow      = s.WouldSubmitLongNow || s.WouldSubmitShortNow;
@@ -410,6 +421,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public RegimeSnapshot Regime;
 	        public int SigLongAgo, SigShortAgo;
 	        public int LongExtraDelay, ShortExtraDelay;
+	        public double TrendQualityScore;
 
 	        public int EntryDistDeferLongBar, EntryDistDeferShortBar;
 	        public string Blocks;              // final: "wick-filter;chop-filter;..." etc

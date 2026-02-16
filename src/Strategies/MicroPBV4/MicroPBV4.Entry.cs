@@ -180,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (pulledBack && reclaimed && ConfirmLongEntry(confirmDelay, out _))
                 {
-                    if (!PassesEntryDistanceFilter(confirmDelay, out var priorRangeTicks))
+                    if (!PassesEntryDistanceFilter(true, confirmDelay, out var priorRangeTicks))
                     {
                         // if you want “enter on the bar after next”, skip next bar:
                         _entryDistDeferLongBar = CurrentBar + 2;
@@ -250,7 +250,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (pulledBack && reclaimed && ConfirmShortEntry(confirmDelay, out _))
                 {
-                    if (!PassesEntryDistanceFilter(confirmDelay, out var priorRangeTicks))
+                    if (!PassesEntryDistanceFilter(false, confirmDelay, out var priorRangeTicks))
                     {
                         // if you want “enter on the bar after next”, skip next bar:
                         _entryDistDeferShortBar = CurrentBar + 2;
@@ -303,46 +303,56 @@ namespace NinjaTrader.NinjaScript.Strategies
             ManageBreakEven();
         }
         
-        private bool RecentBarsAreCleanForEntry()
+        private bool ConfirmLongEntry(int barsAgo, out string failReason)
         {
-            if (WickFilterLookback <= 0)
-                return true;
+            failReason = "none";
 
-            if (WickOnlyPreviousBar)
-                return PassesWickFilter();
-
-            var max = Math.Min(WickFilterLookback, CurrentBar);
-            for (var i = 0; i < max; i++)
+            if (!(Close[barsAgo] > emaFast[barsAgo] && Close[barsAgo] > emaSlow[barsAgo]))
             {
-                if (!PassesWickFilter())
-                    return false;
+                failReason = "close-not-above-both-emas";
+                return false;
+            }
+
+            if (Close[barsAgo] < Open[barsAgo])
+            {
+                failReason = "not-bullish-candle";
+                return false;
+            }
+
+            var bodyTicks = Math.Abs(Close[barsAgo] - Open[barsAgo]) / TickSize;
+            if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
+            {
+                failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
+                return false;
             }
 
             return true;
         }
-        
-        private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
+
+        private bool ConfirmShortEntry(int barsAgo, out string failReason)
         {
-            emaTouch = 0;
-            distTicks = double.NaN;
+            failReason = "none";
 
-            if (CurrentBar < barsAgo)
+            if (!(Close[barsAgo] < emaFast[barsAgo] && Close[barsAgo] < emaSlow[barsAgo]))
+            {
+                failReason = "close-not-below-both-emas";
                 return false;
-
-            emaTouch = emaFast[barsAgo];
-
-            if (longSide)
-            {
-                var prox = Math.Max(0, LongTouchTicks) * TickSize;
-                distTicks = (Low[barsAgo] - emaTouch) / TickSize;
-                return Low[barsAgo] <= (emaTouch + prox);
             }
-            else
+
+            if (Close[barsAgo] > Open[barsAgo])
             {
-                var prox = Math.Max(0, ShortTouchTicks) * TickSize;
-                distTicks = (High[barsAgo] - emaTouch) / TickSize;
-                return High[barsAgo] >= (emaTouch - prox);
+                failReason = "not-bearish-candle";
+                return false;
             }
+
+            var bodyTicks = Math.Abs(Close[barsAgo] - Open[barsAgo]) / TickSize;
+            if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
+            {
+                failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
+                return false;
+            }
+
+            return true;
         }
     }
 }
