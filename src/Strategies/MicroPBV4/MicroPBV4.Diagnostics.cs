@@ -69,81 +69,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 	        sb.AppendLine($"  a) Blocks/filters: {snap.Blocks}");
 	        sb.AppendLine($"  b) Wick ticks: {wickDiag}");
-
-	        sb.AppendLine(
-		        $"  c) PB(prev) vs EMAFast: " +
-		        $"ema={snap.PbEmaLong:F2} distTicks={snap.PbDistLong:F1} pbLong={snap.LongPulledBack} | " +
-		        $"ema={snap.PbEmaShort:F2} distTicks={snap.PbDistShort:F1} pbShort={snap.ShortPulledBack}");
-
-	        sb.AppendLine(
-		        $"  d) Regime: ok={snap.Regime.Ok} " +
-		        $"score={snap.Regime.Score:0.#} (min={snap.Regime.MinScoreUsed:0.#}) " +
-		        $"label={snap.Regime.Label}, fail={snap.Regime.Fail}");
-
-	        sb.AppendLine("  e) RegimeMetrics:");
-
-	        sb.AppendLine(
-		        $"     ADX   = {snap.Regime.Adx:0.##} " +
-		        $"(sweet [{RegimeAdxSweetLow},{RegimeAdxSweetHigh}])");
-
-	        // ---- RegimeMetrics DIAG line (replace the old absolute ATR range line) ----
-	        sb.AppendLine(
-		        $"     ATRt  = {snap.Regime.AtrTicks:0.##} " +
-		        $"pct={snap.Regime.AtrPct:0.###} (lb={RegimeAtrPctLookbackBars}, gate [{RegimeAtrPctMin:0.###},{RegimeAtrPctMax:0.###}]) " +
-		        $"med={snap.Regime.AtrMedian:0.##} ratio={snap.Regime.AtrRatio:0.###}"
-	        );
-
-	        sb.AppendLine(
-		        $"     ER    = {snap.Regime.Er:0.###} " +
-		        $"(min {RegimeErMin:0.###})");
-
-	        sb.AppendLine(
-		        $"     EMA   slopeT={snap.Regime.EmaSlopeTicks:0.##} " +
-		        $"sepT={snap.Regime.EmaSepTicks:0.##}");
+	        sb.AppendLine("   c) Regime Metrics:");
+	        sb.AppendLine($"     ADX   = {snap.Regime.Adx:0.##}");
+	        sb.AppendLine($"     ATRt  = {snap.Regime.AtrTicks:0.##} ");
 	        
 	        sb.AppendLine(
-		        $"     Cross penalty={snap.Regime.CrossPenaltyActive} " +
-		        $"barsSince={snap.Regime.BarsSinceCross}");
+		        $"     EMA   fastEmaDistTicks={snap.PbDistTicks:F1},  " +
+		        $"slopeT={snap.Regime.EmaSlopeTicks:0.##}, sepT={snap.Regime.EmaSepTicks:0.##}");
 	        
 	        sb.AppendLine(
-		        $"     Struct aligned={OkIcon(snap.Regime.Aligned)} " +
-		        $"strong={OkIcon(snap.Regime.StrongStructure)} " +
-		        $"(slope {Math.Abs(snap.Regime.EmaSlopeTicks):0.#}/{snap.Regime.StrongSlopeMinUsed:0.#}={OkIcon(snap.Regime.StrongSlopeOk)}, " +
-		        $"sep {Math.Abs(snap.Regime.EmaSepTicks):0.#}/{snap.Regime.StrongSepMinUsed:0.#}={OkIcon(snap.Regime.StrongSepOk)})");
-
-	        if (!snap.Regime.StrongStructure)
-		        sb.AppendLine($"     StructFail={snap.Regime.StrongFail}");
-
-	        // sb.AppendLine($"  f) RegimeJson: {snap.Regime.Json}");
-
-	        sb.AppendLine(
-		        $"  g) MaxDailyLoss={dailyKill:C0}, " +
+		        $"  d) MaxDailyLoss={dailyKill:C0}, " +
 		        $"LossRemaining={bufferToKill:C0}, " +
 		        $"MaxDailyProfit={dailyMaxProfit:C0}, " +
 		        $"ProfitRemaining={dailyProfitRemaining:C0}");
 	        
 	        sb.AppendLine(
-		        $"  h) ConfirmBars={ConfirmBars} " +
-		        $"sigLongAgo={snap.SigLongAgo} (extraDelay={snap.LongExtraDelay}) " +
-		        $"sigShortAgo={snap.SigShortAgo} (extraDelay={snap.ShortExtraDelay}) " +
-		        $"deferLongAtBar={snap.EntryDistDeferLongBar} deferShortAtBar={snap.EntryDistDeferShortBar}");
-	        
-	        sb.AppendLine(
-		        $"  i) MaxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
+		        $"  e) MaxPriorBarRange={MaxPriorBarRangeTicks:0.0} " +
 		        $"PriorBarLongRangeTicks={snap.PriorBarRangeTicksLong:0.0} " +
 		        $"PriorBarShortRangeTicks={snap.PriorBarRangeTicksShort:0.0} " +
 		        $"pass={OkIcon(snap.PassesEntryDistance)}");
 	        
-	        sb.AppendLine($"  i3) TrendStrengthTicks={snap.TrendStrengthTicks}, TrendStrengthMinTicks={snap.TrendStrengthMinTicks}, TrendStrengthTicksLbBars={snap.TrendStrengthTicksLbBars}, LongRangeTicks={snap.LongRangeTicks}, ShortRangeTicks={snap.ShortRangeTicks}");
+	        sb.AppendLine($"  f) TrendStrengthTicks={snap.TrendStrengthTicks} (trendStrengthMinTicks={snap.TrendStrengthMinTicks}, trendStrengthTicksLbBars={snap.TrendStrengthTicksLbBars})");
 	        
 	        sb.AppendLine(
-		        $"  j) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
+		        $"  g) {pos} Entry {OkIcon(snap.WouldSubmitNow)} " +
 		        $"({trend}, pulledBack=" +
 		        $"{(snap.TrendUp ? snap.LongPulledBack : snap.ShortPulledBack)}, " +
 		        $"reclaimed=" +
 		        $"{(snap.TrendUp ? snap.LongReclaimed : snap.ShortReclaimed)}, " +
-		        $"trendFailReason={snap.TrendFailReason})" +
-		        $"confirmFailReason={snap.ConfirmFailReason}");
+		        $"trendFailReason={snap.TrendFailReason}, " +
+		        $"confirmFailReason={snap.ConfirmFailReason})");
 
 	        sb.AppendLine(new string('-', 103));
 
@@ -306,8 +261,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// s.LongPulledBack  = PullbackTouchedFastEma(true,  s.SigLongAgo,  out s.PbEmaLong,  out s.PbDistLong);
 			// s.ShortPulledBack = PullbackTouchedFastEma(false, s.SigShortAgo, out s.PbEmaShort, out s.PbDistShort);
 			
-			s.LongPulledBack  = PullbackTouchedFastEma(true,  ConfirmBars,  out s.PbEmaLong,  out s.PbDistLong);
-			s.ShortPulledBack = PullbackTouchedFastEma(false, ConfirmBars, out s.PbEmaShort, out s.PbDistShort);
+			s.LongPulledBack  = TouchedEma(true, out var longDistTicks);
+			s.ShortPulledBack = TouchedEma(false, out var shortDistTicks);
 
 			s.LongReclaimed  = Reclaimed(true, s.SigLongAgo);
 			s.ShortReclaimed = Reclaimed(false, s.SigShortAgo);
@@ -316,11 +271,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (s.TrendUp || s.LongPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistLongOk;
+			    s.PbDistTicks = longDistTicks;
+			    
 			    StrongTrend(true, out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
 			}
 			else if (s.TrendDown || s.ShortPulledBack)
 			{
 			    s.PassesEntryDistance = s.EntryDistShortOk;
+			    s.PbDistTicks = shortDistTicks;
+			    
 			    StrongTrend(false, out s.TrendStrengthTicks, out s.TrendStrengthTicksLbBars, out s.TrendStrengthMinTicks);
 			}
 			else
@@ -409,7 +368,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        public bool LongReclaimed, ShortReclaimed;
 	        public bool Flat, LongCandidate, ShortCandidate, WouldSubmitLongNow, WouldSubmitShortNow, WouldSubmitNow;
 
-	        public double PriorBarRangeTicksLong, PriorBarRangeTicksShort, PbEmaLong, PbDistLong, PbEmaShort, PbDistShort;
+	        public double PriorBarRangeTicksLong, PriorBarRangeTicksShort, PbDistTicks;
 	        public bool EntryDistLongOk, EntryDistShortOk, EntryDistCooldownOk, EntryDistCooldownEnabled;
 	        public int EntryDistBlockBarsLeft;
 	        
