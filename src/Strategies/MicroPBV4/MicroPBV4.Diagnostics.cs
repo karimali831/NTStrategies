@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        sb.AppendLine($"  a) Blocks/filters: {snap.Blocks}");
 	        sb.AppendLine($"  b) Wick ticks: {wickDiag}");
 	        sb.AppendLine("   c) Regime Metrics:");
-	        sb.AppendLine($"     ADX   = {snap.Regime.Adx:0.##}");
+	        sb.AppendLine($"     ADX   = {snap.Regime.Adx:0.##} (ok={snap.AdxOk}, min={ADXMin}, max={ADXMax}");
 	        sb.AppendLine($"     ATRt  = {snap.Regime.AtrTicks:0.##} ");
 	        
 	        sb.AppendLine(
@@ -217,6 +217,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        var minsSinceLast = Time[0].Subtract(lastFlatExecutionTime ).TotalMinutes;
 		        s.SpacingOk = minsSinceLast >= MinMinutesBetweenTrades;
 		    }
+		    
+		    //-- ADX ---
+		    s.AdxOk = AdxOk(); 
 
 		    // ---- WICK FITLER ----
 		    s.WickOk = RecentBarsAreCleanForEntry();
@@ -361,7 +364,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private struct EntryEvalSnapshot
         {
 	        public bool TimeOk, InMainWindow, InMidBreak, HasSessionStart, DayOk, PnlOrDdLock, TradeCountOk, SpacingOk;
-	        public bool WickOk;
+	        public bool AdxOk, WickOk;
 	        public bool TrendUp, TrendDown, Tradeable;
 	        public string TrendFailReason, ConfirmFailReason;
 	        public bool LongPulledBack, ShortPulledBack;

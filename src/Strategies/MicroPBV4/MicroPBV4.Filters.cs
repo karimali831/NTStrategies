@@ -44,7 +44,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return priorBarRangeTicks <= MaxPriorBarRangeTicks;
         }
-        
+
+        private bool AdxOk()
+        {
+            var adxNow = adx[0];
+            return adxNow >= ADXMin && adxNow <= ADXMax;
+        }
         
         private bool PassesWickFilter()
         {

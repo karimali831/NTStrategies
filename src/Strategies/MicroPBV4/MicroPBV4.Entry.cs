@@ -138,6 +138,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
             
+            // ADX Filter
+            if (!AdxOk())
+            {
+                ManageBreakEven();
+                return;
+            }
+            
             // Cooldown after an "entry too far from EMA" rejection
             if (EntryDistCooldownBars > 0 && _entryDistBlockLastBar >= 0 && CurrentBar <= _entryDistBlockLastBar)
             {

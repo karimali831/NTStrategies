@@ -62,34 +62,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // ========== 03 – Trend / Pullback / Confirmation ==========
         [NinjaScriptProperty]
+        [Display(Name = "ADX min", Order = 1, GroupName = "03-Trend & Filters")]
+        public double ADXMin { get; set; } = 15.0;
+
+        [NinjaScriptProperty]
+        [Display(Name = "ADX max", Order = 2, GroupName = "03-Trend & Filters")]
+        public double ADXMax { get; set; } = 45.0;
+        
+        [NinjaScriptProperty]
         [Range(1, int.MaxValue)]
-        [Display(Name = "EMA fast", Order = 1, GroupName = "03-Trend & Filters")]
+        [Display(Name = "EMA fast", Order = 3, GroupName = "03-Trend & Filters")]
         public int EMAFast { get; set; } = 14;
 
         [NinjaScriptProperty]
         [Range(1, int.MaxValue)]
-        [Display(Name = "EMA slow", Order = 2, GroupName = "03-Trend & Filters")]
+        [Display(Name = "EMA slow", Order = 4, GroupName = "03-Trend & Filters")]
         public int EMASlow { get; set; } = 50;
         
         [NinjaScriptProperty]
-        [Display(Name = "EMA slope lookback (bars)", Order = 3, GroupName = "03-Trend & Filters")]
+        [Display(Name = "EMA slope lookback (bars)", Order = 5, GroupName = "03-Trend & Filters")]
         public int EmaSlopeLookbackBars { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name = "Trend slope min ticks", Order = 4, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Trend slope min ticks", Order = 6, GroupName = "03-Trend & Filters")]
         public int TrendSlopeMinTicks { get; set; } = 25;
         
         [NinjaScriptProperty]
-        [Display(Name = "Min EMA slope (ticks)", Order = 5, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Min EMA slope (ticks)", Order = 7, GroupName = "03-Trend & Filters")]
         public double MinEmaSlopeTicks { get; set; } = 70;
 
         [NinjaScriptProperty]
-        [Display(Name = "Min EMA separation (ticks)", Order = 6, GroupName = "03-Trend & Filters")]
+        [Display(Name = "Min EMA separation (ticks)", Order = 8, GroupName = "03-Trend & Filters")]
         public double MinEmaSeparationTicks { get; set; } = 8;
         
         [NinjaScriptProperty]
         [Range(1, int.MaxValue)]
-        [Display(Name = "ADX period", Order = 7, GroupName = "03-Trend & Filters")]
+        [Display(Name = "ADX period", Order = 9, GroupName = "03-Trend & Filters")]
         public int ADXPeriod { get; set; } = 14;
 
         [NinjaScriptProperty]
