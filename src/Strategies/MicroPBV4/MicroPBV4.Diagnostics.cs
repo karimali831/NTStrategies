@@ -142,7 +142,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        $"{(snap.TrendUp ? snap.LongPulledBack : snap.ShortPulledBack)}, " +
 		        $"reclaimed=" +
 		        $"{(snap.TrendUp ? snap.LongReclaimed : snap.ShortReclaimed)}, " +
-		        $"trendFailReason={snap.TrendFailReason})");
+		        $"trendFailReason={snap.TrendFailReason})" +
+		        $"confirmFailReason={snap.ConfirmFailReason}");
 
 	        sb.AppendLine(new string('-', 103));
 
@@ -290,7 +291,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    s.TrendDown = trendDown;
 		    s.TrendFailReason = trendFail;
 		    
-		    s.ConfirmFailReason = "n/a";
+		    s.ConfirmFailReason = "none";
 		    var confirmLong  = ConfirmLongEntry(s.SigLongAgo, out var longFailReason);
 		    var confirmShort = ConfirmShortEntry(s.SigShortAgo, out var shortFailReason);
 

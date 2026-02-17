@@ -166,6 +166,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool PassesMarketRegimeGate(bool longSide, int sigBarsAgo, out RegimeSnapshot r)
         {
             ComputeMarketRegime(out r);
+            
+            return true;
 
             if (r.Label == "WARMUP" || !r.Ok)
             {
@@ -173,8 +175,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 r.Fail = string.IsNullOrEmpty(r.Fail) ? "warmup" : r.Fail;
                 return false;
             }
-
-            return true;
 
             var fails = new List<string>();
             var idx = Math.Max(0, sigBarsAgo);
