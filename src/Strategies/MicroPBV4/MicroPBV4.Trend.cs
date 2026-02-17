@@ -21,11 +21,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
             
-            TrendTicks(30, out var lb, out var bars, out var ticks, out var upTicks,
+            // -------- Trend context (single source of truth) --------
+            TrendTicks(30, out _, out _, out _, out var upTicks,
                 out var downTicks);
+            
+            var alignedUp   = emaFast[0] > emaSlow[0];
+            var alignedDown = emaFast[0] < emaSlow[0];
 
-            trendUp = upTicks > downTicks;
-            trendDown = downTicks > upTicks;
+            trendUp   = alignedUp   && m.PriceAboveFast && upTicks > downTicks;
+            trendDown = alignedDown && m.PriceBelowFast && downTicks > upTicks;
+            
+            if (!trendUp && !trendDown)
+            {
+                if (!alignedUp && !alignedDown)
+                    failReason = "emas-flat-or-crossed";
+                else if (alignedUp && !m.PriceAboveFast)
+                    failReason = "price-not-above-fast-ema";
+                else if (alignedDown && !m.PriceBelowFast)
+                    failReason = "price-not-below-fast-ema";
+                else
+                    failReason = "trend-unknown";
+            }
 
             return trendUp || trendDown;
         }
