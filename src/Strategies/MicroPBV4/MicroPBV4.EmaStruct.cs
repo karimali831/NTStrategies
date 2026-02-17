@@ -187,13 +187,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 var prox = Math.Max(0, LongTouchTicks) * TickSize;
                 distTicks = (Low[barsAgo] - emaTouch) / TickSize;
-                return Low[barsAgo] <= (emaTouch + prox);
+                return Low[barsAgo] <= emaTouch + prox;
             }
             else
             {
                 var prox = Math.Max(0, ShortTouchTicks) * TickSize;
                 distTicks = (High[barsAgo] - emaTouch) / TickSize;
-                return High[barsAgo] >= (emaTouch - prox);
+                return High[barsAgo] >= emaTouch - prox;
             }
         }
     }
