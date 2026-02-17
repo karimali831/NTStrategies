@@ -303,8 +303,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    TrendTicks(30, out _, out _, out _, out s.LongRangeTicks, out s.ShortRangeTicks);
 
 			// ---- setup components (signal bar) ----
-			s.LongPulledBack  = PullbackTouchedFastEmaPrevBar(true,  s.SigLongAgo,  out s.PbEmaLong,  out s.PbDistLong);
-			s.ShortPulledBack = PullbackTouchedFastEmaPrevBar(false, s.SigShortAgo, out s.PbEmaShort, out s.PbDistShort);
+			// s.LongPulledBack  = PullbackTouchedFastEma(true,  s.SigLongAgo,  out s.PbEmaLong,  out s.PbDistLong);
+			// s.ShortPulledBack = PullbackTouchedFastEma(false, s.SigShortAgo, out s.PbEmaShort, out s.PbDistShort);
+			
+			s.LongPulledBack  = PullbackTouchedFastEma(true,  ConfirmBars,  out s.PbEmaLong,  out s.PbDistLong);
+			s.ShortPulledBack = PullbackTouchedFastEma(false, ConfirmBars, out s.PbEmaShort, out s.PbDistShort);
 
 			s.LongReclaimed  = Reclaimed(true, s.SigLongAgo);
 			s.ShortReclaimed = Reclaimed(false, s.SigShortAgo);
