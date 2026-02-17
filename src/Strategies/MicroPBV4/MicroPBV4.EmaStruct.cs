@@ -172,8 +172,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return Close[barsAgo] <= emaFast[barsAgo];
         }
+        
+        // private bool TouchedEma(EMA ema, bool longSide)
+        // {
+        //     var look = Math.Min(6, CurrentBar - 1);
+        //     if (look <= 0)
+        //         return false;
+        //
+        //     if (longSide)
+        //     {
+        //         var proximity = LongTouchTicks > 0 ? LongTouchTicks * TickSize : 0.0;
+        //         for (var i = 1; i <= look; i++)
+        //             if (Low[i] <= ema[i] + proximity)
+        //                 return true;
+        //     }
+        //     else
+        //     {
+        //         var proximity = ShortTouchTicks > 0 ? ShortTouchTicks * TickSize : 0.0;
+        //         for (var i = 1; i <= look; i++)
+        //             if (High[i] >= ema[i] - proximity)
+        //                 return true;
+        //     }
+        //
+        //     return false;
+        // }
 
-        private bool PullbackTouchedFastEmaPrevBar(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
+        private bool PullbackTouchedFastEma(bool longSide, int barsAgo, out double emaTouch, out double distTicks)
         {
             emaTouch = 0;
             distTicks = double.NaN;

@@ -175,7 +175,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                var pulledBack = PullbackTouchedFastEmaPrevBar(true, confirmDelay, out _, out _);
+                // var pulledBack = PullbackTouchedFastEmaPrevBar(true, confirmDelay, out _, out _);
+                var pulledBack = PullbackTouchedFastEma(true, ConfirmBars, out _, out _);
            
                 if (pulledBack && Reclaimed(true, confirmDelay) && ConfirmLongEntry(confirmDelay, out _))
                 {
@@ -237,7 +238,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                var pulledBack = PullbackTouchedFastEmaPrevBar(false, confirmDelay, out _, out _);
+                // var pulledBack = PullbackTouchedFastEmaPrevBar(false, confirmDelay, out _, out _);
+                var pulledBack = PullbackTouchedFastEma(false, ConfirmBars, out _, out _);
         
                 if (pulledBack && Reclaimed(false, confirmDelay) && ConfirmShortEntry(confirmDelay, out _))
                 {
