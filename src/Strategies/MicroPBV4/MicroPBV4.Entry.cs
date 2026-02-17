@@ -252,7 +252,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         return;
                     }
                     
-
                     // consume defer once reached
                     if (_entryDistDeferShortBar >= 0 && CurrentBar >= _entryDistDeferShortBar)
                         _entryDistDeferShortBar = -1;

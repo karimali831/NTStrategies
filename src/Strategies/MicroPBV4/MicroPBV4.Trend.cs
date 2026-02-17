@@ -28,17 +28,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             var alignedUp   = emaFast[0] > emaSlow[0];
             var alignedDown = emaFast[0] < emaSlow[0];
 
-            trendUp   = alignedUp   && m.PriceAboveFast && upTicks > downTicks;
-            trendDown = alignedDown && m.PriceBelowFast && downTicks > upTicks;
+            // trendUp   = alignedUp   && m.PriceAboveFast && upTicks > downTicks;
+            // trendDown = alignedDown && m.PriceBelowFast && downTicks > upTicks;
+
+            var greaterTrendUpTicks = upTicks > downTicks;
+            var greaterTrendDownTicks = downTicks > upTicks;
+            
+            trendUp   = alignedUp   && greaterTrendUpTicks;
+            trendDown = alignedDown && greaterTrendDownTicks;
             
             if (!trendUp && !trendDown)
             {
                 if (!alignedUp && !alignedDown)
                     failReason = "emas-flat-or-crossed";
-                else if (alignedUp && !m.PriceAboveFast)
-                    failReason = "price-not-above-fast-ema";
-                else if (alignedDown && !m.PriceBelowFast)
-                    failReason = "price-not-below-fast-ema";
+                // else if (alignedUp && !m.PriceAboveFast)
+                //     failReason = "price-not-above-fast-ema";
+                // else if (alignedDown && !m.PriceBelowFast)
+                //     failReason = "price-not-below-fast-ema";
+                else if (alignedUp && greaterTrendDownTicks)
+                    failReason = $"upticks-lesser-than-downticks (ut: {upTicks} dt: ${downTicks})";
+                else if (alignedDown && greaterTrendUpTicks)
+                    failReason = $"downticks-lesser-than-upticks (dt: {downTicks} ut: ${upTicks})";
                 else
                     failReason = "trend-unknown";
             }
