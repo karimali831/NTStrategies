@@ -309,6 +309,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
                 return false;
             }
+            
+            var minLow = emaFast[barsAgo] + 5 * TickSize;
+            if (Low[barsAgo] <= minLow)
+            {
+                failReason = "wick-below-ema";
+                return false;
+            }
 
             return true;
         }
@@ -333,6 +340,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (StrongBodyTicks > 0 && bodyTicks < StrongBodyTicks)
             {
                 failReason = $"body-too-small ({bodyTicks} < {StrongBodyTicks})";
+                return false;
+            }
+            
+            double maxHigh = emaFast[barsAgo] - 5 * TickSize;
+            if (High[barsAgo] >= maxHigh)
+            {
+                failReason = "wick-above-ema";
                 return false;
             }
 
