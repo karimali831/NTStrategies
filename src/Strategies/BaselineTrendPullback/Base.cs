@@ -76,8 +76,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Session & trade limits
                 UseTimeWindow           = true;
-                StartTimeHHmm           = 1330;  // 13:30 London ~ US open (adjust to your preference)
-                EndTimeHHmm             = 2100;
+                StartTimeHHmm           = 0930; 
+                EndTimeHHmm             = 1600;
                 MaxTradesPerSession     = 4;
 
                 // Logging
