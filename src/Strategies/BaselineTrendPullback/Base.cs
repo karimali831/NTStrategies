@@ -50,9 +50,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinEmaSepTicks         = 3;     // separation between EMAs in ticks
 
                 // Regime (minimal)
-                MinAdx = 18;
+                MinAdx = 15;
                 MaxAdx = 40;
-                AtrMedianLookbackBars = 50;     // "ATR above rolling median" check
+                AtrMedianLookbackBars = 0;     // "ATR above rolling median" check
 
                 // Pullback / trigger
                 TouchLookbackBars = 6;          // how far back we consider "touched"
@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RequireSignalCandleInTrendDir = true;
 
                 // Candle quality
-                MaxWickPct      = 0.65;         // (range - body) / range
+                MaxWickPct      =  0.90;         // (range - body) / range
                 MinRangeTicks   = 8;            // ignore tiny bars
 
                 // Risk

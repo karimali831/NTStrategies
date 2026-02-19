@@ -42,10 +42,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             var atrVal = atr[barsAgo];
 
             // ATR median lookback
-            var atrMedian = ComputeAtrMedian(barsAgo + 1, AtrMedianLookbackBars);
+            var atrMedian = atrVal;
+            var atrOk = true;
+
+            if (AtrMedianLookbackBars > 0)
+            {
+                atrMedian = ComputeAtrMedian(barsAgo + 1, AtrMedianLookbackBars);
+                atrOk = atrVal >= atrMedian;
+            }
 
             var adxOk = adxVal >= MinAdx && adxVal <= MaxAdx;
-            var atrOk = atrVal >= atrMedian;
 
             var regimeOk = adxOk && atrOk;
             var regimeFail =
