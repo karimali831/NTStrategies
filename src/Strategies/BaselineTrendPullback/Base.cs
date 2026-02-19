@@ -35,7 +35,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsExitOnSessionCloseStrategy = true;
                 ExitOnSessionCloseSeconds    = 30;
                 IsInstantiatedOnEachOptimizationIteration = false;
-
+                
+                UseBreakoutTrigger = true;
                 // ----- Parameter groups -----
 
                 // Indicators
@@ -57,7 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Pullback / trigger
                 TouchLookbackBars = 6;          // how far back we consider "touched"
                 TouchTicks        = 4;          // proximity in ticks to fast EMA
-                RequireCloseBackAcrossFastEma = true;
+                RequireCloseBackAcrossFastEma = false;
                 RequireSignalCandleInTrendDir = true;
 
                 // Candle quality
@@ -66,9 +67,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Risk
                 RiskMode                = BaselineRiskMode.SwingWithCap;
-                SwingLookbackBars       = 8;
+                SwingLookbackBars       = 3;
                 StopBufferTicks         = 2;
-                MaxStopTicks            = 40;
+                MaxStopTicks            = 60;
                 ProfitTargetR           = 2.0;   // target = R * stopTicks
                 UseBreakEven            = true;
                 BreakEvenAtR            = 1.0;   // move stop to BE after 1R

@@ -163,10 +163,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool LongTriggerOk(BarFeatures f)
         {
-            if (RequireCloseBackAcrossFastEma && Close[0] <= emaFast[0])
+            if (RequireSignalCandleInTrendDir && Close[0] < Open[0])
                 return false;
 
-            if (RequireSignalCandleInTrendDir && Close[0] < Open[0])
+            if (UseBreakoutTrigger)
+                return Close[0] > High[1];
+
+            // fallback to old behavior
+            if (RequireCloseBackAcrossFastEma && Close[0] <= emaFast[0])
                 return false;
 
             return true;
@@ -174,10 +178,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool ShortTriggerOk(BarFeatures f)
         {
-            if (RequireCloseBackAcrossFastEma && Close[0] >= emaFast[0])
+            if (RequireSignalCandleInTrendDir && Close[0] > Open[0])
                 return false;
 
-            if (RequireSignalCandleInTrendDir && Close[0] > Open[0])
+            if (UseBreakoutTrigger)
+                return Close[0] < Low[1];
+
+            if (RequireCloseBackAcrossFastEma && Close[0] >= emaFast[0])
                 return false;
 
             return true;

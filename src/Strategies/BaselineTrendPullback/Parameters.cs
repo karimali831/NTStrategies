@@ -97,6 +97,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "RequireSignalCandleInTrendDir", GroupName = "Pullback", Order = 13)]
         public bool RequireSignalCandleInTrendDir { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(Name = "UseBreakoutTrigger", GroupName = "Pullback", Order = 14)]
+        public bool UseBreakoutTrigger { get; set; }
 
         // ----- Candle quality -----
         [NinjaScriptProperty]
