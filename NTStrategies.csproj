@@ -65,6 +65,12 @@
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Strategies\ApexMicroPBLiveV3.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Features.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Base.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Logger.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Parameters.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Risk.cs" />
+        <Compile Include="src\Strategies\BaselineTrendPullback\Utils.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Api.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Core.cs" />
         <Compile Include="src\Strategies\MicroPBV3\MicroPBV3.Diagnostics.cs" />
