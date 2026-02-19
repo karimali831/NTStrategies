@@ -12,21 +12,24 @@ using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.Strategies;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
 
-    public sealed class BaselineLogger : Strategy, IDisposable
+    public sealed class BaselineLogger : IDisposable
     {
+        private readonly Strategy _strategy;
         private readonly string _strategyName;
         private readonly string _instrument;
         private readonly bool _logToFile;
         private readonly string _filePath;
         private StreamWriter _writer;
 
-        public BaselineLogger(string strategyName, string instrument, bool logToFile, string fileNamePrefix)
+        public BaselineLogger(Strategy strategy, string strategyName, string instrument, bool logToFile, string fileNamePrefix)
         {
+            _strategy = strategy;
             _strategyName = strategyName ?? "Strategy";
             _instrument = instrument ?? "";
             _logToFile = logToFile;
@@ -88,7 +91,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 sb.Append(kv.Value);
             }
 
-            Print(sb.ToString());
+            _strategy?.Print(sb.ToString());
         }
 
         private void WriteCsv(string code, Dictionary<string, object> f, string meta)

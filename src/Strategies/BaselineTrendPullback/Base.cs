@@ -103,10 +103,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddChartIndicator(emaSlow);
 
                 _log = new BaselineLogger(
-                    strategyName: Name,
-                    instrument: Instrument?.FullName ?? "",
-                    logToFile: LogToFile,
-                    fileNamePrefix: LogFileNamePrefix);
+                    this,
+                    Name,
+                    Instrument?.FullName ?? "",
+                    LogToFile,
+                    LogFileNamePrefix);
 
                 _log.Info("INIT", new Dictionary<string, object>
                 {
