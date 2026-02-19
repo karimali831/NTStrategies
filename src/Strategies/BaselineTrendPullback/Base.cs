@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExitOnSessionCloseSeconds    = 30;
                 IsInstantiatedOnEachOptimizationIteration = false;
                 
-                UseBreakoutTrigger = true;
+                UseBreakoutTrigger = false;
                 // ----- Parameter groups -----
 
                 // Indicators
@@ -58,7 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Pullback / trigger
                 TouchLookbackBars = 6;          // how far back we consider "touched"
                 TouchTicks        = 4;          // proximity in ticks to fast EMA
-                RequireCloseBackAcrossFastEma = false;
+                RequireCloseBackAcrossFastEma = true;
                 RequireSignalCandleInTrendDir = true;
 
                 // Candle quality
