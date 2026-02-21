@@ -1245,7 +1245,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var adxNow = adx[Sig()];
             var triggerTicks = BE_TriggerTicks;
 
-            if (adxNow < 30)
+            if (adxNow < 25)
                 triggerTicks /= 2;
 
             if (upTicks < triggerTicks)
