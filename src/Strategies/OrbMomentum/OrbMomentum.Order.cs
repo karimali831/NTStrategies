@@ -34,8 +34,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     tradesToday++;
                     lastTradeTime = time;
+
                     runnerFilled = true;
-				
+                    runnerEntryPrice = price;
+
                     LogDiag($"FILL runner: sig={sig} price={price:F2} qty={quantity} tradesToday={tradesToday}");
                 }
             }
@@ -76,6 +78,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             if (!runnerFilled)
+                return;
+            
+            if (runnerEntryPrice <= 0)
                 return;
 
             if (runnerStopMoved)
