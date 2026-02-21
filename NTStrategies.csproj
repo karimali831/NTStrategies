@@ -89,6 +89,14 @@
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Risk.cs" />
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Summary.cs" />
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Core.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Diag.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Entry.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.EntryConditions.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Filters.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Order.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Risk.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Session.cs" />
     </ItemGroup>
     <ItemGroup>
       <None Include="packages.config" />
