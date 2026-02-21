@@ -11,6 +11,47 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class OrbMomentum : Strategy
     {
+        private void ManageRunner()
+        {
+            if (!EnableRunner)
+                return;
+
+            if (!RunnerBreakEvenEnabled)
+                return;
+
+            if (!runnerFilled)
+                return;
+            
+            if (runnerEntryPrice <= 0)
+                return;
+
+            if (runnerStopMoved)
+                return;
+
+            if (primaryDir == 0)
+                return;
+
+            // runner unrealized ticks based on RUNNER entry
+            var upTicks =
+                primaryDir > 0
+                    ? (Close[0] - runnerEntryPrice) / TickSize
+                    : (runnerEntryPrice - Close[0]) / TickSize;
+			
+            if (upTicks < RunnerTriggerTicks)
+                return;
+			
+            // Move runner stop to RUNNER BE + RunnerPlusTicks
+            var bePrice = runnerEntryPrice + (primaryDir > 0 ? +1 : -1) * (RunnerPlusTicks * TickSize);
+
+            if (primaryDir > 0)
+                SetStopLoss(SigRunnerLong, CalculationMode.Price, bePrice, false);
+            else
+                SetStopLoss(SigRunnerShort, CalculationMode.Price, bePrice, false);
+
+            runnerStopMoved = true;
+            LogDiag($"Runner stop moved to BE+{RunnerPlusTicks} @ {bePrice:F2} (upTicks={upTicks:F1})");
+        }
+        
         private int DollarsToTicks(double dollars)
         {
             // tickValue = PointValue * TickSize (e.g., ES: 50 * 0.25 = $12.50)

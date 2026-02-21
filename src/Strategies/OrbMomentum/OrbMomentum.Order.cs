@@ -69,45 +69,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
         
-        private void ManageRunner()
+        protected override void OnOrderUpdate(
+            Order order, double limitPrice, double stopPrice,
+            int quantity, int filled, double averageFillPrice,
+            OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
-            if (!EnableRunner)
+            if (order == null)
                 return;
 
-            if (!RunnerBreakEvenEnabled)
+            // Only log your strategy's stop/target orders
+            var name = order.Name ?? "";
+            if (name != SigPrimaryLong && name != SigPrimaryShort && name != SigRunnerLong && name != SigRunnerShort)
                 return;
 
-            if (!runnerFilled)
-                return;
-            
-            if (runnerEntryPrice <= 0)
-                return;
-
-            if (runnerStopMoved)
-                return;
-
-            if (primaryDir == 0)
-                return;
-
-            // runner unrealized ticks based on RUNNER entry
-            var upTicks =
-                primaryDir > 0
-                    ? (Close[0] - runnerEntryPrice) / TickSize
-                    : (runnerEntryPrice - Close[0]) / TickSize;
-			
-            if (upTicks < RunnerTriggerTicks)
-                return;
-			
-            // Move runner stop to RUNNER BE + RunnerPlusTicks
-            var bePrice = runnerEntryPrice + (primaryDir > 0 ? +1 : -1) * (RunnerPlusTicks * TickSize);
-
-            if (primaryDir > 0)
-                SetStopLoss(SigRunnerLong, CalculationMode.Price, bePrice, false);
-            else
-                SetStopLoss(SigRunnerShort, CalculationMode.Price, bePrice, false);
-
-            runnerStopMoved = true;
-            LogDiag($"Runner stop moved to BE+{RunnerPlusTicks} @ {bePrice:F2} (upTicks={upTicks:F1})");
+            // Filter to the important moments
+            if (orderState == OrderState.Rejected || orderState == OrderState.Cancelled || orderState == OrderState.Working)
+            {
+                LogDiag($"ORDER {orderState}: name={name} type={order.OrderType} qty={quantity} " +
+                        $"lim={limitPrice:F2} stp={stopPrice:F2} err={error} cmt={comment}");
+            }
         }
     }
 }
