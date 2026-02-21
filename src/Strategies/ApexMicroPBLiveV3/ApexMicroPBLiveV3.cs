@@ -1215,7 +1215,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // bool isRealtime = (State == State.Realtime);
             // int sig = (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-            return 1;
+            return 0;
         }
 
         private void ManageBreakEven()
