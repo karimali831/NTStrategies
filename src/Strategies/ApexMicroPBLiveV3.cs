@@ -213,11 +213,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Use break-even", Order = 1, GroupName = "05-BE & Management")]
         public bool UseBreakEven { get; set; } = false;
-
-        [NinjaScriptProperty]
-        [Display(Name = "Use aggressive BE preset", Order = 2, GroupName = "05-BE & Management")]
-        public bool UseAggressiveBE { get; set; } = true;
-
+        
         [NinjaScriptProperty]
         [Display(Name = "BE trigger (ticks in favour)", Order = 3, GroupName = "05-BE & Management")]
         public int BE_TriggerTicks { get; set; } = 12;
@@ -332,13 +328,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EmergencyStopTicks = MaxStopTicks + 5;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.StopCancelCloseIgnoreRejects;
-
-                if (UseAggressiveBE)
-                {
-                    BE_TriggerTicks = 12;
-                    BE_PlusTicks = 6;
-                }
-
+                
                 if (EmergencyStopTicks < 1)
                     EmergencyStopTicks = MaxStopTicks + 5;
             }
@@ -684,22 +674,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // ===== ENTRY EVALUATION GATE (ONLY WHEN FLAT) =====
-            bool isRealtime = (State == State.Realtime);
-
-            bool evalEntriesNow =
-                Calculate == Calculate.OnBarClose ||
-                !isRealtime ||
-                (Calculate == Calculate.OnEachTick && IsFirstTickOfBar);
+            var isRealtime = State == State.Realtime;
+            var evalEntriesNow = !isRealtime || IsFirstTickOfBar;
 
             if (!evalEntriesNow)
             {
                 ManageBreakEven();
                 return;
             }
-
-            int sig = (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-
-            if (isRealtime && Calculate == Calculate.OnEachTick)
+            
+            if (isRealtime)
             {
                 if (CurrentBar == lastEntryAttemptBar)
                 {
@@ -708,7 +692,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            DateTime now = Time[sig];
+            var sig = Sig();
+            var now = Time[sig];
 
             if (sessionStart == DateTime.MinValue)
             {
@@ -1226,6 +1211,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             SetProfitTarget(tag, CalculationMode.Ticks, targetTicksBase);
         }
 
+        public int Sig()
+        {
+            // bool isRealtime = (State == State.Realtime);
+            // int sig = (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
+            return 0;
+        }
+
         private void ManageBreakEven()
         {
             if (!UseBreakEven)
@@ -1249,11 +1241,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 upTicks = (int)Math.Floor((Close[0] - entryPrice) / TickSize);
             else
                 upTicks = (int)Math.Floor((entryPrice - Close[0]) / TickSize);
+            
+            var adxNow = adx[Sig()];
+            var triggerTicks = BE_TriggerTicks;
 
-            if (upTicks < BE_TriggerTicks)
+            if (adxNow < 30)
+                triggerTicks /= 2;
+
+            if (upTicks < triggerTicks)
                 return;
-
-            double newStop = Position.MarketPosition == MarketPosition.Long
+            
+            var newStop = Position.MarketPosition == MarketPosition.Long
                 ? entryPrice + BE_PlusTicks * TickSize
                 : entryPrice - BE_PlusTicks * TickSize;
 
@@ -1285,10 +1283,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (MaxDailyLossPerContractUSD <= 0)
                 return 0;
-
-            int sig = (State == State.Realtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-            int eff = GetEffectiveContractsToday(sig);
-
+            
+            int eff = GetEffectiveContractsToday(Sig());
             return Math.Abs(MaxDailyLossPerContractUSD) * eff;
         }
 
@@ -1354,9 +1350,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (MaxDailyProfitPerContractUSD <= 0)
                 return 0;
-
-            int sig = (State == State.Realtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-            int eff = GetEffectiveContractsToday(sig);
+            
+            var eff = GetEffectiveContractsToday(Sig());
 
             return Math.Abs(MaxDailyProfitPerContractUSD) * eff;
         }
@@ -1473,11 +1468,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 		    if (IsInStrategyAnalyzer) return false;
 		    if (sessionStart == DateTime.MinValue) return false;
+            
 		
-		    bool isRealtime = (State == State.Realtime);
-		    int sig = (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-		
-		    int minFromOpen = (int)Math.Floor(Time[sig].Subtract(sessionStart).TotalMinutes);
+		    int minFromOpen = (int)Math.Floor(Time[Sig()].Subtract(sessionStart).TotalMinutes);
 		
 		    // mid-break block
 		    if (MidBreakEndMin > MidBreakStartMin)
@@ -1592,12 +1585,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (!DebugMode)
                 return;
+            
+            var effContracts = GetEffectiveContractsToday(Sig());
 
-            bool isRealtime = (State == State.Realtime);
-            int sig = (isRealtime && Calculate == Calculate.OnEachTick) ? 1 : 0;
-            int effContracts = GetEffectiveContractsToday(sig);
-
-            DateTime diagTime = Time[sig];
+            var diagTime = Time[Sig()];
             if ((diagTime - lastDiagTime).TotalSeconds < diagThrottleSeconds)
                 return;
 
@@ -1608,8 +1599,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 //			var account = Account.All.FirstOrDefault(a => a.Name == "Playback101")
 //			.GetAccountItem(AccountItem.TrailingMaxDrawdown, Currency.UsDollar);
 //			Print("!!!! trailing drawdown" + account);
-				
 
+            var sig = Sig();
             double realizedToday = GetRealizedToday();
             double dailyKill = GetDailyKillLimitUsd();
             double dailyMaxProfit = GetDailyProfitLimitUsd();
