@@ -58,106 +58,106 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		//-- GENERAL --//
 		[NinjaScriptProperty]
-		[Display(Name="Enable diagnostics", Order=1, GroupName="General")]
+		[Display(Name="Enable diagnostics", Order=1, GroupName="01-General")]
 		public bool EnableDiagnostics { get; set; } = true;
 		
         [NinjaScriptProperty]
-        [Display(Name="Contracts", Order=2, GroupName="General")]
+        [Display(Name="Contracts", Order=2, GroupName="01-General")]
         public int Contracts { get; set; } = 1;
         
         [NinjaScriptProperty]
-        [Display(Name="Mins from start", Order = 3, GroupName="General")]
+        [Display(Name="Mins from start", Order = 3, GroupName="01-General")]
         public int MinsFromStart { get; set; } = 20;
 
         [NinjaScriptProperty]
-        [Display(Name="Mins from end", Order = 4, GroupName="General")]
+        [Display(Name="Mins from end", Order = 4, GroupName="01-General")]
         public int MinsFromEnd { get; set; } = 75;
 
         [NinjaScriptProperty]
-        [Display(Name="Enable longs", Order=5, GroupName="General")]
+        [Display(Name="Enable longs", Order=5, GroupName="01-General")]
         public bool EnableLongs { get; set; } = true;
 
         [NinjaScriptProperty]
-        [Display(Name="Enable shorts", Order=6, GroupName="General")]
+        [Display(Name="Enable shorts", Order=6, GroupName="01-General")]
         public bool EnableShorts { get; set; } = true;
 
         [NinjaScriptProperty]
-        [Display(Name="Enable runner", Order=7, GroupName="General")]
+        [Display(Name="Enable runner", Order=7, GroupName="01-General")]
         public bool EnableRunner { get; set; } = true;
         
         //-- FILTERS --//
         [NinjaScriptProperty]
-        [Display(Name="EMA Fast", Order = 1, GroupName="Filters")]
+        [Display(Name="EMA Fast", Order = 1, GroupName="02-Filters")]
         public int EMAFast { get; set; } = 14;
 		
         [NinjaScriptProperty]
-        [Display(Name="EMA Slow", Order = 2, GroupName="Filters")]
+        [Display(Name="EMA Slow", Order = 2, GroupName="02-Filters")]
         public int EMASlow { get; set; } = 40;
         
         [NinjaScriptProperty]
-        [Display(Name="Confirm bars", Order= 3, GroupName="Filters")]
+        [Display(Name="Confirm bars", Order= 3, GroupName="02-Filters")]
         public int ConfirmBars { get; set; } = 1;
 
         [NinjaScriptProperty]
-        [Display(Name="Confirm body ticks", Order= 4, GroupName="Filters")]
+        [Display(Name="Confirm body ticks", Order= 4, GroupName="02-Filters")]
         public int ConfirmBodyTicks { get; set; } = 16;
         
         [NinjaScriptProperty]
-        [Display(Name="Trade cooldown minutes", Order= 5, GroupName="Filters")]
+        [Display(Name="Trade cooldown minutes", Order= 5, GroupName="02-Filters")]
         public int TradeCooldownMinutes { get; set; } = 10;
         
         [NinjaScriptProperty]
-        [Display(Name="Min ticks outside ORB", Order = 6, GroupName="Filters")]
+        [Display(Name="Min ticks outside ORB", Order = 6, GroupName="02-Filters")]
         public int MinTicksOutsideOrb { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Runner pullback ticks", Order=7, GroupName="Filters")]
+        [Display(Name="Runner pullback ticks", Order=7, GroupName="02-Filters")]
         public int RunnerPullbackTicks { get; set; } = 8;
         
         //-- RISK --//
         [NinjaScriptProperty]
-        [Display(Name="Max profit per trade ($)", Order=1, GroupName="Risk")]
+        [Display(Name="Max profit per trade ($)", Order=1, GroupName="03-Risk")]
         public double MaxProfitPerTrade { get; set; } = 500;
 
         [NinjaScriptProperty]
-        [Display(Name="Max loss per trade ($)", Order=2, GroupName="Risk")]
+        [Display(Name="Max loss per trade ($)", Order=2, GroupName="03-Risk")]
         public double MaxLossPerTrade { get; set; } = 250;
 
         [NinjaScriptProperty]
-        [Display(Name="Max trades per day", Order=3, GroupName = "Risk")]
+        [Display(Name="Max trades per day", Order=3, GroupName = "03-Risk")]
         public int MaxTradesPerDay { get; set; } = 8;
 		
 		[NinjaScriptProperty]
-		[Display(Name="Max daily loss ($)", Order=4, GroupName = "Risk")]
+		[Display(Name="Max daily loss ($)", Order=4, GroupName = "03-Risk")]
 		public double MaxDailyLoss { get; set; } = 500;
 		
 		[NinjaScriptProperty]
-		[Display(Name="Max daily profit ($)", Order=5, GroupName= "Risk")]
+		[Display(Name="Max daily profit ($)", Order=5, GroupName= "03-Risk")]
 		public double MaxDailyProfit { get; set; } = 1500;
 		
 		//-- BREAK-EVEN --//
 		[NinjaScriptProperty]
-		[Display(Name="Primary break-even enabled", Order=1, GroupName="Break-even")]
+		[Display(Name="Primary break-even enabled", Order=1, GroupName="04-Break-even")]
 		public bool PrimaryBreakEvenEnabled { get; set; } = true;
 
 		[NinjaScriptProperty]
-		[Display(Name="Primary BE trigger ticks", Order=2, GroupName="Break-even")]
+		[Display(Name="Primary BE trigger ticks", Order=2, GroupName="04-Break-even")]
 		public int PrimaryBeTriggerTicks { get; set; } = 25;
 
 		[NinjaScriptProperty]
-		[Display(Name="Primary BE plus ticks", Order=3, GroupName="Break-even")]
+		[Display(Name="Primary BE plus ticks", Order=3, GroupName="04-Break-even")]
 		public int PrimaryBePlusTicks { get; set; } = 6;
 		
 		[NinjaScriptProperty]
-		[Display(Name="Runner break-even enabled", Order=4, GroupName="Break-even")]
+		[Display(Name="Runner break-even enabled", Order=4, GroupName="04-Break-even")]
 		public bool RunnerBreakEvenEnabled { get; set; } = true;
 
 		[NinjaScriptProperty]
-		[Display(Name="Runner trigger ticks", Order=5, GroupName="Break-even")]
+		[Display(Name="Runner trigger ticks", Order=5, GroupName="04-Break-even")]
 		public int RunnerTriggerTicks { get; set; } = 50;
 
 		[NinjaScriptProperty]
-		[Display(Name="Runner plus ticks", Order=6, GroupName="Break-even")]
+		[Display(Name="Runner plus ticks", Order=6, GroupName="04-Break-even")]
 		public int RunnerPlusTicks { get; set; } = 8;
 		
 
