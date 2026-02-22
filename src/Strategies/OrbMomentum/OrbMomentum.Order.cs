@@ -26,8 +26,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     tradesToday++;
                     primaryEntryPrice = price;
+                    primaryFilled = true;
                     lastTradeTime = time;
-				
+
                     LogDiag($"FILL primary: sig={sig} price={price:F2} qty={quantity} tradesToday={tradesToday}");
                 }
                 else if (sig == SigRunnerLong || sig == SigRunnerShort)
@@ -56,6 +57,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 primaryDir = 0;
                 primaryEntryPrice = 0;
                 primarySubmitted = false;
+                primaryStopMoved = false;
+                primaryFilled = false;
 				
                 runnerSubmitted = false;
                 runnerStopMoved = false;

@@ -100,14 +100,51 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
         private bool PullbackSatisfied(int dir)
         {
-            var pbTicks = Math.Max(1, RunnerPullbackTicks); // reuse your existing setting
-		
+            // This is used as your "re-entry pullback satisfied" gate.
+            // Now it means: we only allow a new primary if trend confirm is met.
+
+            var bars = Math.Max(1, ConfirmBars);
+
+            if (CurrentBar < bars)
+                return false;
+
+            // EMA structure must be aligned on the most recent closed bar
             if (dir > 0)
-                return Low[0] <= emaFast[0] - (pbTicks * TickSize);
-		
-            if (dir < 0)
-                return High[0] >= emaFast[0] + (pbTicks * TickSize);
-		
+            {
+                if (!(emaFast[0] > emaSlow[0]))
+                    return false;
+            }
+            else if (dir < 0)
+            {
+                if (!(emaFast[0] < emaSlow[0]))
+                    return false;
+            }
+            else
+                return true;
+
+            var minBodyTicks = Math.Max(0, ConfirmBodyTicks);
+
+            for (var i = 0; i < bars; i++)
+            {
+                var bodyTicks = Math.Abs(Close[i] - Open[i]) / TickSize;
+
+                if (bodyTicks < minBodyTicks)
+                    return false;
+
+                if (dir > 0)
+                {
+                    // bullish + close above both EMAs
+                    if (!(Close[i] > Open[i] && Close[i] > emaFast[i] && Close[i] > emaSlow[i]))
+                        return false;
+                }
+                else
+                {
+                    // bearish + close below both EMAs
+                    if (!(Close[i] < Open[i] && Close[i] < emaFast[i] && Close[i] < emaSlow[i]))
+                        return false;
+                }
+            }
+
             return true;
         }
     }

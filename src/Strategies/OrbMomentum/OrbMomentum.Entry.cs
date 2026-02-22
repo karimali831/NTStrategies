@@ -48,6 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    LogDiag($"BLOCK: max daily profit hit dailyPnL={dailyPnL2:F2} >= {Math.Abs(MaxDailyProfit):F2}");
 
             // Manage runner logic (stop move / trigger)
+            ManagePrimaryBreakEven();
             ManageRunner();
 
             // If flat, look for primary entry

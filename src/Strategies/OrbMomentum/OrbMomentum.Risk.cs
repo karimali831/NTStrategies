@@ -52,6 +52,44 @@ namespace NinjaTrader.NinjaScript.Strategies
             LogDiag($"Runner stop moved to BE+{RunnerPlusTicks} @ {bePrice:F2} (upTicks={upTicks:F1})");
         }
         
+        private void ManagePrimaryBreakEven()
+        {
+            if (!PrimaryBreakEvenEnabled)
+                return;
+
+            if (!primaryFilled)
+                return;
+
+            if (primaryEntryPrice <= 0)
+                return;
+
+            if (primaryStopMoved)
+                return;
+
+            if (primaryDir == 0)
+                return;
+
+            // primary unrealized ticks based on PRIMARY entry
+            var upTicks =
+                primaryDir > 0
+                    ? (Close[0] - primaryEntryPrice) / TickSize
+                    : (primaryEntryPrice - Close[0]) / TickSize;
+
+            if (upTicks < Math.Max(1, PrimaryBeTriggerTicks))
+                return;
+
+            // Move primary stop to PRIMARY BE + PrimaryBEPlusTicks
+            var bePrice = primaryEntryPrice + (primaryDir > 0 ? +1 : -1) * (Math.Max(0, PrimaryBePlusTicks) * TickSize);
+
+            if (primaryDir > 0)
+                SetStopLoss(SigPrimaryLong, CalculationMode.Price, bePrice, false);
+            else
+                SetStopLoss(SigPrimaryShort, CalculationMode.Price, bePrice, false);
+
+            primaryStopMoved = true;
+            LogDiag($"Primary stop moved to BE+{PrimaryBePlusTicks} @ {bePrice:F2} (upTicks={upTicks:F1})");
+        }
+        
         private int DollarsToTicks(double dollars)
         {
             // tickValue = PointValue * TickSize (e.g., ES: 50 * 0.25 = $12.50)

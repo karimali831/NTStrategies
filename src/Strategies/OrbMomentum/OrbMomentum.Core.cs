@@ -27,6 +27,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int      primaryDir;                 // +1 long, -1 short, 0 none
         private double   primaryEntryPrice;
         private bool     primarySubmitted;
+        private bool     primaryStopMoved;
+        private bool     primaryFilled;
 		private bool     reEntryWaitPullback;
 		private int      reEntryDir;
 		
@@ -54,88 +56,110 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const string SigRunnerLong   = "ORB2L";
         private const string SigRunnerShort  = "ORB2S";
 
-        #region Params (as requested)
+		//-- GENERAL --//
+		[NinjaScriptProperty]
+		[Display(Name="Enable diagnostics", Order=1, GroupName="General")]
+		public bool EnableDiagnostics { get; set; } = true;
+		
         [NinjaScriptProperty]
-        [Display(Name="Contracts", Order=1, GroupName="General")]
+        [Display(Name="Contracts", Order=2, GroupName="General")]
         public int Contracts { get; set; } = 1;
-
+        
         [NinjaScriptProperty]
-        [Display(Name="Enable longs", Order=2, GroupName="General")]
-        public bool EnableLongs { get; set; } = true;
-
-        [NinjaScriptProperty]
-        [Display(Name="Enable shorts", Order=3, GroupName="General")]
-        public bool EnableShorts { get; set; } = true;
-
-        [NinjaScriptProperty]
-        [Display(Name="Enable runner", Order=4, GroupName="General")]
-        public bool EnableRunner { get; set; } = true;
-
-        [NinjaScriptProperty]
-        [Display(Name="Max profit per trade ($)", Order=5, GroupName="Risk")]
-        public double MaxProfitPerTrade { get; set; } = 500;
-
-        [NinjaScriptProperty]
-        [Display(Name="Max loss per trade ($)", Order=6, GroupName="Risk")]
-        public double MaxLossPerTrade { get; set; } = 250;
-
-        [NinjaScriptProperty]
-        [Display(Name="Max trades per day", Order=7, GroupName="Risk")]
-        public int MaxTradesPerDay { get; set; } = 8;
-		
-		[NinjaScriptProperty]
-		[Display(Name="Max daily loss ($)", Order=8, GroupName="Risk")]
-		public double MaxDailyLoss { get; set; } = 500;
-		
-		[NinjaScriptProperty]
-		[Display(Name="Max daily profit ($)", Order=9, GroupName="Risk")]
-		public double MaxDailyProfit { get; set; } = 1500;
-		
-		[NinjaScriptProperty]
-		[Display(Name="Trade cooldown minutes", Order=10, GroupName="Risk")]
-		public int TradeCooldownMinutes { get; set; } = 10;
-
-        [NinjaScriptProperty]
-        [Display(Name="Mins from start", Order = 1, GroupName="ORB")]
+        [Display(Name="Mins from start", Order = 3, GroupName="General")]
         public int MinsFromStart { get; set; } = 20;
 
         [NinjaScriptProperty]
-        [Display(Name="Mins from end", Order = 2, GroupName="ORB")]
+        [Display(Name="Mins from end", Order = 4, GroupName="General")]
         public int MinsFromEnd { get; set; } = 75;
-		
-		[NinjaScriptProperty]
-		[Display(Name="EMA Fast", Order = 3, GroupName="ORB")]
-		public int EMAFast { get; set; } = 14;
-		
-		[NinjaScriptProperty]
-		[Display(Name="EMA Slow", Order = 4, GroupName="ORB")]
-		public int EMASlow { get; set; } = 40;
-		
-		[NinjaScriptProperty]
-		[Display(Name="Min ticks outside ORB", Order = 5, GroupName="ORB")]
-		public int MinTicksOutsideOrb { get; set; } = 8;
 
         [NinjaScriptProperty]
-        [Display(Name="Runner break-even enabled", Order=10, GroupName="Runner")]
-        public bool RunnerBreakEvenEnabled { get; set; } = true;
+        [Display(Name="Enable longs", Order=5, GroupName="General")]
+        public bool EnableLongs { get; set; } = true;
 
         [NinjaScriptProperty]
-        [Display(Name="Runner trigger ticks", Order=11, GroupName="Runner")]
-        public int RunnerTriggerTicks { get; set; } = 50;
+        [Display(Name="Enable shorts", Order=6, GroupName="General")]
+        public bool EnableShorts { get; set; } = true;
 
         [NinjaScriptProperty]
-        [Display(Name="Runner plus ticks", Order=12, GroupName="Runner")]
-        public int RunnerPlusTicks { get; set; } = 8;
+        [Display(Name="Enable runner", Order=7, GroupName="General")]
+        public bool EnableRunner { get; set; } = true;
+        
+        //-- FILTERS --//
+        [NinjaScriptProperty]
+        [Display(Name="EMA Fast", Order = 1, GroupName="Filters")]
+        public int EMAFast { get; set; } = 14;
+		
+        [NinjaScriptProperty]
+        [Display(Name="EMA Slow", Order = 2, GroupName="Filters")]
+        public int EMASlow { get; set; } = 40;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Confirm bars", Order= 3, GroupName="Filters")]
+        public int ConfirmBars { get; set; } = 1;
+
+        [NinjaScriptProperty]
+        [Display(Name="Confirm body ticks", Order= 4, GroupName="Filters")]
+        public int ConfirmBodyTicks { get; set; } = 16;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Trade cooldown minutes", Order= 5, GroupName="Filters")]
+        public int TradeCooldownMinutes { get; set; } = 10;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Min ticks outside ORB", Order = 6, GroupName="Filters")]
+        public int MinTicksOutsideOrb { get; set; } = 8;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Runner pullback ticks", Order=7, GroupName="Filters")]
+        public int RunnerPullbackTicks { get; set; } = 8;
+        
+        //-- RISK --//
+        [NinjaScriptProperty]
+        [Display(Name="Max profit per trade ($)", Order=1, GroupName="Risk")]
+        public double MaxProfitPerTrade { get; set; } = 500;
+
+        [NinjaScriptProperty]
+        [Display(Name="Max loss per trade ($)", Order=2, GroupName="Risk")]
+        public double MaxLossPerTrade { get; set; } = 250;
+
+        [NinjaScriptProperty]
+        [Display(Name="Max trades per day", Order=3, GroupName = "Risk")]
+        public int MaxTradesPerDay { get; set; } = 8;
 		
 		[NinjaScriptProperty]
-		[Display(Name="Runner pullback ticks", Order=13, GroupName="Runner")]
-		public int RunnerPullbackTicks { get; set; } = 8;
+		[Display(Name="Max daily loss ($)", Order=4, GroupName = "Risk")]
+		public double MaxDailyLoss { get; set; } = 500;
+		
+		[NinjaScriptProperty]
+		[Display(Name="Max daily profit ($)", Order=5, GroupName= "Risk")]
+		public double MaxDailyProfit { get; set; } = 1500;
+		
+		//-- BREAK-EVEN --//
+		[NinjaScriptProperty]
+		[Display(Name="Primary break-even enabled", Order=1, GroupName="Break-even")]
+		public bool PrimaryBreakEvenEnabled { get; set; } = true;
 
-        // Extra (suggested) param to control output noise
-        [NinjaScriptProperty]
-        [Display(Name="Enable diagnostics", Order=13, GroupName="Diagnostics")]
-        public bool EnableDiagnostics { get; set; } = true;
-        #endregion
+		[NinjaScriptProperty]
+		[Display(Name="Primary BE trigger ticks", Order=2, GroupName="Break-even")]
+		public int PrimaryBeTriggerTicks { get; set; } = 25;
+
+		[NinjaScriptProperty]
+		[Display(Name="Primary BE plus ticks", Order=3, GroupName="Break-even")]
+		public int PrimaryBePlusTicks { get; set; } = 6;
+		
+		[NinjaScriptProperty]
+		[Display(Name="Runner break-even enabled", Order=4, GroupName="Break-even")]
+		public bool RunnerBreakEvenEnabled { get; set; } = true;
+
+		[NinjaScriptProperty]
+		[Display(Name="Runner trigger ticks", Order=5, GroupName="Break-even")]
+		public int RunnerTriggerTicks { get; set; } = 50;
+
+		[NinjaScriptProperty]
+		[Display(Name="Runner plus ticks", Order=6, GroupName="Break-even")]
+		public int RunnerPlusTicks { get; set; } = 8;
+		
 
         protected override void OnStateChange()
         {

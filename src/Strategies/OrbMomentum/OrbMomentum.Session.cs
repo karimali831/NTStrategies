@@ -46,6 +46,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             primaryDir = 0;
             primaryEntryPrice = 0;
             primarySubmitted = false;
+            primaryStopMoved = false;
+            primaryFilled = false;
             reEntryWaitPullback = false;
             reEntryDir = 0;
             lastTradeTime = Core.Globals.MinDate;
