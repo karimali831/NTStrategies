@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name  = "OrbMomentum";
-                Calculate = Calculate.OnBarClose;
+                Calculate = Calculate.OnEachTick;
                 EntriesPerDirection = 2;
 				EntryHandling = EntryHandling.UniqueEntries;
 				StopTargetHandling = StopTargetHandling.PerEntryExecution;

@@ -24,7 +24,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableDiagnostics)
                 return;
 
-            if (CurrentBar == lastLoggedBlockBar && string.Equals(reason, lastLoggedBlockReason, StringComparison.Ordinal))
+            // reset each new bar
+            if (CurrentBar != lastLoggedBlockBar)
+                lastLoggedBlockReason = null;
+
+            if (string.Equals(reason, lastLoggedBlockReason, StringComparison.Ordinal))
                 return;
 
             lastLoggedBlockBar = CurrentBar;
