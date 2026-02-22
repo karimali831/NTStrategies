@@ -58,14 +58,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				{
 					if (reEntryWaitPullback)
 					{
-						if (PullbackSatisfied(reEntryDir, out var pbFail))
+						if (RunnerPullbackTouched(reEntryDir, out var pbFail))
 						{
 							reEntryWaitPullback = false;
 							LogDiag($"Re-entry satisfied dir={(reEntryDir > 0 ? "LONG" : "SHORT")}: allow new primary");
 						}
 						else
 						{
-							LogDiag($"BLOCK: re-entry-wait ({(reEntryDir > 0 ? "LONG" : "SHORT")}): {pbFail}");
+							LogBlockOnce($"re-entry-wait ({(reEntryDir > 0 ? "LONG" : "SHORT")}): {pbFail}");
 							return;
 						}
 					}
@@ -197,45 +197,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (CurrentBar == runnerArmBar)
 		        return;
 		
-		    // Step 2: wait for a pullback (to emaFast)
+		    // Step 2: wait for a pullback (to emaFast by RunnerPullbackTicks)
 		    if (!runnerPullbackSeen)
 		    {
-		        if (primaryDir > 0)
-		        {
-		            if (Low[0] <= emaFast[0] - (Math.Max(1, RunnerPullbackTicks) * TickSize))
-		            {
-		                runnerPullbackSeen = true;
-		                LogDiag($"Runner pullback seen LONG: low={Low[0]:F2} emaFast={emaFast[0]:F2}");
-		            }
-		        }
-		        else
-		        {
-		            if (High[0] >= emaFast[0] + (Math.Max(1, RunnerPullbackTicks) * TickSize))
-		            {
-		                runnerPullbackSeen = true;
-		                LogDiag($"Runner pullback seen SHORT: high={High[0]:F2} emaFast={emaFast[0]:F2}");
-		            }
-		        }
-		
-		        return;
+			    if (RunnerPullbackTouched(primaryDir, out var pbFail))
+			    {
+				    runnerPullbackSeen = true;
+				    LogDiag(primaryDir > 0
+					    ? $"Runner pullback seen LONG: low={Low[0]:F2} emaFast={emaFast[0]:F2}"
+					    : $"Runner pullback seen SHORT: high={High[0]:F2} emaFast={emaFast[0]:F2}");
+			    }
+			    else
+			    {
+				    LogBlockOnce($"runner-wait-pullback: {pbFail}");
+			    }
+
+			    return;
 		    }
-		    
-		    // Step 3: enter on first bullish/bearish candle after pullback
-		    // if (primaryDir > 0)
-		    // {
-			   //  if (!(Close[0] > Open[0]))
-				  //   return;
-		    // }
-		    // else
-		    // {
-			   //  if (!(Close[0] < Open[0]))
-				  //   return;
-		    // }
 		
-		    // Step 3: after pullback, require confirm-bars logic (close above/below both EMAs, body ticks, etc.)
-		    if (!PullbackSatisfied(primaryDir, out var confirmFail))
+		    // Step 3: after pullback, require confirm-bars logic (bull/bear + close above/below both EMAs, min body, etc.)
+		    if (!ConfirmBarsSatisfied(primaryDir, out var confirmFail))
 		    {
-			    LogDiag($"BLOCK: runner-confirm: {confirmFail}");
+			    LogBlockOnce($"runner-confirm: {confirmFail}");
 			    return;
 		    }
 		

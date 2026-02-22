@@ -91,6 +91,7 @@
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Core.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Diag.cs" />
+        <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Drawing.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Entry.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.EntryConditions.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Filters.cs" />

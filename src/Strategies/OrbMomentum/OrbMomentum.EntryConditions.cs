@@ -101,6 +101,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     failReason = "long-block: emaFast-not-above-emaSlow";
                     return 0;
                 }
+
+                // must be at EMA zone (no chasing)
+                if (!EntryAtEmaFast(+1, out var emaFail))
+                {
+                    failReason = $"long-block: {emaFail}";
+                    return 0;
+                }
+
                 failReason = "ok";
                 return +1;
             }
@@ -112,6 +120,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     failReason = "short-block: emaFast-not-below-emaSlow";
                     return 0;
                 }
+
+                // must be at EMA zone (no chasing)
+                if (!EntryAtEmaFast(-1, out var emaFail))
+                {
+                    failReason = $"short-block: {emaFail}";
+                    return 0;
+                }
+
                 failReason = "ok";
                 return -1;
             }
@@ -120,8 +136,74 @@ namespace NinjaTrader.NinjaScript.Strategies
             failReason = $"not-outside-orb (outL={outLongTicks:F1}t outS={outShortTicks:F1}t need={MinTicksOutsideOrb}t)";
             return 0;
         }
+        
+        private bool EntryAtEmaFast(int dir, out string failReason)
+        {
+            failReason = "ok";
+
+            var proxTicks = Math.Max(0, EntryEmaProximityTicks);
+            if (proxTicks <= 0)
+                return true;
+
+            // distance from close to emaFast
+            var distTicks = Math.Abs(Close[0] - emaFast[0]) / TickSize;
+
+            if (distTicks > proxTicks)
+            {
+                failReason = $"entry-too-far-from-emaFast (dist={distTicks:F1}t > {proxTicks}t)";
+                return false;
+            }
+
+            // also require the bar actually "gets to" the EMA area (touch-ish)
+            if (dir > 0)
+            {
+                if (Low[0] > emaFast[0] + (proxTicks * TickSize))
+                {
+                    failReason = $"entry-no-touch-zone-long (low>{proxTicks}t above emaFast)";
+                    return false;
+                }
+            }
+            else if (dir < 0)
+            {
+                if (High[0] < emaFast[0] - (proxTicks * TickSize))
+                {
+                    failReason = $"entry-no-touch-zone-short (high<{proxTicks}t below emaFast)";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        
+        private bool RunnerPullbackTouched(int dir, out string failReason)
+        {
+            failReason = "ok";
+
+            var pbTicks = Math.Max(1, RunnerPullbackTicks);
+
+            if (dir > 0)
+            {
+                if (Low[0] <= emaFast[0] - (pbTicks * TickSize))
+                    return true;
+
+                failReason = $"runner-pullback-not-deep-enough (low not <= emaFast-{pbTicks}t)";
+                return false;
+            }
+
+            if (dir < 0)
+            {
+                if (High[0] >= emaFast[0] + (pbTicks * TickSize))
+                    return true;
+
+                failReason = $"runner-pullback-not-deep-enough (high not >= emaFast+{pbTicks}t)";
+                return false;
+            }
+
+            failReason = "dir=0";
+            return false;
+        }
 		
-        private bool PullbackSatisfied(int dir, out string failReason)
+        private bool ConfirmBarsSatisfied(int dir, out string failReason)
         {
             failReason = "unknown";
 
