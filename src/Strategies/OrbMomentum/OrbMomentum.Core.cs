@@ -113,7 +113,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MinTicksOutsideOrb { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Runner pullback ticks", Order=7, GroupName="02-Filters")]
+        [Display(Name="Entry EMA proximity ticks", Order=7, GroupName="Filters")]
+        public int EntryEmaProximityTicks { get; set; } = 8;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Runner pullback ticks", Order=8, GroupName="02-Filters")]
         public int RunnerPullbackTicks { get; set; } = 8;
         
         //-- RISK --//
@@ -182,6 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 emaSlow = EMA(EMASlow);
                 adx     = ADX(14);
 
+                ConfigureEmaVisuals();
                 ResetDailyState();
             }
         }
