@@ -56,31 +56,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 			    if (!blockPrimary)
 				{
-				    if (reEntryWaitPullback)
-				    {
-				        if (PullbackSatisfied(reEntryDir))
-				        {
-				            reEntryWaitPullback = false;
-				            LogDiag($"Re-entry pullback satisfied dir={(reEntryDir > 0 ? "LONG" : "SHORT")}: allow new primary");
-				        }
-				        else
-				        {
-				            // still waiting for pullback; do not take a new primary yet
-				            return;
-				        }
-				    }
+					if (reEntryWaitPullback)
+					{
+						if (PullbackSatisfied(reEntryDir, out var pbFail))
+						{
+							reEntryWaitPullback = false;
+							LogDiag($"Re-entry satisfied dir={(reEntryDir > 0 ? "LONG" : "SHORT")}: allow new primary");
+						}
+						else
+						{
+							LogDiag($"BLOCK: re-entry-wait ({(reEntryDir > 0 ? "LONG" : "SHORT")}): {pbFail}");
+							return;
+						}
+					}
 					
 					if (TradeCooldownMinutes > 0 && lastTradeTime > Core.Globals.MinDate)
-				    {
-				        var minsSinceTrade = (GetEtTime() - lastTradeTime).TotalMinutes;
-				        if (minsSinceTrade < TradeCooldownMinutes)
-				        {
-				            LogDiag($"BLOCK: cooldown active ({minsSinceTrade:F1}m < {TradeCooldownMinutes}m)");
-				            return;
-				        }
-				    }
+					{
+						var minsSinceTrade = (GetEtTime() - lastTradeTime).TotalMinutes;
+						if (minsSinceTrade < TradeCooldownMinutes)
+						{
+							LogBlockOnce($"cooldown ({minsSinceTrade:F1}m < {TradeCooldownMinutes}m)");
+							return;
+						}
+					}
 				
-				    TryEnterPrimary();
+					if (!TryEnterPrimary(out var primaryFail) && primaryFail != "none")
+						LogBlockOnce(primaryFail);
 				}
 			
 			    return;
@@ -91,21 +92,35 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
 
-        private void TryEnterPrimary()
+        private bool TryEnterPrimary(out string failReason)
         {
-            if (tradesToday >= MaxTradesPerDay)
-                return;
+	        failReason = "none";
+	        
+	        if (tradesToday >= MaxTradesPerDay)
+	        {
+		        failReason = $"max-trades ({tradesToday} >= {MaxTradesPerDay})";
+		        return false;
+	        }
 
-            if (primarySubmitted)
-                return;
+	        if (primarySubmitted)
+	        {
+		        failReason = "primary-already-submitted";
+		        return false;
+	        }
 
-            var now = GetEtTime();
-            if (!IsInTradeWindow(now))
-                return;
+	        var now = GetEtTime();
+	        if (!IsInTradeWindow(now))
+	        {
+		        failReason = "outside-trade-window";
+		        return false;
+	        }
 
-            var sig = GetEntrySignal();
-            if (sig == 0)
-                return;
+	        var sig = GetEntrySignal(out var sigFail);
+	        if (sig == 0)
+	        {
+		        failReason = sigFail;
+		        return false;
+	        }
 
             // Risk in ticks derived from dollars
             var lossTicks   = DollarsToTicks(MaxLossPerTrade);
@@ -113,8 +128,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (lossTicks < 1 || profitTicks < 1)
             {
-                LogDiag($"BLOCK: bad tick conversion lossTicks={lossTicks} profitTicks={profitTicks}");
-                return;
+	            failReason = $"bad-tick-conversion (lossTicks={lossTicks} profitTicks={profitTicks})";
+	            return false;
             }
 
             if (sig > 0 && EnableLongs)
@@ -128,6 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 primaryDir        = +1;
 
                 LogDiag($"ENTER primary LONG @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+                return true;
             }
             else if (sig < 0 && EnableShorts)
             {
@@ -140,7 +156,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 primaryDir        = -1;
 
                 LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+                return true;
             }
+            
+            failReason = sig > 0 ? "longs-disabled" : "shorts-disabled";
+            return false;
         }
 
         private void TryEnterRunner()
@@ -199,17 +219,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		        return;
 		    }
-		
+		    
 		    // Step 3: enter on first bullish/bearish candle after pullback
-		    if (primaryDir > 0)
+		    // if (primaryDir > 0)
+		    // {
+			   //  if (!(Close[0] > Open[0]))
+				  //   return;
+		    // }
+		    // else
+		    // {
+			   //  if (!(Close[0] < Open[0]))
+				  //   return;
+		    // }
+		
+		    // Step 3: after pullback, require confirm-bars logic (close above/below both EMAs, body ticks, etc.)
+		    if (!PullbackSatisfied(primaryDir, out var confirmFail))
 		    {
-		        if (!(Close[0] > Open[0]))
-		            return;
-		    }
-		    else
-		    {
-		        if (!(Close[0] < Open[0]))
-		            return;
+			    LogDiag($"BLOCK: runner-confirm: {confirmFail}");
+			    return;
 		    }
 		
 		    // Runner risk rules requested:

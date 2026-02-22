@@ -18,5 +18,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Print($"[ORB] {Time[0]:yyyy-MM-dd HH:mm:ss} | {Instrument.FullName} | {msg}");
         }
+        
+        private void LogBlockOnce(string reason)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            if (CurrentBar == lastLoggedBlockBar && string.Equals(reason, lastLoggedBlockReason, StringComparison.Ordinal))
+                return;
+
+            lastLoggedBlockBar = CurrentBar;
+            lastLoggedBlockReason = reason;
+
+            LogDiag($"BLOCK: {reason}");
+        }
     }
 }

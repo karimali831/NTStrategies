@@ -45,10 +45,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double runnerEntryPrice;
 		
 		// Logging 
-		private int lastLoggedSigBar;
+		private int    lastLoggedSigBar;
 		private double lastLoggedOrHigh;
 		private double lastLoggedOrLow;
 		private int    lastLoggedOrbBar;
+		private int    lastLoggedBlockBar;
+		private string lastLoggedBlockReason;
 
         // Constants
         private const string SigPrimaryLong  = "ORB1L";

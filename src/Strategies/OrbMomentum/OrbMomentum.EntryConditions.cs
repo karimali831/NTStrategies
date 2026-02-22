@@ -65,12 +65,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
         // Returns: +1 long breakout, -1 short breakout, 0 none
-        private int GetEntrySignal()
+        private int GetEntrySignal(out string failReason)
         {
-            // Basic confirmation set (simple + effective):
-            // - Break OR with 1 tick buffer
-            // - EMA fast vs slow trend alignment
-            // - ADX threshold (avoid dead chop)
+            failReason = "no-signal";
+
             var dist = Math.Max(1, MinTicksOutsideOrb) * TickSize;
 
             var longBreak  = Close[0] >= orHigh + dist;
@@ -80,71 +78,123 @@ namespace NinjaTrader.NinjaScript.Strategies
             var trendDown = emaFast[0] < emaSlow[0];
 
             var adxOk = adx[0] >= 18;
+
             var outLongTicks  = (Close[0] - orHigh) / TickSize;
             var outShortTicks = (orLow - Close[0]) / TickSize;
-	
+
             if (EnableDiagnostics && CurrentBar != lastLoggedSigBar)
             {
                 LogDiag($"SIGCHK: close={Close[0]:F2} orH={orHigh:F2} orL={orLow:F2} outL={outLongTicks:F1}t outS={outShortTicks:F1}t emaF={emaFast[0]:F2} emaS={emaSlow[0]:F2} adx={adx[0]:F2}");
                 lastLoggedSigBar = CurrentBar;
             }
 
-            if (longBreak && trendUp && adxOk)
+            if (!adxOk)
+            {
+                failReason = $"adx-too-low ({adx[0]:F1} < 18)";
+                return 0;
+            }
+
+            if (longBreak)
+            {
+                if (!trendUp)
+                {
+                    failReason = "long-block: emaFast-not-above-emaSlow";
+                    return 0;
+                }
+                failReason = "ok";
                 return +1;
+            }
 
-            if (shortBreak && trendDown && adxOk)
+            if (shortBreak)
+            {
+                if (!trendDown)
+                {
+                    failReason = "short-block: emaFast-not-below-emaSlow";
+                    return 0;
+                }
+                failReason = "ok";
                 return -1;
+            }
 
+            // not outside OR
+            failReason = $"not-outside-orb (outL={outLongTicks:F1}t outS={outShortTicks:F1}t need={MinTicksOutsideOrb}t)";
             return 0;
         }
 		
-        private bool PullbackSatisfied(int dir)
+        private bool PullbackSatisfied(int dir, out string failReason)
         {
-            // This is used as your "re-entry pullback satisfied" gate.
-            // Now it means: we only allow a new primary if trend confirm is met.
+            failReason = "unknown";
 
             var bars = Math.Max(1, ConfirmBars);
-
             if (CurrentBar < bars)
+            {
+                failReason = $"insufficient-bars (need {bars})";
                 return false;
+            }
 
-            // EMA structure must be aligned on the most recent closed bar
+            // EMA structure on most recent bar
             if (dir > 0)
             {
                 if (!(emaFast[0] > emaSlow[0]))
+                {
+                    failReason = "ema-structure-fail (need emaFast > emaSlow)";
                     return false;
+                }
             }
             else if (dir < 0)
             {
                 if (!(emaFast[0] < emaSlow[0]))
+                {
+                    failReason = "ema-structure-fail (need emaFast < emaSlow)";
                     return false;
+                }
             }
             else
+            {
+                failReason = "dir=0";
                 return true;
+            }
 
             var minBodyTicks = Math.Max(0, ConfirmBodyTicks);
 
             for (var i = 0; i < bars; i++)
             {
                 var bodyTicks = Math.Abs(Close[i] - Open[i]) / TickSize;
-
                 if (bodyTicks < minBodyTicks)
+                {
+                    failReason = $"confirm-body-too-small (i={i} body={bodyTicks:F1}t < {minBodyTicks}t)";
                     return false;
+                }
 
                 if (dir > 0)
                 {
-                    // bullish + close above both EMAs
-                    if (!(Close[i] > Open[i] && Close[i] > emaFast[i] && Close[i] > emaSlow[i]))
+                    if (!(Close[i] > Open[i]))
+                    {
+                        failReason = $"confirm-not-bullish (i={i})";
                         return false;
+                    }
+                    if (!(Close[i] > emaFast[i] && Close[i] > emaSlow[i]))
+                    {
+                        failReason = $"confirm-close-not-above-both-emas (i={i})";
+                        return false;
+                    }
                 }
                 else
                 {
-                    // bearish + close below both EMAs
-                    if (!(Close[i] < Open[i] && Close[i] < emaFast[i] && Close[i] < emaSlow[i]))
+                    if (!(Close[i] < Open[i]))
+                    {
+                        failReason = $"confirm-not-bearish (i={i})";
                         return false;
+                    }
+                    if (!(Close[i] < emaFast[i] && Close[i] < emaSlow[i]))
+                    {
+                        failReason = $"confirm-close-not-below-both-emas (i={i})";
+                        return false;
+                    }
                 }
             }
 
+            failReason = "ok";
             return true;
         }
     }
