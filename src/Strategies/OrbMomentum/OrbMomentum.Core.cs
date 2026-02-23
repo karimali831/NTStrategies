@@ -182,9 +182,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
-                emaFast = EMA(EMAFast);
-                emaSlow = EMA(EMASlow);
-                adx     = ADX(14);
+	            emaFast = EMA(BarsArray[0], EMAFast);
+	            emaSlow = EMA(BarsArray[0], EMASlow);
+	            adx     = ADX(BarsArray[0], 14);
 
                 ConfigureEmaVisuals();
                 ResetDailyState();
