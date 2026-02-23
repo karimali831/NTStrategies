@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var trendUp   = emaFast[0] > emaSlow[0];
             var trendDown = emaFast[0] < emaSlow[0];
 
-            var adxOk = adx[0] >= 18;
+            var adxOk = adx[0] >= 15;
 
             var outLongTicks  = (Close[0] - orHigh) / TickSize;
             var outShortTicks = (orLow - Close[0]) / TickSize;
@@ -156,7 +156,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var distTicks = Math.Abs(refPrice - emaFast[0]) / TickSize;
 
-            LogDiag($"EMA CHECK: dir={dir} ref={refPrice:F2} emaFast={emaFast[0]:F2} dist={distTicks:F1}t prox={proxTicks}t tickSize={TickSize}");
+            // LogDiag($"EMA CHECK: dir={dir} ref={refPrice:F2} emaFast={emaFast[0]:F2} dist={distTicks:F1}t prox={proxTicks}t tickSize={TickSize}");
 
             if (distTicks > proxTicks)
             {

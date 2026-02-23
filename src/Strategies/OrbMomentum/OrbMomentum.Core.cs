@@ -113,7 +113,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MinTicksOutsideOrb { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Entry EMA proximity ticks", Order=7, GroupName="Filters")]
+        [Display(Name="Entry EMA proximity ticks", Order=7, GroupName="02-Filters")]
         public int EntryEmaProximityTicks { get; set; } = 8;
         
         [NinjaScriptProperty]
