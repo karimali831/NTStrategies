@@ -81,7 +81,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
                 touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
 
-            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t prox={EntryEmaProximityTicks}t earlyRange={EarlyEntryRangeTicks}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}");
+            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t proxMin={EntryEmaMinProximityTicks}t proxMax={EntryEmaMaxProximityTicks}t earlyRange={EarlyEntryRangeTicks}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}");
         }
     }
 }

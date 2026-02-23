@@ -115,27 +115,31 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MinTicksOutsideOrb { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Entry EMA proximity ticks", Order=7, GroupName="02-Filters")]
-        public int EntryEmaProximityTicks { get; set; } = 8;
+        [Display(Name="Entry EMA min proximity ticks", Order=7, GroupName="02-Filters")]
+        public int EntryEmaMinProximityTicks { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Runner pullback ticks", Order=8, GroupName="02-Filters")]
+        [Display(Name="Entry EMA max proximity ticks", Order=8, GroupName="02-Filters")]
+        public int EntryEmaMaxProximityTicks { get; set; } = 30;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Runner pullback ticks", Order=9, GroupName="02-Filters")]
         public int RunnerPullbackTicks { get; set; } = 8;
         
         [NinjaScriptProperty]
-        [Display(Name="Indecision wick diff ticks", Order=9, GroupName="02-Filters")]
+        [Display(Name="Indecision wick diff ticks", Order=0, GroupName="02-Filters")]
         public int IndecisionWickDiffTicks { get; set; } = 6;
 
         [NinjaScriptProperty]
-        [Display(Name="Rejection wick min ticks", Order=10, GroupName="02-Filters")]
+        [Display(Name="Rejection wick min ticks", Order=11, GroupName="02-Filters")]
         public int RejectionWickMinTicks { get; set; } = 24;
         
         [NinjaScriptProperty]
-        [Display(Name="Early entry range ticks", Order=11, GroupName="02-Filters")]
+        [Display(Name="Early entry range ticks", Order=12, GroupName="02-Filters")]
         public int EarlyEntryRangeTicks { get; set; } = 40;
         
         [NinjaScriptProperty]
-        [Display(Name="ADX Min", Order=12, GroupName="02-Filters")]
+        [Display(Name="ADX Min", Order=13, GroupName="02-Filters")]
         public int ADXMin { get; set; } = 15;
         
         //-- RISK --//

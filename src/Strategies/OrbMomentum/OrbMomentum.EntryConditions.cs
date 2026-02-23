@@ -149,55 +149,60 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             failReason = "ok";
 
-            var proxTicks = Math.Max(0, EntryEmaProximityTicks);
-            if (proxTicks <= 0)
+            var minTicks = Math.Max(0, EntryEmaMinProximityTicks);
+            var maxTicks = Math.Max(0, EntryEmaMaxProximityTicks);
+
+            // if both disabled, skip filter
+            if (minTicks <= 0 && maxTicks <= 0)
                 return true;
+
+            // safety: if user accidentally flips them
+            if (maxTicks > 0 && minTicks > maxTicks)
+            {
+                (minTicks, maxTicks) = (maxTicks, minTicks);
+            }
 
             var ema = emaFast[0];
 
-            // Wick-aware touch distance:
-            // 0 if EMA is inside bar range, else min distance to range edge
+            // Wick-aware touch distance (you already compute this)
             double touchDistTicks;
             if (Low[0] <= ema && ema <= High[0])
-            {
                 touchDistTicks = 0.0;
-            }
             else
-            {
-                touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
-            }
+                touchDistTicks = Math.Min(
+                    Math.Abs(High[0] - ema),
+                    Math.Abs(Low[0] - ema)
+                ) / TickSize;
 
-            if (EnableDiagnostics)
-                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t prox={proxTicks}t", oncePerBar: false);
-            
-            if (touchDistTicks > proxTicks)
+            // enforce minimum distance (avoid entries sitting right on EMA)
+            if (minTicks > 0 && touchDistTicks < minTicks)
             {
-                failReason = $"entry-too-far-from-emaFast (touchDist={touchDistTicks:F1}t > {proxTicks}t)";
+                failReason = $"entry-too-close-to-emaFast (touchDist={touchDistTicks:F1}t < {minTicks}t)";
                 return false;
             }
 
-            // Also ensure price actually reached the EMA zone on the correct side
-            var prox = proxTicks * TickSize;
-
-            if (dir > 0)
+            // enforce maximum distance (avoid chasing)
+            if (maxTicks > 0 && touchDistTicks > maxTicks)
             {
-                // For longs, LOW must be within +prox above EMA (or below it)
-                if (Low[0] > ema + prox)
-                {
-                    failReason = $"entry-no-touch-zone-long (low>{proxTicks}t above emaFast)";
-                    return false;
-                }
-            }
-            else if (dir < 0)
-            {
-                // For shorts, HIGH must be within -prox below EMA (or above it)
-                if (High[0] < ema - prox)
-                {
-                    failReason = $"entry-no-touch-zone-short (high<{proxTicks}t below emaFast)";
-                    return false;
-                }
+                failReason = $"entry-too-far-from-emaFast (touchDist={touchDistTicks:F1}t > {maxTicks}t)";
+                return false;
             }
 
+            if (EnableDiagnostics)
+                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t min={minTicks}t max={maxTicks}t", oncePerBar: true);
+
+            if (dir > 0 && High[0] < ema)
+            {
+                failReason = "entry-wrong-side-long (bar entirely below emaFast)";
+                return false;
+            }
+
+            if (dir < 0 && Low[0] > ema)
+            {
+                failReason = "entry-wrong-side-short (bar entirely above emaFast)";
+                return false;
+            }
+            
             return true;
         }
         
