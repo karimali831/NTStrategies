@@ -191,18 +191,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (EnableDiagnostics)
                 LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t min={minTicks}t max={maxTicks}t", oncePerBar: true);
 
-            if (dir > 0 && High[0] < ema)
-            {
-                failReason = "entry-wrong-side-long (bar entirely below emaFast)";
-                return false;
-            }
-
-            if (dir < 0 && Low[0] > ema)
-            {
-                failReason = "entry-wrong-side-short (bar entirely above emaFast)";
-                return false;
-            }
-            
+            // if (dir > 0 && High[0] < ema)
+            // {
+            //     failReason = "entry-wrong-side-long (bar entirely below emaFast)";
+            //     return false;
+            // }
+            //
+            // if (dir < 0 && Low[0] > ema)
+            // {
+            //     failReason = "entry-wrong-side-short (bar entirely above emaFast)";
+            //     return false;
+            // }
+            //
             return true;
         }
         
