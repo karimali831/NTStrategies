@@ -66,6 +66,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastLoggedOrbBar = -1;
             lastLoggedBlockBar = -1;
             lastLoggedBlockReason = null;
+            lastLoggedEmaDistBar = -1;
+            lastDiagBar = -1;
 			
             startOfDayCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
         }

@@ -11,12 +11,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class OrbMomentum : Strategy
     {
-        private void LogDiag(string msg)
+        private void LogDiag(string msg, bool oncePerBar = true)
         {
             if (!EnableDiagnostics)
                 return;
 
-            Print($"[ORB] {Time[0]:yyyy-MM-dd HH:mm:ss} | {Instrument.FullName} | {msg}");
+            if (oncePerBar && !ShouldLogThisBar())
+                return;
+
+            Print($"[ORB] {Time[0]:yyyy-MM-dd HH:mm:ss} | {Instrument?.FullName} | {msg}");
         }
         
         private void LogBlockOnce(string reason)
@@ -34,7 +37,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastLoggedBlockBar = CurrentBar;
             lastLoggedBlockReason = reason;
 
-            LogDiag($"BLOCK: {reason}");
+            LogDiag($"BLOCK: {reason}", false);
+        }
+        
+        private bool ShouldLogThisBar()
+        {
+            if (CurrentBar == lastDiagBar)
+                return false;
+
+            lastDiagBar = CurrentBar;
+            return true;
         }
         
         private void LogEmaDistanceEveryBar()
@@ -62,7 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
                 touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
 
-            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}");
+            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}", false);
         }
     }
 }
