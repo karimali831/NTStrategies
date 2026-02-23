@@ -220,9 +220,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             failReason = "unknown";
 
             var bars = Math.Max(1, ConfirmBars);
-            if (CurrentBar < bars)
+            if (CurrentBar < bars - 1)
             {
-                failReason = $"insufficient-bars (need {bars})";
+                failReason = $"insufficient-bars (need {bars} confirm bars)";
                 return false;
             }
 
@@ -254,54 +254,54 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             for (var j = 0; j < bars; j++)
             {
-                var i = 1 + j;
-
-                if (CurrentBar < i)
+                if (CurrentBar <= j)
                 {
-                    failReason = $"insufficient-bars (need barsAgo={i})";
+                    failReason = $"insufficient-bars (need barsAgo={j})";
                     return false;
                 }
 
                 // use i instead of j from here down
-                if (IsIndecisionCandle(i, out var topW, out var botW))
+                if (IsIndecisionCandle(j, out var topW, out var botW))
                 {
-                    failReason = $"confirm-indecision (i={i} topW={topW:F1}t botW={botW:F1}t diff<={IndecisionWickDiffTicks}t)";
+                    failReason = $"confirm-indecision (i={j} topW={topW:F1}t botW={botW:F1}t diff<={IndecisionWickDiffTicks}t)";
                     return false;
                 }
 
-                var bodyTicks = Math.Abs(Close[i] - Open[i]) / TickSize;
+                var bodyTicks = Math.Abs(Close[j] - Open[j]) / TickSize;
                 if (bodyTicks < minBodyTicks)
                 {
-                    if (!IsRejectionCandle(dir, i, out var rejWick))
+                    if (!IsRejectionCandle(dir, j, out var rejWick))
                     {
-                        failReason = $"confirm-body-too-small (i={i} body={bodyTicks:F1}t < {minBodyTicks}t)";
+                        failReason = $"confirm-body-too-small (i={j} body={bodyTicks:F1}t < {minBodyTicks}t)";
                         return false;
                     }
                 }
+                
+                var ej = Math.Max(1, j);
 
                 if (dir > 0)
                 {
-                    if (!(Close[i] > Open[i]))
+                    if (!(Close[j] > Open[j]))
                     {
-                        failReason = $"confirm-not-bullish (i={i})";
+                        failReason = $"confirm-not-bullish (i={j})";
                         return false;
                     }
-                    if (!(Close[i] > emaFast[i] && Close[i] > emaSlow[i]))
+                    if (!(Close[j] > emaFast[ej] && Close[j] > emaSlow[ej]))
                     {
-                        failReason = $"confirm-close-not-above-both-emas (i={i})";
+                        failReason = $"confirm-close-not-above-both-emas (i={j})";
                         return false;
                     }
                 }
                 else
                 {
-                    if (!(Close[i] < Open[i]))
+                    if (!(Close[j] < Open[j]))
                     {
-                        failReason = $"confirm-not-bearish (i={i})";
+                        failReason = $"confirm-not-bearish (i={j})";
                         return false;
                     }
-                    if (!(Close[i] < emaFast[i] && Close[i] < emaSlow[i]))
+                    if (!(Close[j] < emaFast[ej] && Close[j] < emaSlow[ej]))
                     {
-                        failReason = $"confirm-close-not-below-both-emas (i={i})";
+                        failReason = $"confirm-close-not-below-both-emas (i={j})";
                         return false;
                     }
                 }

@@ -31,13 +31,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar != lastLoggedBlockBar)
                 lastLoggedBlockReason = null;
 
-            if (string.Equals(reason, lastLoggedBlockReason, StringComparison.Ordinal))
+            // Dedupe by a stable "key" (strip dynamic values in parentheses)
+            var key = reason;
+            var idx = reason.IndexOf(" (", StringComparison.Ordinal);
+            if (idx > 0)
+                key = reason.Substring(0, idx);
+
+            if (string.Equals(key, lastLoggedBlockReason, StringComparison.Ordinal))
                 return;
 
             lastLoggedBlockBar = CurrentBar;
-            lastLoggedBlockReason = reason;
+            lastLoggedBlockReason = key;
 
-            LogDiag($"BLOCK: {reason}", false);
+            // Print full reason once (with details)
+            LogDiag($"BLOCK: {reason}");
         }
         
         private bool ShouldLogThisBar()
