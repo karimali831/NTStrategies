@@ -139,39 +139,29 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private bool EntryAtEmaFast(int dir, out string failReason)
         {
-            LogDiag($"EMA CHECK: close={Close[0]:F2} emaFast={emaFast[0]:F2} diff={(Close[0]-emaFast[0]):F2} tickSize={TickSize}");
-            
             failReason = "ok";
 
             var proxTicks = Math.Max(0, EntryEmaProximityTicks);
             if (proxTicks <= 0)
                 return true;
 
-            // distance from close to emaFast
-            var distTicks = Math.Abs(Close[0] - emaFast[0]) / TickSize;
+            // Use wick-touch distance (NOT close distance)
+            double refPrice;
+            if (dir > 0)
+                refPrice = Low[0];        // long: require the bar's LOW to come into the EMA zone
+            else if (dir < 0)
+                refPrice = High[0];       // short: require the bar's HIGH to come into the EMA zone
+            else
+                refPrice = Close[0];
+
+            var distTicks = Math.Abs(refPrice - emaFast[0]) / TickSize;
+
+            LogDiag($"EMA CHECK: dir={dir} ref={refPrice:F2} emaFast={emaFast[0]:F2} dist={distTicks:F1}t prox={proxTicks}t tickSize={TickSize}");
 
             if (distTicks > proxTicks)
             {
-                failReason = $"entry-too-far-from-emaFast (dist={distTicks:F1}t > {proxTicks}t)";
+                failReason = $"entry-too-far-from-emaFast (touchDist={distTicks:F1}t > {proxTicks}t)";
                 return false;
-            }
-
-            // also require the bar actually "gets to" the EMA area (touch-ish)
-            if (dir > 0)
-            {
-                if (Low[0] > emaFast[0] + (proxTicks * TickSize))
-                {
-                    failReason = $"entry-no-touch-zone-long (low>{proxTicks}t above emaFast)";
-                    return false;
-                }
-            }
-            else if (dir < 0)
-            {
-                if (High[0] < emaFast[0] - (proxTicks * TickSize))
-                {
-                    failReason = $"entry-no-touch-zone-short (high<{proxTicks}t below emaFast)";
-                    return false;
-                }
             }
 
             return true;
