@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastLoggedBlockReason = key;
 
             // Print full reason once (with details)
-            LogDiag($"BLOCK: {reason}");
+            LogDiag($"BLOCK: {reason}", oncePerBar: false);
         }
         
         private bool ShouldLogThisBar()
@@ -81,7 +81,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
                 touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
 
-            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}", false);
+            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t prox={EntryEmaProximityTicks}t earlyRange={EarlyEntryRangeTicks}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}");
         }
     }
 }

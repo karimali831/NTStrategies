@@ -179,14 +179,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SetStopLoss(SigPrimaryLong, CalculationMode.Ticks, lossTicks, false);
                 SetProfitTarget(SigPrimaryLong, CalculationMode.Ticks, profitTicks);
 
-                LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK");
+                LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK", oncePerBar: false);
 
                 EnterLong(Contracts, SigPrimaryLong);
 
                 primarySubmitted  = true;
                 primaryDir        = +1;
 
-                LogDiag($"ENTER primary LONG @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+                LogDiag($"ENTER primary LONG @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}", oncePerBar: false);
 
 				// Submit runner immediately (same bar) with its own stop/target
                 if (EnableRunner && !runnerSubmitted && tradesToday < MaxTradesPerDay)
@@ -218,14 +218,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 	            SetStopLoss(SigPrimaryShort, CalculationMode.Ticks, lossTicks, false);
 	            SetProfitTarget(SigPrimaryShort, CalculationMode.Ticks, profitTicks);
 
-	            LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK");
+	            LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK", oncePerBar: false);
 
 	            EnterShort(Contracts, SigPrimaryShort);
 
 	            primarySubmitted  = true;
 	            primaryDir        = -1;
 
-	            LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+	            LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}", oncePerBar: false);
 
 				// Submit runner immediately (same bar) with its own stop/target
 	            if (EnableRunner && !runnerSubmitted && tradesToday < MaxTradesPerDay)

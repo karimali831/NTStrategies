@@ -147,15 +147,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var ema = emaFast[0];
 
-            // Use the wick-side that matters:
-            // - Longs: distance from LOW to EMA (lower wick tag)
-            // - Shorts: distance from HIGH to EMA (upper wick tag)
-            var touchPrice = dir > 0 ? Low[0] : High[0];
-            var touchDistTicks = Math.Abs(touchPrice - ema) / TickSize;
+            // Wick-aware touch distance:
+            // 0 if EMA is inside bar range, else min distance to range edge
+            double touchDistTicks;
+            if (Low[0] <= ema && ema <= High[0])
+            {
+                touchDistTicks = 0.0;
+            }
+            else
+            {
+                touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
+            }
 
             if (EnableDiagnostics)
-                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t prox={proxTicks}t");
-
+                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t prox={proxTicks}t", oncePerBar: false);
+            
             if (touchDistTicks > proxTicks)
             {
                 failReason = $"entry-too-far-from-emaFast (touchDist={touchDistTicks:F1}t > {proxTicks}t)";
