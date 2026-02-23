@@ -139,6 +139,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private bool EntryAtEmaFast(int dir, out string failReason)
         {
+            LogDiag($"EMA CHECK: close={Close[0]:F2} emaFast={emaFast[0]:F2} diff={(Close[0]-emaFast[0]):F2} tickSize={TickSize}");
+            
             failReason = "ok";
 
             var proxTicks = Math.Max(0, EntryEmaProximityTicks);
