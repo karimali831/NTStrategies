@@ -134,6 +134,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Early entry range ticks", Order=11, GroupName="02-Filters")]
         public int EarlyEntryRangeTicks { get; set; } = 40;
         
+        [NinjaScriptProperty]
+        [Display(Name="ADX Min", Order=12, GroupName="02-Filters")]
+        public int ADXMin { get; set; } = 15;
+        
         //-- RISK --//
         [NinjaScriptProperty]
         [Display(Name="Max profit per trade ($)", Order=1, GroupName="03-Risk")]

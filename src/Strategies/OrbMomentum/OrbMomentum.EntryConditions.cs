@@ -71,16 +71,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var dist = Math.Max(1, MinTicksOutsideOrb) * TickSize;
 
-            var longBreak  = Close[0] >= orHigh + dist;
-            var shortBreak = Close[0] <= orLow  - dist;
+            var longBreak  = High[0] >= orHigh + dist;
+            var shortBreak = Low[0]  <= orLow  - dist;
 
             var trendUp   = emaFast[0] > emaSlow[0];
             var trendDown = emaFast[0] < emaSlow[0];
 
-            var adxOk = adx[0] >= 15;
+            var adxOk = adx[0] >= ADXMin;
 
             var outLongTicks  = (Close[0] - orHigh) / TickSize;
             var outShortTicks = (orLow - Close[0]) / TickSize;
+            
+            if (longBreak && shortBreak)
+            {
+                if (outShortTicks > outLongTicks)
+                    longBreak = false;
+                else
+                    shortBreak = false;
+            }
 
             if (EnableDiagnostics && CurrentBar != lastLoggedSigBar)
             {
@@ -90,7 +98,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!adxOk)
             {
-                failReason = $"adx-too-low ({adx[0]:F1} < 18)";
+                failReason = $"adx-too-low ({adx[0]:F1} < {ADXMin})";
                 return 0;
             }
 
