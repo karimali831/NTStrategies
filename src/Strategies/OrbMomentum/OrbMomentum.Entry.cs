@@ -84,12 +84,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					if (!TryEnterPrimary(out var primaryFail) && primaryFail != "none")
 						LogBlockOnce(primaryFail);
 				}
-			
-			    return;
 			}
 
-            // If in position, runner may still be allowed
-            TryEnterRunner();
+			// Runner now submits with primary (no separate runner entry sequencing)
         }
         
 
@@ -100,6 +97,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 	        if (tradesToday >= MaxTradesPerDay)
 	        {
 		        failReason = $"max-trades ({tradesToday} >= {MaxTradesPerDay})";
+		        return false;
+	        }
+	        
+	        var curRangeTicks = (High[0] - Low[0]) / TickSize;
+	        if (curRangeTicks < Math.Max(1, EarlyEntryRangeTicks))
+	        {
+		        failReason = $"early-entry-wait (curRange={curRangeTicks:F1}t < {EarlyEntryRangeTicks}t)";
 		        return false;
 	        }
 
@@ -142,6 +146,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 	            failReason = $"bad-tick-conversion (lossTicks={lossTicks} profitTicks={profitTicks})";
 	            return false;
             }
+            
+            var moveTicks = Math.Abs(Close[0] - Open[0]) / TickSize;
+
+            if (moveTicks < Math.Max(1, EarlyEntryRangeTicks))
+            {
+	            failReason = $"early-entry-wait (move={moveTicks:F1}t < {EarlyEntryRangeTicks}t)";
+	            return false;
+            }
+
+            // Directional check WITHOUT waiting for close:
+            if (sig > 0)
+            {
+	            if (Close[0] <= Open[0])
+	            {
+		            failReason = "early-entry-wait (current-bar-not-green-yet)";
+		            return false;
+	            }
+            }
+            else if (sig < 0)
+            {
+	            if (Close[0] >= Open[0])
+	            {
+		            failReason = "early-entry-wait (current-bar-not-red-yet)";
+		            return false;
+	            }
+            }
+            
 
             if (sig > 0 && EnableLongs)
             {
@@ -156,6 +187,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                 primaryDir        = +1;
 
                 LogDiag($"ENTER primary LONG @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+
+				// Submit runner immediately (same bar) with its own stop/target
+                if (EnableRunner && !runnerSubmitted && tradesToday < MaxTradesPerDay)
+                {
+	                var runnerLossTicks   = DollarsToTicks(MaxLossPerTrade);
+	                var runnerProfitTicks = DollarsToTicks(MaxProfitPerTrade * 2.0);
+
+	                if (runnerLossTicks >= 1 && runnerProfitTicks >= 1)
+	                {
+		                SetStopLoss(SigRunnerLong, CalculationMode.Ticks, runnerLossTicks, false);
+		                SetProfitTarget(SigRunnerLong, CalculationMode.Ticks, runnerProfitTicks);
+
+		                EnterLong(Contracts, SigRunnerLong);
+		                runnerSubmitted = true;
+
+		                LogDiag($"ENTER runner LONG (with primary) runnerLossTicks={runnerLossTicks} runnerProfitTicks={runnerProfitTicks}");
+	                }
+	                else
+	                {
+		                LogDiag($"BLOCK: runner bad tick conversion lossTicks={runnerLossTicks} profitTicks={runnerProfitTicks}");
+	                }
+                }
+
                 return true;
             }
 
@@ -172,112 +226,34 @@ namespace NinjaTrader.NinjaScript.Strategies
 	            primaryDir        = -1;
 
 	            LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+
+				// Submit runner immediately (same bar) with its own stop/target
+	            if (EnableRunner && !runnerSubmitted && tradesToday < MaxTradesPerDay)
+	            {
+		            var runnerLossTicks   = DollarsToTicks(MaxLossPerTrade);
+		            var runnerProfitTicks = DollarsToTicks(MaxProfitPerTrade * 2.0);
+
+		            if (runnerLossTicks >= 1 && runnerProfitTicks >= 1)
+		            {
+			            SetStopLoss(SigRunnerShort, CalculationMode.Ticks, runnerLossTicks, false);
+			            SetProfitTarget(SigRunnerShort, CalculationMode.Ticks, runnerProfitTicks);
+
+			            EnterShort(Contracts, SigRunnerShort);
+			            runnerSubmitted = true;
+
+			            LogDiag($"ENTER runner SHORT (with primary) runnerLossTicks={runnerLossTicks} runnerProfitTicks={runnerProfitTicks}");
+		            }
+		            else
+		            {
+			            LogDiag($"BLOCK: runner bad tick conversion lossTicks={runnerLossTicks} profitTicks={runnerProfitTicks}");
+		            }
+	            }
+
 	            return true;
             }
 
             failReason = sig > 0 ? "longs-disabled" : "shorts-disabled";
             return false;
         }
-
-        private void TryEnterRunner()
-		{
-		    if (!EnableRunner)
-		        return;
-		
-		    if (tradesToday >= MaxTradesPerDay)
-		        return;
-		
-		    if (runnerSubmitted)
-		        return;
-		
-		    if (primaryDir == 0)
-		        return;
-		
-		    // Step 1: arm runner once primary is in favor by trigger ticks
-		    var upTicks = GetPrimaryUnrealizedTicks();
-		
-		    if (!runnerArmed)
-		    {
-		        if (upTicks < RunnerTriggerTicks)
-		            return;
-		
-		        runnerArmed = true;
-		        runnerPullbackSeen = false;
-		        runnerArmBar = CurrentBar;
-		
-		        LogDiag($"Runner armed: dir={(primaryDir > 0 ? "LONG" : "SHORT")} upTicks={upTicks:F1} waiting pullback->bull/bear");
-		        return;
-		    }
-		
-		    // Don't enter on the same bar we armed it
-		    if (CurrentBar == runnerArmBar)
-		        return;
-		
-		    // Step 2: wait for a pullback (to emaFast by RunnerPullbackTicks)
-		    if (!runnerPullbackSeen)
-		    {
-			    if (RunnerPullbackTouched(primaryDir, out var pbFail))
-			    {
-				    runnerPullbackSeen = true;
-				    LogDiag(primaryDir > 0
-					    ? $"Runner pullback seen LONG: low={Low[0]:F2} emaFast={emaFast[0]:F2}"
-					    : $"Runner pullback seen SHORT: high={High[0]:F2} emaFast={emaFast[0]:F2}");
-			    }
-			    else
-			    {
-				    DrawWaitingConfirmMarker(primaryDir, $"runner-wait-pullback: {pbFail}", "RUNNER_WAIT_PB");
-				    LogBlockOnce($"runner-wait-pullback: {pbFail}");
-			    }
-
-			    return;
-		    }
-		
-		    // Step 3: after pullback, require confirm-bars logic (bull/bear + close above/below both EMAs, min body, etc.)
-		    if (!ConfirmBarsSatisfied(primaryDir, out var confirmFail))
-		    {
-			    DrawWaitingConfirmMarker(primaryDir, $"runner-confirm: {confirmFail}", "RUNNER_WAIT_CONFIRM");
-			    LogBlockOnce($"runner-confirm: {confirmFail}");
-			    return;
-		    }
-		
-		    // Runner risk rules requested:
-		    // Max profit = MaxProfitPerTrade * 2
-		    // Max loss   = MaxLossPerTrade (converted)
-		    var runnerLossTicks   = DollarsToTicks(MaxLossPerTrade);
-		    var runnerProfitTicks = DollarsToTicks(MaxProfitPerTrade * 2.0);
-		
-		    if (runnerLossTicks < 1 || runnerProfitTicks < 1)
-		    {
-		        LogDiag($"BLOCK: runner bad tick conversion lossTicks={runnerLossTicks} profitTicks={runnerProfitTicks}");
-		        return;
-		    }
-		
-		    if (primaryDir > 0 && EnableLongs)
-		    {
-			    SetStopLoss(SigRunnerLong, CalculationMode.Ticks, runnerLossTicks, false);
-			    SetProfitTarget(SigRunnerLong, CalculationMode.Ticks, runnerProfitTicks);
-
-			    LogDiag("RUNNER PASS: armed + pullbackTouched + confirm-bars OK");
-			    EnterLong(Contracts, SigRunnerLong);
-		
-		        runnerSubmitted = true;
-		        runnerArmed = false;
-		
-		        LogDiag($"ENTER runner LONG (pullback+bull) runnerLossTicks={runnerLossTicks} runnerProfitTicks={runnerProfitTicks}");
-		    }
-		    else if (primaryDir < 0 && EnableShorts)
-		    {
-			    SetStopLoss(SigRunnerShort, CalculationMode.Ticks, runnerLossTicks, false);
-			    SetProfitTarget(SigRunnerShort, CalculationMode.Ticks, runnerProfitTicks);
-
-			    LogDiag("RUNNER PASS: armed + pullbackTouched + confirm-bars OK");
-			    EnterShort(Contracts, SigRunnerShort);
-		
-		        runnerSubmitted = true;
-		        runnerArmed = false;
-		
-		        LogDiag($"ENTER runner SHORT (pullback+bear) runnerLossTicks={runnerLossTicks} runnerProfitTicks={runnerProfitTicks}");
-		    }
-		}
     }
 }

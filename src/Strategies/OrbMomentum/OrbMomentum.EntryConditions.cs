@@ -145,23 +145,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (proxTicks <= 0)
                 return true;
 
-            // Use wick-touch distance (NOT close distance)
-            double refPrice;
-            if (dir > 0)
-                refPrice = Low[0];        // long: require the bar's LOW to come into the EMA zone
-            else if (dir < 0)
-                refPrice = High[0];       // short: require the bar's HIGH to come into the EMA zone
-            else
-                refPrice = Close[0];
+            var ema = emaFast[0];
 
-            var distTicks = Math.Abs(refPrice - emaFast[0]) / TickSize;
+            // Use the wick-side that matters:
+            // - Longs: distance from LOW to EMA (lower wick tag)
+            // - Shorts: distance from HIGH to EMA (upper wick tag)
+            var touchPrice = dir > 0 ? Low[0] : High[0];
+            var touchDistTicks = Math.Abs(touchPrice - ema) / TickSize;
 
-            // LogDiag($"EMA CHECK: dir={dir} ref={refPrice:F2} emaFast={emaFast[0]:F2} dist={distTicks:F1}t prox={proxTicks}t tickSize={TickSize}");
+            if (EnableDiagnostics)
+                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t prox={proxTicks}t");
 
-            if (distTicks > proxTicks)
+            if (touchDistTicks > proxTicks)
             {
-                failReason = $"entry-too-far-from-emaFast (touchDist={distTicks:F1}t > {proxTicks}t)";
+                failReason = $"entry-too-far-from-emaFast (touchDist={touchDistTicks:F1}t > {proxTicks}t)";
                 return false;
+            }
+
+            // Also ensure price actually reached the EMA zone on the correct side
+            var prox = proxTicks * TickSize;
+
+            if (dir > 0)
+            {
+                // For longs, LOW must be within +prox above EMA (or below it)
+                if (Low[0] > ema + prox)
+                {
+                    failReason = $"entry-no-touch-zone-long (low>{proxTicks}t above emaFast)";
+                    return false;
+                }
+            }
+            else if (dir < 0)
+            {
+                // For shorts, HIGH must be within -prox below EMA (or above it)
+                if (High[0] < ema - prox)
+                {
+                    failReason = $"entry-no-touch-zone-short (high<{proxTicks}t below emaFast)";
+                    return false;
+                }
             }
 
             return true;
@@ -207,9 +227,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // EMA structure on most recent bar
+            // Early-entry mode: use last CLOSED bar for structure
             if (dir > 0)
             {
-                if (!(emaFast[0] > emaSlow[0]))
+                if (!(emaFast[1] > emaSlow[1]))
                 {
                     failReason = "ema-structure-fail (need emaFast > emaSlow)";
                     return false;
@@ -217,7 +238,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (dir < 0)
             {
-                if (!(emaFast[0] < emaSlow[0]))
+                if (!(emaFast[1] < emaSlow[1]))
                 {
                     failReason = "ema-structure-fail (need emaFast < emaSlow)";
                     return false;
@@ -231,13 +252,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var minBodyTicks = Math.Max(0, ConfirmBodyTicks);
 
-            for (var i = 0; i < bars; i++)
+            for (var j = 0; j < bars; j++)
             {
+                var i = 1 + j;
+
+                if (CurrentBar < i)
+                {
+                    failReason = $"insufficient-bars (need barsAgo={i})";
+                    return false;
+                }
+
+                // use i instead of j from here down
+                if (IsIndecisionCandle(i, out var topW, out var botW))
+                {
+                    failReason = $"confirm-indecision (i={i} topW={topW:F1}t botW={botW:F1}t diff<={IndecisionWickDiffTicks}t)";
+                    return false;
+                }
+
                 var bodyTicks = Math.Abs(Close[i] - Open[i]) / TickSize;
                 if (bodyTicks < minBodyTicks)
                 {
-                    failReason = $"confirm-body-too-small (i={i} body={bodyTicks:F1}t < {minBodyTicks}t)";
-                    return false;
+                    if (!IsRejectionCandle(dir, i, out var rejWick))
+                    {
+                        failReason = $"confirm-body-too-small (i={i} body={bodyTicks:F1}t < {minBodyTicks}t)";
+                        return false;
+                    }
                 }
 
                 if (dir > 0)

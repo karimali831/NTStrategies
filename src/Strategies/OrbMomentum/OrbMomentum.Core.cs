@@ -121,6 +121,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Runner pullback ticks", Order=8, GroupName="02-Filters")]
         public int RunnerPullbackTicks { get; set; } = 8;
         
+        [NinjaScriptProperty]
+        [Display(Name="Indecision wick diff ticks", Order=9, GroupName="02-Filters")]
+        public int IndecisionWickDiffTicks { get; set; } = 6;
+
+        [NinjaScriptProperty]
+        [Display(Name="Rejection wick min ticks", Order=10, GroupName="02-Filters")]
+        public int RejectionWickMinTicks { get; set; } = 24;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Early entry range ticks", Order=11, GroupName="02-Filters")]
+        public int EarlyEntryRangeTicks { get; set; } = 40;
+        
         //-- RISK --//
         [NinjaScriptProperty]
         [Display(Name="Max profit per trade ($)", Order=1, GroupName="03-Risk")]
@@ -183,9 +195,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
-	            emaFast = EMA(BarsArray[0], EMAFast);
-	            emaSlow = EMA(BarsArray[0], EMASlow);
-	            adx     = ADX(BarsArray[0], 14);
+	            emaFast = EMA(EMAFast);
+	            emaSlow = EMA(EMASlow);
+	            adx     = ADX(14);
 
                 ConfigureEmaVisuals();
                 ResetDailyState();
