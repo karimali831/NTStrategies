@@ -1,8 +1,12 @@
 ﻿#region Using declarations
+
+using System.Windows;
 using System.Windows.Media;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Tools;
 using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -35,6 +39,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 emaSlow.Plots[0].DashStyleHelper = DashStyleHelper.Solid;
                 emaSlow.Plots[0].PlotStyle = PlotStyle.Line;
             }
+        }
+        
+        private void DrawWaitingConfirmMarker(int dir, string reason, string context)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            var tag = $"WAIT_{context}_{dir}_{CurrentBar}";
+            var y = dir > 0 ? (Low[0] - 2 * TickSize) : (High[0] + 2 * TickSize);
+
+            Draw.Dot(this, tag, false, 0, y, dir > 0 ? Brushes.LimeGreen : Brushes.OrangeRed);
+            Draw.Text(this, tag + "_T", false, reason, 0, y, 0,
+                Brushes.Gray, new SimpleFont("Arial", 10),
+                TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
         }
     }
 }

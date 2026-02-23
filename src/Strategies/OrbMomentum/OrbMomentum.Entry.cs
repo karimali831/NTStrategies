@@ -32,7 +32,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (State != State.Realtime)
 				return;
 
-            UpdateOpeningRange();
+			UpdateOpeningRange();
+			LogEmaDistanceEveryBar();
 
             if (!orBuilt)
                 return;
@@ -122,6 +123,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        return false;
 	        }
 
+			// NEW: enforce confirm bars for ALL entries (not just re-entry)
+			if (!ConfirmBarsSatisfied(sig, out var confirmFail))
+			{
+				// Visual marker: signal is valid, but confirmation not satisfied yet
+				DrawWaitingConfirmMarker(sig, confirmFail, "PRIMARY_WAIT_CONFIRM");
+
+				failReason = $"confirm-fail: {confirmFail}";
+				return false;
+			}
+
             // Risk in ticks derived from dollars
             var lossTicks   = DollarsToTicks(MaxLossPerTrade);
             var profitTicks = DollarsToTicks(MaxProfitPerTrade);
@@ -137,6 +148,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SetStopLoss(SigPrimaryLong, CalculationMode.Ticks, lossTicks, false);
                 SetProfitTarget(SigPrimaryLong, CalculationMode.Ticks, profitTicks);
 
+                LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK");
+
                 EnterLong(Contracts, SigPrimaryLong);
 
                 primarySubmitted  = true;
@@ -145,20 +158,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogDiag($"ENTER primary LONG @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
                 return true;
             }
-            else if (sig < 0 && EnableShorts)
+
+            if (sig < 0 && EnableShorts)
             {
-                SetStopLoss(SigPrimaryShort, CalculationMode.Ticks, lossTicks, false);
-                SetProfitTarget(SigPrimaryShort, CalculationMode.Ticks, profitTicks);
+	            SetStopLoss(SigPrimaryShort, CalculationMode.Ticks, lossTicks, false);
+	            SetProfitTarget(SigPrimaryShort, CalculationMode.Ticks, profitTicks);
 
-                EnterShort(Contracts, SigPrimaryShort);
+	            LogDiag("PRIMARY PASS: orb-break + adxOk + ema-structure + ema-touch + confirm-bars OK");
 
-                primarySubmitted  = true;
-                primaryDir        = -1;
+	            EnterShort(Contracts, SigPrimaryShort);
 
-                LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
-                return true;
+	            primarySubmitted  = true;
+	            primaryDir        = -1;
+
+	            LogDiag($"ENTER primary SHORT @{Close[0]:F2} lossTicks={lossTicks} profitTicks={profitTicks}");
+	            return true;
             }
-            
+
             failReason = sig > 0 ? "longs-disabled" : "shorts-disabled";
             return false;
         }
@@ -209,6 +225,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    }
 			    else
 			    {
+				    DrawWaitingConfirmMarker(primaryDir, $"runner-wait-pullback: {pbFail}", "RUNNER_WAIT_PB");
 				    LogBlockOnce($"runner-wait-pullback: {pbFail}");
 			    }
 
@@ -218,6 +235,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // Step 3: after pullback, require confirm-bars logic (bull/bear + close above/below both EMAs, min body, etc.)
 		    if (!ConfirmBarsSatisfied(primaryDir, out var confirmFail))
 		    {
+			    DrawWaitingConfirmMarker(primaryDir, $"runner-confirm: {confirmFail}", "RUNNER_WAIT_CONFIRM");
 			    LogBlockOnce($"runner-confirm: {confirmFail}");
 			    return;
 		    }
@@ -236,10 +254,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		    if (primaryDir > 0 && EnableLongs)
 		    {
-		        SetStopLoss(SigRunnerLong, CalculationMode.Ticks, runnerLossTicks, false);
-		        SetProfitTarget(SigRunnerLong, CalculationMode.Ticks, runnerProfitTicks);
-		
-		        EnterLong(Contracts, SigRunnerLong);
+			    SetStopLoss(SigRunnerLong, CalculationMode.Ticks, runnerLossTicks, false);
+			    SetProfitTarget(SigRunnerLong, CalculationMode.Ticks, runnerProfitTicks);
+
+			    LogDiag("RUNNER PASS: armed + pullbackTouched + confirm-bars OK");
+			    EnterLong(Contracts, SigRunnerLong);
 		
 		        runnerSubmitted = true;
 		        runnerArmed = false;
@@ -248,10 +267,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    }
 		    else if (primaryDir < 0 && EnableShorts)
 		    {
-		        SetStopLoss(SigRunnerShort, CalculationMode.Ticks, runnerLossTicks, false);
-		        SetProfitTarget(SigRunnerShort, CalculationMode.Ticks, runnerProfitTicks);
-		
-		        EnterShort(Contracts, SigRunnerShort);
+			    SetStopLoss(SigRunnerShort, CalculationMode.Ticks, runnerLossTicks, false);
+			    SetProfitTarget(SigRunnerShort, CalculationMode.Ticks, runnerProfitTicks);
+
+			    LogDiag("RUNNER PASS: armed + pullbackTouched + confirm-bars OK");
+			    EnterShort(Contracts, SigRunnerShort);
 		
 		        runnerSubmitted = true;
 		        runnerArmed = false;

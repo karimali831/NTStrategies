@@ -51,6 +51,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int    lastLoggedOrbBar;
 		private int    lastLoggedBlockBar;
 		private string lastLoggedBlockReason;
+		private int    lastLoggedEmaDistBar = -1;
 
         // Constants
         private const string SigPrimaryLong  = "ORB1L";

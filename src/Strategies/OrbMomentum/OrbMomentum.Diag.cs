@@ -36,5 +36,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             LogDiag($"BLOCK: {reason}");
         }
+        
+        private void LogEmaDistanceEveryBar()
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            if (CurrentBar == lastLoggedEmaDistBar)
+                return;
+
+            lastLoggedEmaDistBar = CurrentBar;
+
+            if (emaFast == null)
+                return;
+
+            var ema = emaFast[0];
+
+            // close distance
+            var closeDistTicks = Math.Abs(Close[0] - ema) / TickSize;
+
+            // wick-aware "touch distance": 0 if EMA is inside the bar range, else min distance to range
+            double touchDistTicks;
+            if (Low[0] <= ema && ema <= High[0])
+                touchDistTicks = 0.0;
+            else
+                touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
+
+            LogDiag($"EMA DIST: emaF={ema:F2} closeDist={closeDistTicks:F1}t touchDist={touchDistTicks:F1}t H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2}");
+        }
     }
 }
