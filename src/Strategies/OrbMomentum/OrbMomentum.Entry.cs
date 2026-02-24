@@ -120,16 +120,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            var longSide = sig > 0;
-            
-            // Reclaimed
-            if (!Reclaimed(longSide, 0))
-            {
-                DrawWaitingConfirmMarker(sig, "reclaimed-false", "RECLAIMED_FALSE");
-                failReason = "confirm-fail: long-reclaimed-false";
-                return false;
-            }
-            
             // Confirm bars (your current behavior)
             if (!ConfirmBarsSatisfied(sig, out var confirmFail))
             {
@@ -160,7 +150,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Directional check WITHOUT waiting for close:
-            if (longSide)
+            if (sig > 0)
             {
                 if (Close[0] <= Open[0])
                 {
@@ -168,7 +158,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return false;
                 }
             }
-            else
+            else if (sig < 0)
             {
                 if (Close[0] >= Open[0])
                 {
@@ -177,7 +167,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            if (longSide && EnableLongs)
+            if (sig > 0 && EnableLongs)
             {
                 SetStopLoss(SigPrimaryLong, CalculationMode.Ticks, lossTicks, false);
                 SetProfitTarget(SigPrimaryLong, CalculationMode.Ticks, profitTicks);
@@ -216,7 +206,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
 
-            if (!longSide && EnableShorts)
+            if (sig < 0 && EnableShorts)
             {
                 SetStopLoss(SigPrimaryShort, CalculationMode.Ticks, lossTicks, false);
                 SetProfitTarget(SigPrimaryShort, CalculationMode.Ticks, profitTicks);

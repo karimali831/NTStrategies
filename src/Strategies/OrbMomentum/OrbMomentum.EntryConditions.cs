@@ -158,23 +158,34 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // safety: if user accidentally flips them
             if (maxTicks > 0 && minTicks > maxTicks)
-            {
                 (minTicks, maxTicks) = (maxTicks, minTicks);
-            }
 
             var ema = emaFast[0];
 
-            // Wick-aware touch distance (you already compute this)
+            // Wick-aware touch distance:
+            // 0 if EMA is inside bar range, else min distance to range edge
             double touchDistTicks;
             if (Low[0] <= ema && ema <= High[0])
                 touchDistTicks = 0.0;
             else
-                touchDistTicks = Math.Min(
-                    Math.Abs(High[0] - ema),
-                    Math.Abs(Low[0] - ema)
-                ) / TickSize;
+                touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
+
+            // ---- NEW: require "reclaim/touch" of EMA area ----
+            // Meaning: we don't accept a "retracement near EMA" that never actually tags it.
+            // We treat "reclaim zone" as EMA +/- minTicks (or 0 if minTicks disabled).
+            var reclaimTicks = Math.Max(0, minTicks);
+            var reclaim = reclaimTicks * TickSize;
+
+            var touchedZone = (Low[0] <= ema + reclaim) && (High[0] >= ema - reclaim);
+            if (!touchedZone)
+            {
+                failReason = $"entry-no-reclaim-touch (need bar to touch emaZone +/-{reclaimTicks}t)";
+                return false;
+            }
 
             // enforce minimum distance (avoid entries sitting right on EMA)
+            // NOTE: if you want "touch required AND min distance required" this can conflict when touchDist=0.
+            // This keeps your original intent: minTicks avoids entering right on the EMA.
             if (minTicks > 0 && touchDistTicks < minTicks)
             {
                 failReason = $"entry-too-close-to-emaFast (touchDist={touchDistTicks:F1}t < {minTicks}t)";
@@ -189,20 +200,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             if (EnableDiagnostics)
-                LogDiag($"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} emaFast={ema:F2} touchDist={touchDistTicks:F1}t min={minTicks}t max={maxTicks}t", oncePerBar: true);
+                LogDiag(
+                    $"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} " +
+                    $"emaFast={ema:F2} touchDist={touchDistTicks:F1}t min={minTicks}t max={maxTicks}t reclaim={reclaimTicks}t touched={touchedZone}",
+                    oncePerBar: true
+                );
 
-            // if (dir > 0 && High[0] < ema)
-            // {
-            //     failReason = "entry-wrong-side-long (bar entirely below emaFast)";
-            //     return false;
-            // }
-            //
-            // if (dir < 0 && Low[0] > ema)
-            // {
-            //     failReason = "entry-wrong-side-short (bar entirely above emaFast)";
-            //     return false;
-            // }
-            //
             return true;
         }
         
@@ -232,16 +235,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             failReason = "dir=0";
             return false;
-        }
-        
-        public bool Reclaimed(bool longSide, int barsAgo)
-        {
-            if (longSide)
-            {
-                return Close[barsAgo] >= emaFast[barsAgo] ;
-            }
-
-            return Close[barsAgo] <= emaFast[barsAgo];
         }
 		
         private bool ConfirmBarsSatisfied(int dir, out string failReason)
