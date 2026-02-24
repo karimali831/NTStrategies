@@ -162,47 +162,50 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var ema = emaFast[0];
 
-            // Wick-aware touch distance:
-            // 0 if EMA is inside bar range, else min distance to range edge
-            double touchDistTicks;
-            if (Low[0] <= ema && ema <= High[0])
-                touchDistTicks = 0.0;
-            else
-                touchDistTicks = Math.Min(Math.Abs(High[0] - ema), Math.Abs(Low[0] - ema)) / TickSize;
-
-            // ---- NEW: require "reclaim/touch" of EMA area ----
-            // Meaning: we don't accept a "retracement near EMA" that never actually tags it.
-            // We treat "reclaim zone" as EMA +/- minTicks (or 0 if minTicks disabled).
-            var reclaimTicks = Math.Max(0, minTicks);
-            var reclaim = reclaimTicks * TickSize;
-
-            var touchedZone = (Low[0] <= ema + reclaim) && (High[0] >= ema - reclaim);
-            if (!touchedZone)
+            // 1) HARD REQUIREMENT: bar must actually TOUCH/RECLAIM the EMA (wick touch)
+            // (i.e., EMA is inside the bar range)
+            var touchedEma = (Low[0] <= ema && High[0] >= ema);
+            if (!touchedEma)
             {
-                failReason = $"entry-no-reclaim-touch (need bar to touch emaZone +/-{reclaimTicks}t)";
+                failReason = "entry-no-ema-touch (bar did not reclaim/touch emaFast)";
                 return false;
             }
 
-            // enforce minimum distance (avoid entries sitting right on EMA)
-            // NOTE: if you want "touch required AND min distance required" this can conflict when touchDist=0.
-            // This keeps your original intent: minTicks avoids entering right on the EMA.
-            if (minTicks > 0 && touchDistTicks < minTicks)
+            // 2) Proximity is based on CLOSE distance (your intent: don't enter sitting on EMA)
+            var closeDistTicks = Math.Abs(Close[0] - ema) / TickSize;
+
+            // enforce minimum distance from EMA using CLOSE, direction-aware
+            if (minTicks > 0)
             {
-                failReason = $"entry-too-close-to-emaFast (touchDist={touchDistTicks:F1}t < {minTicks}t)";
-                return false;
+                if (dir > 0)
+                {
+                    if (Close[0] < ema + (minTicks * TickSize))
+                    {
+                        failReason = $"entry-close-too-near-emaFast-long (closeDist={closeDistTicks:F1}t < {minTicks}t)";
+                        return false;
+                    }
+                }
+                else if (dir < 0)
+                {
+                    if (Close[0] > ema - (minTicks * TickSize))
+                    {
+                        failReason = $"entry-close-too-near-emaFast-short (closeDist={closeDistTicks:F1}t < {minTicks}t)";
+                        return false;
+                    }
+                }
             }
 
-            // enforce maximum distance (avoid chasing)
-            if (maxTicks > 0 && touchDistTicks > maxTicks)
+            // enforce maximum distance from EMA using CLOSE (avoid chasing)
+            if (maxTicks > 0 && closeDistTicks > maxTicks)
             {
-                failReason = $"entry-too-far-from-emaFast (touchDist={touchDistTicks:F1}t > {maxTicks}t)";
+                failReason = $"entry-close-too-far-from-emaFast (closeDist={closeDistTicks:F1}t > {maxTicks}t)";
                 return false;
             }
 
             if (EnableDiagnostics)
                 LogDiag(
                     $"EMA CHECK: dir={(dir > 0 ? "LONG" : "SHORT")} close={Close[0]:F2} low={Low[0]:F2} high={High[0]:F2} " +
-                    $"emaFast={ema:F2} touchDist={touchDistTicks:F1}t min={minTicks}t max={maxTicks}t reclaim={reclaimTicks}t touched={touchedZone}",
+                    $"emaFast={ema:F2} touched=Y closeDist={closeDistTicks:F1}t min={minTicks}t max={maxTicks}t",
                     oncePerBar: true
                 );
 
