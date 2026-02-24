@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var longSide = sig > 0;
             
             // Reclaimed
-            if (!Reclaimed(longSide, sig))
+            if (!Reclaimed(longSide, 0))
             {
                 DrawWaitingConfirmMarker(sig, "reclaimed-false", "RECLAIMED_FALSE");
                 failReason = "confirm-fail: long-reclaimed-false";
