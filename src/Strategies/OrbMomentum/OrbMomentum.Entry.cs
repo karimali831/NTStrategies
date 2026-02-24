@@ -119,6 +119,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 failReason = sigFail;
                 return false;
             }
+            
+            // Reclaimed
+            if (!Reclaimed(true, sig))
+            {
+                DrawWaitingConfirmMarker(sig, "reclaimed-false", "RECLAIMED_FALSE");
+                failReason = $"confirm-fail: reclaimed-false";
+                return false;
+            }
 
             // Confirm bars (your current behavior)
             if (!ConfirmBarsSatisfied(sig, out var confirmFail))

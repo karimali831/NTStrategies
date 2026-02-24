@@ -48,11 +48,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var tag = $"WAIT_{context}_{dir}_{CurrentBar}";
             var y = dir > 0 ? (Low[0] - 2 * TickSize) : (High[0] + 2 * TickSize);
+            
+            // LogDiag($"[CONFIRM] {tag} ({reason})");
 
             Draw.Dot(this, tag, false, 0, y, dir > 0 ? Brushes.LimeGreen : Brushes.OrangeRed);
-            Draw.Text(this, tag + "_T", false, reason, 0, y, 0,
-                Brushes.Gray, new SimpleFont("Arial", 10),
-                TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
+            // Draw.Text(this, tag + "_T", false, reason, 0, y, 0,
+            //     Brushes.Gray, new SimpleFont("Arial", 10),
+            //     TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
         }
     }
 }

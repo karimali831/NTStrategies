@@ -233,6 +233,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             failReason = "dir=0";
             return false;
         }
+        
+        public bool Reclaimed(bool longSide, int barsAgo)
+        {
+            if (longSide)
+            {
+                return Close[barsAgo] >= emaFast[barsAgo] ;
+            }
+
+            return Close[barsAgo] <= emaFast[barsAgo];
+        }
 		
         private bool ConfirmBarsSatisfied(int dir, out string failReason)
         {
