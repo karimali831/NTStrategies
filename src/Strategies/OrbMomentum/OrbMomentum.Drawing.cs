@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             // Per your request: purple dot at the BOTTOM of the candle
-            var y = Low[0] - (2 * TickSize);
+            var y = Low[0] - 2 * TickSize;
             var tag = isTop ? $"DTB_TOP_{CurrentBar}" : $"DTB_BOT_{CurrentBar}";
             Draw.Dot(this, tag, false, 0, y, Brushes.Purple);
 
