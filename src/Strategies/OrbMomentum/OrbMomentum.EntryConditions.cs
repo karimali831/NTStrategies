@@ -151,14 +151,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (EnableDoubleTopBottomFilter)
             {
-                var passes = PassesDoubleTopBottomFilter(dir, out _);
-
-                if (passes)
+                if (PassesDoubleTopBottomFilter(dir, out _))
                 {
                     if (EnableDiagnostics)
-                    {
                         LogDiag("PASSED double top/bottom filter", oncePerBar: true);
-                    }
+                    
                     return true;
                 }
             }
