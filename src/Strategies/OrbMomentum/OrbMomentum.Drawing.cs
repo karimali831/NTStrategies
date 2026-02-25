@@ -62,75 +62,112 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Returns true ONLY if current bar (0) forms part of a double top/bottom
         private (bool DoubleTop, bool DoubleBottom) DetectAndDrawDoubleTopBottomLast()
         {
-            var lookbackBars = Math.Max(2, DoubleTopBottomLookbackBars);
+            var lookbackBars = Math.Max(2, DoubleTopBottomLookbackBars);   // includes bar 0
             var maxDiffTicks = Math.Max(1, DoubleTopBottomMaxDiffTicks);
-            
+
             if (CurrentBar < lookbackBars - 1)
-                return (false, false);
-
-            int lowIdx1 = -1, lowIdx2 = -1;
-            double low1 = double.MaxValue, low2 = double.MaxValue;
-
-            int highIdx1 = -1, highIdx2 = -1;
-            double high1 = double.MinValue, high2 = double.MinValue;
-
-            for (var i = 0; i < lookbackBars; i++)
             {
-                var l = Low[i];
-                if (l < low1)
-                {
-                    low2 = low1; lowIdx2 = lowIdx1;
-                    low1 = l;    lowIdx1 = i;
-                }
-                else if (l < low2)
-                {
-                    low2 = l;    lowIdx2 = i;
-                }
+                // nothing to draw yet
+                return (false, false);
+            }
 
-                var h = High[i];
-                if (h > high1)
-                {
-                    high2 = high1; highIdx2 = highIdx1;
-                    high1 = h;     highIdx1 = i;
-                }
-                else if (h > high2)
-                {
-                    high2 = h;     highIdx2 = i;
-                }
+            // Stable tags (same during the life of CurrentBar, overwrite on each tick)
+            var tagB0 = $"DTB_B0_{CurrentBar}";
+            var tagB1 = $"DTB_B1_{CurrentBar}";
+            var tagT0 = $"DTB_T0_{CurrentBar}";
+            var tagT1 = $"DTB_T1_{CurrentBar}";
+
+            // Helper: remove stale dots when invalid
+            void ClearBottom()
+            {
+                RemoveDrawObject(tagB0);
+                RemoveDrawObject(tagB1);
+            }
+
+            void ClearTop()
+            {
+                RemoveDrawObject(tagT0);
+                RemoveDrawObject(tagT1);
             }
 
             var isCurrentDoubleBottom = false;
             var isCurrentDoubleTop = false;
 
-            // ---- Double Bottom check ----
-            if (lowIdx1 >= 0 && lowIdx2 >= 0)
+            // -------------------------
+            // Double Bottom (current bar must participate)
+            // -------------------------
             {
-                double diffTicks = Math.Abs(low1 - low2) / TickSize;
+                var cur = Low[0];
 
-                if (diffTicks <= maxDiffTicks)
+                // Find the closest prior low within lookback (bars 1..lookbackBars-1)
+                var bestIdx = -1;
+                var bestDiffTicks = double.MaxValue;
+
+                for (var i = 1; i < lookbackBars; i++)
                 {
-                    // draw dots
-                    Draw.Dot(this, $"DTB_B_{CurrentBar}_{lowIdx1}", false, lowIdx1, Low[lowIdx1], Brushes.Purple);
-                    Draw.Dot(this, $"DTB_B_{CurrentBar}_{lowIdx2}", false, lowIdx2, Low[lowIdx2], Brushes.Purple);
+                    var dTicks = Math.Abs(cur - Low[i]) / TickSize;
+                    if (dTicks < bestDiffTicks)
+                    {
+                        bestDiffTicks = dTicks;
+                        bestIdx = i;
+                    }
+                }
 
-                    // current bar participates?
-                    if (lowIdx1 == 0 || lowIdx2 == 0)
-                        isCurrentDoubleBottom = true;
+                // Extra guard: current low should be near the lowest area in the window
+                var minLow = double.MaxValue;
+                for (int i = 0; i < lookbackBars; i++)
+                    if (Low[i] < minLow) minLow = Low[i];
+
+                var nearWindowLow = (cur - minLow) / TickSize <= maxDiffTicks;
+
+                if (bestIdx > 0 && bestDiffTicks <= maxDiffTicks && nearWindowLow)
+                {
+                    // Draw / update (every tick). If price moves away later, we clear.
+                    Draw.Dot(this, tagB0, false, 0, Low[0], Brushes.Purple);
+                    Draw.Dot(this, tagB1, false, bestIdx, Low[bestIdx], Brushes.Purple);
+                    isCurrentDoubleBottom = true;
+                }
+                else
+                {
+                    // preferred behaviour: remove as soon as it becomes invalid intrabar
+                    ClearBottom();
                 }
             }
 
-            // ---- Double Top check ----
-            if (highIdx1 >= 0 && highIdx2 >= 0)
+            // -------------------------
+            // Double Top (current bar must participate)
+            // -------------------------
             {
-                double diffTicks = Math.Abs(high1 - high2) / TickSize;
+                var cur = High[0];
 
-                if (diffTicks <= maxDiffTicks)
+                var bestIdx = -1;
+                var bestDiffTicks = double.MaxValue;
+
+                for (var i = 1; i < lookbackBars; i++)
                 {
-                    Draw.Dot(this, $"DTB_T_{CurrentBar}_{highIdx1}", false, highIdx1, High[highIdx1], Brushes.Purple);
-                    Draw.Dot(this, $"_DTB_T_{CurrentBar}_{highIdx2}", false, highIdx2, High[highIdx2], Brushes.Purple);
+                    var dTicks = Math.Abs(cur - High[i]) / TickSize;
+                    if (dTicks < bestDiffTicks)
+                    {
+                        bestDiffTicks = dTicks;
+                        bestIdx = i;
+                    }
+                }
 
-                    if (highIdx1 == 0 || highIdx2 == 0)
-                        isCurrentDoubleTop = true;
+                var maxHigh = double.MinValue;
+                for (int i = 0; i < lookbackBars; i++)
+                    if (High[i] > maxHigh) maxHigh = High[i];
+
+                var nearWindowHigh = (maxHigh - cur) / TickSize <= maxDiffTicks;
+
+                if (bestIdx > 0 && bestDiffTicks <= maxDiffTicks && nearWindowHigh)
+                {
+                    Draw.Dot(this, tagT0, false, 0, High[0], Brushes.Purple);
+                    Draw.Dot(this, tagT1, false, bestIdx, High[bestIdx], Brushes.Purple);
+                    isCurrentDoubleTop = true;
+                }
+                else
+                {
+                    ClearTop();
                 }
             }
 
