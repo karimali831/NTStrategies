@@ -157,6 +157,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Double Top/Bottom Max Diff Ticks", Order=16, GroupName="02-Filters")]
         public int DoubleTopBottomMaxDiffTicks { get; set; } = 5;
         
+        [NinjaScriptProperty]
+        [Display(Name="EMA separation min ticks", Order=17, GroupName="02-Filters")]
+        public int EmaSeparationMinTicks { get; set; } = 15;
+
+        [NinjaScriptProperty]
+        [Display(Name="EMA separation max ticks (0=off)", Order=18, GroupName="02-Filters")]
+        public int EmaSeparationMaxTicks { get; set; } = 60;
+        
         //-- RISK --//
         [NinjaScriptProperty]
         [Display(Name="Max profit per trade ($)", Order=1, GroupName="03-Risk")]

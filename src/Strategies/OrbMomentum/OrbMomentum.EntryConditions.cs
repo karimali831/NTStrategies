@@ -78,6 +78,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             var trendDown = emaFast[0] < emaSlow[0];
 
             var adxOk = adx[0] >= ADXMin;
+
+            // EMA separation filter (trend strength / chop filter)
+            var sepTicks = Math.Abs(emaFast[0] - emaSlow[0]) / TickSize;
+
+            var sepMin = Math.Max(0, EmaSeparationMinTicks);
+            var sepMax = Math.Max(0, EmaSeparationMaxTicks);
+
+            // safety if user flips them
+            if (sepMax > 0 && sepMin > sepMax)
+                (sepMin, sepMax) = (sepMax, sepMin);
+
+            var sepOk = true;
+            if (sepMin > 0 && sepTicks < sepMin)
+                sepOk = false;
+            if (sepMax > 0 && sepTicks > sepMax)
+                sepOk = false;
             
             var outLongTicks  = (High[0] - orHigh) / TickSize;   // how far the bar's HIGH exceeded orHigh
             var outShortTicks = (orLow - Low[0]) / TickSize;     // how far the bar's LOW broke below orLow
@@ -92,13 +108,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (EnableDiagnostics && CurrentBar != lastLoggedSigBar)
             {
-                LogDiag($"SIGCHK: H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2} orH={orHigh:F2} orL={orLow:F2} outL={outLongTicks:F1}t outS={outShortTicks:F1}t need={MinTicksOutsideOrb}t emaF={emaFast[0]:F2} emaS={emaSlow[0]:F2} adx={adx[0]:F2}");
+                LogDiag($"SIGCHK: H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2} orH={orHigh:F2} orL={orLow:F2} outL={outLongTicks:F1}t outS={outShortTicks:F1}t need={MinTicksOutsideOrb}t emaF={emaFast[0]:F2} emaS={emaSlow[0]:F2} sep={sepTicks:F1}t(min={sepMin} max={sepMax}) adx={adx[0]:F2}");
                 lastLoggedSigBar = CurrentBar;
             }
 
             if (!adxOk)
             {
                 failReason = $"adx-too-low ({adx[0]:F1} < {ADXMin})";
+                return 0;
+            }
+
+            if (!sepOk)
+            {
+                failReason = $"ema-sep-out-of-range (sep={sepTicks:F1}t min={sepMin} max={sepMax})";
                 return 0;
             }
             
