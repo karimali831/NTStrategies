@@ -151,13 +151,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (EnableDoubleTopBottomFilter)
             {
-                if (PassesDoubleTopBottomFilter(dir, out _))
+                var passes = PassesDoubleTopBottomFilter(dir, out var topBottomFailReason);
+
+                if (passes)
                 {
                     if (EnableDiagnostics)
                         LogDiag("PASSED double top/bottom filter", oncePerBar: true);
                     
                     return true;
                 }
+
+                if (EnableDiagnostics)
+                    LogDiag($"FAILED double top/bottom filter: {topBottomFailReason}" , oncePerBar: true);
+
             }
             
             var minTicks = Math.Max(0, EntryEmaMinProximityTicks);
