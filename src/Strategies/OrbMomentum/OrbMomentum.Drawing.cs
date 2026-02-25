@@ -1,5 +1,6 @@
 ﻿#region Using declarations
 
+using System;
 using System.Windows;
 using System.Windows.Media;
 using NinjaTrader.Gui;
@@ -57,30 +58,83 @@ namespace NinjaTrader.NinjaScript.Strategies
             //     TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
         }
         
-        private void DrawDoubleTopBottomMarkerIfAny()
+        // Looks at barsAgo 0..3 (4 bars total, includes current bar).
+        // Returns true ONLY if current bar (0) forms part of a double top/bottom
+        private (bool DoubleTop, bool DoubleBottom) DetectAndDrawDoubleTopBottomLast()
         {
-            if (!EnableDoubleTopBottomFilter)
-                return;
+            var lookbackBars = Math.Max(2, DoubleTopBottomLookbackBars);
+            var maxDiffTicks = Math.Max(1, DoubleTopBottomMaxDiffTicks);
+            
+            if (CurrentBar < lookbackBars - 1)
+                return (false, false);
 
-            // once per bar (OnEachTick safe)
-            if (CurrentBar == lastDtbMarkBar)
-                return;
+            int lowIdx1 = -1, lowIdx2 = -1;
+            double low1 = double.MaxValue, low2 = double.MaxValue;
 
-            lastDtbMarkBar = CurrentBar;
+            int highIdx1 = -1, highIdx2 = -1;
+            double high1 = double.MinValue, high2 = double.MinValue;
 
-            if (!TryGetDoubleTopBottomClosedBars(out var isTop, out var isBot, out var lvl, out var dbg))
-                return;
+            for (var i = 0; i < lookbackBars; i++)
+            {
+                var l = Low[i];
+                if (l < low1)
+                {
+                    low2 = low1; lowIdx2 = lowIdx1;
+                    low1 = l;    lowIdx1 = i;
+                }
+                else if (l < low2)
+                {
+                    low2 = l;    lowIdx2 = i;
+                }
 
-            if (!isTop && !isBot)
-                return;
+                var h = High[i];
+                if (h > high1)
+                {
+                    high2 = high1; highIdx2 = highIdx1;
+                    high1 = h;     highIdx1 = i;
+                }
+                else if (h > high2)
+                {
+                    high2 = h;     highIdx2 = i;
+                }
+            }
 
-            // Per your request: purple dot at the BOTTOM of the candle
-            var y = Low[0] - 2 * TickSize;
-            var tag = isTop ? $"DTB_TOP_{CurrentBar}" : $"DTB_BOT_{CurrentBar}";
-            Draw.Dot(this, tag, false, 0, y, Brushes.Purple);
+            var isCurrentDoubleBottom = false;
+            var isCurrentDoubleTop = false;
 
-            if (EnableDiagnostics)
-                LogDiag($"DTB MARK: {(isTop ? "DOUBLE_TOP" : "DOUBLE_BOTTOM")} lvl={lvl:F2} {dbg}", oncePerBar: true);
+            // ---- Double Bottom check ----
+            if (lowIdx1 >= 0 && lowIdx2 >= 0)
+            {
+                double diffTicks = Math.Abs(low1 - low2) / TickSize;
+
+                if (diffTicks <= maxDiffTicks)
+                {
+                    // draw dots
+                    Draw.Dot(this, $"DTB_B_{CurrentBar}_{lowIdx1}", false, lowIdx1, Low[lowIdx1], Brushes.Purple);
+                    Draw.Dot(this, $"DTB_B_{CurrentBar}_{lowIdx2}", false, lowIdx2, Low[lowIdx2], Brushes.Purple);
+
+                    // current bar participates?
+                    if (lowIdx1 == 0 || lowIdx2 == 0)
+                        isCurrentDoubleBottom = true;
+                }
+            }
+
+            // ---- Double Top check ----
+            if (highIdx1 >= 0 && highIdx2 >= 0)
+            {
+                double diffTicks = Math.Abs(high1 - high2) / TickSize;
+
+                if (diffTicks <= maxDiffTicks)
+                {
+                    Draw.Dot(this, $"DTB_T_{CurrentBar}_{highIdx1}", false, highIdx1, High[highIdx1], Brushes.Purple);
+                    Draw.Dot(this, $"_DTB_T_{CurrentBar}_{highIdx2}", false, highIdx2, High[highIdx2], Brushes.Purple);
+
+                    if (highIdx1 == 0 || highIdx2 == 0)
+                        isCurrentDoubleTop = true;
+                }
+            }
+
+            return (isCurrentDoubleTop, isCurrentDoubleBottom);
         }
     }
 }
