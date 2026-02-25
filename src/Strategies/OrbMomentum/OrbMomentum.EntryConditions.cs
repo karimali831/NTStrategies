@@ -109,9 +109,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                     failReason = "long-block: emaFast-not-above-emaSlow";
                     return 0;
                 }
+                
+                // ✅ Entry qualifier = (EMA reclaim/touch) OR (DoubleBottom + early-range trigger)
+                var emaOk = EntryAtEmaFast(+1, out var emaFail);
 
-                // must be at EMA zone (no chasing)
-                if (!EntryAtEmaFast(+1, out var emaFail))
+                var dtbOk = false;
+                if (EnableDoubleTopBottomFilter)
+                {
+                    var curRangeTicks = (High[0] - Low[0]) / TickSize;
+                    var earlyRangeOk  = curRangeTicks >= Math.Max(1, EarlyEntryRangeTicks);
+
+                    if (earlyRangeOk && TryGetDoubleTopBottomClosedBars(out var isTop, out var isBot, out var lvl, out var dbg))
+                    {
+                        // LONGS use DOUBLE BOTTOM
+                        if (isBot)
+                            dtbOk = true;
+                    }
+                }
+
+                if (!emaOk && !dtbOk)
                 {
                     failReason = $"long-block: {emaFail}";
                     return 0;
@@ -129,8 +145,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return 0;
                 }
 
-                // must be at EMA zone (no chasing)
-                if (!EntryAtEmaFast(-1, out var emaFail))
+                // ✅ Entry qualifier = (EMA reclaim/touch) OR (DoubleTop + early-range trigger)
+                var emaOk = EntryAtEmaFast(-1, out var emaFail);
+
+                var dtbOk = false;
+                if (EnableDoubleTopBottomFilter)
+                {
+                    var curRangeTicks = (High[0] - Low[0]) / TickSize;
+                    var earlyRangeOk  = curRangeTicks >= Math.Max(1, EarlyEntryRangeTicks);
+
+                    if (earlyRangeOk && TryGetDoubleTopBottomClosedBars(out var isTop, out var isBot, out var lvl, out var dbg))
+                    {
+                        // SHORTS use DOUBLE TOP
+                        if (isTop)
+                            dtbOk = true;
+                    }
+                }
+
+                if (!emaOk && !dtbOk)
                 {
                     failReason = $"short-block: {emaFail}";
                     return 0;
@@ -155,15 +187,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (passes)
                 {
-                    if (EnableDiagnostics)
-                        LogDiag("PASSED double top/bottom filter", oncePerBar: true);
-                    
+                    LogDiag("PASSED double top/bottom filter", oncePerBar: true);
                     return true;
                 }
-
-                if (EnableDiagnostics)
-                    LogDiag($"FAILED double top/bottom filter: {topBottomFailReason}" , oncePerBar: true);
-
+                
+                LogDiag($"FAILED double top/bottom filter: {topBottomFailReason}" , oncePerBar: true);
             }
             
             var minTicks = Math.Max(0, EntryEmaMinProximityTicks);

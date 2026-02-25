@@ -34,6 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			UpdateOpeningRange();
 			LogEmaDistanceEveryBar();
+            DrawDoubleTopBottomMarkerIfAny();
 
             if (!orBuilt)
                 return;
