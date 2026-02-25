@@ -78,9 +78,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var trendDown = emaFast[0] < emaSlow[0];
 
             var adxOk = adx[0] >= ADXMin;
-
-            var outLongTicks  = (Close[0] - orHigh) / TickSize;
-            var outShortTicks = (orLow - Close[0]) / TickSize;
+            
+            var outLongTicks  = (High[0] - orHigh) / TickSize;   // how far the bar's HIGH exceeded orHigh
+            var outShortTicks = (orLow - Low[0]) / TickSize;     // how far the bar's LOW broke below orLow
             
             if (longBreak && shortBreak)
             {
@@ -92,7 +92,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (EnableDiagnostics && CurrentBar != lastLoggedSigBar)
             {
-                LogDiag($"SIGCHK: close={Close[0]:F2} orH={orHigh:F2} orL={orLow:F2} outL={outLongTicks:F1}t outS={outShortTicks:F1}t emaF={emaFast[0]:F2} emaS={emaSlow[0]:F2} adx={adx[0]:F2}");
+                LogDiag($"SIGCHK: H={High[0]:F2} L={Low[0]:F2} C={Close[0]:F2} orH={orHigh:F2} orL={orLow:F2} outL={outLongTicks:F1}t outS={outShortTicks:F1}t need={MinTicksOutsideOrb}t emaF={emaFast[0]:F2} emaS={emaSlow[0]:F2} adx={adx[0]:F2}");
                 lastLoggedSigBar = CurrentBar;
             }
 
