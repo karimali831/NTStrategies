@@ -53,6 +53,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private string lastLoggedBlockReason;
 		private int    lastLoggedEmaDistBar;
 		private int    lastDiagBar;
+		
+		// Double top/bottom
+		private int lastDtbMarkBar = -1;
 
         // Constants
         private const string SigPrimaryLong  = "ORB1L";
@@ -88,6 +91,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name="Enable runner", Order=7, GroupName="01-General")]
         public bool EnableRunner { get; set; } = true;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Enable Double Top/Bottom Filter", Order=8, GroupName="01-General")]
+        public bool EnableDoubleTopBottomFilter { get; set; } = true;
         
         //-- FILTERS --//
         [NinjaScriptProperty]
@@ -141,6 +148,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name="ADX Min", Order=13, GroupName="02-Filters")]
         public int ADXMin { get; set; } = 15;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Double Top/Bottom Lookback Bars", Order=15, GroupName="02-Filters")]
+        public int DoubleTopBottomLookbackBars { get; set; } = 4;
+
+        [NinjaScriptProperty]
+        [Display(Name="Double Top/Bottom Max Diff Ticks", Order=16, GroupName="02-Filters")]
+        public int DoubleTopBottomMaxDiffTicks { get; set; } = 5;
         
         //-- RISK --//
         [NinjaScriptProperty]

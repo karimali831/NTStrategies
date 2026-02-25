@@ -56,5 +56,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             //     Brushes.Gray, new SimpleFont("Arial", 10),
             //     TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
         }
+        
+        private void DrawDoubleTopBottomMarkerIfAny()
+        {
+            if (!EnableDoubleTopBottomFilter)
+                return;
+
+            // once per bar (OnEachTick safe)
+            if (CurrentBar == lastDtbMarkBar)
+                return;
+
+            lastDtbMarkBar = CurrentBar;
+
+            if (!TryGetDoubleTopBottomClosedBars(out var isTop, out var isBot, out var lvl, out var dbg))
+                return;
+
+            if (!isTop && !isBot)
+                return;
+
+            // Per your request: purple dot at the BOTTOM of the candle
+            var y = Low[0] - (2 * TickSize);
+            var tag = isTop ? $"DTB_TOP_{CurrentBar}" : $"DTB_BOT_{CurrentBar}";
+            Draw.Dot(this, tag, false, 0, y, Brushes.Purple);
+
+            if (EnableDiagnostics)
+                LogDiag($"DTB MARK: {(isTop ? "DOUBLE_TOP" : "DOUBLE_BOTTOM")} lvl={lvl:F2} {dbg}", oncePerBar: true);
+        }
     }
 }

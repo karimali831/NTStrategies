@@ -149,6 +149,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             failReason = "ok";
 
+            if (EnableDoubleTopBottomFilter)
+            {
+                var passes = PassesDoubleTopBottomFilter(dir, out _);
+
+                if (passes)
+                {
+                    if (EnableDiagnostics)
+                    {
+                        LogDiag("PASSED double top/bottom filter", oncePerBar: true);
+                    }
+                    return true;
+                }
+            }
+            
             var minTicks = Math.Max(0, EntryEmaMinProximityTicks);
             var maxTicks = Math.Max(0, EntryEmaMaxProximityTicks);
 
@@ -333,6 +347,109 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             failReason = "ok";
+            return true;
+        }
+        
+        private bool TryGetDoubleTopBottomClosedBars(out bool isDoubleTop, out bool isDoubleBottom, out double levelPrice, out string debug)
+        {
+            isDoubleTop = false;
+            isDoubleBottom = false;
+            levelPrice = 0;
+            debug = "none";
+
+            var lookback = Math.Max(2, DoubleTopBottomLookbackBars);
+            var maxDiffTicks = Math.Max(1, DoubleTopBottomMaxDiffTicks);
+            var maxDiff = maxDiffTicks * TickSize;
+
+            // Use CLOSED bars only: barsAgo = 1..lookback
+            if (CurrentBar < lookback + 1)
+            {
+                debug = "insufficient-bars";
+                return false;
+            }
+
+            // --- Double Top (two highs within maxDiff)
+            int top1Idx = -1, top2Idx = -1;
+            double top1 = double.MinValue, top2 = double.MinValue;
+
+            for (int i = 1; i <= lookback; i++)
+            {
+                var h = High[i];
+                if (h > top1)
+                {
+                    top2 = top1; top2Idx = top1Idx;
+                    top1 = h;    top1Idx = i;
+                }
+                else if (h > top2)
+                {
+                    top2 = h; top2Idx = i;
+                }
+            }
+
+            if (top1Idx > 0 && top2Idx > 0 && Math.Abs(top1 - top2) <= maxDiff)
+            {
+                isDoubleTop = true;
+                levelPrice = (top1 + top2) * 0.5;
+                debug = $"double-top top1={top1:F2}@{top1Idx} top2={top2:F2}@{top2Idx} diffTicks={Math.Abs(top1-top2)/TickSize:F1}";
+                return true;
+            }
+
+            // --- Double Bottom (two lows within maxDiff)
+            int bot1Idx = -1, bot2Idx = -1;
+            double bot1 = double.MaxValue, bot2 = double.MaxValue;
+
+            for (int i = 1; i <= lookback; i++)
+            {
+                var l = Low[i];
+                if (l < bot1)
+                {
+                    bot2 = bot1; bot2Idx = bot1Idx;
+                    bot1 = l;    bot1Idx = i;
+                }
+                else if (l < bot2)
+                {
+                    bot2 = l; bot2Idx = i;
+                }
+            }
+
+            if (bot1Idx > 0 && bot2Idx > 0 && Math.Abs(bot1 - bot2) <= maxDiff)
+            {
+                isDoubleBottom = true;
+                levelPrice = (bot1 + bot2) * 0.5;
+                debug = $"double-bottom bot1={bot1:F2}@{bot1Idx} bot2={bot2:F2}@{bot2Idx} diffTicks={Math.Abs(bot1-bot2)/TickSize:F1}";
+                return true;
+            }
+
+            debug = "none";
+            return false;
+        }
+
+        
+
+        private bool PassesDoubleTopBottomFilter(int dir, out string failReason)
+        {
+            failReason = "ok";
+
+            if (!EnableDoubleTopBottomFilter)
+                return true;
+
+            if (!TryGetDoubleTopBottomClosedBars(out var isTop, out var isBot, out var lvl, out var dbg))
+                return true;
+
+            // Block LONGs into a double top (resistance)
+            if (dir > 0 && isTop)
+            {
+                failReason = $"double-top-block (lvl={lvl:F2})";
+                return false;
+            }
+
+            // Block SHORTs into a double bottom (support)
+            if (dir < 0 && isBot)
+            {
+                failReason = $"double-bottom-block (lvl={lvl:F2})";
+                return false;
+            }
+
             return true;
         }
     }
