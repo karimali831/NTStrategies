@@ -163,7 +163,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(Name="EMA separation max ticks (0=off)", Order=18, GroupName="02-Filters")]
-        public int EmaSeparationMaxTicks { get; set; } = 60;
+        public int EmaSeparationMaxTicks { get; set; } = 180;
         
         //-- RISK --//
         [NinjaScriptProperty]
