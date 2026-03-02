@@ -93,11 +93,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool EnableRunner { get; set; } = true;
         
         [NinjaScriptProperty]
-        [Display(Name="Enable Double Top/Bottom Filter", Order=8, GroupName="01-General")]
+        [Display(Name="Display Double Top/Bottom Dots", Order=8, GroupName="01-General")]
         public bool EnableDoubleTopBottomFilter { get; set; } = true;
         
         [NinjaScriptProperty]
-        [Display(Name="Require puullback", Order=9, GroupName="01-General")]
+        [Display(Name="Require pullback", Order=9, GroupName="01-General")]
         public bool RequirePullback { get; set; } = true;
         
         //-- FILTERS --//
