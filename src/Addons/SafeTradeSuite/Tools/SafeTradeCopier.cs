@@ -30,6 +30,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         public void Show()
         {
+            // If the window object exists but is no longer usable, drop it and rebuild
+            if (window != null)
+            {
+                if (!window.IsLoaded || window.Dispatcher.HasShutdownStarted || window.Dispatcher.HasShutdownFinished)
+                {
+                    window = null;
+                    uiDispatcher = null;
+                }
+            }
+
             if (window != null)
             {
                 if (!window.IsVisible)
@@ -47,19 +57,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Title = "Safe Trade Copier (v1)",
                 Width = 520,
                 Height = 620,
+                Content = BuildUi(engine),
                 Background = SystemColors.WindowBrush,
                 Foreground = SystemColors.WindowTextBrush
             };
 
             uiDispatcher = window.Dispatcher;
-            StartAccountsAutoRefresh();
-            
-            window.Content = BuildUi(engine);
+
             window.Closing += (s, e) =>
             {
                 if (allowWindowClose) return;
                 e.Cancel = true;
                 window.Hide();
+            };
+
+            // Important: if the window DOES close, clear refs so Show() rebuilds safely
+            window.Closed += (s, e) =>
+            {
+                uiDispatcher = null;
+                window = null;
+
+                engine?.Dispose();
+                engine = null;
             };
 
             window.Show();
