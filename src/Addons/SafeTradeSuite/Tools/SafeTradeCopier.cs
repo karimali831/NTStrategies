@@ -508,6 +508,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         private string instrumentName;
         private Instrument instrument;
 
+        // Shadow net position for master (avoids stale Account.Positions during ExecutionUpdate)
+        private int masterNetShadow;
+        private bool masterNetShadowInit;
+
         private volatile bool armed;
         private volatile bool copyEnabled;
         private readonly object gate = new object();
@@ -575,6 +579,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                     Log("Cannot ARM: no Connected followers.");
                     return;
                 }
+                
+                masterNetShadow = GetNetPosition(master, instrument);
+                masterNetShadowInit = true;
 
                 armed = true;
                 copyEnabled = false;
@@ -624,8 +631,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 }
 
                 armed = false;
+                masterNetShadowInit = false;
+                masterNetShadow = 0;
+                
                 RaiseModeChanged();
-
                 // Swap FIRST so no other thread can observe a disposed CTS in 'cts'
                 oldCts = cts;
                 cts = new CancellationTokenSource();
@@ -662,7 +671,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 return;
             }
 
-            var masterNet = GetNetPosition(master, instrument);
+            if (!masterNetShadowInit)
+            {
+                masterNetShadow = GetNetPosition(master, instrument);
+                masterNetShadowInit = true;
+            }
+
+            // Update shadow net using *this execution* (so entry is seen immediately)
+            masterNetShadow += SignedQtyFromExecution(e.Execution);
+
+            var masterTargetNet = masterNetShadow;
 
             // Capture a stable token source/token for this work item
             var localCts = cts;
@@ -673,7 +691,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 await submitLock.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
-                    await CopyToFollowers(execId, masterNet, token).ConfigureAwait(false);
+                    await CopyToFollowers(execId, masterTargetNet, token).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -760,6 +778,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                 Disarm($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}. Msg={msg}");
             }
+        }
+        
+        private int SignedQtyFromExecution(Execution exec)
+        {
+            if (exec == null) return 0;
+
+            var qty = (int)Math.Round((double)exec.Quantity, MidpointRounding.AwayFromZero);
+            if (qty == 0) return 0;
+
+            var action = exec.Order?.OrderAction ?? OrderAction.Buy;
+
+            // Buy / BuyToCover increases net, Sell / SellShort decreases net
+            if (action == OrderAction.Buy || action == OrderAction.BuyToCover)
+                return Math.Abs(qty);
+
+            if (action == OrderAction.Sell || action == OrderAction.SellShort)
+                return -Math.Abs(qty);
+
+            return 0;
         }
 
         private int GetNetPosition(Account acc, Instrument instr)
