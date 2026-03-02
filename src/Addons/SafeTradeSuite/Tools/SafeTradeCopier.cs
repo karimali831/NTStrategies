@@ -292,12 +292,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             return root;
         }
 
+        // private List<Account> GetSelectableAccounts()
+        // {
+        //     // Only Connected accounts (filters out dead/liquidated/closed)
+        //     // Playback accounts will only appear if connected (i.e., typically Market Replay)
+        //     return Account.All
+        //         .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected)
+        //         .OrderBy(a => a.Name)
+        //         .ToList();
+        // }
+
         private List<Account> GetSelectableAccounts()
         {
-            // Only Connected accounts (filters out dead/liquidated/closed)
-            // Playback accounts will only appear if connected (i.e., typically Market Replay)
             return Account.All
-                .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected)
+                .Where(a => a?.Connection != null)
                 .OrderBy(a => a.Name)
                 .ToList();
         }
