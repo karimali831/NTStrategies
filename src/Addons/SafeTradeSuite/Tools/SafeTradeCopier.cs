@@ -78,15 +78,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // followers
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // controls + status
 
+            var headerArea = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
             var header = new TextBlock
             {
                 Text = "Execution-based copier with circuit-breaker",
                 FontSize = 16,
-                Margin = new Thickness(0, 0, 0, 10),
+                Margin = new Thickness(0, 0, 0, 6),
                 Foreground = SystemColors.WindowTextBrush
             };
-            Grid.SetRow(header, 0);
-            root.Children.Add(header);
+
+            var modeText = new TextBlock
+            {
+                Text = "ARMED: OFF   |   COPY: OFF",
+                Margin = new Thickness(0, 0, 0, 12),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = SystemColors.WindowTextBrush
+            };
+
+            Grid.SetRow(modeText, 0);
+            root.Children.Add(modeText);
+
+            headerArea.Children.Add(header);
+            headerArea.Children.Add(modeText);
+
+            Grid.SetRow(headerArea, 0);
+            root.Children.Add(headerArea);
 
             // ---------------- Master + Instrument ----------------
             var row1 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
@@ -203,6 +225,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Background = Brushes.DimGray,
                 Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
+            };
+            
+            void UpdateModeUi(bool isArmed, bool isCopyOn)
+            {
+                modeText.Text = $"ARMED: {(isArmed ? "ON" : "OFF")}   |   COPY: {(isCopyOn ? "ON" : "OFF")}";
+
+                btnArm.IsEnabled = !isArmed;
+                btnOn.IsEnabled = isArmed && !isCopyOn;
+                btnOff.IsEnabled = isArmed;
+
+                // Optional: make Copy button show current intent
+                btnOn.Content = isCopyOn ? "COPY ON (active)" : "COPY ON";
+            }
+
+            UpdateModeUi(isArmed: false, isCopyOn: false);
+
+            eng.OnModeChanged += (a, c) =>
+            {
+                var disp = uiDispatcher ?? window?.Dispatcher;
+                if (disp == null) return;
+
+                disp.InvokeAsync(() => UpdateModeUi(a, c));
             };
 
             var status = new TextBox
@@ -459,6 +503,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         private CancellationTokenSource cts = new CancellationTokenSource();
 
         public event Action<string> OnStatus;
+        public event Action<bool, bool> OnModeChanged; 
 
         public void Configure(Account masterAccount, List<Account> followerAccounts, string instrumentName)
         {
@@ -473,6 +518,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 : Instrument.GetInstrument(this.instrumentName);
 
             Log($"Configured. Master={master?.Name}, Followers={followers.Count}, Instr='{this.instrumentName}'");
+        }
+        
+        private void RaiseModeChanged()
+        {
+            OnModeChanged?.Invoke(armed, copyEnabled);
         }
 
         public void Arm()
@@ -508,6 +558,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 armed = true;
                 copyEnabled = false;
 
+                RaiseModeChanged();
+
                 master.ExecutionUpdate += OnMasterExecution;
 
                 foreach (var f in followers)
@@ -529,6 +581,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             }
 
             copyEnabled = true;
+            RaiseModeChanged();
             Log("COPY ON.");
         }
 
@@ -550,6 +603,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 }
 
                 armed = false;
+                RaiseModeChanged();
 
                 // Swap FIRST so no other thread can observe a disposed CTS in 'cts'
                 oldCts = cts;
