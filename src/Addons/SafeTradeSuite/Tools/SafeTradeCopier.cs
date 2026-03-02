@@ -47,6 +47,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                 window.WindowState = WindowState.Normal;
                 window.Activate();
+                
+                StartAccountsAutoRefresh();
                 return;
             }
 
@@ -69,6 +71,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 if (allowWindowClose) return;
                 e.Cancel = true;
                 window.Hide();
+                StopAccountsAutoRefresh();
             };
 
             // Important: if the window DOES close, clear refs so Show() rebuilds safely
@@ -82,6 +85,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             };
 
             window.Show();
+            StartAccountsAutoRefresh();
         }
 
         private UIElement BuildUi(SafeCopierEngine eng)
@@ -119,9 +123,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 FontWeight = FontWeights.SemiBold,
                 Foreground = SystemColors.WindowTextBrush
             };
-
-            Grid.SetRow(modeText, 0);
-            root.Children.Add(modeText);
 
             headerArea.Children.Add(header);
             headerArea.Children.Add(modeText);
@@ -476,17 +477,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         public void Dispose()
         {
-            engine?.Dispose();
-            engine = null;
+            // Stop UI timers first (prevents ticks during shutdown)
+            StopAccountsAutoRefresh();
 
+            // Stop engine next (prevents background callbacks)
+            if (engine != null)
+            {
+                engine.Dispose();
+                engine = null;
+            }
+
+            // Close window last
             if (window != null)
             {
+                var w = window;          // capture local
+                window = null;           // important: prevent Show() from seeing a closing window
+                uiDispatcher = null;
+
                 allowWindowClose = true;
-                StopAccountsAutoRefresh();
-                
-                window.Close();
+                w.Close();
                 allowWindowClose = false;
-                window = null;
             }
         }
     }
