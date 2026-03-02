@@ -65,7 +65,13 @@
         <Compile Include="src\Addons\SafeTradeSuite\AddOns.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuManager.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuNodes.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Accounts.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Core.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ExecutionCopy.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\SafetyAndUtils.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UiEvents.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UiLayout.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\ToolRegistry.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />

@@ -12,6 +12,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 {
     public partial class SafeTradeCopierTool : IDisposable
     {
+        private Button btnBuyMkt;
+        private Button btnSellMkt;
+        private TextBox qtyBox;
+        private ComboBox atmBox;
+        
         private UIElement BuildUi(SafeCopierEngine eng)
         {
             var root = new Grid
@@ -101,7 +106,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             btnCopyOn = new Button
             {
-                Content = "COPY ON",
+                Content = "Trade Copier ON",
                 Height = 44,
                 Background = Brushes.DarkGreen,
                 Foreground = Brushes.White,
@@ -110,7 +115,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             btnCopyOff = new Button
             {
-                Content = "COPY OFF (panic)",
+                Content = "Trade Copier OFF",
                 Height = 44,
                 Background = Brushes.Maroon,
                 Foreground = Brushes.White,
@@ -119,7 +124,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             var btnQuit = new Button
             {
-                Content = "QUIT (close & dispose)",
+                Content = "Close",
                 Height = 44,
                 Background = Brushes.DimGray,
                 Foreground = Brushes.White,
@@ -237,6 +242,71 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                     };
                 }
             }
+            
+            // ---------------- Manual order controls (Master) ----------------
+            var orderGrid = new Grid { Margin = new Thickness(0, 6, 0, 8) };
+            orderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            orderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            btnBuyMkt = new Button
+            {
+                Content = "BUY MKT",
+                Height = 34,
+                Margin = new Thickness(0, 0, 6, 0),
+                Background = Brushes.DimGray,
+                Foreground = Brushes.White
+            };
+
+            btnSellMkt = new Button
+            {
+                Content = "SELL MKT",
+                Height = 34,
+                Margin = new Thickness(6, 0, 0, 0),
+                Background = Brushes.DimGray,
+                Foreground = Brushes.White
+            };
+
+            Grid.SetColumn(btnBuyMkt, 0);
+            Grid.SetColumn(btnSellMkt, 1);
+            orderGrid.Children.Add(btnBuyMkt);
+            orderGrid.Children.Add(btnSellMkt);
+
+            var qtyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+            qtyRow.Children.Add(new TextBlock
+            {
+                Text = "Order qty:",
+                Width = 90,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = SystemColors.WindowTextBrush
+            });
+
+            qtyBox = new TextBox
+            {
+                Height = 26,
+                Width = 80,
+                Text = "1",
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            qtyRow.Children.Add(qtyBox);
+
+            qtyRow.Children.Add(new TextBlock
+            {
+                Text = "ATM template:",
+                Width = 100,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = SystemColors.WindowTextBrush
+            });
+
+            atmBox = new ComboBox
+            {
+                Height = 26,
+                MinWidth = 180
+            };
+            qtyRow.Children.Add(atmBox);
+
+            // Add into row3 stack
+            row3.Children.Add(orderGrid);
+            row3.Children.Add(qtyRow);
 
             void RenderButtons(bool copyOn)
             {
@@ -305,6 +375,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             Grid.SetRow(row3, 3);
             root.Children.Add(row3);
+            
+            LoadAtmTemplatesInto(atmBox);
+            WireOrderButtons(eng, instrBox);
 
             if (accounts.Count == 0)
                 eng.Log("No accounts detected. Connect in Control Center first.");

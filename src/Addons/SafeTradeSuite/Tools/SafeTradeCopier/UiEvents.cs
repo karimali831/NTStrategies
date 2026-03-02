@@ -67,5 +67,74 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             return true;
         }
+        
+        private int ParseQtyOrDefault(string s, int fallback)
+        {
+            if (int.TryParse(s, out var v) && v > 0) return v;
+            return fallback;
+        }
+
+        private void WireOrderButtons(SafeCopierEngine eng, TextBox instrBox)
+        {
+            if (btnBuyMkt != null)
+                btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, instrBox?.Text, isBuy: true);
+
+            if (btnSellMkt != null)
+                btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, instrBox?.Text, isBuy: false);
+        }
+
+        private void SubmitMasterMarket(SafeCopierEngine eng, string instrumentName, bool isBuy)
+        {
+            if (eng == null)
+                return;
+
+            var master = masterBox?.SelectedItem as Account;
+            if (master == null)
+            {
+                eng.Log("Select a master account first.");
+                return;
+            }
+
+            var instrName = (instrumentName ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(instrName))
+            {
+                eng.Log("Instrument is empty.");
+                return;
+            }
+
+            var instr = Instrument.GetInstrument(instrName);
+            if (instr == null)
+            {
+                eng.Log("Invalid instrument (must match NT instrument exactly).");
+                return;
+            }
+
+            var qty = ParseQtyOrDefault(qtyBox?.Text, 1);
+            var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
+
+            // ATM is currently UI-only for AddOn (logged for now)
+            var atm = atmBox?.SelectedItem as string;
+            if (!string.IsNullOrWhiteSpace(atm) && !string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+                eng.Log($"ATM selected: {atm} (note: ATM attach not supported from AddOn yet)");
+
+            // This is the "master action" that should get copied by ExecutionUpdate
+            var ord = master.CreateOrder(
+                instr,
+                action,
+                OrderType.Market,
+                OrderEntry.Manual,
+                TimeInForce.Day,
+                qty,
+                0,
+                0,
+                string.Empty,
+                "STC:MANUAL",
+                DateTime.MaxValue,
+                null
+            );
+
+            eng.Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName}");
+            master.Submit(new[] { ord });
+        }
     }
 }

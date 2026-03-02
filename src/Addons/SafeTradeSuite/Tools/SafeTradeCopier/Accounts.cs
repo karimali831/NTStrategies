@@ -129,5 +129,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             if (engine.CopyEnabled)
                 engine.SetCopyEnabled(true);
         }
+        
+        private void LoadAtmTemplatesInto(ComboBox combo)
+        {
+            if (combo == null) return;
+
+            var items = new List<string> { "None" };
+
+            try
+            {
+                // Typical NT8 templates path:
+                // Documents\NinjaTrader 8\templates\AtmStrategy\
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var folder = System.IO.Path.Combine(docs, "NinjaTrader 8", "templates", "AtmStrategy");
+
+                if (System.IO.Directory.Exists(folder))
+                {
+                    foreach (var f in System.IO.Directory.GetFiles(folder, "*.xml"))
+                    {
+                        var name = System.IO.Path.GetFileNameWithoutExtension(f);
+                        if (!string.IsNullOrWhiteSpace(name))
+                            items.Add(name);
+                    }
+                }
+            }
+            catch
+            {
+                // No try/catch preference noted for “unhandled” —
+                // but template loading is non-critical UI. If you want *zero* try/catch,
+                // remove this and we’ll just let it throw (not recommended for UX).
+            }
+
+            items = items.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToList();
+            combo.ItemsSource = items;
+            combo.SelectedItem = items.Contains("None") ? "None" : items.FirstOrDefault();
+        }
     }
 }
