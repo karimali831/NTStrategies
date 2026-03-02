@@ -9,7 +9,7 @@ using NinjaTrader.Code;
 using NinjaTrader.NinjaScript;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 {
     public sealed class MenuNode
     {
