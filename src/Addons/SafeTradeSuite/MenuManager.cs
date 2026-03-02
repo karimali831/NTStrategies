@@ -187,8 +187,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 
             foreach (var obj in parent.Items)
             {
-                var sep = obj as Separator;
-                if (sep == null) continue;
+                if (!(obj is Separator sep)) continue;
 
                 var id = AutomationProperties.GetAutomationId(sep);
                 if (string.Equals(id, automationId, StringComparison.Ordinal))

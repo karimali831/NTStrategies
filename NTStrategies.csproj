@@ -63,7 +63,7 @@
     <ItemGroup>
         <Compile Include="Properties\AssemblyInfo.cs"/>
         <Compile Include="src\Addons\SafeTradeSuite\MenuManager.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\SafeTradeSuiteAddOn.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\AddOn.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />

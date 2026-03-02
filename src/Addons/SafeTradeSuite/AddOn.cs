@@ -10,7 +10,7 @@ using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
-    public class SafeTradeSuiteAddOn : AddOnBase
+    public class AddOn : AddOnBase
     {
         private Window controlCenterWindow;
 

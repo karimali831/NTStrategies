@@ -39,10 +39,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             {
                 Title = "Safe Trade Copier (v1)",
                 Width = 520,
-                Height = 520,
+                Height = 620,
                 Content = BuildUi(engine),
-                Background = Brushes.DimGray,
-                Foreground = Brushes.White
+
+                // Theme-aware: follows NT light/dark theme
+                Background = SystemColors.WindowBrush,
+                Foreground = SystemColors.WindowTextBrush
             };
 
             window.Closing += (s, e) =>
@@ -57,95 +59,128 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         private UIElement BuildUi(SafeCopierEngine eng)
         {
-            var root = new Grid { Margin = new Thickness(12) };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var root = new Grid
+            {
+                Margin = new Thickness(12),
+                Background = SystemColors.WindowBrush
+            };
+
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // master + instr
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // followers
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // controls + status
 
             var header = new TextBlock
             {
                 Text = "Execution-based copier with circuit-breaker",
                 FontSize = 16,
-                Margin = new Thickness(0, 0, 0, 10)
+                Margin = new Thickness(0, 0, 0, 10),
+                Foreground = SystemColors.WindowTextBrush
             };
             Grid.SetRow(header, 0);
             root.Children.Add(header);
 
+            // ---------------- Master + Instrument ----------------
             var row1 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
 
-            var masterBox = new ComboBox { Height = 26, Margin = new Thickness(0, 0, 0, 6) };
-            var instrBox = new TextBox { Height = 26, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 6) };
+            var masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
+            var instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 6) };
 
-            var accounts = Account.All.ToList();
+            var accounts = GetSelectableAccounts();
             masterBox.ItemsSource = accounts;
             masterBox.DisplayMemberPath = "Name";
             masterBox.SelectedItem = accounts.FirstOrDefault();
 
-            row1.Children.Add(new TextBlock { Text = "Master account:" });
+            row1.Children.Add(new TextBlock { Text = "Master account (Connected):", Foreground = SystemColors.WindowTextBrush });
             row1.Children.Add(masterBox);
-            row1.Children.Add(new TextBlock { Text = "Instrument (exact NT name):" });
+            row1.Children.Add(new TextBlock { Text = "Instrument (exact NT name):", Foreground = SystemColors.WindowTextBrush });
             row1.Children.Add(instrBox);
 
             Grid.SetRow(row1, 1);
             root.Children.Add(row1);
 
+            // ---------------- Followers (checkbox list) ----------------
             var row2 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
 
-            var followerList = new ListBox
+            row2.Children.Add(new TextBlock { Text = "Followers (Connected):", Foreground = SystemColors.WindowTextBrush });
+
+            var followersPanel = new StackPanel { Orientation = Orientation.Vertical };
+            var followersScroll = new ScrollViewer
             {
-                Height = 140,
-                SelectionMode = SelectionMode.Multiple,
-                ItemsSource = accounts,
-                DisplayMemberPath = "Name"
+                Height = 180,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = followersPanel,
+                Background = SystemColors.ControlLightBrush
             };
 
-            row2.Children.Add(new TextBlock { Text = "Followers (multi-select):" });
-            row2.Children.Add(followerList);
+            var followerCheckboxes = new List<CheckBox>();
+
+            foreach (var acc in accounts)
+            {
+                var cb = new CheckBox
+                {
+                    Content = acc.Name,
+                    Tag = acc,
+                    Margin = new Thickness(6, 3, 6, 3),
+                    Foreground = SystemColors.ControlTextBrush
+                };
+
+                followerCheckboxes.Add(cb);
+                followersPanel.Children.Add(cb);
+            }
+
+            row2.Children.Add(followersScroll);
 
             Grid.SetRow(row2, 2);
             root.Children.Add(row2);
 
+            // ---------------- Controls + Status ----------------
             var row3 = new StackPanel { Orientation = Orientation.Vertical };
 
-            var btnArm = new Button { Content = "ARM (required)", Height = 34, Background = Brushes.SteelBlue, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) };
-            var btnOn = new Button { Content = "COPY ON", Height = 34, Background = Brushes.DarkGreen, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) };
-            var btnOff = new Button { Content = "DISARM (panic)", Height = 34, Background = Brushes.Maroon, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6) };
-
-            var btnQuit = new Button
+            var btnArm = new Button
             {
-                Content = "QUIT (close & dispose)",
-                Height = 34,
-                Background = Brushes.DarkSlateGray,
+                Content = "ARM (required)",
+                Height = 40,
+                Background = Brushes.SteelBlue,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 6, 0, 6)
+            };
+
+            var btnOn = new Button
+            {
+                Content = "COPY ON",
+                Height = 40,
+                Background = Brushes.DarkGreen,
                 Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
             };
 
-            btnQuit.Click += (s, e) =>
+            var btnOff = new Button
             {
-                eng.Disarm("Quit");
-                eng.Dispose(); 
-
-                engine = null;
-
-                allowWindowClose = true;
-                window.Close(); 
-                window = null;
-                allowWindowClose = false;
+                Content = "DISARM (panic)",
+                Height = 40,
+                Background = Brushes.Maroon,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 6)
             };
 
-            var maxQtyBox = new TextBox { Height = 26, Text = "2", Margin = new Thickness(0, 6, 0, 6) };
-            var staggerMsBox = new TextBox { Height = 26, Text = "125", Margin = new Thickness(0, 0, 0, 6) };
-            var longOnly = new CheckBox { Content = "Long-only (never create shorts)", IsChecked = true, Margin = new Thickness(0, 4, 0, 0) };
+            var btnQuit = new Button
+            {
+                Content = "QUIT (close & dispose)",
+                Height = 40,
+                Background = Brushes.DimGray,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
 
             var status = new TextBox
             {
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = 120,
-                Background = Brushes.Black,
-                Foreground = Brushes.LightGray,
+                Height = 160,
+                Background = SystemColors.ControlLightBrush,
+                Foreground = SystemColors.ControlTextBrush,
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
@@ -164,30 +199,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             btnArm.Click += (s, e) =>
             {
                 var master = masterBox.SelectedItem as Account;
-                var followers = followerList.SelectedItems.Cast<Account>().Where(a => a != null).ToList();
-
                 if (master == null)
                 {
-                    eng.Log("Select a master account.");
+                    eng.Log("Select a master account (must be Connected).");
                     return;
                 }
+
+                var followers = followerCheckboxes
+                    .Where(cb => cb.IsChecked == true)
+                    .Select(cb => cb.Tag as Account)
+                    .Where(a => a != null)
+                    .ToList();
 
                 if (followers.Count == 0)
                 {
-                    eng.Log("Select at least one follower.");
+                    eng.Log("Select at least one follower (Connected).");
                     return;
                 }
-
-                var maxQty = ParseInt(maxQtyBox.Text, 2);
-                var staggerMs = ParseInt(staggerMsBox.Text, 125);
 
                 eng.Configure(
                     masterAccount: master,
                     followerAccounts: followers,
-                    instrumentName: instrBox.Text?.Trim(),
-                    maxAbsQtyPerFollower: Math.Max(1, maxQty),
-                    staggerMsPerFollower: Math.Max(0, staggerMs),
-                    longOnly: longOnly.IsChecked == true
+                    instrumentName: instrBox.Text?.Trim()
                 );
 
                 eng.Arm();
@@ -196,28 +229,44 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             btnOn.Click += (s, e) => eng.EnableCopying();
             btnOff.Click += (s, e) => eng.Disarm("Manual DISARM");
 
-            row3.Children.Add(new TextBlock { Text = "Max abs qty per follower (hard cap):" });
-            row3.Children.Add(maxQtyBox);
-            row3.Children.Add(new TextBlock { Text = "Stagger ms per follower:" });
-            row3.Children.Add(staggerMsBox);
-            row3.Children.Add(longOnly);
+            btnQuit.Click += (s, e) =>
+            {
+                eng.Disarm("Quit");
+                eng.Dispose();
+
+                engine = null;
+
+                allowWindowClose = true;
+                window.Close();
+                window = null;
+                allowWindowClose = false;
+            };
+
             row3.Children.Add(btnArm);
             row3.Children.Add(btnOn);
             row3.Children.Add(btnOff);
             row3.Children.Add(btnQuit);
-            row3.Children.Add(new TextBlock { Text = "Status:" });
+            row3.Children.Add(new TextBlock { Text = "Status:", Foreground = SystemColors.WindowTextBrush });
             row3.Children.Add(status);
 
             Grid.SetRow(row3, 3);
             root.Children.Add(row3);
 
+            // If no accounts, make it obvious
+            if (accounts.Count == 0)
+                eng.Log("No Connected accounts detected. Connect in Control Center first.");
+
             return root;
         }
 
-        private int ParseInt(string s, int fallback)
+        private List<Account> GetSelectableAccounts()
         {
-            if (int.TryParse(s, out var v)) return v;
-            return fallback;
+            // Only Connected accounts (filters out dead/liquidated/closed)
+            // Playback accounts will only appear if connected (i.e., typically Market Replay)
+            return Account.All
+                .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected)
+                .OrderBy(a => a.Name)
+                .ToList();
         }
 
         public void Dispose()
@@ -241,9 +290,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         private List<Account> followers = new List<Account>();
         private string instrumentName;
         private Instrument instrument;
-        private int maxAbsQtyPerFollower = 2;
-        private int staggerMsPerFollower = 125;
-        private bool longOnly = true;
 
         private volatile bool armed;
         private volatile bool copyEnabled;
@@ -251,30 +297,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         private readonly ConcurrentDictionary<string, long> seen = new ConcurrentDictionary<string, long>();
         private readonly ConcurrentQueue<long> copiedTicks = new ConcurrentQueue<long>();
-        private int maxCopiesPer2Sec = 20;
+
+        // Safety defaults (not exposed to UI)
+        private const int MaxAbsQtyPerFollower = 2;
+        private const int MaxCopiesPer2Sec = 20;
+        private const int StaggerMsPerFollower = 125;
 
         private readonly SemaphoreSlim submitLock = new SemaphoreSlim(1, 1);
         private CancellationTokenSource cts = new CancellationTokenSource();
 
         public event Action<string> OnStatus;
 
-        public void Configure(Account masterAccount, List<Account> followerAccounts, string instrumentName,
-            int maxAbsQtyPerFollower, int staggerMsPerFollower, bool longOnly)
+        public void Configure(Account masterAccount, List<Account> followerAccounts, string instrumentName)
         {
             Disarm("Reconfigure");
 
             master = masterAccount;
             followers = followerAccounts?.Where(a => a != null).Distinct().ToList() ?? new List<Account>();
             this.instrumentName = instrumentName ?? "";
-            this.maxAbsQtyPerFollower = maxAbsQtyPerFollower;
-            this.staggerMsPerFollower = staggerMsPerFollower;
-            this.longOnly = longOnly;
 
             instrument = string.IsNullOrWhiteSpace(this.instrumentName)
                 ? null
                 : Instrument.GetInstrument(this.instrumentName);
 
-            Log($"Configured. Master={master?.Name}, Followers={followers.Count}, Instr='{this.instrumentName}', MaxQty={this.maxAbsQtyPerFollower}, StaggerMs={this.staggerMsPerFollower}, LongOnly={this.longOnly}");
+            Log($"Configured. Master={master?.Name}, Followers={followers.Count}, Instr='{this.instrumentName}'");
         }
 
         public void Arm()
@@ -284,6 +330,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Log("Cannot ARM: missing master/followers.");
                 return;
             }
+
             if (instrument == null)
             {
                 Log("Cannot ARM: invalid instrument name (must match NT instrument exactly).");
@@ -293,6 +340,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             lock (gate)
             {
                 if (armed) return;
+
+                // Safety: ignore any follower that isn't connected at arm time
+                followers = followers
+                    .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected)
+                    .Distinct()
+                    .ToList();
+
+                if (followers.Count == 0)
+                {
+                    Log("Cannot ARM: no Connected followers.");
+                    return;
+                }
+
                 armed = true;
                 copyEnabled = false;
 
@@ -338,7 +398,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 armed = false;
 
                 cts.Cancel();
-                cts.Dispose(); 
+                cts.Dispose();
                 cts = new CancellationTokenSource();
 
                 seen.Clear();
@@ -351,51 +411,43 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         private void OnMasterExecution(object sender, ExecutionEventArgs e)
         {
-            try
+            if (!armed || !copyEnabled) return;
+            if (e?.Execution == null) return;
+            if (master == null || e.Execution.Account != master) return;
+            if (instrument == null) return;
+
+            if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != instrument.FullName)
+                return;
+
+            var execId = e.Execution.ExecutionId ?? "";
+            if (string.IsNullOrWhiteSpace(execId))
+                execId = $"{e.Execution.Time.Ticks}_{e.Execution.Price}_{e.Execution.Quantity}_{e.Execution.MarketPosition}";
+
+            if (!AllowCopyNow())
             {
-                if (!armed || !copyEnabled) return;
-                if (e?.Execution == null) return;
-                if (master == null || e.Execution.Account != master) return;
-                if (instrument == null) return;
+                Disarm("Circuit breaker: too many copied orders in short window");
+                return;
+            }
 
-                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != instrument.FullName)
-                    return;
+            var masterNet = GetNetPosition(master, instrument);
 
-                var execId = e.Execution.ExecutionId ?? "";
-                if (string.IsNullOrWhiteSpace(execId))
-                    execId = $"{e.Execution.Time.Ticks}_{e.Execution.Price}_{e.Execution.Quantity}_{e.Execution.MarketPosition}";
-
-                var masterNet = GetNetPosition(master, instrument);
-                if (longOnly && masterNet < 0)
-                    masterNet = 0;
-
-                if (!AllowCopyNow())
+            _ = Task.Run(async () =>
+            {
+                await submitLock.WaitAsync(cts.Token).ConfigureAwait(false);
+                try
                 {
-                    Disarm("Circuit breaker: too many copied orders in short window");
-                    return;
+                    await CopyToFollowers(execId, masterNet, cts.Token).ConfigureAwait(false);
                 }
-
-                _ = Task.Run(async () =>
+                finally
                 {
-                    await submitLock.WaitAsync(cts.Token).ConfigureAwait(false);
-                    try
-                    {
-                        await CopyToFollowers(execId, masterNet, cts.Token).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        submitLock.Release();
-                    }
-                }, cts.Token);
-            }
-            catch (Exception ex)
-            {
-                Disarm("Exception in OnMasterExecution: " + ex.Message);
-            }
+                    submitLock.Release();
+                }
+            }, cts.Token);
         }
 
         private async Task CopyToFollowers(string execId, int masterTargetNet, CancellationToken token)
         {
+            // occasional cleanup
             if (seen.Count > 5000)
             {
                 var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
@@ -421,17 +473,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 var followerNet = GetNetPosition(f, instrument);
                 var delta = masterTargetNet - followerNet;
 
-                if (longOnly)
-                {
-                    var desiredNet = followerNet + delta;
-                    if (desiredNet < 0)
-                        delta = -followerNet;
-                }
-
                 if (delta == 0) continue;
 
-                if (Math.Abs(delta) > maxAbsQtyPerFollower)
-                    delta = Math.Sign(delta) * maxAbsQtyPerFollower;
+                if (Math.Abs(delta) > MaxAbsQtyPerFollower)
+                    delta = Math.Sign(delta) * MaxAbsQtyPerFollower;
 
                 var key = $"{execId}|{f.Name}|{instrument.FullName}";
                 if (!seen.TryAdd(key, DateTime.UtcNow.Ticks))
@@ -440,14 +485,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 var action = delta > 0 ? OrderAction.Buy : OrderAction.SellShort;
                 var qty = Math.Abs(delta);
 
-                if (longOnly && action == OrderAction.SellShort)
-                    continue;
-
-                var name = $"STC:{execId}";
-                var ord = f.CreateOrder(instrument, action, OrderType.Market, OrderEntry.Manual, TimeInForce.Day,
-                    qty, 0, 0, string.Empty, name, DateTime.MaxValue, null);
-
-                if (qty <= 0 || qty > maxAbsQtyPerFollower)
+                if (qty <= 0 || qty > MaxAbsQtyPerFollower)
                 {
                     Disarm($"Safety stop: computed qty={qty} for follower={f.Name}");
                     return;
@@ -455,52 +493,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                 Log($"Copy -> {f.Name}: target={masterTargetNet}, followerNet={followerNet}, delta={delta}, action={action}, qty={qty}");
 
+                var ord = f.CreateOrder(instrument, action, OrderType.Market, OrderEntry.Manual, TimeInForce.Day,
+                    qty, 0, 0, string.Empty, $"STC:{execId}", DateTime.MaxValue, null);
+
                 f.Submit(new[] { ord });
                 RecordCopy();
 
-                if (staggerMsPerFollower > 0)
-                    await Task.Delay(staggerMsPerFollower, token).ConfigureAwait(false);
+                if (StaggerMsPerFollower > 0)
+                    await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
             }
         }
 
         private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
         {
-            try
+            if (!armed) return;
+            if (e?.Order == null) return;
+
+            if (string.IsNullOrWhiteSpace(e.Order.Name) || !e.Order.Name.StartsWith("STC:", StringComparison.Ordinal))
+                return;
+
+            if (e.Order.OrderState == OrderState.Rejected)
             {
-                if (!armed) return;
-                if (e?.Order == null) return;
+                var msg =
+                    $"Error={e.Error} " +
+                    $"State={e.Order.OrderState} " +
+                    $"Action={e.Order.OrderAction} " +
+                    $"Qty={e.Order.Quantity} " +
+                    $"Name={e.Order.Name}";
 
-                if (string.IsNullOrWhiteSpace(e.Order.Name) || !e.Order.Name.StartsWith("STC:", StringComparison.Ordinal))
-                    return;
-
-                if (e.Order.OrderState == OrderState.Rejected)
-                {
-                    var msg =
-                        $"Error={e.Error} " +
-                        $"State={e.Order.OrderState} " +
-                        $"Action={e.Order.OrderAction} " +
-                        $"Qty={e.Order.Quantity} " +
-                        $"Name={e.Order.Name}";
-
-                    var lower = msg.ToLowerInvariant();
-
-                    if (lower.Contains("rate limit") ||
-                        lower.Contains("liquidation") ||
-                        lower.Contains("max") ||
-                        lower.Contains("risk") ||
-                        lower.Contains("position") ||
-                        lower.Contains("order quantity"))
-                    {
-                        Disarm($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}. Msg={msg}");
-                        return;
-                    }
-
-                    Disarm($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}.");
-                }
-            }
-            catch
-            {
-                Disarm("Exception in follower OrderUpdate monitor");
+                Disarm($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}. Msg={msg}");
             }
         }
 
@@ -531,7 +552,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             while (copiedTicks.TryPeek(out var t) && t < cutoff)
                 copiedTicks.TryDequeue(out _);
 
-            return copiedTicks.Count <= maxCopiesPer2Sec;
+            return copiedTicks.Count <= MaxCopiesPer2Sec;
         }
 
         private void RecordCopy()
