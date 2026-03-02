@@ -534,6 +534,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         public void Disarm(string reason)
         {
+            CancellationTokenSource oldCts;
+
             lock (gate)
             {
                 copyEnabled = false;
@@ -549,8 +551,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                 armed = false;
 
-                cts.Cancel();
-                cts.Dispose();
+                // Swap FIRST so no other thread can observe a disposed CTS in 'cts'
+                oldCts = cts;
                 cts = new CancellationTokenSource();
 
                 seen.Clear();
@@ -559,6 +561,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 if (!string.IsNullOrWhiteSpace(reason))
                     Log($"DISARMED: {reason}");
             }
+
+            // Cancel/Dispose outside lock
+            oldCts.Cancel();
+            oldCts.Dispose();
         }
 
         private void OnMasterExecution(object sender, ExecutionEventArgs e)
@@ -583,18 +589,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             var masterNet = GetNetPosition(master, instrument);
 
-            _ = Task.Run(async () =>
+            // Capture a stable token source/token for this work item
+            var localCts = cts;
+            var token = localCts.Token;
+
+            Task.Run(async () =>
             {
-                await submitLock.WaitAsync(cts.Token).ConfigureAwait(false);
+                await submitLock.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
-                    await CopyToFollowers(execId, masterNet, cts.Token).ConfigureAwait(false);
+                    await CopyToFollowers(execId, masterNet, token).ConfigureAwait(false);
                 }
                 finally
                 {
                     submitLock.Release();
                 }
-            }, cts.Token);
+            }, token);
         }
 
         private async Task CopyToFollowers(string execId, int masterTargetNet, CancellationToken token)
