@@ -15,19 +15,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
         private Window _controlCenterWindow;
         private MenuManager _menuManager;
         private ToolRegistry _tools;
-
-        public AddOns()
-        {
-            _tools = new ToolRegistry();
-            _tools.Register(SafeTradeSuiteMenuNodes.ToolKeys.SafeTradeCopier, () => new SafeTradeCopierTool());
-        }
-
+        
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
                 Name = "SafeTradeSuite";
                 Description = "SafeTrade Suite - tools for safer execution and account operations.";
+                
+                _tools = new ToolRegistry();
+                _tools.Register(SafeTradeSuiteMenuNodes.ToolKeys.SafeTradeCopier, () => new SafeTradeCopierTool());
             }
             else if (State == State.Terminated)
             {
