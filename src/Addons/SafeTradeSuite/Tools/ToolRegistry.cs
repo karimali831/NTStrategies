@@ -7,42 +7,56 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 {
     public sealed class ToolRegistry : IDisposable
     {
-        private readonly Dictionary<string, Func<object>> factories = new Dictionary<string, Func<object>>(StringComparer.Ordinal);
-        private readonly Dictionary<string, object> instances = new Dictionary<string, object>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Func<object>> _factories =
+            new Dictionary<string, Func<object>>(StringComparer.Ordinal);
 
-        public void Register<T>(string key, Func<T> factory) where T : class
+        private readonly Dictionary<string, object> _instances =
+            new Dictionary<string, object>(StringComparer.Ordinal);
+
+        private readonly object _gate = new object();
+
+        public void RegisterSingleton<T>(string key, Func<T> factory) where T : class
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentException("key is required", nameof(key));
             if (factory == null) throw new ArgumentNullException(nameof(factory));
 
-            factories[key] = () => factory();
+            lock (_gate)
+            {
+                _factories[key] = factory;
+            }
         }
 
         public T Get<T>(string key) where T : class
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentException("key is required", nameof(key));
 
-            if (instances.TryGetValue(key, out var existing))
-                return existing as T;
+            lock (_gate)
+            {
+                if (_instances.TryGetValue(key, out var existing))
+                    return existing as T;
 
-            if (!factories.TryGetValue(key, out var create))
-                throw new InvalidOperationException($"Tool not registered: '{key}'");
+                if (!_factories.TryGetValue(key, out var create))
+                    throw new InvalidOperationException($"Tool not registered: '{key}'");
 
-            var obj = create();
-            instances[key] = obj;
-            return obj as T;
+                var obj = create();
+                _instances[key] = obj;
+                return obj as T;
+            }
         }
 
         public void Dispose()
         {
-            foreach (var kv in instances)
+            lock (_gate)
             {
-                if (kv.Value is IDisposable d)
-                    d.Dispose();
-            }
+                foreach (var kv in _instances)
+                {
+                    if (kv.Value is IDisposable d)
+                        d.Dispose();
+                }
 
-            instances.Clear();
-            factories.Clear();
+                _instances.Clear();
+                _factories.Clear();
+            }
         }
     }
 }

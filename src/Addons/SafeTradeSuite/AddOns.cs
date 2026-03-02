@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                 Description = "SafeTrade Suite - tools for safer execution and account operations.";
                 
                 _tools = new ToolRegistry();
-                _tools.Register(SafeTradeSuiteMenuNodes.ToolKeys.SafeTradeCopier, () => new SafeTradeCopierTool());
+                _tools.RegisterSingleton(SafeTradeSuiteMenuNodes.ToolKeys.SafeTradeCopier, () => new SafeTradeCopierTool());
             }
             else if (State == State.Terminated)
             {

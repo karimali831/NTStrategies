@@ -16,7 +16,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 {
     public sealed class SafeTradeCopierTool : IDisposable
     {
-        private Window window;
+        private static Window window;
+        private static readonly object windowGate = new object();
         private SafeCopierEngine engine;
         private Dispatcher uiDispatcher;
         private bool allowWindowClose;
@@ -30,62 +31,66 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
         public void Show()
         {
-            // If the window object exists but is no longer usable, drop it and rebuild
-            if (window != null)
+            lock (windowGate)
             {
-                if (!window.IsLoaded || window.Dispatcher.HasShutdownStarted || window.Dispatcher.HasShutdownFinished)
+                // If the window object exists but is no longer usable, drop it and rebuild
+                if (window != null)
                 {
-                    window = null;
-                    uiDispatcher = null;
+                    if (!window.IsLoaded || window.Dispatcher.HasShutdownStarted ||
+                        window.Dispatcher.HasShutdownFinished)
+                    {
+                        window = null;
+                        uiDispatcher = null;
+                    }
                 }
-            }
 
-            if (window != null)
-            {
-                if (!window.IsVisible)
-                    window.Show();
+                if (window != null)
+                {
+                    if (!window.IsVisible)
+                        window.Show();
 
-                window.WindowState = WindowState.Normal;
-                window.Activate();
-                
+                    window.WindowState = WindowState.Normal;
+                    window.Activate();
+
+                    StartAccountsAutoRefresh();
+                    return;
+                }
+
+                engine = new SafeCopierEngine();
+
+                window = new Window
+                {
+                    Title = "Safe Trade Copier (v1)",
+                    Width = 520,
+                    Height = 620,
+                    Content = BuildUi(engine),
+                    Background = SystemColors.WindowBrush,
+                    Foreground = SystemColors.WindowTextBrush
+                };
+
+                uiDispatcher = window.Dispatcher;
+
+                window.Closing += (s, e) =>
+                {
+                    if (allowWindowClose) return;
+                    e.Cancel = true;
+                    window.Hide();
+                    StopAccountsAutoRefresh();
+                };
+
+                // Important: if the window DOES close, clear refs so Show() rebuilds safely
+                window.Closed += (s, e) =>
+                {
+                    uiDispatcher = null;
+                    window = null;
+
+                    engine?.Dispose();
+                    engine = null;
+                };
+
+                window.Show();
                 StartAccountsAutoRefresh();
-                return;
             }
-
-            engine = new SafeCopierEngine();
-
-            window = new Window
-            {
-                Title = "Safe Trade Copier (v1)",
-                Width = 520,
-                Height = 620,
-                Content = BuildUi(engine),
-                Background = SystemColors.WindowBrush,
-                Foreground = SystemColors.WindowTextBrush
-            };
-
-            uiDispatcher = window.Dispatcher;
-
-            window.Closing += (s, e) =>
-            {
-                if (allowWindowClose) return;
-                e.Cancel = true;
-                window.Hide();
-                StopAccountsAutoRefresh();
-            };
-
-            // Important: if the window DOES close, clear refs so Show() rebuilds safely
-            window.Closed += (s, e) =>
-            {
-                uiDispatcher = null;
-                window = null;
-
-                engine?.Dispose();
-                engine = null;
-            };
-
-            window.Show();
-            StartAccountsAutoRefresh();
         }
 
         private UIElement BuildUi(SafeCopierEngine eng)
