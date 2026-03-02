@@ -20,6 +20,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         private SafeCopierEngine engine;
         private Dispatcher uiDispatcher;
         private bool allowWindowClose;
+        
+        private ComboBox masterBox;
+        private StackPanel followersPanel;
+        private List<CheckBox> followerCheckboxes;
+
+        private DispatcherTimer accountsTimer;
+        private List<Account> lastAccountsSnapshot = new List<Account>();
 
         public void Show()
         {
@@ -45,8 +52,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             };
 
             uiDispatcher = window.Dispatcher;
+            StartAccountsAutoRefresh();
+            
             window.Content = BuildUi(engine);
-
             window.Closing += (s, e) =>
             {
                 if (allowWindowClose) return;
@@ -83,7 +91,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             // ---------------- Master + Instrument ----------------
             var row1 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
 
-            var masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
+            masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
             var instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 6) };
 
             var accounts = GetSelectableAccounts();
@@ -104,7 +112,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             row2.Children.Add(new TextBlock { Text = "Copy accounts:", Foreground = SystemColors.WindowTextBrush });
 
-            var followersPanel = new StackPanel { Orientation = Orientation.Vertical };
+            followersPanel = new StackPanel { Orientation = Orientation.Vertical };
             var followersScroll = new ScrollViewer
             {
                 Height = 180,
@@ -113,7 +121,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Background = SystemColors.ControlLightBrush
             };
 
-            var followerCheckboxes = new List<CheckBox>();
+            followerCheckboxes = new List<CheckBox>();
 
             foreach (var acc in accounts)
             {
@@ -258,8 +266,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 eng.Dispose();
 
                 engine = null;
-
                 allowWindowClose = true;
+                
+                StopAccountsAutoRefresh();
+                
                 window.Close();
                 window = null;
                 allowWindowClose = false;
@@ -291,6 +301,115 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 .OrderBy(a => a.Name)
                 .ToList();
         }
+        
+        private void StartAccountsAutoRefresh()
+        {
+            if (accountsTimer != null) return;
+
+            accountsTimer = new DispatcherTimer(DispatcherPriority.Background, uiDispatcher ?? Dispatcher.CurrentDispatcher)
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            
+            accountsTimer.Tick += (s, e) => RefreshAccountsUi();
+            accountsTimer.Start();
+
+            RefreshAccountsUi(); // immediate first run
+        }
+
+        private void StopAccountsAutoRefresh()
+        {
+            if (accountsTimer == null) return;
+
+            accountsTimer.Stop();
+            accountsTimer = null;
+        }
+
+        private void RefreshAccountsUi()
+        {
+            if (window == null) return;
+            if (masterBox == null) return;
+            if (followersPanel == null) return;
+            if (followerCheckboxes == null) return;
+
+            // Preserve current selections
+            var prevMasterName = (masterBox.SelectedItem as Account)?.Name;
+            var prevChecked = new HashSet<string>(
+                followerCheckboxes
+                    .Where(cb => cb.IsChecked == true)
+                    .Select(cb => (cb.Tag as Account)?.Name)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+            );
+
+            // Recompute accounts
+            var accounts = GetSelectableAccounts();
+
+            // If nothing materially changed, skip UI rebuild
+            if (SameAccountList(lastAccountsSnapshot, accounts))
+                return;
+
+            lastAccountsSnapshot = accounts;
+
+            // Update master list
+            masterBox.ItemsSource = accounts;
+            masterBox.DisplayMemberPath = "Name";
+
+            var newMaster = !string.IsNullOrWhiteSpace(prevMasterName)
+                ? accounts.FirstOrDefault(a => a.Name == prevMasterName)
+                : null;
+
+            masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
+
+            // Rebuild followers checkboxes (excluding master)
+            var master = masterBox.SelectedItem as Account;
+            var masterName = master?.Name;
+
+            followersPanel.Children.Clear();
+            followerCheckboxes.Clear();
+
+            foreach (var acc in accounts)
+            {
+                if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
+                    continue;
+
+                var cb = new CheckBox
+                {
+                    Content = acc.Name,
+                    Tag = acc,
+                    Margin = new Thickness(6, 3, 6, 3),
+                    Foreground = SystemColors.ControlTextBrush,
+                    IsChecked = prevChecked.Contains(acc.Name)
+                };
+
+                followerCheckboxes.Add(cb);
+                followersPanel.Children.Add(cb);
+            }
+
+            // If master changes manually, we should also keep followers excluding it.
+            masterBox.SelectionChanged -= MasterBox_SelectionChanged;
+            masterBox.SelectionChanged += MasterBox_SelectionChanged;
+        }
+
+        private void MasterBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // When master changes, immediately refresh the followers list
+            RefreshAccountsUi();
+        }
+
+        private bool SameAccountList(List<Account> a, List<Account> b)
+        {
+            if (a == null || b == null) return false;
+            if (a.Count != b.Count) return false;
+
+            for (var i = 0; i < a.Count; i++)
+            {
+                // comparing by Name is stable enough for UI purposes
+                if (!string.Equals(a[i]?.Name, b[i]?.Name, StringComparison.Ordinal))
+                    return false;
+            }
+
+            return true;
+        }
 
         public void Dispose()
         {
@@ -300,6 +419,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             if (window != null)
             {
                 allowWindowClose = true;
+                StopAccountsAutoRefresh();
+                
                 window.Close();
                 allowWindowClose = false;
                 window = null;
