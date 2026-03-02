@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
@@ -18,7 +18,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
     {
         private Window window;
         private SafeCopierEngine engine;
-
+        private Dispatcher uiDispatcher;
         private bool allowWindowClose;
 
         public void Show()
@@ -40,12 +40,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Title = "Safe Trade Copier (v1)",
                 Width = 520,
                 Height = 620,
-                Content = BuildUi(engine),
-
-                // Theme-aware: follows NT light/dark theme
                 Background = SystemColors.WindowBrush,
                 Foreground = SystemColors.WindowTextBrush
             };
+
+            uiDispatcher = window.Dispatcher;
+            window.Content = BuildUi(engine);
 
             window.Closing += (s, e) =>
             {
@@ -91,9 +91,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             masterBox.DisplayMemberPath = "Name";
             masterBox.SelectedItem = accounts.FirstOrDefault();
 
-            row1.Children.Add(new TextBlock { Text = "Master account (Connected):", Foreground = SystemColors.WindowTextBrush });
+            row1.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
             row1.Children.Add(masterBox);
-            row1.Children.Add(new TextBlock { Text = "Instrument (exact NT name):", Foreground = SystemColors.WindowTextBrush });
+            row1.Children.Add(new TextBlock { Text = "Instrument:", Foreground = SystemColors.WindowTextBrush });
             row1.Children.Add(instrBox);
 
             Grid.SetRow(row1, 1);
@@ -102,7 +102,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             // ---------------- Followers (checkbox list) ----------------
             var row2 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
 
-            row2.Children.Add(new TextBlock { Text = "Followers (Connected):", Foreground = SystemColors.WindowTextBrush });
+            row2.Children.Add(new TextBlock { Text = "Copy accounts:", Foreground = SystemColors.WindowTextBrush });
 
             var followersPanel = new StackPanel { Orientation = Orientation.Vertical };
             var followersScroll = new ScrollViewer
@@ -128,6 +128,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 followerCheckboxes.Add(cb);
                 followersPanel.Children.Add(cb);
             }
+
+            void ApplyMasterExclusion()
+            {
+                var master = masterBox.SelectedItem as Account;
+
+                foreach (var cb in followerCheckboxes)
+                {
+                    var acc = cb.Tag as Account;
+                    var isMaster = (master != null && acc != null && ReferenceEquals(acc, master));
+
+                    if (isMaster)
+                    {
+                        cb.IsChecked = false;
+                        cb.Visibility = Visibility.Collapsed; // hide master from follower list
+                    }
+                    else
+                    {
+                        cb.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+
+            masterBox.SelectionChanged += (s, e) => ApplyMasterExclusion();
+            ApplyMasterExclusion();
 
             row2.Children.Add(followersScroll);
 
@@ -186,10 +210,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             eng.OnStatus += (msg) =>
             {
-                var disp = Application.Current?.Dispatcher;
+                var disp = uiDispatcher ?? window?.Dispatcher;
                 if (disp == null) return;
 
-                disp.Invoke(() =>
+                disp.InvokeAsync(() =>
                 {
                     status.AppendText($"{DateTime.Now:HH:mm:ss}  {msg}\n");
                     status.ScrollToEnd();
@@ -198,8 +222,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             btnArm.Click += (s, e) =>
             {
-                var master = masterBox.SelectedItem as Account;
-                if (master == null)
+                if (!(masterBox.SelectedItem is Account master))
                 {
                     eng.Log("Select a master account (must be Connected).");
                     return;
@@ -208,7 +231,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 var followers = followerCheckboxes
                     .Where(cb => cb.IsChecked == true)
                     .Select(cb => cb.Tag as Account)
-                    .Where(a => a != null)
+                    .Where(a => a != null && !ReferenceEquals(a, master))
                     .ToList();
 
                 if (followers.Count == 0)
