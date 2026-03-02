@@ -96,6 +96,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Enable Double Top/Bottom Filter", Order=8, GroupName="01-General")]
         public bool EnableDoubleTopBottomFilter { get; set; } = true;
         
+        [NinjaScriptProperty]
+        [Display(Name="Require puullback", Order=9, GroupName="01-General")]
+        public bool RequirePullback { get; set; } = true;
+        
         //-- FILTERS --//
         [NinjaScriptProperty]
         [Display(Name="EMA Fast", Order = 1, GroupName="02-Filters")]

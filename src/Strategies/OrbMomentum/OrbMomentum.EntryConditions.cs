@@ -89,9 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (sepMax > 0 && sepMin > sepMax)
                 (sepMin, sepMax) = (sepMax, sepMin);
 
-            var sepOk = true;
-            if (sepMin > 0 && sepTicks < sepMin)
-                sepOk = false;
+            var sepOk = !(sepMin > 0 && sepTicks < sepMin);
             if (sepMax > 0 && sepTicks > sepMax)
                 sepOk = false;
             
@@ -195,6 +193,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool EntryAtEmaFast(int dir, out string failReason)
         {
             failReason = "ok";
+
+            if (!RequirePullback)
+                return true;
             
             var minTicks = Math.Max(0, EntryEmaMinProximityTicks);
             var maxTicks = Math.Max(0, EntryEmaMaxProximityTicks);
