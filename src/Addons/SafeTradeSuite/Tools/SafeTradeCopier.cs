@@ -325,16 +325,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             btnQuit.Click += (s, e) =>
             {
-                eng.Disarm("Quit");
-                eng.Dispose();
-
-                engine = null;
                 allowWindowClose = true;
-                
-                StopAccountsAutoRefresh();
-                
                 window.Close();
-                window = null;
                 allowWindowClose = false;
             };
 
