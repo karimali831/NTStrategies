@@ -208,7 +208,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // enable/disable FlattenAll if ANY selected account has open position on instrument
             if (_btnFlattenAll != null)
+            {
                 _btnFlattenAll.IsEnabled = instr != null && master != null;
+                _engine.Log($"FlattenAll enabled={_btnFlattenAll.IsEnabled} (instr={(instr!=null ? instr.FullName : "null")})");
+            }
         }
         
         private void SubmitMasterMarket(SafeCopierEngine eng, bool isBuy)
