@@ -1,57 +1,37 @@
 ﻿#region Using declarations
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
-        internal partial class SafeCopierEngine : IDisposable
+        public partial class SafeCopierEngine
         {
             private bool AllowCopyNow()
             {
                 var cutoff = DateTime.UtcNow.AddSeconds(-2).Ticks;
-                while (copiedTicks.TryPeek(out var t) && t < cutoff)
-                    copiedTicks.TryDequeue(out _);
+                while (_copiedTicks.TryPeek(out var t) && t < cutoff)
+                    _copiedTicks.TryDequeue(out _);
 
-                return copiedTicks.Count <= MaxCopiesPer2Sec;
+                return _copiedTicks.Count <= MaxCopiesPer2Sec;
             }
             
             private void RecordCopy()
             {
-                copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
+                _copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
             }
             
-            private int SignedQtyFromExecution(Execution exec)
+            public int GetNetForUi(Account acc, Instrument instr)
             {
-                if (exec == null) return 0;
-
-                var qty = (int)Math.Round((double)exec.Quantity, MidpointRounding.AwayFromZero);
-                if (qty == 0) return 0;
-
-                var action = exec.Order?.OrderAction ?? OrderAction.Buy;
-
-                if (action == OrderAction.Buy || action == OrderAction.BuyToCover)
-                    return Math.Abs(qty);
-
-                if (action == OrderAction.Sell || action == OrderAction.SellShort)
-                    return -Math.Abs(qty);
-
-                return 0;
+                return GetNetPosition(acc, instr);
             }
-            
+
             private int GetNetPosition(Account acc, Instrument instr)
             {
+                if (acc == null || instr == null) return 0;
+
                 foreach (var p in acc.Positions)
                 {
                     if (p?.Instrument == null) continue;
@@ -69,6 +49,54 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 }
 
                 return 0;
+            }
+            
+            public static double GetAccountValue(Account a, AccountItem item)
+            {
+                if (a == null) return 0.0;
+
+                try
+                {
+                    // Most NT8 installs support this signature
+                    return a.Get(item, Currency.UsDollar);
+                }
+                catch
+                {
+                    return 0.0;
+                }
+            }
+
+            public static string FmtMoney(double v)
+            {
+                return v.ToString("+#,0.00;-#,0.00;0.00");
+            }
+
+            public void FlattenInstrument(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null) return;
+
+                var net = GetNetPosition(acc, instr);
+                if (net == 0) return;
+
+                var action = net > 0 ? OrderAction.Sell : OrderAction.BuyToCover;
+                var qty = Math.Abs(net);
+
+                var ord = acc.CreateOrder(
+                    instr,
+                    action,
+                    OrderType.Market,
+                    OrderEntry.Manual,
+                    TimeInForce.Day,
+                    qty,
+                    0,
+                    0,
+                    string.Empty,
+                    "STC:FLATTEN",
+                    DateTime.MaxValue,
+                    null
+                );
+
+                acc.Submit(new[] { ord });
             }
         }
     }

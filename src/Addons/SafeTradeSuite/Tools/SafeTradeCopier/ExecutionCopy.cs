@@ -7,20 +7,20 @@ using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool : IDisposable
     {
-        internal partial class SafeCopierEngine : IDisposable
+        public partial class SafeCopierEngine : IDisposable
         {
             private void OnMasterExecution(object sender, ExecutionEventArgs e)
             {
-                if (!armed || !copyEnabled) return;
+                if (!_armed || !_copyEnabled) return;
                 if (e?.Execution == null) return;
-                if (master == null || e.Execution.Account != master) return;
-                if (instrument == null) return;
+                if (_master == null || e.Execution.Account != _master) return;
+                if (_instrument == null) return;
 
-                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != instrument.FullName)
+                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
                 var execId = e.Execution.ExecutionId ?? "";
@@ -29,9 +29,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                 if (!AllowCopyNow())
                 {
-                    lock (gate)
+                    lock (_gate)
                     {
-                        copyEnabled = false;
+                        _copyEnabled = false;
                         DisarmUnsafe_NoLock("Circuit breaker: too many copies in short window");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: "Circuit breaker tripped");
@@ -39,61 +39,59 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                     return;
                 }
 
-                if (!masterNetShadowInit)
-                {
-                    masterNetShadow = GetNetPosition(master, instrument);
-                    masterNetShadowInit = true;
-                }
+                var masterExecQty = (int)Math.Round((double)e.Execution.Quantity, MidpointRounding.AwayFromZero);
+                masterExecQty = Math.Abs(masterExecQty);
+                if (masterExecQty <= 0) return;
 
-                // Update shadow net using *this execution*
-                masterNetShadow += SignedQtyFromExecution(e.Execution);
-                var masterTargetNet = masterNetShadow;
+                var masterAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
 
-                // Capture stable token
+                // For copying, we mirror the master *order action* direction.
+                // Sell = Sell (close long), BuyToCover = BuyToCover (close short), etc.
+                var followerAction = masterAction;
+
                 CancellationToken token;
                 CancellationTokenSource localCts;
-                lock (gate)
+                lock (_gate)
                 {
-                    localCts = cts;
+                    localCts = _cts;
                     token = localCts.Token;
                 }
 
                 Task.Run(async () =>
                 {
-                    await submitLock.WaitAsync(token).ConfigureAwait(false);
+                    await _submitLock.WaitAsync(token).ConfigureAwait(false);
                     try
                     {
-                        await CopyToFollowers(execId, masterTargetNet, token).ConfigureAwait(false);
+                        await CopyToFollowers(execId, followerAction, masterExecQty, token).ConfigureAwait(false);
                     }
                     finally
                     {
-                        submitLock.Release();
+                        _submitLock.Release();
                     }
                 }, token);
             }
  
-            private async Task CopyToFollowers(string execId, int masterTargetNet, CancellationToken token)
+            private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
             {
-                if (seen.Count > 5000)
+                if (_seen.Count > 5000)
                 {
                     var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
-                    foreach (var kv in seen.ToArray())
+                    foreach (var kv in _seen.ToArray())
                     {
                         if (kv.Value < cutoff)
-                            seen.TryRemove(kv.Key, out _);
+                            _seen.TryRemove(kv.Key, out _);
                     }
                 }
 
-                // Snapshot followers to avoid mid-iteration edits (safe even without try/catch)
                 List<Account> followerSnap;
                 Account masterSnap;
                 Instrument instrSnap;
 
-                lock (gate)
+                lock (_gate)
                 {
-                    followerSnap = followers.ToList();
-                    masterSnap = master;
-                    instrSnap = instrument;
+                    followerSnap = _followers.ToList();
+                    masterSnap = _master;
+                    instrSnap = _instrument;
                 }
 
                 foreach (var f in followerSnap)
@@ -105,9 +103,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
                     if (f.ConnectionStatus != ConnectionStatus.Connected)
                     {
-                        lock (gate)
+                        lock (_gate)
                         {
-                            copyEnabled = false;
+                            _copyEnabled = false;
                             DisarmUnsafe_NoLock($"Follower {f.Name} not Connected");
                             RaiseModeChanged_NoLock();
                             RaiseReady_NoLock(reasonOverride: $"Follower {f.Name} disconnected");
@@ -115,37 +113,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                         return;
                     }
 
-                    var followerNet = GetNetPosition(f, instrSnap);
-                    var delta = masterTargetNet - followerNet;
-
-                    if (delta == 0) continue;
-
-                    if (Math.Abs(delta) > MaxAbsQtyPerFollower)
-                        delta = Math.Sign(delta) * MaxAbsQtyPerFollower;
-
                     var key = $"{execId}|{f.Name}|{instrSnap.FullName}";
-                    if (!seen.TryAdd(key, DateTime.UtcNow.Ticks))
+                    if (!_seen.TryAdd(key, DateTime.UtcNow.Ticks))
                         continue;
 
-                    var action = delta > 0 ? OrderAction.Buy : OrderAction.SellShort;
-                    var qty = Math.Abs(delta);
-
+                    var qty = ResolveFollowerQty(f, masterExecQty);
                     if (qty <= 0 || qty > MaxAbsQtyPerFollower)
                     {
-                        lock (gate)
-                        {
-                            copyEnabled = false;
-                            DisarmUnsafe_NoLock($"Safety stop: qty={qty} follower={f.Name}");
-                            RaiseModeChanged_NoLock();
-                            RaiseReady_NoLock(reasonOverride: "Safety stop");
-                        }
-                        return;
+                        // Safety: cap follower qty by max-per-follower
+                        qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
                     }
 
-                    Log($"Copy -> {f.Name}: target={masterTargetNet}, followerNet={followerNet}, delta={delta}, action={action}, qty={qty}");
+                    var atm = ResolveFollowerAtm(f);
+                    if (!string.IsNullOrWhiteSpace(atm) && !string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+                        Log($"Follower {f.Name} ATM override: {atm} (stored; attach not enabled from AddOn yet)");
 
-                    var ord = f.CreateOrder(instrSnap, action, OrderType.Market, OrderEntry.Manual, TimeInForce.Day,
-                        qty, 0, 0, string.Empty, $"STC:{execId}", DateTime.MaxValue, null);
+                    Log($"Copy -> {f.Name}: action={action}, qty={qty}, instr={instrSnap.FullName}");
+
+                    var ord = f.CreateOrder(
+                        instrSnap,
+                        action,
+                        OrderType.Market,
+                        OrderEntry.Manual,
+                        TimeInForce.Day,
+                        qty,
+                        0,
+                        0,
+                        string.Empty,
+                        $"STC:{execId}",
+                        DateTime.MaxValue,
+                        null
+                    );
 
                     f.Submit(new[] { ord });
                     RecordCopy();
@@ -153,11 +151,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                     if (StaggerMsPerFollower > 0)
                         await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
                 }
+
             }
 
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
             {
-                if (!armed) return;
+                if (!_armed) return;
                 if (e?.Order == null) return;
 
                 if (string.IsNullOrWhiteSpace(e.Order.Name) || !e.Order.Name.StartsWith("STC:", StringComparison.Ordinal))
@@ -172,14 +171,44 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                         $"Qty={e.Order.Quantity} " +
                         $"Name={e.Order.Name}";
 
-                    lock (gate)
+                    lock (_gate)
                     {
-                        copyEnabled = false;
+                        _copyEnabled = false;
                         DisarmUnsafe_NoLock($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}. Msg={msg}");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: "Order rejected");
                     }
                 }
+            }
+            
+            private int ResolveFollowerQty(Account follower, int masterExecQty)
+            {
+                if (follower == null) return masterExecQty;
+
+                if (_configuredFollowerQtyOverrides != null &&
+                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q) &&
+                    q > 0)
+                    return q;
+
+                // inherit master execution qty (most consistent for strategy/manual)
+                return masterExecQty;
+            }
+
+            private string ResolveFollowerAtm(Account follower)
+            {
+                if (follower == null) return _configuredMasterAtm ?? "None";
+
+                if (_configuredFollowerAtmOverrides != null &&
+                    _configuredFollowerAtmOverrides.TryGetValue(follower.Name, out var a) &&
+                    !string.IsNullOrWhiteSpace(a))
+                {
+                    a = a.Trim();
+                    if (string.Equals(a, "(inherit master)", StringComparison.OrdinalIgnoreCase))
+                        return _configuredMasterAtm ?? "None";
+                    return a;
+                }
+
+                return _configuredMasterAtm ?? "None";
             }
         }
     }

@@ -7,98 +7,90 @@ using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
         // Single instance window (prevents multiple instances in NT)
-        private static Window window;
-        private static readonly object windowGate = new object();
+        private static Window _window;
+        private static readonly object WindowGate = new object();
 
-        private SafeCopierEngine engine;
-        private Dispatcher uiDispatcher;
-        private bool allowWindowClose;
+        private SafeCopierEngine _engine;
+        private Dispatcher _uiDispatcher;
+        private bool _allowWindowClose;
 
-        private ComboBox masterBox;
-        private TextBox instrBox;
+        private ComboBox _masterBox;
+        private TextBox _instrBox;
 
-        private StackPanel followersPanel;
-        private List<CheckBox> followerCheckboxes = new List<CheckBox>();
+        private StackPanel _followersPanel;
+        private readonly List<CheckBox> _followerCheckboxes = new List<CheckBox>();
 
-        private DispatcherTimer accountsTimer;
-        private List<AccountSnap> lastAccountsSnapshot = new List<AccountSnap>();
-
-        // UI state
-        private TextBlock headerStateText;
-        private TextBox statusBox;
-        private Button btnCopyOn;
-        private Button btnCopyOff;
-
-        private bool readyState;
-        private string readyReason = "";
+        private DispatcherTimer _accountsTimer;
+        private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
 
         public void Show()
         {
-            lock (windowGate)
+            lock (WindowGate)
             {
                 // If window exists but is no longer usable, drop it
-                if (window != null)
+                if (_window != null)
                 {
-                    if (!window.IsLoaded || window.Dispatcher.HasShutdownStarted || window.Dispatcher.HasShutdownFinished)
+                    if (!_window.IsLoaded || _window.Dispatcher.HasShutdownStarted || _window.Dispatcher.HasShutdownFinished)
                     {
-                        window = null;
-                        uiDispatcher = null;
+                        _window = null;
+                        _uiDispatcher = null;
                     }
                 }
 
-                if (window != null)
+                if (_window != null)
                 {
-                    if (!window.IsVisible)
-                        window.Show();
+                    if (!_window.IsVisible)
+                        _window.Show();
 
-                    window.WindowState = WindowState.Normal;
-                    window.Activate();
+                    _window.WindowState = WindowState.Normal;
+                    _window.Activate();
 
                     StartAccountsAutoRefresh();
                     return;
                 }
 
-                engine = new SafeCopierEngine();
+                _engine = new SafeCopierEngine();
 
-                window = new Window
+                _window = new Window
                 {
                     Title = "Safe Trade Copier (v1)",
                     Width = 520,
                     Height = 620,
                     Background = SystemColors.WindowBrush,
                     Foreground = SystemColors.WindowTextBrush,
-                    Content = BuildUi(engine),
+                    Content = BuildUi(_engine),
                 };
 
-                uiDispatcher = window.Dispatcher;
+                _uiDispatcher = _window.Dispatcher;
 
-                window.Closing += (s, e) =>
+                _window.Closing += (s, e) =>
                 {
-                    if (allowWindowClose) return;
+                    if (_allowWindowClose) return;
 
                     // Hide instead of closing
                     e.Cancel = true;
-                    window.Hide();
+                    _window.Hide();
                     StopAccountsAutoRefresh();
                 };
 
-                window.Closed += (s, e) =>
+                _window.Closed += (s, e) =>
                 {
                     StopAccountsAutoRefresh();
 
-                    uiDispatcher = null;
-                    window = null;
+                    _uiDispatcher = null;
+                    _window = null;
 
-                    engine?.Dispose();
-                    engine = null;
+                    _engine?.Dispose();
+                    _engine = null;
                 };
 
-                window.Show();
+                StopPnLTimer();
+                _window.Show();
                 StartAccountsAutoRefresh();
             }
         }
@@ -107,58 +99,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         {
             StopAccountsAutoRefresh();
 
-            if (engine != null)
+            if (_engine != null)
             {
-                engine.Dispose();
-                engine = null;
+                _engine.Dispose();
+                _engine = null;
             }
 
-            lock (windowGate)
+            lock (WindowGate)
             {
-                if (window != null)
+                if (_window != null)
                 {
-                    var w = window;
-                    window = null;
-                    uiDispatcher = null;
+                    var w = _window;
+                    _window = null;
+                    _uiDispatcher = null;
 
-                    allowWindowClose = true;
+                    _allowWindowClose = true;
                     w.Close();
-                    allowWindowClose = false;
-                }
-            }
-        }
-
-        private sealed class AccountSnap
-        {
-            public readonly string Name;
-            public readonly ConnectionStatus Status;
-            public readonly string ConnName;
-
-            public AccountSnap(Account a)
-            {
-                Name = a?.Name ?? "";
-                Status = a != null ? a.ConnectionStatus : ConnectionStatus.Disconnected;
-                ConnName = a?.Connection != null ? (a.Connection.Options?.Name ?? a.Connection.ToString()) : "";
-            }
-
-            public override bool Equals(object obj)
-            {
-                var o = obj as AccountSnap;
-                if (o == null) return false;
-                return string.Equals(Name, o.Name, StringComparison.Ordinal)
-                       && Status == o.Status
-                       && string.Equals(ConnName, o.ConnName, StringComparison.Ordinal);
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    var h = 17;
-                    h = h * 31 + (Name?.GetHashCode() ?? 0);
-                    h = h * 31 + Status.GetHashCode();
-                    h = h * 31 + (ConnName?.GetHashCode() ?? 0);
-                    return h;
+                    _allowWindowClose = false;
                 }
             }
         }

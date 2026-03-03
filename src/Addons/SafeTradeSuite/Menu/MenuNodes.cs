@@ -1,5 +1,6 @@
 ﻿#region Using declarations
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools;
+using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu

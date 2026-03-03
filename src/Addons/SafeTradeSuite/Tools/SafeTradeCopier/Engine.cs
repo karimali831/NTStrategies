@@ -1,63 +1,64 @@
-﻿#region Using declarations
-using System;
+﻿using System; 
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Threading;
 using NinjaTrader.Cbi;
-#endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool : IDisposable
     {
-        internal partial class SafeCopierEngine : IDisposable
+        public partial class SafeCopierEngine
         {
-            private Account master;
-            private List<Account> followers = new List<Account>();
-            private string instrumentName;
-            private Instrument instrument;
+            private Account _master;
+            private List<Account> _followers = new List<Account>();
+            private string _instrumentName;
+            private Instrument _instrument;
 
             // Config snapshot used for rewiring
-            private Account configuredMaster;
-            private List<Account> configuredFollowers = new List<Account>();
-            private string configuredInstrumentName;
-            private Instrument configuredInstrument;
+            private Account _configuredMaster;
+            private List<Account> _configuredFollowers = new List<Account>();
+            private string _configuredInstrumentName;
+            private Instrument _configuredInstrument;
 
-            // Shadow net position for master (avoids stale Account.Positions during ExecutionUpdate)
-            private int masterNetShadow;
-            private bool masterNetShadowInit;
+            private volatile bool _armed;
+            private volatile bool _copyEnabled;
+            private readonly object _gate = new object();
 
-            private volatile bool armed;
-            private volatile bool copyEnabled;
-            private readonly object gate = new object();
-
-            private readonly ConcurrentDictionary<string, long> seen = new ConcurrentDictionary<string, long>();
-            private readonly ConcurrentQueue<long> copiedTicks = new ConcurrentQueue<long>();
+            private readonly ConcurrentDictionary<string, long> _seen = new ConcurrentDictionary<string, long>();
+            private readonly ConcurrentQueue<long> _copiedTicks = new ConcurrentQueue<long>();
 
             // Safety defaults (not exposed to UI)
             private const int MaxAbsQtyPerFollower = 2;
             private const int MaxCopiesPer2Sec = 20;
             private const int StaggerMsPerFollower = 125;
 
-            private readonly SemaphoreSlim submitLock = new SemaphoreSlim(1, 1);
-            private CancellationTokenSource cts = new CancellationTokenSource();
+            private readonly SemaphoreSlim _submitLock = new SemaphoreSlim(1, 1);
+            private CancellationTokenSource _cts = new CancellationTokenSource();
 
             public event Action<string> OnStatus;
             public event Action<bool, bool> OnModeChanged;
             public event Action<bool, string> OnReadyChanged;
 
+            private string _configuredMasterAtm = "None";
+
+            private Dictionary<string, int> _configuredFollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
+            private Dictionary<string, string> _configuredFollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
+
             public bool CopyEnabled
             {
-                get { lock (gate) return copyEnabled; }
+                get { lock (_gate) return _copyEnabled; }
             }
 
-            public void ApplyConfig(Account masterAccount, List<Account> followerAccounts, string instrName)
+            public void ApplyConfig(
+                Account masterAccount,
+                List<Account> followerAccounts,
+                string instrName,
+                int masterQty,
+                string masterAtm,
+                Dictionary<string, int> followerQtyOverridesByAccountName,
+                Dictionary<string, string> followerAtmOverridesByAccountName)
             {
                 var followersClean = followerAccounts?
                     .Where(a => a != null && masterAccount != null && !ReferenceEquals(a, masterAccount))
@@ -67,17 +68,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 var name = instrName ?? "";
                 var instr = string.IsNullOrWhiteSpace(name) ? null : Instrument.GetInstrument(name);
 
-                lock (gate)
+                lock (_gate)
                 {
-                    configuredMaster = masterAccount;
-                    configuredFollowers = followersClean;
-                    configuredInstrumentName = name;
-                    configuredInstrument = instr;
+                    _configuredMaster = masterAccount;
+                    _configuredFollowers = followersClean;
+                    _configuredInstrumentName = name;
+                    _configuredInstrument = instr;
 
-                    // If COPY is ON and config becomes invalid -> fail safe to OFF
-                    if (copyEnabled && !IsReady_NoLock(out var reason))
+                    _configuredMasterAtm = string.IsNullOrWhiteSpace(masterAtm) ? "None" : masterAtm.Trim();
+
+                    _configuredFollowerQtyOverrides = followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
+                    _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
+
+                    if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
-                        copyEnabled = false;
+                        _copyEnabled = false;
                         DisarmUnsafe_NoLock("Config no longer valid");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: reason);
@@ -85,8 +90,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                         return;
                     }
 
-                    // If COPY is ON and config changed -> rewire immediately
-                    if (copyEnabled)
+                    if (_copyEnabled)
                         RewireUnsafe_NoLock("Config changed");
 
                     RaiseReady_NoLock();
@@ -95,13 +99,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             public void SetCopyEnabled(bool enabled)
             {
-                lock (gate)
+                lock (_gate)
                 {
                     if (enabled)
                     {
                         if (!IsReady_NoLock(out var reason))
                         {
-                            copyEnabled = false;
+                            _copyEnabled = false;
                             DisarmUnsafe_NoLock("COPY ON blocked");
                             RaiseModeChanged_NoLock();
                             RaiseReady_NoLock(reasonOverride: reason);
@@ -109,7 +113,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                             return;
                         }
 
-                        copyEnabled = true;
+                        _copyEnabled = true;
                         RewireUnsafe_NoLock("COPY ON");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock();
@@ -117,7 +121,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                     }
                     else
                     {
-                        copyEnabled = false;
+                        _copyEnabled = false;
                         DisarmUnsafe_NoLock("COPY OFF");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock();
@@ -128,7 +132,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             private void RaiseModeChanged_NoLock()
             {
-                OnModeChanged?.Invoke(armed, copyEnabled);
+                OnModeChanged?.Invoke(_armed, _copyEnabled);
             }
 
             private void RaiseReady_NoLock(string reasonOverride = null)
@@ -142,25 +146,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             private bool IsReady_NoLock(out string reason)
             {
-                if (configuredMaster == null)
+                if (_configuredMaster == null)
                 {
                     reason = "Select a master account";
                     return false;
                 }
 
-                if (configuredInstrument == null)
+                if (_configuredInstrument == null)
                 {
                     reason = "Invalid instrument (must match NT instrument name)";
                     return false;
                 }
 
-                if (configuredFollowers == null || configuredFollowers.Count == 0)
+                if (_configuredFollowers == null || _configuredFollowers.Count == 0)
                 {
                     reason = "Select at least one follower";
                     return false;
                 }
 
-                if (!configuredFollowers.Any(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected))
+                if (!_configuredFollowers.Any(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected))
                 {
                     reason = "No connected followers";
                     return false;
@@ -173,79 +177,75 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             private void RewireUnsafe_NoLock(string reason)
             {
                 // Tear down old wiring (if any)
-                if (armed)
+                if (_armed)
                 {
-                    if (master != null)
-                        master.ExecutionUpdate -= OnMasterExecution;
+                    if (_master != null)
+                        _master.ExecutionUpdate -= OnMasterExecution;
 
-                    foreach (var f in followers)
+                    foreach (var f in _followers)
                         f.OrderUpdate -= OnFollowerOrderUpdate;
                 }
 
                 // Apply current config into active fields used by copier
-                master = configuredMaster;
-                followers = (configuredFollowers ?? new List<Account>())
-                    .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected && master != null && !ReferenceEquals(a, master))
+                _master = _configuredMaster;
+                _followers = (_configuredFollowers ?? new List<Account>())
+                    .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected && _master != null && !ReferenceEquals(a, _master))
                     .Distinct()
                     .ToList();
 
-                instrumentName = configuredInstrumentName;
-                instrument = configuredInstrument;
+                _instrumentName = _configuredInstrumentName;
+                _instrument = _configuredInstrument;
 
                 // Reset shadow to current master position
-                masterNetShadow = (instrument != null && master != null) ? GetNetPosition(master, instrument) : 0;
-                masterNetShadowInit = (instrument != null && master != null);
 
                 // Arm only if we’re copy-enabled and ready
-                if (!copyEnabled || !IsReady_NoLock(out _))
+                if (!_copyEnabled || !IsReady_NoLock(out _))
                 {
-                    armed = false;
+                    _armed = false;
                     return;
                 }
 
-                armed = true;
+                _armed = true;
 
-                master.ExecutionUpdate += OnMasterExecution;
+                _master.ExecutionUpdate += OnMasterExecution;
 
-                foreach (var f in followers)
+                foreach (var f in _followers)
                     f.OrderUpdate += OnFollowerOrderUpdate;
 
                 // reset circuit-breaker bookkeeping
-                seen.Clear();
-                while (copiedTicks.TryDequeue(out _)) { }
+                _seen.Clear();
+                while (_copiedTicks.TryDequeue(out _)) { }
 
                 // token swap
-                var oldCts = cts;
-                cts = new CancellationTokenSource();
+                var oldCts = _cts;
+                _cts = new CancellationTokenSource();
                 oldCts.Cancel();
                 oldCts.Dispose();
 
-                Log($"ARMED (auto). Reason={reason}. Master={master?.Name}, Followers={followers.Count}, Instr='{instrumentName}'");
+                Log($"ARMED (auto). Reason={reason}. Master={_master?.Name}, Followers={_followers.Count}, Instr='{_instrumentName}'");
             }
 
             private void DisarmUnsafe_NoLock(string reason)
             {
-                if (armed)
+                if (_armed)
                 {
-                    if (master != null)
-                        master.ExecutionUpdate -= OnMasterExecution;
+                    if (_master != null)
+                        _master.ExecutionUpdate -= OnMasterExecution;
 
-                    foreach (var f in followers)
+                    foreach (var f in _followers)
                         f.OrderUpdate -= OnFollowerOrderUpdate;
                 }
 
-                armed = false;
-                masterNetShadowInit = false;
-                masterNetShadow = 0;
+                _armed = false;
 
                 // token swap
-                var oldCts = cts;
-                cts = new CancellationTokenSource();
+                var oldCts = _cts;
+                _cts = new CancellationTokenSource();
                 oldCts.Cancel();
                 oldCts.Dispose();
 
-                seen.Clear();
-                while (copiedTicks.TryDequeue(out _)) { }
+                _seen.Clear();
+                while (_copiedTicks.TryDequeue(out _)) { }
 
                 if (!string.IsNullOrWhiteSpace(reason))
                     Log($"DISARMED: {reason}");
@@ -255,19 +255,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             public void Dispose()
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    copyEnabled = false;
+                    _copyEnabled = false;
                     DisarmUnsafe_NoLock("Dispose");
                     RaiseModeChanged_NoLock();
                     RaiseReady_NoLock(reasonOverride: "Disposed");
                 }
 
-                submitLock.Dispose();
+                _submitLock.Dispose();
 
-                lock (gate)
+                lock (_gate)
                 {
-                    cts.Dispose();
+                    _cts.Dispose();
                 }
             }
         }

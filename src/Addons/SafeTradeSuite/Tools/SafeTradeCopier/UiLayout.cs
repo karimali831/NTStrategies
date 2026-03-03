@@ -5,17 +5,45 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
-        private Button btnBuyMkt;
-        private Button btnSellMkt;
-        private TextBox qtyBox;
-        private ComboBox atmBox;
+        private TextBlock _headerStateText;
+        private TextBox _statusBox;
+        private Button _btnCopyOn;
+        private Button _btnCopyOff;
+
+        private bool _readyState;
+        private string _readyReason = "";
+        
+        // ---- V2 UI controls ----
+        private TextBox _masterQtyBox;
+        private ComboBox _masterAtmBox;
+        private TextBlock _masterPnlText;
+        private TextBlock _totalPnlText;
+
+        private Button _btnBuyMkt;
+        private Button _btnSellMkt;
+        private Button _btnFlattenAll;
+        private DispatcherTimer _pnlTimer;
+
+        // follower rows
+        private sealed class FollowerRow
+        {
+            public Account Account;
+            public CheckBox EnabledCheck;
+            public TextBox QtyOverrideBox;
+            public ComboBox AtmOverrideBox;
+            public TextBlock PnlText;
+            public Button FlattenBtn;
+        }
+
+        private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
         
         private UIElement BuildUi(SafeCopierEngine eng)
         {
@@ -26,103 +54,223 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             };
 
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // master + instr
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // followers
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // controls + status
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // totals pnl
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // master
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // followers
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // copier buttons + status
 
             // ---------------- Header ----------------
-            var headerArea = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 10)
-            };
+            var headerArea = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 8) };
 
             var header = new TextBlock
             {
-                Text = "Execution-based copier with circuit-breaker",
+                Text = "Safe Trade Copier (v2)",
                 FontSize = 16,
-                Margin = new Thickness(0, 0, 0, 6),
+                Margin = new Thickness(0, 0, 0, 4),
                 Foreground = SystemColors.WindowTextBrush
             };
 
-            headerStateText = new TextBlock
+            _headerStateText = new TextBlock
             {
                 Text = "READY: ✗   |   COPY: OFF",
-                Margin = new Thickness(0, 0, 0, 8),
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = SystemColors.WindowTextBrush
             };
 
             headerArea.Children.Add(header);
-            headerArea.Children.Add(headerStateText);
+            headerArea.Children.Add(_headerStateText);
 
             Grid.SetRow(headerArea, 0);
             root.Children.Add(headerArea);
 
-            // ---------------- Master + Instrument ----------------
-            var row1 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
-
-            masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
-            instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 6) };
-
-            var accounts = GetSelectableAccounts();
-
-            masterBox.ItemsSource = accounts;
-            masterBox.DisplayMemberPath = "Name";
-            masterBox.SelectedItem = accounts.FirstOrDefault();
-
-            row1.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
-            row1.Children.Add(masterBox);
-            row1.Children.Add(new TextBlock { Text = "Instrument:", Foreground = SystemColors.WindowTextBrush });
-            row1.Children.Add(instrBox);
-
-            Grid.SetRow(row1, 1);
-            root.Children.Add(row1);
-
-            // ---------------- Followers (checkbox list) ----------------
-            var row2 = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 10) };
-
-            row2.Children.Add(new TextBlock { Text = "Copy accounts:", Foreground = SystemColors.WindowTextBrush });
-
-            followersPanel = new StackPanel { Orientation = Orientation.Vertical };
-            var followersScroll = new ScrollViewer
+            // ---------------- Totals PnL ----------------
+            _totalPnlText = new TextBlock
             {
-                Height = 180,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Content = followersPanel,
-                Background = SystemColors.ControlLightBrush
+                Text = "TOTAL PnL  R: 0.00  U: 0.00",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = SystemColors.WindowTextBrush,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            Grid.SetRow(_totalPnlText, 1);
+            root.Children.Add(_totalPnlText);
+
+            // ---------------- Master group ----------------
+            var masterBorder = new Border
+            {
+                BorderThickness = new Thickness(1),
+                BorderBrush = SystemColors.ActiveBorderBrush,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(10),
+                Margin = new Thickness(0, 0, 0, 10),
+                Background = SystemColors.WindowBrush
             };
 
-            BuildFollowerCheckboxes(accounts);
+            var masterStack = new StackPanel { Orientation = Orientation.Vertical };
 
-            row2.Children.Add(followersScroll);
-
-            Grid.SetRow(row2, 2);
-            root.Children.Add(row2);
-
-            // ---------------- Controls + Status ----------------
-            var row3 = new StackPanel { Orientation = Orientation.Vertical };
-
-            btnCopyOn = new Button
+            var masterTitle = new TextBlock
             {
-                Content = "Trade Copier ON",
+                Text = "Master",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = SystemColors.WindowTextBrush,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+
+            _masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
+            _instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 8) };
+
+            // Order buttons row (Buy / Sell / Flatten All)
+            var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            _btnBuyMkt = new Button
+            {
+                Content = "BUY MKT",
+                Height = 36,
+                Margin = new Thickness(0, 0, 6, 0),
+                Background = Brushes.DimGray,
+                Foreground = Brushes.White
+            };
+            _btnSellMkt = new Button
+            {
+                Content = "SELL MKT",
+                Height = 36,
+                Margin = new Thickness(6, 0, 6, 0),
+                Background = Brushes.DimGray,
+                Foreground = Brushes.White
+            };
+            _btnFlattenAll = new Button
+            {
+                Content = "FLATTEN ALL",
+                Height = 36,
+                Margin = new Thickness(6, 0, 0, 0),
+                Background = Brushes.Maroon,
+                Foreground = Brushes.White
+            };
+
+            Grid.SetColumn(_btnBuyMkt, 0);
+            Grid.SetColumn(_btnSellMkt, 1);
+            Grid.SetColumn(_btnFlattenAll, 2);
+            orderRow.Children.Add(_btnBuyMkt);
+            orderRow.Children.Add(_btnSellMkt);
+            orderRow.Children.Add(_btnFlattenAll);
+
+            // Master qty + ATM row
+            var qaRow = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var qtyLbl = new TextBlock
+            {
+                Text = "Order qty:",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = SystemColors.WindowTextBrush
+            };
+            _masterQtyBox = new TextBox { Height = 26, Text = "1", Margin = new Thickness(0, 0, 14, 0) };
+
+            var atmLbl = new TextBlock
+            {
+                Text = "ATM:",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = SystemColors.WindowTextBrush
+            };
+            _masterAtmBox = new ComboBox { Height = 26, MinWidth = 180 };
+
+            Grid.SetColumn(qtyLbl, 0);
+            Grid.SetColumn(_masterQtyBox, 1);
+            Grid.SetColumn(atmLbl, 2);
+            Grid.SetColumn(_masterAtmBox, 3);
+
+            qaRow.Children.Add(qtyLbl);
+            qaRow.Children.Add(_masterQtyBox);
+            qaRow.Children.Add(atmLbl);
+            qaRow.Children.Add(_masterAtmBox);
+
+            _masterPnlText = new TextBlock
+            {
+                Text = "Master PnL  R: 0.00  U: 0.00",
+                Margin = new Thickness(0, 2, 0, 0),
+                Foreground = SystemColors.WindowTextBrush,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            masterStack.Children.Add(masterTitle);
+            masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
+            masterStack.Children.Add(_masterBox);
+            masterStack.Children.Add(new TextBlock { Text = "Instrument:", Foreground = SystemColors.WindowTextBrush });
+            masterStack.Children.Add(_instrBox);
+            masterStack.Children.Add(orderRow);
+            masterStack.Children.Add(qaRow);
+            masterStack.Children.Add(_masterPnlText);
+
+            masterBorder.Child = masterStack;
+            Grid.SetRow(masterBorder, 2);
+            root.Children.Add(masterBorder);
+
+            // ---------------- Followers ----------------
+            var followersBorder = new Border
+            {
+                BorderThickness = new Thickness(1),
+                BorderBrush = SystemColors.ActiveBorderBrush,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(10),
+                Background = SystemColors.WindowBrush
+            };
+
+            var followersStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            followersStack.Children.Add(new TextBlock
+            {
+                Text = "Followers (override qty/ATM per account)",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = SystemColors.WindowTextBrush,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+
+            _followersPanel = new StackPanel { Orientation = Orientation.Vertical };
+            var followersScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Height = 220,
+                Content = _followersPanel,
+                Background = SystemColors.ControlLightBrush
+            };
+            followersStack.Children.Add(followersScroll);
+
+            followersBorder.Child = followersStack;
+            Grid.SetRow(followersBorder, 3);
+            root.Children.Add(followersBorder);
+
+            // ---------------- Copier buttons + Status ----------------
+            var bottom = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 10, 0, 0) };
+
+            _btnCopyOn = new Button
+            {
+                Content = "COPY ON",
                 Height = 44,
                 Background = Brushes.DarkGreen,
                 Foreground = Brushes.White,
-                Margin = new Thickness(0, 6, 0, 6)
+                Margin = new Thickness(0, 0, 0, 6)
             };
-
-            btnCopyOff = new Button
+            _btnCopyOff = new Button
             {
-                Content = "Trade Copier OFF",
+                Content = "COPY OFF",
                 Height = 44,
                 Background = Brushes.Maroon,
                 Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 6)
             };
 
-            var btnQuit = new Button
+            var btnClose = new Button
             {
                 Content = "Close",
                 Height = 44,
@@ -131,39 +279,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 Margin = new Thickness(0, 0, 0, 6)
             };
 
-            statusBox = new TextBox
+            _statusBox = new TextBox
             {
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = 160,
+                Height = 140,
                 Background = SystemColors.ControlLightBrush,
-                Foreground = SystemColors.ControlTextBrush,
-                Margin = new Thickness(0, 10, 0, 0)
+                Foreground = SystemColors.ControlTextBrush
             };
 
-            // Engine -> UI events
+            bottom.Children.Add(_btnCopyOn);
+            bottom.Children.Add(_btnCopyOff);
+            bottom.Children.Add(btnClose);
+            bottom.Children.Add(new TextBlock { Text = "Status:", Foreground = SystemColors.WindowTextBrush });
+            bottom.Children.Add(_statusBox);
+
+            Grid.SetRow(bottom, 4);
+            root.Children.Add(bottom);
+
+            // ---------------- Hook engine events ----------------
             eng.OnStatus += (msg) =>
             {
-                var disp = uiDispatcher ?? window?.Dispatcher;
+                var disp = _uiDispatcher ?? _window?.Dispatcher;
                 if (disp == null) return;
 
                 disp.InvokeAsync(() =>
                 {
-                    statusBox.AppendText($"{DateTime.Now:HH:mm:ss}  {msg}\n");
-                    statusBox.ScrollToEnd();
+                    _statusBox.AppendText($"{DateTime.Now:HH:mm:ss}  {msg}\n");
+                    _statusBox.ScrollToEnd();
                 });
             };
 
             eng.OnReadyChanged += (ready, reason) =>
             {
-                var disp = uiDispatcher ?? window?.Dispatcher;
+                var disp = _uiDispatcher ?? _window?.Dispatcher;
                 if (disp == null) return;
 
                 disp.InvokeAsync(() =>
                 {
-                    readyState = ready;
-                    readyReason = reason ?? "";
+                    _readyState = ready;
+                    _readyReason = reason ?? "";
                     RenderHeader(eng.CopyEnabled);
                     RenderButtons(eng.CopyEnabled);
                 });
@@ -171,7 +327,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
 
             eng.OnModeChanged += (armedIgnored, copyOn) =>
             {
-                var disp = uiDispatcher ?? window?.Dispatcher;
+                var disp = _uiDispatcher ?? _window?.Dispatcher;
                 if (disp == null) return;
 
                 disp.InvokeAsync(() =>
@@ -181,228 +337,164 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 });
             };
 
-            // Helpers
-            List<Account> GetSelectedFollowers(Account master)
-            {
-                return followerCheckboxes
-                    .Where(cb => cb.IsChecked == true)
-                    .Select(cb => cb.Tag as Account)
-                    .Where(a => a != null && master != null && !ReferenceEquals(a, master))
-                    .ToList();
-            }
-
-            void ApplyCurrentConfig()
-            {
-                var master = masterBox.SelectedItem as Account;
-                if (master == null)
-                {
-                    eng.ApplyConfig(null, new List<Account>(), instrBox.Text?.Trim());
-                    return;
-                }
-
-                var followers = GetSelectedFollowers(master);
-                eng.ApplyConfig(master, followers, instrBox.Text?.Trim());
-            }
-
-            void ApplyMasterExclusion()
-            {
-                var master = masterBox.SelectedItem as Account;
-                foreach (var cb in followerCheckboxes)
-                {
-                    var acc = cb.Tag as Account;
-                    var isMaster = (master != null && acc != null && ReferenceEquals(acc, master));
-                    if (isMaster)
-                    {
-                        cb.IsChecked = false;
-                        cb.Visibility = Visibility.Collapsed;
-                    }
-                    else
-                    {
-                        cb.Visibility = Visibility.Visible;
-                    }
-                }
-            }
-
-            void HookFollowerChangeHandlers()
-            {
-                foreach (var cb in followerCheckboxes)
-                {
-                    cb.Checked += (s, e) =>
-                    {
-                        ApplyCurrentConfig();
-                        if (eng.CopyEnabled)
-                            eng.SetCopyEnabled(true); // rewire immediately if needed
-                    };
-
-                    cb.Unchecked += (s, e) =>
-                    {
-                        ApplyCurrentConfig();
-                        if (eng.CopyEnabled)
-                            eng.SetCopyEnabled(true); // rewire immediately if needed
-                    };
-                }
-            }
-            
-            // ---------------- Manual order controls (Master) ----------------
-            var orderGrid = new Grid { Margin = new Thickness(0, 6, 0, 8) };
-            orderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            orderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            btnBuyMkt = new Button
-            {
-                Content = "BUY MKT",
-                Height = 34,
-                Margin = new Thickness(0, 0, 6, 0),
-                Background = Brushes.DimGray,
-                Foreground = Brushes.White
-            };
-
-            btnSellMkt = new Button
-            {
-                Content = "SELL MKT",
-                Height = 34,
-                Margin = new Thickness(6, 0, 0, 0),
-                Background = Brushes.DimGray,
-                Foreground = Brushes.White
-            };
-
-            Grid.SetColumn(btnBuyMkt, 0);
-            Grid.SetColumn(btnSellMkt, 1);
-            orderGrid.Children.Add(btnBuyMkt);
-            orderGrid.Children.Add(btnSellMkt);
-
-            var qtyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
-            qtyRow.Children.Add(new TextBlock
-            {
-                Text = "Order qty:",
-                Width = 90,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = SystemColors.WindowTextBrush
-            });
-
-            qtyBox = new TextBox
-            {
-                Height = 26,
-                Width = 80,
-                Text = "1",
-                Margin = new Thickness(0, 0, 12, 0)
-            };
-            qtyRow.Children.Add(qtyBox);
-
-            qtyRow.Children.Add(new TextBlock
-            {
-                Text = "ATM template:",
-                Width = 100,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = SystemColors.WindowTextBrush
-            });
-
-            atmBox = new ComboBox
-            {
-                Height = 26,
-                MinWidth = 180
-            };
-            qtyRow.Children.Add(atmBox);
-
-            // Add into row3 stack
-            row3.Children.Add(orderGrid);
-            row3.Children.Add(qtyRow);
-
             void RenderButtons(bool copyOn)
             {
-                btnCopyOn.IsEnabled = !copyOn;
-                btnCopyOff.IsEnabled = copyOn;
-                btnCopyOn.Content = copyOn ? "COPY ON (active)" : "COPY ON";
+                _btnCopyOn.IsEnabled = !copyOn;
+                _btnCopyOff.IsEnabled = copyOn;
+                _btnCopyOn.Content = copyOn ? "COPY ON (active)" : "COPY ON";
             }
 
             void RenderHeader(bool copyOn)
             {
-                var symbol = readyState ? "✓" : "✗";
-                var readyLabel = readyState ? "READY" : $"NOT READY ({readyReason})";
-                headerStateText.Text = $"{readyLabel}: {symbol}   |   COPY: {(copyOn ? "ON" : "OFF")}";
+                var symbol = _readyState ? "✓" : "✗";
+                var readyLabel = _readyState ? "READY" : $"NOT READY ({_readyReason})";
+                _headerStateText.Text = $"{readyLabel}: {symbol}   |   COPY: {(copyOn ? "ON" : "OFF")}";
             }
 
-            // Initial render
-            ApplyMasterExclusion();
-            HookFollowerChangeHandlers();
-            ApplyCurrentConfig(); // will raise ready state
+            // ---------------- Populate accounts + followers ----------------
+            var accounts = GetSelectableAccounts();
+            _masterBox.ItemsSource = accounts;
+            _masterBox.DisplayMemberPath = "Name";
+            _masterBox.SelectedItem = accounts.FirstOrDefault();
 
-            RenderHeader(copyOn: false);
-            RenderButtons(copyOn: false);
+            BuildFollowerRows(accounts);
 
-            // UI -> Engine actions
-            btnCopyOn.Click += (s, e) =>
+            // ATMs
+            LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
+            foreach (var r in _followerRows)
+                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+
+            // ---------------- UI -> Engine wiring ----------------
+            void ApplyAndMaybeRewire()
             {
-                ApplyMasterExclusion();
-                ApplyCurrentConfig();
+                ApplyConfigFromUi();
+                if (eng.CopyEnabled)
+                    eng.SetCopyEnabled(true);
+            }
+
+            _masterBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
+            _instrBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
+            _masterQtyBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
+            _masterAtmBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
+
+            _btnCopyOn.Click += (s, e) =>
+            {
+                ApplyConfigFromUi();
                 eng.SetCopyEnabled(true);
             };
 
-            btnCopyOff.Click += (s, e) =>
-            {
-                eng.SetCopyEnabled(false);
-            };
+            _btnCopyOff.Click += (s, e) => eng.SetCopyEnabled(false);
 
-            btnQuit.Click += (s, e) =>
+            btnClose.Click += (s, e) =>
             {
-                // true close + dispose (not hide)
-                allowWindowClose = true;
+                _allowWindowClose = true;
                 Dispose();
-                // Dispose() will close the window if needed
-                allowWindowClose = false;
+                _allowWindowClose = false;
             };
 
-            masterBox.SelectionChanged += (s, e) =>
-            {
-                ApplyMasterExclusion();
-                ApplyCurrentConfig();
-                if (eng.CopyEnabled)
-                    eng.SetCopyEnabled(true); // rewire to new master/followers
-            };
+            WireOrderButtons(eng);
+            WireFollowerFlattenButtons(eng);
 
-            instrBox.TextChanged += (s, e) =>
-            {
-                ApplyCurrentConfig();
-                if (eng.CopyEnabled)
-                    eng.SetCopyEnabled(true); // rewire if needed (instrument matters)
-            };
+            // initial config
+            ApplyConfigFromUi();
+            RenderHeader(copyOn: false);
+            RenderButtons(copyOn: false);
 
-            row3.Children.Add(btnCopyOn);
-            row3.Children.Add(btnCopyOff);
-            row3.Children.Add(btnQuit);
-            row3.Children.Add(new TextBlock { Text = "Status:", Foreground = SystemColors.WindowTextBrush });
-            row3.Children.Add(statusBox);
-
-            Grid.SetRow(row3, 3);
-            root.Children.Add(row3);
-            
-            LoadAtmTemplatesInto(atmBox);
-            WireOrderButtons(eng, instrBox);
-
-            if (accounts.Count == 0)
-                eng.Log("No accounts detected. Connect in Control Center first.");
+            // start pnl timer
+            StartPnLTimer();
 
             return root;
+        }
+        
+        private void BuildFollowerRows(List<Account> accounts)
+        {
+            _followerRows.Clear();
+            _followersPanel.Children.Clear();
 
-            // local function
-            void BuildFollowerCheckboxes(List<Account> accs)
+            var master = _masterBox?.SelectedItem as Account;
+            var masterName = master?.Name ?? "";
+
+            foreach (var acc in accounts)
             {
-                followersPanel.Children.Clear();
-                followerCheckboxes.Clear();
+                if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
+                    continue;
 
-                foreach (var acc in accs)
+                var rowGrid = new Grid { Margin = new Thickness(2, 2, 2, 2) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });   // checkbox
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });                    // qty
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });                   // atm
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });                   // pnl
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });                    // flatten
+
+                var enabled = new CheckBox
                 {
-                    var cb = new CheckBox
-                    {
-                        Content = acc.Name,
-                        Tag = acc,
-                        Margin = new Thickness(6, 3, 6, 3),
-                        Foreground = SystemColors.ControlTextBrush
-                    };
+                    Content = acc.Name,
+                    Tag = acc,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = SystemColors.ControlTextBrush
+                };
 
-                    followerCheckboxes.Add(cb);
-                    followersPanel.Children.Add(cb);
-                }
+                var qtyBox = new TextBox
+                {
+                    Height = 24,
+                    Margin = new Thickness(6, 0, 6, 0),
+                    ToolTip = "Qty override (blank = inherit master)"
+                };
+
+                var atmBox = new ComboBox
+                {
+                    Height = 24,
+                    Margin = new Thickness(6, 0, 6, 0),
+                    MinWidth = 160
+                };
+
+                var pnl = new TextBlock
+                {
+                    Text = "R: 0.00  U: 0.00",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = SystemColors.ControlTextBrush,
+                    Margin = new Thickness(6, 0, 6, 0)
+                };
+
+                var flatten = new Button
+                {
+                    Content = "Flatten",
+                    Height = 24,
+                    Background = Brushes.DimGray,
+                    Foreground = Brushes.White,
+                    IsEnabled = false
+                };
+
+                Grid.SetColumn(enabled, 0);
+                Grid.SetColumn(qtyBox, 1);
+                Grid.SetColumn(atmBox, 2);
+                Grid.SetColumn(pnl, 3);
+                Grid.SetColumn(flatten, 4);
+
+                rowGrid.Children.Add(enabled);
+                rowGrid.Children.Add(qtyBox);
+                rowGrid.Children.Add(atmBox);
+                rowGrid.Children.Add(pnl);
+                rowGrid.Children.Add(flatten);
+
+                var row = new FollowerRow
+                {
+                    Account = acc,
+                    EnabledCheck = enabled,
+                    QtyOverrideBox = qtyBox,
+                    AtmOverrideBox = atmBox,
+                    PnlText = pnl,
+                    FlattenBtn = flatten
+                };
+
+                // When user changes follower settings, we re-apply config (no re-arm UX)
+                enabled.Checked += (s, e) => ApplyConfigFromUi();
+                enabled.Unchecked += (s, e) => ApplyConfigFromUi();
+                qtyBox.TextChanged += (s, e) => ApplyConfigFromUi();
+                atmBox.SelectionChanged += (s, e) => ApplyConfigFromUi();
+
+                _followerRows.Add(row);
+                _followersPanel.Children.Add(rowGrid);
             }
         }
     }

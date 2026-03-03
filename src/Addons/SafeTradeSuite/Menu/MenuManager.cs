@@ -1,12 +1,10 @@
 ﻿#region Using declarations
 using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
-using NinjaTrader.Code;
-using NinjaTrader.NinjaScript;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
@@ -31,37 +29,36 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 
     public sealed class MenuManager : IDisposable
     {
-        private readonly Window controlCenterWindow;
-
-        private MenuItem toolsRoot;
-        private bool hooked;
+        private readonly Window _controlCenterWindow;
+        private MenuItem _toolsRoot;
+        private bool _hooked;
 
         private const string SuiteSeparatorAutomationId = "SafeTradeSuite_ToolsSeparator";
 
         public MenuManager(Window controlCenterWindow)
         {
-            this.controlCenterWindow = controlCenterWindow;
+            this._controlCenterWindow = controlCenterWindow;
         }
 
         public MenuItem FindToolsRootMenuItem()
         {
-            if (controlCenterWindow == null) return null;
+            if (_controlCenterWindow == null) return null;
 
             // In NT 8.1.x, top menu items are MenuItems in the visual tree.
-            return FindMenuItemByHeader(controlCenterWindow, "Tools");
+            return FindMenuItemByHeader(_controlCenterWindow, "Tools");
         }
 
         public void HookToolsMenu(MenuItem toolsRoot, MenuNode[] suiteNodes)
         {
             if (toolsRoot == null) return;
 
-            this.toolsRoot = toolsRoot;
+            this._toolsRoot = toolsRoot;
 
-            if (!hooked)
+            if (!_hooked)
             {
                 toolsRoot.SubmenuOpened -= ToolsRoot_SubmenuOpened;
                 toolsRoot.SubmenuOpened += ToolsRoot_SubmenuOpened;
-                hooked = true;
+                _hooked = true;
             }
 
             InjectMenuTree(toolsRoot, suiteNodes);
@@ -70,7 +67,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
         private void ToolsRoot_SubmenuOpened(object sender, RoutedEventArgs e)
         {
             // Re-inject on open (NT rebuilds menus sometimes, and recompiles can cause duplicates without guards)
-            if (toolsRoot == null) return;
+            if (_toolsRoot == null) return;
         }
 
         private void InjectMenuTree(MenuItem toolsRoot, MenuNode[] suiteNodes)
@@ -259,11 +256,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 
         public void Dispose()
         {
-            if (toolsRoot != null)
-                toolsRoot.SubmenuOpened -= ToolsRoot_SubmenuOpened;
+            if (_toolsRoot != null)
+                _toolsRoot.SubmenuOpened -= ToolsRoot_SubmenuOpened;
 
-            toolsRoot = null;
-            hooked = false;
+            _toolsRoot = null;
+            _hooked = false;
         }
     }
 }

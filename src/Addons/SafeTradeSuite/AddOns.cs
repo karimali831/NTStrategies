@@ -3,9 +3,10 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools;
+using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite

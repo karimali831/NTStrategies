@@ -1,25 +1,29 @@
 ﻿#region Using declarations
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
+namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool : IDisposable
     {
-        private List<Account> GetSelectableAccounts()
+        // private List<Account> GetSelectableAccounts()
+        // {
+        //     // “Connected in Accounts panel” practical filter:
+        //     // must have a connection object and be Connected.
+        //     return Account.All
+        //         .Where(a => a != null && a.Connection != null && a.ConnectionStatus == ConnectionStatus.Connected)
+        //         .OrderBy(a => a.Name)
+        //         .ToList();
+        // }
+        //
+        private static List<Account> GetSelectableAccounts()
         {
-            // “Connected in Accounts panel” practical filter:
-            // must have a connection object and be Connected.
             return Account.All
                 .Where(a => a != null && a.Connection != null && a.ConnectionStatus == ConnectionStatus.Connected)
                 .OrderBy(a => a.Name)
@@ -28,39 +32,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
         
         private void StartAccountsAutoRefresh()
         {
-            if (accountsTimer != null) return;
+            if (_accountsTimer != null) return;
 
-            var disp = uiDispatcher ?? Dispatcher.CurrentDispatcher;
+            var display = _uiDispatcher ?? Dispatcher.CurrentDispatcher;
 
-            accountsTimer = new DispatcherTimer(DispatcherPriority.Background, disp)
+            _accountsTimer = new DispatcherTimer(DispatcherPriority.Background, display)
             {
                 Interval = TimeSpan.FromSeconds(1)
             };
 
-            accountsTimer.Tick += (s, e) => RefreshAccountsUi();
-            accountsTimer.Start();
+            _accountsTimer.Tick += (s, e) => RefreshAccountsUi();
+            _accountsTimer.Start();
 
             RefreshAccountsUi();
         }
         
-                private void StopAccountsAutoRefresh()
+        private void StopAccountsAutoRefresh()
         {
-            if (accountsTimer == null) return;
-            accountsTimer.Stop();
-            accountsTimer = null;
+            if (_accountsTimer == null) return;
+            _accountsTimer.Stop();
+            _accountsTimer = null;
         }
 
         private void RefreshAccountsUi()
         {
-            if (window == null) return;
-            if (masterBox == null) return;
-            if (followersPanel == null) return;
-            if (engine == null) return;
+            if (_window == null) return;
+            if (_masterBox == null) return;
+            if (_followersPanel == null) return;
+            if (_engine == null) return;
 
             // Preserve selections
-            var prevMasterName = (masterBox.SelectedItem as Account)?.Name ?? "";
+            var prevMasterName = (_masterBox.SelectedItem as Account)?.Name ?? "";
             var prevChecked = new HashSet<string>(
-                followerCheckboxes
+                _followerCheckboxes
                     .Where(cb => cb.IsChecked == true)
                     .Select(cb => (cb.Tag as Account)?.Name)
                     .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -69,26 +73,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
             var accounts = GetSelectableAccounts();
 
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
-            if (SameSnapshot(lastAccountsSnapshot, snap))
+            if (SameSnapshot(_lastAccountsSnapshot, snap))
                 return;
 
-            lastAccountsSnapshot = snap;
+            _lastAccountsSnapshot = snap;
 
-            masterBox.ItemsSource = accounts;
-            masterBox.DisplayMemberPath = "Name";
+            _masterBox.ItemsSource = accounts;
+            _masterBox.DisplayMemberPath = "Name";
 
             var newMaster = !string.IsNullOrWhiteSpace(prevMasterName)
                 ? accounts.FirstOrDefault(a => a.Name == prevMasterName)
                 : null;
 
-            masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
+            _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
 
             // Rebuild follower list
-            var master = masterBox.SelectedItem as Account;
+            var master = _masterBox.SelectedItem as Account;
             var masterName = master?.Name ?? "";
 
-            followersPanel.Children.Clear();
-            followerCheckboxes.Clear();
+            _followersPanel.Children.Clear();
+            _followerCheckboxes.Clear();
 
             foreach (var acc in accounts)
             {
@@ -108,61 +112,60 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools
                 cb.Checked += (s, e) =>
                 {
                     ApplyConfigFromUi();
-                    if (engine.CopyEnabled)
-                        engine.SetCopyEnabled(true);
+                    if (_engine.CopyEnabled)
+                        _engine.SetCopyEnabled(true);
                 };
 
                 cb.Unchecked += (s, e) =>
                 {
                     ApplyConfigFromUi();
-                    if (engine.CopyEnabled)
-                        engine.SetCopyEnabled(true);
+                    if (_engine.CopyEnabled)
+                        _engine.SetCopyEnabled(true);
                 };
 
-                followerCheckboxes.Add(cb);
-                followersPanel.Children.Add(cb);
+                _followerCheckboxes.Add(cb);
+                _followersPanel.Children.Add(cb);
             }
 
             ApplyConfigFromUi();
 
             // If COPY is ON, ensure engine re-wires to the refreshed account objects
-            if (engine.CopyEnabled)
-                engine.SetCopyEnabled(true);
+            if (_engine.CopyEnabled)
+                _engine.SetCopyEnabled(true);
         }
         
-        private void LoadAtmTemplatesInto(ComboBox combo)
+        private sealed class AccountSnap
         {
-            if (combo == null) return;
+            private readonly string _name;
+            private readonly ConnectionStatus _status;
+            private readonly string _connName;
 
-            var items = new List<string> { "None" };
-
-            try
+            public AccountSnap(Account a)
             {
-                // Typical NT8 templates path:
-                // Documents\NinjaTrader 8\templates\AtmStrategy\
-                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var folder = System.IO.Path.Combine(docs, "NinjaTrader 8", "templates", "AtmStrategy");
+                _name = a?.Name ?? "";
+                _status = a?.ConnectionStatus ?? ConnectionStatus.Disconnected;
+                _connName = a?.Connection != null ? (a.Connection.Options?.Name ?? a.Connection.ToString()) : "";
+            }
 
-                if (System.IO.Directory.Exists(folder))
+            public override bool Equals(object obj)
+            {
+                if (!(obj is AccountSnap o)) return false;
+                return string.Equals(_name, o._name, StringComparison.Ordinal)
+                       && _status == o._status
+                       && string.Equals(_connName, o._connName, StringComparison.Ordinal);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
                 {
-                    foreach (var f in System.IO.Directory.GetFiles(folder, "*.xml"))
-                    {
-                        var name = System.IO.Path.GetFileNameWithoutExtension(f);
-                        if (!string.IsNullOrWhiteSpace(name))
-                            items.Add(name);
-                    }
+                    var h = 17;
+                    h = h * 31 + (_name?.GetHashCode() ?? 0);
+                    h = h * 31 + _status.GetHashCode();
+                    h = h * 31 + (_connName?.GetHashCode() ?? 0);
+                    return h;
                 }
             }
-            catch
-            {
-                // No try/catch preference noted for “unhandled” —
-                // but template loading is non-critical UI. If you want *zero* try/catch,
-                // remove this and we’ll just let it throw (not recommended for UX).
-            }
-
-            items = items.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToList();
-            combo.ItemsSource = items;
-            combo.SelectedItem = items.Contains("None") ? "None" : items.FirstOrDefault();
         }
     }
 }
