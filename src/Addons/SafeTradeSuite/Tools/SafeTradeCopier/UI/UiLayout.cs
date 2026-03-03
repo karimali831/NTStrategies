@@ -29,6 +29,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnSellMkt;
         private Button _btnFlattenAll;
         private DispatcherTimer _pnlTimer;
+        private CheckBox _chkSimOnly;
+        private bool _simOnlyMode = true; // default checked
 
         // follower rows
         private sealed class FollowerRow
@@ -79,6 +81,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             //     Margin = new Thickness(0, 0, 0, 4),
             //     Foreground = SystemColors.WindowTextBrush
             // };
+            
+            _chkSimOnly = new CheckBox
+            {
+                Content = "Simulation Mode (Sim / Playback only)",
+                IsChecked = true,
+                Margin = new Thickness(0, 0, 0, 6),
+                Foreground = SystemColors.WindowTextBrush
+            };
+            
+            var accounts = GetSelectableAccounts();
+
+            _chkSimOnly.Checked += (s, e) =>
+            {
+                _simOnlyMode = true;
+                EnforceSimOnlyModeUi(accounts);
+                ApplyConfigFromUi();
+            };
+
+            _chkSimOnly.Unchecked += (s, e) =>
+            {
+                _simOnlyMode = false;
+                EnforceSimOnlyModeUi(accounts);
+                ApplyConfigFromUi();
+            };
+
+            headerArea.Children.Add(_chkSimOnly);
 
             _headerStateText = new TextBlock
             {
@@ -368,7 +396,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             // ---------------- Populate accounts + followers ----------------
-            var accounts = GetSelectableAccounts();
             _masterBox.ItemsSource = accounts;
             _masterBox.DisplayMemberPath = "Name";
             _masterBox.SelectedItem = accounts.FirstOrDefault();
@@ -461,7 +488,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
                     continue;
-
+                
                 var rowGrid = new Grid { Margin = new Thickness(2, 2, 2, 2) };
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });   // checkbox
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });                    // qty

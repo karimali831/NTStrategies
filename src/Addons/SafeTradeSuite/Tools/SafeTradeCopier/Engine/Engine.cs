@@ -70,19 +70,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
+                    // PnL subscriptions: unsubscribe old, subscribe new
+                    var oldMaster = _configuredMaster;
+                    var oldFollowers = _configuredFollowers ?? new List<Account>();
+
+                    UnsubscribePnl(oldMaster);
+                    foreach (var f in oldFollowers) UnsubscribePnl(f);
+
+                    // overwrite config
                     _configuredMaster = masterAccount;
                     _configuredFollowers = followersClean;
                     _configuredInstrumentName = name;
                     _configuredInstrument = instr;
-
                     _configuredMasterAtm = string.IsNullOrWhiteSpace(masterAtm) ? "None" : masterAtm.Trim();
-
                     _configuredFollowerQtyOverrides = followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
                     _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
-                    
-                    // PnL subscriptions
-                    UnsubscribePnl(_master);
-                    foreach (var f in _followers) UnsubscribePnl(f);
+
+                    // subscribe new
+                    SubscribePnl(_configuredMaster);
+                    foreach (var f in _configuredFollowers) SubscribePnl(f);
 
                     SubscribePnl(_configuredMaster);
                     foreach (var f in _configuredFollowers) SubscribePnl(f);

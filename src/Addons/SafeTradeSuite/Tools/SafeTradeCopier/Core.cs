@@ -49,6 +49,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _window.Activate();
 
                     StartAccountsAutoRefresh();
+                    StartPnLTimer(); // ✅ restart UI polling every time we show
                     return;
                 }
 

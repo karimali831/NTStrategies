@@ -87,20 +87,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            
             public int GetNetPositionForUi(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null) return 0;
 
+                var want = instr.FullName ?? "";
+                if (string.IsNullOrWhiteSpace(want)) return 0;
+
                 foreach (var p in acc.Positions)
                 {
                     if (p?.Instrument == null) continue;
-                    if (!SameInstrument(p.Instrument, instr)) continue;
+                    if (!string.Equals(p.Instrument.FullName, want, StringComparison.Ordinal)) continue;
 
-                    var qty = (int)Math.Round((double)p.Quantity, MidpointRounding.AwayFromZero);
-                    if (p.MarketPosition == MarketPosition.Short) return -Math.Abs(qty);
-                    if (p.MarketPosition == MarketPosition.Long)  return  Math.Abs(qty);
-                    return 0;
+                    return (int)p.Quantity;
                 }
 
                 return 0;

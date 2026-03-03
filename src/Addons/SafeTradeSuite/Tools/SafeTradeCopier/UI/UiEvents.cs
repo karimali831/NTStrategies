@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
@@ -116,7 +118,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // --- master ---
             if (master != null)
             {
-                _engine.TryGetPnlForUi(master, out var r, out var u);
+                if (!_engine.TryGetPnlForUi(master, out var r, out var u))
+                {
+                    // fallback (first second after subscribe, cache can be empty)
+                    r = master.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                    u = master.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+                }
                 
                 totalR += r;
                 totalU += u;
@@ -137,7 +144,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var acc = row?.Account;
                 if (acc == null) continue;
 
-                _engine.TryGetPnlForUi(acc, out var r, out var u);
+                if (!_engine.TryGetPnlForUi(acc, out var r, out var u))
+                {
+                    // fallback (first second after subscribe, cache can be empty)
+                    r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                    u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+                }
 
                 totalR += r;
                 totalU += u;
@@ -167,6 +179,59 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_btnFlattenAll != null)
                 _btnFlattenAll.IsEnabled = instr != null && master != null;
             
+        }
+        
+        private void EnforceSimOnlyModeUi(List<Account> accounts)
+        {
+            if (accounts == null) return;
+
+            // 1) Master: if sim-only enabled and current selection is not sim -> move to first sim
+            if (_simOnlyMode && _masterBox != null)
+            {
+                if (_masterBox.SelectedItem is Account selected && !IsSimAccount(selected))
+                {
+                    var firstSim = accounts.FirstOrDefault(IsSimAccount);
+                    _masterBox.SelectedItem = firstSim; // may be null if none
+                }
+            }
+
+            // 2) Followers: disable + uncheck non-sim rows (and disable their overrides/flatten)
+            foreach (var r in _followerRows)
+            {
+                if (r?.Account == null) continue;
+
+                var allow = !_simOnlyMode || IsSimAccount(r.Account);
+
+                if (r.EnabledCheck != null)
+                {
+                    r.EnabledCheck.IsEnabled = allow;
+                    if (!allow) r.EnabledCheck.IsChecked = false;
+                }
+
+                if (r.QtyOverrideBox != null) r.QtyOverrideBox.IsEnabled = allow;
+                if (r.AtmOverrideBox != null) r.AtmOverrideBox.IsEnabled = allow;
+                if (r.FlattenBtn != null) r.FlattenBtn.IsEnabled = false; // PnL timer will re-enable when allowed+net!=0
+            }
+
+            UpdateMasterComboItemEnablement();
+        }
+        
+        private void UpdateMasterComboItemEnablement()
+        {
+            // containers may not exist yet
+            _masterBox?.Dispatcher?.InvokeAsync(() =>
+            {
+                foreach (var item in _masterBox.Items)
+                {
+                    var acc = item as Account;
+                    var c = _masterBox.ItemContainerGenerator.ContainerFromItem(item) as ComboBoxItem;
+                    if (c == null) continue;
+
+                    var allow = !_simOnlyMode || IsSimAccount(acc);
+                    c.IsEnabled = allow;
+                    c.Opacity = allow ? 1.0 : 0.45;
+                }
+            }, DispatcherPriority.Loaded);
         }
     }
 }
