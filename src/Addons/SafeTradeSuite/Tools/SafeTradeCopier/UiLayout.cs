@@ -166,6 +166,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = Brushes.Maroon,
                 Foreground = Brushes.White
             };
+            
+            _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
+            _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
+            _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
 
             Grid.SetColumn(_btnBuyMkt, 0);
             Grid.SetColumn(_btnSellMkt, 1);
@@ -406,8 +410,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Dispose();
                 _allowWindowClose = false;
             };
-
-            WireOrderButtons(eng);
+            
             WireFollowerFlattenButtons(eng);
 
             // initial config
@@ -424,6 +427,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Content = root
             };
+        }
+        
+        private void WireFollowerFlattenButtons(SafeCopierEngine eng)
+        {
+            foreach (var r in _followerRows)
+            {
+                if (r?.FlattenBtn == null) continue;
+
+                r.FlattenBtn.Click += (s, e) =>
+                {
+                    if (eng == null) return;
+                    if (r.Account == null) return;
+
+                    var instrName = (_instrBox?.Text ?? "").Trim();
+                    var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
+                    if (instr == null)
+                    {
+                        eng.Log("Invalid instrument (must match NT instrument exactly).");
+                        return;
+                    }
+
+                    eng.FlattenInstrument(r.Account, instr);
+                    eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
+                };
+            }
         }
         
         private void BuildFollowerRows(List<Account> accounts)
