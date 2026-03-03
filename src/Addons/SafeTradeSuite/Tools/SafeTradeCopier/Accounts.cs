@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
@@ -22,8 +21,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         //         .ToList();
         // }
         //
-        private static List<Account> GetSelectableAccounts()
+        
+        private List<Account> GetSelectableAccounts()
         {
+            // “Connected in Accounts panel” practical filter:
+            // must have a connection object and be Connected.
             return Account.All
                 .Where(a => a != null && a.Connection != null && a.ConnectionStatus == ConnectionStatus.Connected)
                 .OrderBy(a => a.Name)
@@ -35,7 +37,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_accountsTimer != null) return;
 
             var display = _uiDispatcher ?? Dispatcher.CurrentDispatcher;
-
             _accountsTimer = new DispatcherTimer(DispatcherPriority.Background, display)
             {
                 Interval = TimeSpan.FromSeconds(1)
@@ -61,15 +62,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_followersPanel == null) return;
             if (_engine == null) return;
 
-            // Preserve selections
+            // Preserve selections / overrides from the *row* UI
             var prevMasterName = (_masterBox.SelectedItem as Account)?.Name ?? "";
-            var prevChecked = new HashSet<string>(
-                _followerCheckboxes
-                    .Where(cb => cb.IsChecked == true)
-                    .Select(cb => (cb.Tag as Account)?.Name)
-                    .Where(n => !string.IsNullOrWhiteSpace(n))
-            );
 
+            var prevFollowers = new Dictionary<string, PrevFollowerState>(StringComparer.Ordinal);
+            foreach (var r in _followerRows)
+            {
+                var name = r?.AccountName;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                prevFollowers[name] = new PrevFollowerState
+                {
+                    Included = r.IncludeCheck != null && r.IncludeCheck.IsChecked == true,
+                    OverrideEnabled = r.OverrideCheck != null && r.OverrideCheck.IsChecked == true,
+                    QtyText = r.QtyBox?.Text ?? "",
+                    AtmName = r.AtmBox?.SelectedItem as string
+                };
+            }
+
+            // Recompute accounts
             var accounts = GetSelectableAccounts();
 
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
@@ -78,6 +89,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _lastAccountsSnapshot = snap;
 
+            // Update master list
             _masterBox.ItemsSource = accounts;
             _masterBox.DisplayMemberPath = "Name";
 
@@ -87,53 +99,52 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
 
-            // Rebuild follower list
-            var master = _masterBox.SelectedItem as Account;
-            var masterName = master?.Name ?? "";
+            // Rebuild follower rows (with override UI)
+            // Rebuild follower rows (with override UI)
+            BuildFollowerRows(accounts);
 
-            _followersPanel.Children.Clear();
-            _followerCheckboxes.Clear();
+            // Load ATM templates into newly created follower rows (followers include inherit option)
+            foreach (var r in _followerRows)
+                LoadAtmTemplatesInto(r?.AtmBox, includeInherit: true);
 
-            foreach (var acc in accounts)
+            // Restore preserved UI state (included + overrides)
+            foreach (var r in _followerRows)
             {
-                if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
+                if (r == null) continue;
+
+                if (!prevFollowers.TryGetValue(r.AccountName, out var ps))
                     continue;
 
-                var cb = new CheckBox
-                {
-                    Content = acc.Name,
-                    Tag = acc,
-                    Margin = new Thickness(6, 3, 6, 3),
-                    Foreground = SystemColors.ControlTextBrush,
-                    IsChecked = prevChecked.Contains(acc.Name)
-                };
+                if (r.IncludeCheck != null) r.IncludeCheck.IsChecked = ps.Included;
 
-                // Hook changes: auto re-apply config / rewire if COPY ON
-                cb.Checked += (s, e) =>
-                {
-                    ApplyConfigFromUi();
-                    if (_engine.CopyEnabled)
-                        _engine.SetCopyEnabled(true);
-                };
+                // If you still have an override checkbox in UI, restore it.
+                if (r.OverrideCheck != null) r.OverrideCheck.IsChecked = ps.OverrideEnabled;
 
-                cb.Unchecked += (s, e) =>
-                {
-                    ApplyConfigFromUi();
-                    if (_engine.CopyEnabled)
-                        _engine.SetCopyEnabled(true);
-                };
+                if (r.QtyBox != null) r.QtyBox.Text = ps.QtyText ?? "";
 
-                _followerCheckboxes.Add(cb);
-                _followersPanel.Children.Add(cb);
+                if (r.AtmBox != null && ps.AtmName != null)
+                    r.AtmBox.SelectedItem = ps.AtmName;
             }
 
+// Re-wire per-row flatten buttons for the new controls
+            WireFollowerFlattenButtons(_engine);
+
+// Apply config from the (now restored) UI
             ApplyConfigFromUi();
 
-            // If COPY is ON, ensure engine re-wires to the refreshed account objects
+// If COPY is ON, ensure engine re-wires to refreshed account objects
             if (_engine.CopyEnabled)
                 _engine.SetCopyEnabled(true);
         }
         
+        private sealed class PrevFollowerState
+        {
+            public bool Included;
+            public bool OverrideEnabled;
+            public string QtyText;
+            public string AtmName;
+        }
+
         private sealed class AccountSnap
         {
             private readonly string _name;

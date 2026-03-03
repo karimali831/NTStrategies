@@ -36,11 +36,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private sealed class FollowerRow
         {
             public Account Account;
+
+            // UI controls (current)
             public CheckBox EnabledCheck;
             public TextBox QtyOverrideBox;
             public ComboBox AtmOverrideBox;
             public TextBlock PnlText;
             public Button FlattenBtn;
+
+            // ---- Compatibility wrappers (expected by Accounts.cs) ----
+            public string AccountName => Account?.Name ?? "";
+            public CheckBox IncludeCheck => EnabledCheck;
+
+            // We are not using a dedicated override checkbox in the UI.
+            // Accounts.cs will treat "override enabled" as: qty filled OR atm chosen.
+            public CheckBox OverrideCheck => null;
+
+            public TextBox QtyBox => QtyOverrideBox;
+            public ComboBox AtmBox => AtmOverrideBox;
         }
 
         private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
@@ -403,7 +416,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // start pnl timer
             StartPnLTimer();
 
-            return root;
+            return new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = root
+            };
         }
         
         private void BuildFollowerRows(List<Account> accounts)
