@@ -142,7 +142,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += mu;
 
                         if (_masterPnlText != null)
-                            _masterPnlText.Text = $"Master PnL  R: {mr:0.00}  U: {mu:0.00}";
+                            _masterPnlText.Text = $"Master PnL  R: {FmtUsd(r)}  U: {FmtUsd(u)}";
                     }
 
                     // followers
@@ -165,33 +165,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += u;
 
                         if (row.PnlText != null)
-                            row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
+                            row.PnlText.Text = $"R: {FmtUsd(r)}  U: {FmtUsd(u)}";
                     }
 
                     if (_totalPnlText != null)
-                        _totalPnlText.Text = $"TOTAL PnL  R: {totalR:0.00}  U: {totalU:0.00}";
+                        _totalPnlText.Text = $"TOTAL PnL  R: {FmtUsd(totalR)}  U: {FmtUsd(totalU)}";
                 }, DispatcherPriority.Background);
             }
-
-        private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)
-        {
-            if (a == null || b == null) return false;
-            if (a.Count != b.Count) return false;
-
-            for (var i = 0; i < a.Count; i++)
-            {
-                if (!a[i].Equals(b[i]))
-                    return false;
-            }
-
-            return true;
-        }
         
         private static int ParseQtyOrDefault(string s, int fallback)
         {
             if (int.TryParse((s ?? "").Trim(), out var v) && v > 0) return v;
             return fallback;
         }
+        
         
         private void EnforceSimOnlyModeUi(List<Account> accounts)
         {

@@ -89,7 +89,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     // subscribe new
                     SubscribePnl(_configuredMaster);
                     foreach (var f in _configuredFollowers) SubscribePnl(f);
-
+                    
                     if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
                         _copyEnabled = false;

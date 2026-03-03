@@ -11,5 +11,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return n.StartsWith("Sim", StringComparison.OrdinalIgnoreCase)
                    || n.StartsWith("Playback", StringComparison.OrdinalIgnoreCase);
         }
+        
+        private static string FmtUsd(double v)
+        {
+            return v.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+        }
     }
 }
