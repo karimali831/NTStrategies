@@ -22,19 +22,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var txt = "";
             if (realized != 0 || unrealized != 0)
             {
-                txt = $"{prefix} PnL: ";
+                txt += $"{prefix} PnL: ";
                 
                 if (realized != 0)
                 {
-                    txt = shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
+                    txt += shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
 
                     if (unrealized != 0)
-                        txt = " | ";
+                        txt += " | ";
                 }
                 
                 if (unrealized != 0)
                 {
-                    txt = shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
+                    txt += shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
                 }
             }
 
