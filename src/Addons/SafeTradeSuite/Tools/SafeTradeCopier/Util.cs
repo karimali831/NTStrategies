@@ -17,12 +17,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return v.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
         }
 
-        private static string FormatPnL(double realized, double unrealized, string prefix, bool followerTbl)
+        private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
         {
             var txt = "";
-            if (unrealized != 0)
-                txt  = $"{prefix} PnL: {(realized != 0 ? $"{(followerTbl ? "R" : "Realized")} {FmtUsd(realized)} |" : "")} {(followerTbl ? "U" : "Unrealized")}: {FmtUsd(unrealized)}";
-            
+            if (unrealized != 0 || unrealized != 0)
+            {
+                txt = $"{prefix} PnL: ";
+                
+                if (realized != 0)
+                {
+                    txt = shortened ? $"R ${FmtUsd(realized)}" : $"Realized ${FmtUsd(realized)}";
+
+                    if (unrealized != 0)
+                        txt = " | ";
+                }
+                
+                if (unrealized != 0)
+                {
+                    txt = shortened ? $"U ${FmtUsd(unrealized)}" : $"Unrealized ${FmtUsd(unrealized)}";
+                }
+            }
+
             return txt;
         }
     }

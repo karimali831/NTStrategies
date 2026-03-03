@@ -141,7 +141,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalU += mu;
 
                     if (_masterPnlText != null)
-                        _masterPnlText.Text = FormatPnL(totalR, totalU, "Total", followerTbl: false);
+                        _masterPnlText.Text = FormatPnL(totalR, totalU, "Master", shortened: false);
                 }
 
                 // followers
@@ -164,11 +164,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalU += u;
 
                     if (row.PnlText != null)
-                        row.PnlText.Text = FormatPnL(r, u, "Total", followerTbl: true);
+                        row.PnlText.Text = FormatPnL(r, u, "Total", shortened: true);
                 }
 
                 if (_totalPnlText != null)
-                    _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", followerTbl: false);
+                    _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", shortened: false);
                 
             }, DispatcherPriority.Background);
         }
