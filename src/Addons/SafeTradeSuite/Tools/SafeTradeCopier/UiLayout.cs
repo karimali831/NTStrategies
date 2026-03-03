@@ -135,20 +135,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 8) };
 
             // Order buttons row (Buy / Sell / Flatten All)
-            
-            
-            
-            
             var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            
-            
-            var orderRowHost = new Border
-            {
-                Background = Brushes.Transparent, // important for hit testing in some templates
-                Child = orderRow
-            };
-            masterStack.Children.Add(orderRowHost);
-            
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -177,32 +164,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Height = 36,
                 Margin = new Thickness(6, 0, 0, 0),
                 Background = Brushes.Maroon,
-                Foreground = Brushes.White,
-
-                // make it obvious it's interactive
-                IsEnabled = true,
-                IsHitTestVisible = true,
-                Focusable = true
+                Foreground = Brushes.White
             };
             
-            // Force it to sit above anything weird in NT styling/containers
-            Panel.SetZIndex(_btnFlattenAll, 999);
-
-// HARD DEBUG: confirm WPF is seeing mouse at all
-            _btnFlattenAll.PreviewMouseDown += (s, e) =>
-            {
-                eng.Log("FlattenAll PREVIEW MOUSEDOWN");
-            };
-
-// HARD DEBUG: confirm click routing
-            _btnFlattenAll.Click += (s, e) =>
-            {
-                eng.Log("FlattenAll CLICK");
-                FlattenAllSelected(eng);
-            };
-            
-            // _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
-            _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
+            _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
+            _btnBuyMkt.Click += (s, e) => FlattenAllSelected(eng);
             _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
 
             Grid.SetColumn(_btnBuyMkt, 0);
