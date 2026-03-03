@@ -154,7 +154,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     else
                     {
-                        var net = GetNetPositionForUi(acc, instr);
+                        var net = _engine.GetNetPositionForUi(acc, instr);
                         row.FlattenBtn.IsEnabled = (net != 0);
                     }
                 }

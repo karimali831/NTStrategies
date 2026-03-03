@@ -73,6 +73,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return true;
                 }
             }
+            
+            
+            public int GetNetPositionForUi(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null) return 0;
+
+                foreach (var p in acc.Positions)
+                {
+                    if (p?.Instrument == null) continue;
+                    if (!SameInstrument(p.Instrument, instr)) continue;
+
+                    var qty = (int)Math.Round((double)p.Quantity, MidpointRounding.AwayFromZero);
+                    if (p.MarketPosition == MarketPosition.Short) return -Math.Abs(qty);
+                    if (p.MarketPosition == MarketPosition.Long)  return  Math.Abs(qty);
+                    return 0;
+                }
+
+                return 0;
+            }
         }
     }
 }

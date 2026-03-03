@@ -81,11 +81,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
                     
                     // PnL subscriptions
-                    UnsubscribePnl(_configuredMaster);
-                    foreach (var f in _configuredFollowers) UnsubscribePnl(f);
+                    UnsubscribePnl(_master);
+                    foreach (var f in _followers) UnsubscribePnl(f);
 
                     SubscribePnl(_configuredMaster);
-                    foreach (var f in _followers) SubscribePnl(f);
+                    foreach (var f in _configuredFollowers) SubscribePnl(f);
 
                     if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
@@ -166,6 +166,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected && _master != null && !ReferenceEquals(a, _master))
                     .Distinct()
                     .ToList();
+                
+                SubscribePnl(_master);
+                foreach (var f in _followers) SubscribePnl(f);
 
                 _instrumentName = _configuredInstrumentName;
                 _instrument = _configuredInstrument;
