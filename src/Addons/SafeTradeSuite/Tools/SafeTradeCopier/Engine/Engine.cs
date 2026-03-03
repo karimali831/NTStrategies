@@ -79,6 +79,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     _configuredFollowerQtyOverrides = followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
                     _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
+                    
+                    // PnL subscriptions
+                    UnsubscribePnl(_configuredMaster);
+                    foreach (var f in _configuredFollowers) UnsubscribePnl(f);
+
+                    SubscribePnl(_configuredMaster);
+                    foreach (var f in _followers) SubscribePnl(f);
 
                     if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
@@ -201,6 +208,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     foreach (var f in _followers)
                         f.OrderUpdate -= OnFollowerOrderUpdate;
+                    
+                    UnsubscribePnl(_master);
+                    foreach (var f in _followers) UnsubscribePnl(f);
                 }
 
                 _armed = false;

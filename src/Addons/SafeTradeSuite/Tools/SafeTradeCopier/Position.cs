@@ -28,64 +28,61 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return 0;
         }
         
-        private static bool SameInstrument(Instrument a, Instrument b)
+        internal bool SameInstrument(Instrument a, Instrument b)
         {
             if (a == null || b == null) return false;
+            if (ReferenceEquals(a, b)) return true;
 
-            // FullName is usually enough, but can differ by formatting sometimes.
-            // MasterInstrument.Name is the safest "symbol" match.
-            if (!string.IsNullOrWhiteSpace(a.FullName) && !string.IsNullOrWhiteSpace(b.FullName) &&
-                string.Equals(a.FullName, b.FullName, StringComparison.OrdinalIgnoreCase))
+            // strongest: FullName match (case-insensitive)
+            var af = (a.FullName ?? "").Trim();
+            var bf = (b.FullName ?? "").Trim();
+            if (af.Length > 0 && bf.Length > 0 &&
+                string.Equals(af, bf, StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            var an = a.MasterInstrument?.Name ?? "";
-            var bn = b.MasterInstrument?.Name ?? "";
-            if (!string.IsNullOrWhiteSpace(an) && !string.IsNullOrWhiteSpace(bn) &&
-                string.Equals(an, bn, StringComparison.OrdinalIgnoreCase))
-                return true;
+            // fallback: master instrument name match (NQ/ES etc)
+            var am = a.MasterInstrument?.Name ?? "";
+            var bm = b.MasterInstrument?.Name ?? "";
+            if (!string.IsNullOrWhiteSpace(am) &&
+                string.Equals(am, bm, StringComparison.OrdinalIgnoreCase))
+            {
+                // still require same expiry if both look like futures contracts
+                // (this prevents matching NQ 03-26 to NQ 06-26)
+                // If your FullName is like "NQ 03-26", keep it strict by month-year token.
+                var atok = ExtractExpiryToken(af);
+                var btok = ExtractExpiryToken(bf);
+                if (atok.Length == 0 || btok.Length == 0) return true;
+                return string.Equals(atok, btok, StringComparison.OrdinalIgnoreCase);
+            }
 
             return false;
         }
-
-        private static double GetUnrealizedFromPositions(Account acc, Instrument instr)
+        
+        private static string ExtractExpiryToken(string fullName)
         {
-            if (acc == null || instr == null) return 0.0;
-
-            foreach (var pos in acc.Positions)
-            {
-                if (pos?.Instrument == null) continue;
-                if (!SameInstrument(pos.Instrument, instr)) continue;
-
-                return pos.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
-            }
-
-            return 0.0;
+            // expects "... 03-26" or "... 12-25"
+            if (string.IsNullOrWhiteSpace(fullName)) return "";
+            var parts = fullName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) return "";
+            return parts[parts.Length - 1].Trim();
         }
 
-        private static int GetNetFromPositions(Account acc, Instrument instr)
+        private int GetNetPositionForUi(Account acc, Instrument instr)
         {
             if (acc == null || instr == null) return 0;
 
-            var net = 0;
-
-            foreach (var pos in acc.Positions)
+            foreach (var p in acc.Positions)
             {
-                if (pos?.Instrument == null) continue;
-                if (!SameInstrument(pos.Instrument, instr)) continue;
+                if (p?.Instrument == null) continue;
+                if (!SameInstrument(p.Instrument, instr)) continue;
 
-                var q = (int)Math.Round((double)pos.Quantity, MidpointRounding.AwayFromZero);
-                if (q == 0) continue;
-
-                if (pos.MarketPosition == MarketPosition.Short)
-                    net -= Math.Abs(q);
-                else if (pos.MarketPosition == MarketPosition.Long)
-                    net += Math.Abs(q);
-
-                // instrument-only scope => break after first match
-                break;
+                var qty = (int)Math.Round((double)p.Quantity, MidpointRounding.AwayFromZero);
+                if (p.MarketPosition == MarketPosition.Short) return -Math.Abs(qty);
+                if (p.MarketPosition == MarketPosition.Long)  return  Math.Abs(qty);
+                return 0;
             }
 
-            return net;
+            return 0;
         }
     }
 }

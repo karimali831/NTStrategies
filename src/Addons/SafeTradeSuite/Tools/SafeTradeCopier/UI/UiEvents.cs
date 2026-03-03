@@ -116,9 +116,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // --- master ---
             if (master != null)
             {
-                var r = master.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                var u = (instr != null) ? GetUnrealizedFromPositions(master, instr) : 0.0;
-
+                _engine.TryGetPnlForUi(master, out var r, out var u);
+                
                 totalR += r;
                 totalU += u;
 
@@ -138,11 +137,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var acc = row?.Account;
                 if (acc == null) continue;
 
-                // Realized: keep account-level for now (instrument-level realized needs an execution ledger)
-                var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-
-                // Unrealized: compute from Positions for the selected instrument
-                var u = (instr != null) ? GetUnrealizedFromPositions(acc, instr) : 0.0;
+                _engine.TryGetPnlForUi(acc, out var r, out var u);
 
                 totalR += r;
                 totalU += u;
@@ -159,7 +154,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     else
                     {
-                        var net = GetNetFromPositions(acc, instr);
+                        var net = GetNetPositionForUi(acc, instr);
                         row.FlattenBtn.IsEnabled = (net != 0);
                     }
                 }
