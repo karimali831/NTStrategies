@@ -125,8 +125,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var totalU = 0.0;
 
                     // master
-                    var master = _masterBox?.SelectedItem as Account;
-                    if (master != null)
+                    if (_masterBox?.SelectedItem is Account master)
                     {
                         var mr = 0.0; var mu = 0.0;
                         lock (_uiPnl)
@@ -142,7 +141,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += mu;
 
                         if (_masterPnlText != null)
-                            _masterPnlText.Text = $"Master PnL  R: {FmtUsd(r)}  U: {FmtUsd(u)}";
+                            _masterPnlText.Text = $"Master PnL (Realized: {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)})";
                     }
 
                     // followers
@@ -165,11 +164,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += u;
 
                         if (row.PnlText != null)
-                            row.PnlText.Text = $"R: {FmtUsd(r)}  U: {FmtUsd(u)}";
+                            row.PnlText.Text = $"Realized: {FmtUsd(r)} | Unrealized: {FmtUsd(u)}";
                     }
 
                     if (_totalPnlText != null)
-                        _totalPnlText.Text = $"TOTAL PnL  R: {FmtUsd(totalR)}  U: {FmtUsd(totalU)}";
+                        _totalPnlText.Text = $"Total PnL (Realized: {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)})";
                 }, DispatcherPriority.Background);
             }
         
@@ -198,7 +197,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             foreach (var r in _followerRows)
             {
                 if (r?.Account == null) continue;
-
                 var allow = !_simOnlyMode || IsSimAccount(r.Account);
 
                 if (r.EnabledCheck != null)

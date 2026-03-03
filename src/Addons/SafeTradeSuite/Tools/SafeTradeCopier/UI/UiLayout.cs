@@ -399,8 +399,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // ---------------- Populate accounts + followers ----------------
             _masterBox.ItemsSource = accounts;
             _masterBox.DisplayMemberPath = "Name";
-            _masterBox.SelectedItem = accounts.FirstOrDefault();
 
+// ✅ choose initial master correctly before building followers
+            Account initialMaster = null;
+            if (_simOnlyMode)
+                initialMaster = accounts.FirstOrDefault(IsSimAccount);
+
+            if (initialMaster == null)
+                initialMaster = accounts.FirstOrDefault();
+
+            _masterBox.SelectedItem = initialMaster;
+            
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
 
