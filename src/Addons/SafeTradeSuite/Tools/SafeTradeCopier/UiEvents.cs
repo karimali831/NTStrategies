@@ -79,13 +79,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return fallback;
         }
         
-        
         private void FlattenAllSelected(SafeCopierEngine eng)
         {
             if (eng == null) return;
 
-            var master = _masterBox?.SelectedItem as Account;
-            if (master == null)
+            if (!(_masterBox?.SelectedItem is Account master))
             {
                 eng.Log("Select a master account first.");
                 return;
@@ -105,20 +103,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            // Flatten master + enabled followers
+            eng.Log($"Flatten All clicked. Instr={instr.FullName}");
+
+            // Flatten master + included followers
             eng.FlattenInstrument(master, instr);
 
             foreach (var r in _followerRows)
             {
                 if (r?.Account == null) continue;
-                if (r.EnabledCheck?.IsChecked != true) continue;
+
+                // ✅ IMPORTANT: this must match your UI checkbox
+                if (r.IncludeCheck?.IsChecked != true) continue;
+
                 eng.FlattenInstrument(r.Account, instr);
             }
 
             eng.Log("Flatten All submitted (instrument-only).");
         }
-        
-      
         
         private void StartPnLTimer()
         {

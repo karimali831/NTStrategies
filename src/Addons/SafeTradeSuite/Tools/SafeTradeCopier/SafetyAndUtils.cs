@@ -76,10 +76,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (acc == null || instr == null) return;
 
                 var net = GetNetPosition(acc, instr);
-                if (net == 0) return;
+                if (net == 0)
+                {
+                    Log($"Flatten -> {acc.Name}: net=0 (nothing to do) instr={instr.FullName}");
+                    return;
+                }
 
-                var action = net > 0 ? OrderAction.Sell : OrderAction.BuyToCover;
+                // ✅ Futures-safe flatten actions
+                var action = net > 0 ? OrderAction.Sell : OrderAction.Buy;
                 var qty = Math.Abs(net);
+
+                Log($"Flatten -> {acc.Name}: net={net}, action={action}, qty={qty}, instr={instr.FullName}");
 
                 var ord = acc.CreateOrder(
                     instr,
