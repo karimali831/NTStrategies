@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 if (realized != 0)
                 {
-                    txt = shortened ? $"R: ${FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
+                    txt = shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
 
                     if (unrealized != 0)
                         txt = " | ";
@@ -34,7 +34,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 if (unrealized != 0)
                 {
-                    txt = shortened ? $"U: ${FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
+                    txt = shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
                 }
             }
 
