@@ -23,7 +23,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
             }
             
-            public int GetNetForUi(Account acc, Instrument instr)
+            public int GetNetPositionForUi(Account acc, Instrument instr)
             {
                 return GetNetPosition(acc, instr);
             }

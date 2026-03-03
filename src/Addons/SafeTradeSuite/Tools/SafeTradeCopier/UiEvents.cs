@@ -122,17 +122,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void StartPnLTimer()
         {
             if (_pnlTimer != null) return;
-            var display = _uiDispatcher ?? Dispatcher.CurrentDispatcher;
 
-            _pnlTimer = new DispatcherTimer(DispatcherPriority.Background, display)
+            var disp = _uiDispatcher ?? _window?.Dispatcher;
+            if (disp == null) return;
+
+            _pnlTimer = new DispatcherTimer(DispatcherPriority.Background, disp)
             {
-                Interval = TimeSpan.FromSeconds(1)
+                Interval = TimeSpan.FromMilliseconds(500)
             };
 
-            _pnlTimer.Tick += (s, e) => RefreshPnLUi();
+            _pnlTimer.Tick += (s, e) => UpdatePnLUi();
             _pnlTimer.Start();
 
-            RefreshPnLUi();
+            UpdatePnLUi();
         }
 
         private void StopPnLTimer()
@@ -142,7 +144,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _pnlTimer = null;
         }
 
-        private void RefreshPnLUi()
+        private void UpdatePnLUi()
         {
             if (_engine == null) return;
 
@@ -150,65 +152,91 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var instrName = (_instrBox?.Text ?? "").Trim();
             var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
 
-            double totalR = 0, totalU = 0;
+            double totalR = 0.0;
+            double totalU = 0.0;
 
+            // --- master ---
             if (master != null)
             {
-                var r = SafeCopierEngine.GetAccountValue(master, AccountItem.RealizedProfitLoss);
-                var u = SafeCopierEngine.GetAccountValue(master, AccountItem.UnrealizedProfitLoss);
-                totalR += r; totalU += u;
+                var r = master.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                var u = master.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+
+                totalR += r;
+                totalU += u;
 
                 if (_masterPnlText != null)
-                    _masterPnlText.Text = $"Master PnL  R: {SafeCopierEngine.FmtMoney(r)}  U: {SafeCopierEngine.FmtMoney(u)}";
+                    _masterPnlText.Text = $"Master PnL  R: {r:0.00}  U: {u:0.00}";
+            }
+            else
+            {
+                if (_masterPnlText != null)
+                    _masterPnlText.Text = $"Master PnL  R: 0.00  U: 0.00";
             }
 
+            // --- followers rows ---
             foreach (var row in _followerRows)
             {
-                if (row?.Account == null) continue;
+                var acc = row?.Account;
+                if (acc == null) continue;
 
-                var r = SafeCopierEngine.GetAccountValue(row.Account, AccountItem.RealizedProfitLoss);
-                var u = SafeCopierEngine.GetAccountValue(row.Account, AccountItem.UnrealizedProfitLoss);
+                var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+
+                totalR += r;
+                totalU += u;
 
                 if (row.PnlText != null)
-                    row.PnlText.Text = $"R: {SafeCopierEngine.FmtMoney(r)}  U: {SafeCopierEngine.FmtMoney(u)}";
+                    row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
 
-                // totals include enabled followers only (as requested “master + follower accounts” – I’m assuming enabled)
-                if (row.EnabledCheck?.IsChecked == true)
+                // enable/disable per-account flatten based on instrument net position
+                if (row.FlattenBtn != null)
                 {
-                    totalR += r;
-                    totalU += u;
-                }
-
-                // enable/disable per-follower flatten button based on open position (instrument-only)
-                if (instr != null && row.FlattenBtn != null)
-                {
-                    var net = _engine.GetNetForUi(row.Account, instr);
-                    row.FlattenBtn.IsEnabled = net != 0;
+                    if (instr == null)
+                    {
+                        row.FlattenBtn.IsEnabled = false;
+                    }
+                    else
+                    {
+                        var net = _engine.GetNetPositionForUi(acc, instr);
+                        row.FlattenBtn.IsEnabled = (net != 0);
+                    }
                 }
             }
 
             if (_totalPnlText != null)
-                _totalPnlText.Text = $"TOTAL PnL  R: {SafeCopierEngine.FmtMoney(totalR)}  U: {SafeCopierEngine.FmtMoney(totalU)}";
+                _totalPnlText.Text = $"TOTAL PnL  R: {totalR:0.00}  U: {totalU:0.00}";
 
-            // flatten all button enabled if any enabled account has open pos
-            if (_btnFlattenAll != null && instr != null)
+            // enable/disable FlattenAll if ANY selected account has open position on instrument
+            if (_btnFlattenAll != null)
             {
-                var anyOpen = false;
-
-                if (master != null && _engine.GetNetForUi(master, instr) != 0)
-                    anyOpen = true;
-
-                if (!anyOpen)
+                if (instr == null || master == null)
                 {
-                    foreach (var r in _followerRows)
-                    {
-                        if (r?.Account == null) continue;
-                        if (r.EnabledCheck?.IsChecked != true) continue;
-                        if (_engine.GetNetForUi(r.Account, instr) != 0) { anyOpen = true; break; }
-                    }
+                    _btnFlattenAll.IsEnabled = false;
                 }
+                else
+                {
+                    var anyOpen = false;
 
-                _btnFlattenAll.IsEnabled = anyOpen;
+                    if (_engine.GetNetPositionForUi(master, instr) != 0)
+                        anyOpen = true;
+
+                    if (!anyOpen)
+                    {
+                        foreach (var r in _followerRows)
+                        {
+                            if (r?.Account == null) continue;
+                            if (r.IncludeCheck?.IsChecked != true) continue;
+
+                            if (_engine.GetNetPositionForUi(r.Account, instr) != 0)
+                            {
+                                anyOpen = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    _btnFlattenAll.IsEnabled = anyOpen;
+                }
             }
         }
         

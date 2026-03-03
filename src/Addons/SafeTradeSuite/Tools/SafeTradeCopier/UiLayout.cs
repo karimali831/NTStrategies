@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
             
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
-            _btnBuyMkt.Click += (s, e) => FlattenAllSelected(eng);
+            _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
             _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
 
             Grid.SetColumn(_btnBuyMkt, 0);
