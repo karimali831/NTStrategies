@@ -22,7 +22,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var txt = "";
             if (realized != 0 || unrealized != 0)
             {
-                txt += $"{prefix} PnL: ";
+                if (!shortened)
+                    txt += $"{prefix} PnL: ";
                 
                 if (realized != 0)
                 {
