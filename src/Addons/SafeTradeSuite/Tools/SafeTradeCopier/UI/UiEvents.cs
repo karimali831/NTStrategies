@@ -141,7 +141,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += mu;
 
                         if (_masterPnlText != null)
-                            _masterPnlText.Text = $"Master PnL (Realized: {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)})";
+                            _masterPnlText.Text = $"Master PnL: Realized {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)}";
                     }
 
                     // followers
@@ -164,11 +164,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         totalU += u;
 
                         if (row.PnlText != null)
-                            row.PnlText.Text = $"Realized: {FmtUsd(r)} | Unrealized: {FmtUsd(u)}";
+                            row.PnlText.Text = $"R: {FmtUsd(r)} | U: {FmtUsd(u)}";
                     }
 
                     if (_totalPnlText != null)
-                        _totalPnlText.Text = $"Total PnL (Realized: {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)})";
+                        _totalPnlText.Text = $"Total PnL: Realized {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)}";
                 }, DispatcherPriority.Background);
             }
         
