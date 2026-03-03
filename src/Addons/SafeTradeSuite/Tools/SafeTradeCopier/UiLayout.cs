@@ -508,7 +508,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Content = "Flatten",
                     Height = 24,
-                    Background = Brushes.DimGray,
+                    Background = Brushes.Maroon,
                     Foreground = Brushes.White,
                     IsEnabled = false
                 };
