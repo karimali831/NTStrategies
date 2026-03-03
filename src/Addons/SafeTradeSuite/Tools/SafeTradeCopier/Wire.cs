@@ -1,4 +1,5 @@
-﻿using NinjaTrader.Cbi;
+﻿using System.Windows;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -8,7 +9,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
             _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
-            _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
+            
+            _btnFlattenAll.Click += (s, e) =>
+            {
+                MessageBox.Show("Flatten button physically clicked.");
+            };
+            
+            // _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
         }
 
         private void WireFollowerFlattenButtons(SafeCopierEngine eng)

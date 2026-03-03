@@ -148,6 +148,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = Brushes.DodgerBlue,
                 Foreground = Brushes.White
             };
+            
             _btnSellMkt = new Button
             {
                 Content = "Sell Market",
@@ -156,6 +157,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = Brushes.DodgerBlue,
                 Foreground = Brushes.White
             };
+            
             _btnFlattenAll = new Button
             {
                 Content = "Flatten All",
