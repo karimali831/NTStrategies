@@ -13,6 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
     public class AddOns : AddOnBase
     {
+        private static bool _registered;
         private Window _controlCenterWindow;
         private MenuManager _menuManager;
         private ToolRegistry _tools;
@@ -36,6 +37,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                 _tools = null;
 
                 _controlCenterWindow = null;
+                _registered = false;
             }
         }
 
@@ -46,6 +48,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
             var typeName = w.GetType().FullName ?? w.GetType().Name;
             if (typeName.IndexOf("ControlCenter", StringComparison.OrdinalIgnoreCase) < 0)
                 return;
+
+            if (_registered) return;
+            _registered = true;
 
             _controlCenterWindow = w;
 

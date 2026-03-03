@@ -9,7 +9,7 @@ using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool
+    public partial class SafeTradeCopierTool : IDisposable
     {
         // Single instance window (prevents multiple instances in NT)
         private static Window _window;
@@ -23,7 +23,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TextBox _instrBox;
 
         private StackPanel _followersPanel;
-        private readonly List<CheckBox> _followerCheckboxes = new List<CheckBox>();
 
         private DispatcherTimer _accountsTimer;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
@@ -32,13 +31,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             lock (WindowGate)
             {
-                // If window exists but is no longer usable, drop it
+                // If window exists but is no longer usable, drop it and rebuild
                 if (_window != null)
                 {
                     if (!_window.IsLoaded || _window.Dispatcher.HasShutdownStarted || _window.Dispatcher.HasShutdownFinished)
                     {
-                        _window = null;
-                        _uiDispatcher = null;
+                        CloseInternal(closeWindow: true);
                     }
                 }
 
@@ -56,68 +54,128 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _engine = new SafeCopierEngine();
 
-                _window = new Window
+                try
                 {
-                    Title = "Safe Trade Copier (v1)",
-                    Width = 520,
-                    Height = 620,
-                    Background = SystemColors.WindowBrush,
-                    Foreground = SystemColors.WindowTextBrush,
-                    Content = BuildUi(_engine),
-                };
+                    _window = new Window
+                    {
+                        Title = "Safe Trade Copier (v2)",
+                        Width = 520,
+                        Height = 620,
+                        Background = SystemColors.WindowBrush,
+                        Foreground = SystemColors.WindowTextBrush,
+                        Content = BuildUi(_engine),
+                    };
 
-                _uiDispatcher = _window.Dispatcher;
+                    _uiDispatcher = _window.Dispatcher;
 
-                _window.Closing += (s, e) =>
+                    _window.Closing += OnWindowClosing;
+                    _window.Closed += OnWindowClosed;
+
+                    _window.Show();
+                    StartAccountsAutoRefresh();
+                }
+                catch
                 {
-                    if (_allowWindowClose) return;
-
-                    // Hide instead of closing
-                    e.Cancel = true;
-                    _window.Hide();
-                    StopAccountsAutoRefresh();
-                };
-
-                _window.Closed += (s, e) =>
-                {
-                    StopAccountsAutoRefresh();
-
-                    _uiDispatcher = null;
-                    _window = null;
-
-                    _engine?.Dispose();
-                    _engine = null;
-                };
-
-                StopPnLTimer();
-                _window.Show();
-                StartAccountsAutoRefresh();
+                    // If BuildUi throws or window creation fails, ensure we don't leave a half-created tool around
+                    CloseInternal(closeWindow: true);
+                    throw;
+                }
             }
         }
 
         public void Dispose()
         {
-            StopAccountsAutoRefresh();
+            // True teardown (used by Close button / tool registry dispose)
+            lock (WindowGate)
+            {
+                CloseInternal(closeWindow: true);
+            }
+        }
 
+        // If you still want to call HardClose() from UI code, keep it as a wrapper
+        private void HardClose()
+        {
+            lock (WindowGate)
+            {
+                CloseInternal(closeWindow: true);
+            }
+        }
+
+        private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (_allowWindowClose) return;
+
+            // X button hides (keeps tool alive)
+            e.Cancel = true;
+
+            try { _window?.Hide(); } catch { }
+
+            StopAccountsAutoRefresh();
+            StopPnLTimer();
+        }
+
+        private void OnWindowClosed(object sender, EventArgs e)
+        {
+            // If it closes for real, ensure full cleanup
+            lock (WindowGate)
+            {
+                CloseInternal(closeWindow: false); // already closed
+            }
+        }
+
+        private void CloseInternal(bool closeWindow)
+        {
+            // Stop UI timers first (prevents Tick from touching disposed UI/engine)
+            StopAccountsAutoRefresh();
+            StopPnLTimer();
+
+            // Turn off copier + dispose engine
             if (_engine != null)
             {
-                _engine.Dispose();
+                try { _engine.SetCopyEnabled(false); } catch { }
+                try { _engine.Dispose(); } catch { }
                 _engine = null;
             }
 
-            lock (WindowGate)
+            // Close window (optionally)
+            if (closeWindow && _window != null)
             {
-                if (_window != null)
-                {
-                    var w = _window;
-                    _window = null;
-                    _uiDispatcher = null;
+                var w = _window;
 
-                    _allowWindowClose = true;
-                    w.Close();
-                    _allowWindowClose = false;
-                }
+                // detach handlers to avoid re-entrancy weirdness
+                try { w.Closing -= OnWindowClosing; } catch { }
+                try { w.Closed -= OnWindowClosed; } catch { }
+
+                _allowWindowClose = true;
+                try { w.Close(); } catch { }
+                _allowWindowClose = false;
             }
+
+            _uiDispatcher = null;
+            _window = null;
+
+            // Clear UI refs / state
+            _masterBox = null;
+            _instrBox = null;
+            _followersPanel = null;
+
+            _btnBuyMkt = null;
+            _btnSellMkt = null;
+            _btnFlattenAll = null;
+
+            _btnCopyOn = null;
+            _btnCopyOff = null;
+
+            _statusBox = null;
+            _headerStateText = null;
+
+            _masterQtyBox = null;
+            _masterAtmBox = null;
+            _masterPnlText = null;
+            _totalPnlText = null;
+
+            _followerRows.Clear();
+            _lastAccountsSnapshot.Clear();
         }
     }
 }

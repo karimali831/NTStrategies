@@ -406,9 +406,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             btnClose.Click += (s, e) =>
             {
-                _allowWindowClose = true;
-                Dispose();
-                _allowWindowClose = false;
+                HardClose();
             };
             
             WireFollowerFlattenButtons(eng);
