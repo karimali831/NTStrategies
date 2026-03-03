@@ -35,25 +35,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void OnAccountItemUpdate(object sender, AccountItemEventArgs e)
             {
                 // cache only USD PnL
-                if (e == null || e.Account == null) return;
+                Log("P1");
+                if (e?.Account == null) return;
                 if (e.Currency != Currency.UsDollar) return;
 
+                Log("P2");
+                
                 var name = e.Account.Name ?? "";
                 if (string.IsNullOrWhiteSpace(name)) return;
 
+                Log($"P3 account name: {name}");
+
                 lock (_gate)
                 {
+                    Log("P4");
+                    
                     if (!_pnlByAccount.TryGetValue(name, out var snap))
                     {
                         snap = new PnlSnap();
                         _pnlByAccount[name] = snap;
                     }
+                    
+                    Log("P5");
 
                     if (e.AccountItem == AccountItem.RealizedProfitLoss)
                         snap.Realized = e.Value;
+                    
+                    Log("P6 Realized" + snap.Realized);
 
                     if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
                         snap.Unrealized = e.Value;
+                    
+                    Log("O7 Unrealized" + snap.Unrealized);
                 }
             }
 

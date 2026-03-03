@@ -72,13 +72,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // ---------------- Header ----------------
             var headerArea = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 8) };
 
-            var header = new TextBlock
-            {
-                Text = "Safe Trade Copier (v2)",
-                FontSize = 16,
-                Margin = new Thickness(0, 0, 0, 4),
-                Foreground = SystemColors.WindowTextBrush
-            };
+            // var header = new TextBlock
+            // {
+            //     Text = "Safe Trade Copier (v2)",
+            //     FontSize = 16,
+            //     Margin = new Thickness(0, 0, 0, 4),
+            //     Foreground = SystemColors.WindowTextBrush
+            // };
 
             _headerStateText = new TextBlock
             {
@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.WindowTextBrush
             };
 
-            headerArea.Children.Add(header);
+            // headerArea.Children.Add(header);
             headerArea.Children.Add(_headerStateText);
 
             Grid.SetRow(headerArea, 0);

@@ -58,7 +58,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     _window = new Window
                     {
-                        Title = "Safe Trade Copier (v2)",
+                        Title = "Safe Trade Copier (V2.1)",
                         Width = 520,
                         Height = 620,
                         Background = SystemColors.WindowBrush,
