@@ -81,6 +81,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FlattenAllSelected(SafeCopierEngine eng)
         {
+            if (eng == null) return;
+
             if (!(_masterBox?.SelectedItem is Account master))
             {
                 eng.Log("Select a master account first.");
@@ -103,17 +105,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             eng.Log($"Flatten All clicked. Instr={instr.FullName}");
 
-            // Flatten master + included followers
-            eng.FlattenInstrument(master, instr);
+            // Master + included followers (instrument-only)
+            eng.EnsureFlatInstrument(master, instr);
 
             foreach (var r in _followerRows)
             {
                 if (r?.Account == null) continue;
-
-                // ✅ IMPORTANT: this must match your UI checkbox
                 if (r.IncludeCheck?.IsChecked != true) continue;
 
-                eng.FlattenInstrument(r.Account, instr);
+                eng.EnsureFlatInstrument(r.Account, instr);
             }
 
             eng.Log("Flatten All submitted (instrument-only).");
@@ -152,8 +152,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var instrName = (_instrBox?.Text ?? "").Trim();
             var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
 
-            double totalR = 0.0;
-            double totalU = 0.0;
+            var totalR = 0.0;
+            var totalU = 0.0;
 
             // --- master ---
             if (master != null)
@@ -182,13 +182,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
                 var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
 
+                // Fallback: if account Unrealized is 0 but we have a position on this instrument,
+                // compute Unrealized directly from the matching Position.
+                if (instr != null && Math.Abs(u) < 0.0001)
+                {
+                    foreach (var pos in acc.Positions)
+                    {
+                        if (pos?.Instrument == null) continue;
+                        if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
+
+                        _engine.Log($"UI sees position: {acc.Name} {pos.Instrument.FullName} qty={pos.Quantity}");
+
+                        u = pos.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
+                        break;
+                    }
+                }
+
                 totalR += r;
                 totalU += u;
 
                 if (row.PnlText != null)
                     row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
 
-                // enable/disable per-account flatten based on instrument net position
                 if (row.FlattenBtn != null)
                 {
                     if (instr == null)
@@ -198,7 +213,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     else
                     {
                         var net = _engine.GetNetPositionForUi(acc, instr);
-                        row.FlattenBtn.IsEnabled = net != 0;
+                        row.FlattenBtn.IsEnabled = (net != 0);
                     }
                 }
             }
@@ -208,10 +223,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // enable/disable FlattenAll if ANY selected account has open position on instrument
             if (_btnFlattenAll != null)
-            {
                 _btnFlattenAll.IsEnabled = instr != null && master != null;
-                _engine.Log($"FlattenAll enabled={_btnFlattenAll.IsEnabled} (instr={(instr!=null ? instr.FullName : "null")})");
-            }
+            
         }
         
         private void SubmitMasterMarket(SafeCopierEngine eng, bool isBuy)

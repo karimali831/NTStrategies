@@ -448,7 +448,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    eng.FlattenInstrument(r.Account, instr);
+                    eng.EnsureFlatInstrument(r.Account, instr);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
                 };
             }

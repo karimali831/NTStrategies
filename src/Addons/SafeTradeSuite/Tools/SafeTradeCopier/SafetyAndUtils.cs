@@ -1,5 +1,6 @@
 ﻿#region Using declarations
 using System;
+using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 #endregion
 
@@ -28,7 +29,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return GetNetPosition(acc, instr);
             }
 
-            private int GetNetPosition(Account acc, Instrument instr)
+            private static int GetNetPosition(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null) return 0;
 
@@ -70,11 +71,61 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 return v.ToString("+#,0.00;-#,0.00;0.00");
             }
+            
+            public void EnsureFlatInstrument(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null) return;
+
+                // fire-and-forget: cancel + flatten now, then re-check once (or twice) shortly after
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        FlattenInstrument(acc, instr);
+
+                        // Re-check after NT has processed cancels/fills
+                        await Task.Delay(300).ConfigureAwait(false);
+                        FlattenInstrument(acc, instr);
+
+                        // Optional: one more pass for stubborn ATM state transitions
+                        await Task.Delay(300).ConfigureAwait(false);
+                        FlattenInstrument(acc, instr);
+                    }
+                    catch
+                    {
+                        // keep tool silent/safe; no exceptions to user from background
+                    }
+                });
+            }
 
             public void FlattenInstrument(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null) return;
 
+                // 1) Cancel any working orders on this instrument (ATM targets/stops live here)
+                try
+                {
+                    foreach (var o in acc.Orders)
+                    {
+                        if (o?.Instrument == null) continue;
+                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
+
+                        // cancel anything still working-ish
+                        if (o.OrderState == OrderState.Working ||
+                            o.OrderState == OrderState.Accepted ||
+                            o.OrderState == OrderState.Submitted)
+                        {
+                            // NT supports cancelling orders via Account.Cancel
+                            acc.Cancel(new[] { o });
+                        }
+                    }
+                }
+                catch
+                {
+                    // non-fatal: flatten should still try to submit market
+                }
+
+                // 2) Now flatten the net position
                 var net = GetNetPosition(acc, instr);
                 if (net == 0)
                 {
@@ -82,8 +133,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
-                // ✅ Futures-safe flatten actions
-                var action = net > 0 ? OrderAction.Sell : OrderAction.Buy;
+                var action = net > 0 ? OrderAction.Sell : OrderAction.BuyToCover;
                 var qty = Math.Abs(net);
 
                 Log($"Flatten -> {acc.Name}: net={net}, action={action}, qty={qty}, instr={instr.FullName}");
