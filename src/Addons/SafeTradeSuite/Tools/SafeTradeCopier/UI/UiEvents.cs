@@ -115,62 +115,63 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         }
         
         private void RenderPnlUi()
+        {
+            var disp = _uiDispatcher ?? _window?.Dispatcher;
+            if (disp == null) return;
+
+            disp.InvokeAsync(() =>
             {
-                var disp = _uiDispatcher ?? _window?.Dispatcher;
-                if (disp == null) return;
+                var totalR = 0.0;
+                var totalU = 0.0;
 
-                disp.InvokeAsync(() =>
+                // master
+                if (_masterBox?.SelectedItem is Account master)
                 {
-                    var totalR = 0.0;
-                    var totalU = 0.0;
-
-                    // master
-                    if (_masterBox?.SelectedItem is Account master)
+                    var mr = 0.0; var mu = 0.0;
+                    lock (_uiPnl)
                     {
-                        var mr = 0.0; var mu = 0.0;
-                        lock (_uiPnl)
+                        if (_uiPnl.TryGetValue(master.Name, out var snap))
                         {
-                            if (_uiPnl.TryGetValue(master.Name, out var snap))
-                            {
-                                mr = snap.r;
-                                mu = snap.u;
-                            }
+                            mr = snap.r;
+                            mu = snap.u;
                         }
-
-                        totalR += mr;
-                        totalU += mu;
-
-                        if (_masterPnlText != null)
-                            _masterPnlText.Text = $"Master PnL: Realized {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)}";
                     }
 
-                    // followers
-                    foreach (var row in _followerRows)
+                    totalR += mr;
+                    totalU += mu;
+
+                    if (_masterPnlText != null)
+                        _masterPnlText.Text = FormatPnL(totalR, totalU, "Total", followerTbl: false);
+                }
+
+                // followers
+                foreach (var row in _followerRows)
+                {
+                    var acc = row?.Account;
+                    if (acc == null) continue;
+
+                    var r = 0.0; var u = 0.0;
+                    lock (_uiPnl)
                     {
-                        var acc = row?.Account;
-                        if (acc == null) continue;
-
-                        var r = 0.0; var u = 0.0;
-                        lock (_uiPnl)
+                        if (_uiPnl.TryGetValue(acc.Name, out var snap))
                         {
-                            if (_uiPnl.TryGetValue(acc.Name, out var snap))
-                            {
-                                r = snap.r;
-                                u = snap.u;
-                            }
+                            r = snap.r;
+                            u = snap.u;
                         }
-
-                        totalR += r;
-                        totalU += u;
-
-                        if (row.PnlText != null)
-                            row.PnlText.Text = $"R: {FmtUsd(r)} | U: {FmtUsd(u)}";
                     }
 
-                    if (_totalPnlText != null)
-                        _totalPnlText.Text = $"Total PnL: Realized {FmtUsd(totalR)} | Unrealized: {FmtUsd(totalU)}";
-                }, DispatcherPriority.Background);
-            }
+                    totalR += r;
+                    totalU += u;
+
+                    if (row.PnlText != null)
+                        row.PnlText.Text = FormatPnL(r, u, "Total", followerTbl: true);
+                }
+
+                if (_totalPnlText != null)
+                    _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", followerTbl: false);
+                
+            }, DispatcherPriority.Background);
+        }
         
         private static int ParseQtyOrDefault(string s, int fallback)
         {
