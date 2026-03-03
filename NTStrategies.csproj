@@ -65,12 +65,15 @@
         <Compile Include="src\Addons\SafeTradeSuite\AddOns.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuManager.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuNodes.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Accounts.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Account.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Core.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ExecutionCopy.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\SafetyAndUtils.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Flatten.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Order.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Position.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\EngineUtil.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UiEvents.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UiLayout.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\ToolRegistry.cs" />

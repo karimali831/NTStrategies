@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using NinjaTrader.Cbi;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -132,8 +132,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // Turn off copier + dispose engine
             if (_engine != null)
             {
-                try { _engine.SetCopyEnabled(false); } catch { }
-                try { _engine.Dispose(); } catch { }
+                _engine.SetCopyEnabled(false); 
+                _engine.Dispose(); 
                 _engine = null;
             }
 
@@ -143,8 +143,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var w = _window;
 
                 // detach handlers to avoid re-entrancy weirdness
-                try { w.Closing -= OnWindowClosing; } catch { }
-                try { w.Closed -= OnWindowClosed; } catch { }
+                w.Closing -= OnWindowClosing;
+                w.Closed -= OnWindowClosed; 
 
                 _allowWindowClose = true;
                 try { w.Close(); } catch { }

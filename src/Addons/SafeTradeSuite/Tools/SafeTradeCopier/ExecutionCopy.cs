@@ -1,11 +1,9 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -50,10 +48,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var followerAction = masterAction;
 
                 CancellationToken token;
-                CancellationTokenSource localCts;
                 lock (_gate)
                 {
-                    localCts = _cts;
+                    var localCts = _cts;
                     token = localCts.Token;
                 }
 

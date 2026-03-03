@@ -97,39 +97,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            public void SetCopyEnabled(bool enabled)
-            {
-                lock (_gate)
-                {
-                    if (enabled)
-                    {
-                        if (!IsReady_NoLock(out var reason))
-                        {
-                            _copyEnabled = false;
-                            DisarmUnsafe_NoLock("COPY ON blocked");
-                            RaiseModeChanged_NoLock();
-                            RaiseReady_NoLock(reasonOverride: reason);
-                            Log($"COPY ON blocked: {reason}");
-                            return;
-                        }
-
-                        _copyEnabled = true;
-                        RewireUnsafe_NoLock("COPY ON");
-                        RaiseModeChanged_NoLock();
-                        RaiseReady_NoLock();
-                        Log("COPY ON.");
-                    }
-                    else
-                    {
-                        _copyEnabled = false;
-                        DisarmUnsafe_NoLock("COPY OFF");
-                        RaiseModeChanged_NoLock();
-                        RaiseReady_NoLock();
-                        Log("COPY OFF.");
-                    }
-                }
-            }
-
             private void RaiseModeChanged_NoLock()
             {
                 OnModeChanged?.Invoke(_armed, _copyEnabled);

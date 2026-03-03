@@ -1,9 +1,7 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -79,46 +77,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return fallback;
         }
         
-        private void FlattenAllSelected(SafeCopierEngine eng)
-        {
-            if (eng == null) return;
-
-            if (!(_masterBox?.SelectedItem is Account master))
-            {
-                eng.Log("Select a master account first.");
-                return;
-            }
-
-            var instrName = (_instrBox?.Text ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(instrName))
-            {
-                eng.Log("Instrument is empty.");
-                return;
-            }
-
-            var instr = Instrument.GetInstrument(instrName);
-            if (instr == null)
-            {
-                eng.Log("Invalid instrument (must match NT instrument exactly).");
-                return;
-            }
-
-            eng.Log($"Flatten All clicked. Instr={instr.FullName}");
-
-            // Master + included followers (instrument-only)
-            eng.EnsureFlatInstrument(master, instr);
-
-            foreach (var r in _followerRows)
-            {
-                if (r?.Account == null) continue;
-                if (r.IncludeCheck?.IsChecked != true) continue;
-
-                eng.EnsureFlatInstrument(r.Account, instr);
-            }
-
-            eng.Log("Flatten All submitted (instrument-only).");
-        }
-        
         private void StartPnLTimer()
         {
             if (_pnlTimer != null) return;
@@ -159,7 +117,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (master != null)
             {
                 var r = master.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                var u = master.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+                var u = (instr != null) ? GetUnrealizedFromPositions(master, instr) : 0.0;
 
                 totalR += r;
                 totalU += u;
@@ -174,29 +132,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             // --- followers rows ---
+            // --- followers rows ---
             foreach (var row in _followerRows)
             {
                 var acc = row?.Account;
                 if (acc == null) continue;
 
+                // Realized: keep account-level for now (instrument-level realized needs an execution ledger)
                 var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
 
-                // Fallback: if account Unrealized is 0 but we have a position on this instrument,
-                // compute Unrealized directly from the matching Position.
-                if (instr != null && Math.Abs(u) < 0.0001)
-                {
-                    foreach (var pos in acc.Positions)
-                    {
-                        if (pos?.Instrument == null) continue;
-                        if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
-
-                        _engine.Log($"UI sees position: {acc.Name} {pos.Instrument.FullName} qty={pos.Quantity}");
-
-                        u = pos.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
-                        break;
-                    }
-                }
+                // Unrealized: compute from Positions for the selected instrument
+                var u = (instr != null) ? GetUnrealizedFromPositions(acc, instr) : 0.0;
 
                 totalR += r;
                 totalU += u;
@@ -204,6 +150,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (row.PnlText != null)
                     row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
 
+                // enable/disable per-account flatten based on instrument net position (from Positions)
                 if (row.FlattenBtn != null)
                 {
                     if (instr == null)
@@ -212,7 +159,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     else
                     {
-                        var net = _engine.GetNetPositionForUi(acc, instr);
+                        var net = GetNetFromPositions(acc, instr);
                         row.FlattenBtn.IsEnabled = (net != 0);
                     }
                 }
@@ -225,57 +172,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_btnFlattenAll != null)
                 _btnFlattenAll.IsEnabled = instr != null && master != null;
             
-        }
-        
-        private void SubmitMasterMarket(SafeCopierEngine eng, bool isBuy)
-        {
-            if (eng == null) return;
-
-            var master = _masterBox?.SelectedItem as Account;
-            if (master == null)
-            {
-                eng.Log("Select a master account first.");
-                return;
-            }
-
-            var instrName = (_instrBox?.Text ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(instrName))
-            {
-                eng.Log("Instrument is empty.");
-                return;
-            }
-
-            var instr = Instrument.GetInstrument(instrName);
-            if (instr == null)
-            {
-                eng.Log("Invalid instrument (must match NT instrument exactly).");
-                return;
-            }
-
-            var qty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
-            var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
-
-            var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
-            if (!string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
-                eng.Log($"Master ATM selected: {atm} (selection stored; attach not enabled from AddOn yet)");
-
-            var ord = master.CreateOrder(
-                instr,
-                action,
-                OrderType.Market,
-                OrderEntry.Manual,
-                TimeInForce.Day,
-                qty,
-                0,
-                0,
-                string.Empty,
-                "STC:MANUAL",
-                DateTime.MaxValue,
-                null
-            );
-
-            eng.Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName}");
-            master.Submit(new[] { ord });
         }
     }
 }

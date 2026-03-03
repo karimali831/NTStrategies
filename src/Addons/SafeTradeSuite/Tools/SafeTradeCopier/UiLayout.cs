@@ -1,5 +1,4 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -7,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -50,8 +48,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // We are not using a dedicated override checkbox in the UI.
             // Accounts.cs will treat "override enabled" as: qty filled OR atm chosen.
-            public CheckBox OverrideCheck => null;
-
+            public static CheckBox OverrideCheck => null;
             public TextBox QtyBox => QtyOverrideBox;
             public ComboBox AtmBox => AtmOverrideBox;
         }

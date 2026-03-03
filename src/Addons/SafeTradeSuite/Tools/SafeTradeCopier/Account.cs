@@ -2,14 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
         // private List<Account> GetSelectableAccounts()
         // {
@@ -74,7 +73,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 prevFollowers[name] = new PrevFollowerState
                 {
                     Included = r.IncludeCheck != null && r.IncludeCheck.IsChecked == true,
-                    OverrideEnabled = r.OverrideCheck != null && r.OverrideCheck.IsChecked == true,
+                    OverrideEnabled = FollowerRow.OverrideCheck != null && FollowerRow.OverrideCheck.IsChecked == true,
                     QtyText = r.QtyBox?.Text ?? "",
                     AtmName = r.AtmBox?.SelectedItem as string
                 };
@@ -118,7 +117,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (r.IncludeCheck != null) r.IncludeCheck.IsChecked = ps.Included;
 
                 // If you still have an override checkbox in UI, restore it.
-                if (r.OverrideCheck != null) r.OverrideCheck.IsChecked = ps.OverrideEnabled;
+                if (FollowerRow.OverrideCheck != null) FollowerRow.OverrideCheck.IsChecked = ps.OverrideEnabled;
 
                 if (r.QtyBox != null) r.QtyBox.Text = ps.QtyText ?? "";
 
