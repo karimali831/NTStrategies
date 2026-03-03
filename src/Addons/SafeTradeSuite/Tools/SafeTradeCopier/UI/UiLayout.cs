@@ -28,7 +28,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnBuyMkt;
         private Button _btnSellMkt;
         private Button _btnFlattenAll;
-        private DispatcherTimer _pnlTimer;
         private CheckBox _chkSimOnly;
         private bool _simOnlyMode = true; // default checked
 
@@ -50,7 +49,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // We are not using a dedicated override checkbox in the UI.
             // Accounts.cs will treat "override enabled" as: qty filled OR atm chosen.
-            public static CheckBox OverrideCheck => null;
+            public CheckBox OverrideCheck => null;
             public TextBox QtyBox => QtyOverrideBox;
             public ComboBox AtmBox => AtmOverrideBox;
         }
@@ -91,6 +90,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
             
             var accounts = GetSelectableAccounts();
+            
+            SubscribeUiAccountEvents(accounts);
 
             _chkSimOnly.Checked += (s, e) =>
             {
@@ -401,6 +402,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterBox.SelectedItem = accounts.FirstOrDefault();
 
             BuildFollowerRows(accounts);
+            EnforceSimOnlyModeUi(accounts);
 
             // ATMs
             LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
@@ -415,7 +417,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     eng.SetCopyEnabled(true);
             }
 
-            _masterBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
+            _masterBox.SelectionChanged += (s, e) =>
+            {
+                RebuildFollowersAndRewire(eng, accounts);
+            };
+            _masterBox.DropDownOpened += (s, e) => UpdateMasterComboItemEnablement();
             _instrBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
             _masterQtyBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
             _masterAtmBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
@@ -439,10 +445,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
             RenderHeader(copyOn: false);
             RenderButtons(copyOn: false);
-
-            // start pnl timer
-            StartPnLTimer();
-
+            
             return new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -495,7 +498,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });                   // atm
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });                   // pnl
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });                    // flatten
-
+                
                 var enabled = new CheckBox
                 {
                     Content = acc.Name,
@@ -534,6 +537,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Foreground = Brushes.White,
                     IsEnabled = false
                 };
+                
+                var allow = !_simOnlyMode || IsSimAccount(acc);
+
+                enabled.IsEnabled = allow;
+                if (!allow) enabled.IsChecked = false;
+
+                qtyBox.IsEnabled = allow;
+                atmBox.IsEnabled = allow;
+
+                // flatten stays disabled by default; PnL timer/net-position logic enables it when needed
+                flatten.IsEnabled = false;
 
                 Grid.SetColumn(enabled, 0);
                 Grid.SetColumn(qtyBox, 1);

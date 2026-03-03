@@ -9,22 +9,18 @@ using System.Windows.Threading;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
         // Single instance window (prevents multiple instances in NT)
         private static Window _window;
         private static readonly object WindowGate = new object();
-
-        private SafeCopierEngine _engine;
         private Dispatcher _uiDispatcher;
         private bool _allowWindowClose;
-
+        
+        private SafeCopierEngine _engine;
         private ComboBox _masterBox;
         private TextBox _instrBox;
-
         private StackPanel _followersPanel;
-
-        private DispatcherTimer _accountsTimer;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
 
         public void Show()
@@ -48,8 +44,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _window.WindowState = WindowState.Normal;
                     _window.Activate();
 
-                    StartAccountsAutoRefresh();
-                    StartPnLTimer(); // ✅ restart UI polling every time we show
                     return;
                 }
 
@@ -68,12 +62,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     };
 
                     _uiDispatcher = _window.Dispatcher;
-
                     _window.Closing += OnWindowClosing;
                     _window.Closed += OnWindowClosed;
 
                     _window.Show();
-                    StartAccountsAutoRefresh();
                 }
                 catch
                 {
@@ -98,6 +90,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             lock (WindowGate)
             {
+                UnsubscribeUiAccountEvents(GetSelectableAccounts());
                 CloseInternal(closeWindow: true);
             }
         }
@@ -108,11 +101,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // X button hides (keeps tool alive)
             e.Cancel = true;
-
-            try { _window?.Hide(); } catch { }
-
-            StopAccountsAutoRefresh();
-            StopPnLTimer();
+            _window?.Hide();
         }
 
         private void OnWindowClosed(object sender, EventArgs e)
@@ -126,10 +115,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void CloseInternal(bool closeWindow)
         {
-            // Stop UI timers first (prevents Tick from touching disposed UI/engine)
-            StopAccountsAutoRefresh();
-            StopPnLTimer();
-
             // Turn off copier + dispose engine
             if (_engine != null)
             {
@@ -148,11 +133,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 w.Closed -= OnWindowClosed; 
 
                 _allowWindowClose = true;
-                try { w.Close(); } catch { }
-                _allowWindowClose = false;
+                w.Close(); 
             }
 
-            _uiDispatcher = null;
             _window = null;
 
             // Clear UI refs / state

@@ -9,19 +9,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private readonly Dictionary<string, (double r, double u)> _uiPnl = new Dictionary<string, (double r, double u)>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _uiNet = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        
         private void ApplyConfigFromUi()
         {
             if (_engine == null) return;
 
             var master = _masterBox?.SelectedItem as Account;
-            var instr = _instrBox?.Text?.Trim() ?? "";
+            var instr = _instrBox?.Text.Trim() ?? "";
 
             // master qty
             var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
 
             // master ATM
-            var masterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
+            var masterAtm = _masterAtmBox?.SelectedItem as string ?? "None";
             if (string.IsNullOrWhiteSpace(masterAtm)) masterAtm = "None";
+            
+            if (_simOnlyMode && master != null && !IsSimAccount(master))
+            {
+                // enforce safety: do not allow non-sim master
+                var accounts = GetSelectableAccounts();
+                var firstSim = accounts.FirstOrDefault(IsSimAccount);
+                _masterBox.SelectedItem = firstSim;
+                master = firstSim;
+            }
 
             // followers enabled + overrides
             var followers = new List<Account>();
@@ -34,6 +47,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var enabled = r.EnabledCheck?.IsChecked == true;
                 if (!enabled) continue;
+
+                if (_simOnlyMode && !IsSimAccount(r.Account))
+                {
+                    // safety: if something slips through, force it off
+                    r.EnabledCheck.IsChecked = false;
+                    continue;
+                }
 
                 followers.Add(r.Account);
 
@@ -58,6 +78,100 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 followerAtmOverridesByAccountName: atmOverrides
             );
         }
+        
+        private void RebuildFollowersAndRewire(SafeCopierEngine eng, List<Account> accounts)
+        {
+            // preserve follower selections by account name (optional but nice)
+            var selected = new HashSet<string>(
+                _followerRows.Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null).Select(r => r.Account.Name),
+                StringComparer.Ordinal);
+
+            // rebuild rows (excludes current master)
+            BuildFollowerRows(accounts);
+
+            // restore selections
+            foreach (var r in _followerRows)
+            {
+                if (r?.Account == null) continue;
+                if (r.EnabledCheck == null) continue;
+                r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
+            }
+
+            // sim-only enforcement after rebuild
+            EnforceSimOnlyModeUi(accounts);
+
+            // reload ATMs into NEW combo instances
+            foreach (var r in _followerRows)
+                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+
+            // rewire follower flatten button handlers (NEW button instances)
+            WireFollowerFlattenButtons(eng);
+
+            // update engine config
+            ApplyConfigFromUi();
+
+            if (eng.CopyEnabled)
+                eng.SetCopyEnabled(true);
+        }
+        
+        private void RenderPnlUi()
+            {
+                var disp = _uiDispatcher ?? _window?.Dispatcher;
+                if (disp == null) return;
+
+                disp.InvokeAsync(() =>
+                {
+                    var totalR = 0.0;
+                    var totalU = 0.0;
+
+                    // master
+                    var master = _masterBox?.SelectedItem as Account;
+                    if (master != null)
+                    {
+                        var mr = 0.0; var mu = 0.0;
+                        lock (_uiPnl)
+                        {
+                            if (_uiPnl.TryGetValue(master.Name, out var snap))
+                            {
+                                mr = snap.r;
+                                mu = snap.u;
+                            }
+                        }
+
+                        totalR += mr;
+                        totalU += mu;
+
+                        if (_masterPnlText != null)
+                            _masterPnlText.Text = $"Master PnL  R: {mr:0.00}  U: {mu:0.00}";
+                    }
+
+                    // followers
+                    foreach (var row in _followerRows)
+                    {
+                        var acc = row?.Account;
+                        if (acc == null) continue;
+
+                        var r = 0.0; var u = 0.0;
+                        lock (_uiPnl)
+                        {
+                            if (_uiPnl.TryGetValue(acc.Name, out var snap))
+                            {
+                                r = snap.r;
+                                u = snap.u;
+                            }
+                        }
+
+                        totalR += r;
+                        totalU += u;
+
+                        if (row.PnlText != null)
+                            row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
+                    }
+
+                    if (_totalPnlText != null)
+                        _totalPnlText.Text = $"TOTAL PnL  R: {totalR:0.00}  U: {totalU:0.00}";
+                }, DispatcherPriority.Background);
+            }
 
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)
         {
@@ -77,108 +191,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             if (int.TryParse((s ?? "").Trim(), out var v) && v > 0) return v;
             return fallback;
-        }
-        
-        private void StartPnLTimer()
-        {
-            if (_pnlTimer != null) return;
-
-            var disp = _uiDispatcher ?? _window?.Dispatcher;
-            if (disp == null) return;
-
-            _pnlTimer = new DispatcherTimer(DispatcherPriority.Background, disp)
-            {
-                Interval = TimeSpan.FromMilliseconds(500)
-            };
-
-            _pnlTimer.Tick += (s, e) => UpdatePnLUi();
-            _pnlTimer.Start();
-
-            UpdatePnLUi();
-        }
-
-        private void StopPnLTimer()
-        {
-            if (_pnlTimer == null) return;
-            _pnlTimer.Stop();
-            _pnlTimer = null;
-        }
-
-        private void UpdatePnLUi()
-        {
-            if (_engine == null) return;
-
-            var master = _masterBox?.SelectedItem as Account;
-            var instrName = (_instrBox?.Text ?? "").Trim();
-            var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
-
-            var totalR = 0.0;
-            var totalU = 0.0;
-
-            // --- master ---
-            if (master != null)
-            {
-                if (!_engine.TryGetPnlForUi(master, out var r, out var u))
-                {
-                    // fallback (first second after subscribe, cache can be empty)
-                    r = master.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                    u = master.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
-                }
-                
-                totalR += r;
-                totalU += u;
-
-                if (_masterPnlText != null)
-                    _masterPnlText.Text = $"Master PnL  R: {r:0.00}  U: {u:0.00}";
-            }
-            else
-            {
-                if (_masterPnlText != null)
-                    _masterPnlText.Text = $"Master PnL  R: 0.00  U: 0.00";
-            }
-
-            // --- followers rows ---
-            // --- followers rows ---
-            foreach (var row in _followerRows)
-            {
-                var acc = row?.Account;
-                if (acc == null) continue;
-
-                if (!_engine.TryGetPnlForUi(acc, out var r, out var u))
-                {
-                    // fallback (first second after subscribe, cache can be empty)
-                    r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                    u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
-                }
-
-                totalR += r;
-                totalU += u;
-
-                if (row.PnlText != null)
-                    row.PnlText.Text = $"R: {r:0.00}  U: {u:0.00}";
-
-                // enable/disable per-account flatten based on instrument net position (from Positions)
-                if (row.FlattenBtn != null)
-                {
-                    if (instr == null)
-                    {
-                        row.FlattenBtn.IsEnabled = false;
-                    }
-                    else
-                    {
-                        var net = _engine.GetNetPositionForUi(acc, instr);
-                        row.FlattenBtn.IsEnabled = (net != 0);
-                    }
-                }
-            }
-
-            if (_totalPnlText != null)
-                _totalPnlText.Text = $"TOTAL PnL  R: {totalR:0.00}  U: {totalU:0.00}";
-
-            // enable/disable FlattenAll if ANY selected account has open position on instrument
-            if (_btnFlattenAll != null)
-                _btnFlattenAll.IsEnabled = instr != null && master != null;
-            
         }
         
         private void EnforceSimOnlyModeUi(List<Account> accounts)
@@ -233,5 +245,119 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }, DispatcherPriority.Loaded);
         }
+        
+        private void SubscribeUiAccountEvents(IEnumerable<Account> accounts)
+            {
+                if (accounts == null) return;
+
+                foreach (var a in accounts)
+                {
+                    if (a == null) continue;
+
+                    a.AccountItemUpdate -= OnUiAccountItemUpdate;
+                    a.AccountItemUpdate += OnUiAccountItemUpdate;
+
+                    a.PositionUpdate -= OnUiPositionUpdate;
+                    a.PositionUpdate += OnUiPositionUpdate;
+                }
+            }
+
+            public void UnsubscribeUiAccountEvents(IEnumerable<Account> accounts)
+            {
+                if (accounts == null) return;
+
+                foreach (var a in accounts)
+                {
+                    if (a == null) continue;
+                    a.AccountItemUpdate -= OnUiAccountItemUpdate;
+                    a.PositionUpdate -= OnUiPositionUpdate;
+                }
+            }
+            
+         
+            
+            private void OnUiAccountItemUpdate(object sender, AccountItemEventArgs e)
+            {
+                if (e?.Account == null) return;
+                if (e.Currency != Currency.UsDollar) return;
+
+                var name = e.Account.Name ?? "";
+                if (string.IsNullOrWhiteSpace(name)) return;
+
+                lock (_uiPnl)
+                {
+                    _uiPnl.TryGetValue(name, out var snap);
+
+                    if (e.AccountItem == AccountItem.RealizedProfitLoss)
+                        snap.r = e.Value;
+                    else if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
+                        snap.u = e.Value;
+
+                    _uiPnl[name] = snap;
+                }
+
+                RenderPnlUi();
+            }
+
+            private void OnUiPositionUpdate(object sender, PositionEventArgs e)
+            {
+                var acc = sender as Account;
+                if (acc == null) return;
+                if (e?.Position == null) return;
+
+                var instrFull = e.Position.Instrument?.FullName ?? "";
+                var key = $"{acc.Name}|{instrFull}";
+                var qty = e.Position.Quantity;
+
+                lock (_uiNet)
+                    _uiNet[key] = qty;
+
+                RenderFlattenEnablementUi();
+            }
+            
+
+            private void RenderFlattenEnablementUi()
+            {
+                var disp = _uiDispatcher ?? _window?.Dispatcher;
+                if (disp == null) return;
+
+                disp.InvokeAsync(() =>
+                {
+                    var instrName = (_instrBox?.Text ?? "").Trim();
+                    var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
+                    var instrFull = instr?.FullName ?? "";
+
+                    foreach (var row in _followerRows)
+                    {
+                        if (row?.Account == null || row.FlattenBtn == null)
+                            continue;
+
+                        if (instr == null)
+                        {
+                            row.FlattenBtn.IsEnabled = false;
+                            continue;
+                        }
+
+                        var net = 0;
+                        var key = $"{row.Account.Name}|{instrFull}";
+
+                        lock (_uiNet)
+                            _uiNet.TryGetValue(key, out net);
+
+                        if (net == 0)
+                        {
+                            foreach (var p in row.Account.Positions)
+                            {
+                                if (p?.Instrument == null) continue;
+                                if (!string.Equals(p.Instrument.FullName, instrFull, StringComparison.Ordinal)) continue;
+                                net = p.Quantity;
+                                break;
+                            }
+                        }
+
+                        row.FlattenBtn.IsEnabled = net != 0 && row.EnabledCheck?.IsChecked == true;
+                    }
+                }, DispatcherPriority.Background);
+            }
     }
 }

@@ -1,6 +1,7 @@
 ﻿#region Using declarations
 using System;
 using System.Collections.Generic;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
@@ -99,7 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (p?.Instrument == null) continue;
                     if (!string.Equals(p.Instrument.FullName, want, StringComparison.Ordinal)) continue;
 
-                    return (int)p.Quantity;
+                    return p.Quantity;
                 }
 
                 return 0;
