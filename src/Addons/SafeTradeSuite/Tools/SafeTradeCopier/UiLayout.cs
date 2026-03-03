@@ -142,23 +142,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnBuyMkt = new Button
             {
-                Content = "BUY MKT",
+                Content = "Buy Market",
                 Height = 36,
                 Margin = new Thickness(0, 0, 6, 0),
-                Background = Brushes.DimGray,
+                Background = Brushes.DodgerBlue,
                 Foreground = Brushes.White
             };
             _btnSellMkt = new Button
             {
-                Content = "SELL MKT",
+                Content = "Sell Market",
                 Height = 36,
                 Margin = new Thickness(6, 0, 6, 0),
-                Background = Brushes.DimGray,
+                Background = Brushes.DodgerBlue,
                 Foreground = Brushes.White
             };
             _btnFlattenAll = new Button
             {
-                Content = "FLATTEN ALL",
+                Content = "Flatten All",
                 Height = 36,
                 Margin = new Thickness(6, 0, 0, 0),
                 Background = Brushes.Maroon,

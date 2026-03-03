@@ -126,13 +126,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     r.AtmBox.SelectedItem = ps.AtmName;
             }
 
-// Re-wire per-row flatten buttons for the new controls
+            // Re-wire per-row flatten buttons for the new controls
             WireFollowerFlattenButtons(_engine);
 
-// Apply config from the (now restored) UI
+            // Apply config from the (now restored) UI
             ApplyConfigFromUi();
 
-// If COPY is ON, ensure engine re-wires to refreshed account objects
+            // If COPY is ON, ensure engine re-wires to refreshed account objects
             if (_engine.CopyEnabled)
                 _engine.SetCopyEnabled(true);
         }

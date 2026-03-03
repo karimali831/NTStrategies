@@ -6,14 +6,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private void WireOrderButtons(SafeCopierEngine eng)
         {
-            if (_btnBuyMkt != null)
-                _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
-
-            if (_btnSellMkt != null)
-                _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
-
-            if (_btnFlattenAll != null)
-                _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
+            _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
+            _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
+            _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
         }
 
         private void WireFollowerFlattenButtons(SafeCopierEngine eng)

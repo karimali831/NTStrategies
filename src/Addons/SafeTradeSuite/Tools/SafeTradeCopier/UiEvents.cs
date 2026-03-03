@@ -81,8 +81,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FlattenAllSelected(SafeCopierEngine eng)
         {
-            if (eng == null) return;
-
             if (!(_masterBox?.SelectedItem is Account master))
             {
                 eng.Log("Select a master account first.");
