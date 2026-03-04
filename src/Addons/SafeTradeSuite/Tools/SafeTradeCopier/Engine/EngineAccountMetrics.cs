@@ -22,13 +22,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void SubscribePnl(Account acc)
             {
-                if (acc == null) return;
-
                 acc.AccountItemUpdate -= OnAccountItemUpdate;
                 acc.AccountItemUpdate += OnAccountItemUpdate;
+                
+                var name = acc.Name ?? "";
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                    var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
 
-                // ✅ Seed initial values so UI is correct immediately (even after NT restart)
-                SeedPnlSnapshot(acc);
+                    lock (_gate)
+                    {
+                        if (!_pnlByAccount.TryGetValue(name, out var snap))
+                        {
+                            snap = new PnlSnap();
+                            _pnlByAccount[name] = snap;
+                        }
+
+                        snap.Realized = r;
+                        snap.Unrealized = u;
+                    }
+                }
             }
 
             private void UnsubscribePnl(Account acc)
@@ -94,30 +108,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 return 0;
-            }
-            
-            private void SeedPnlSnapshot(Account acc)
-            {
-                if (acc == null) return;
-
-                var name = acc.Name ?? "";
-                if (string.IsNullOrWhiteSpace(name)) return;
-
-                // Read current values directly from NT at seed-time
-                var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
-
-                lock (_gate)
-                {
-                    if (!_pnlByAccount.TryGetValue(name, out var snap))
-                    {
-                        snap = new PnlSnap();
-                        _pnlByAccount[name] = snap;
-                    }
-
-                    snap.Realized = r;
-                    snap.Unrealized = u;
-                }
             }
         }
     }

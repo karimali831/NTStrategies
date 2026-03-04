@@ -34,8 +34,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
 
             var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
+
             if (!string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
-                eng.Log($"Master ATM selected: {atm} (selection stored; attach not enabled from AddOn yet)");
+            {
+                eng.SubmitMasterMarketWithBracket(master, instr, action, qty, atm);
+                return;
+            }
 
             var ord = master.CreateOrder(
                 instr,

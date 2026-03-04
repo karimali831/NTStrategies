@@ -21,6 +21,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
+                TrySubmitBracketOnFill(_master, e.Execution);
+
                 var execId = e.Execution.ExecutionId ?? "";
                 if (string.IsNullOrWhiteSpace(execId))
                     execId = $"{e.Execution.Time.Ticks}_{e.Execution.Price}_{e.Execution.Quantity}_{e.Execution.MarketPosition}";

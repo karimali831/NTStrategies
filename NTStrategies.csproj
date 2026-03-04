@@ -66,12 +66,15 @@
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuManager.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuNodes.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Account.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplate.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplateReader.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplateSpec.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Core.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\EngineAccountMetrics.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\EngineBracket.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\EngineUtil.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ExecutionCopy.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Flatten.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Order.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Position.cs" />
