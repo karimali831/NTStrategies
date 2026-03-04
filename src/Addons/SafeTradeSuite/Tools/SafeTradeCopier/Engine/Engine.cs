@@ -160,7 +160,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _master.ExecutionUpdate -= OnMasterExecution;
 
                     foreach (var f in _followers)
-                        f.OrderUpdate -= OnFollowerOrderUpdate;
+                    {
+                        f.OrderUpdate += OnFollowerOrderUpdate;
+                        f.ExecutionUpdate += OnFollowerExecution;
+                    }
                 }
 
                 // Apply current config into active fields used by copier
@@ -213,7 +216,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _master.ExecutionUpdate -= OnMasterExecution;
 
                     foreach (var f in _followers)
+                    {
                         f.OrderUpdate -= OnFollowerOrderUpdate;
+                        f.ExecutionUpdate -= OnFollowerExecution;
+                    }
                     
                     UnsubscribePnl(_master);
                     foreach (var f in _followers) UnsubscribePnl(f);
@@ -233,6 +239,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!string.IsNullOrWhiteSpace(reason))
                     Log($"DISARMED: {reason}");
             }
+            
             
             public void Log(string msg) => OnStatus?.Invoke(msg);
 

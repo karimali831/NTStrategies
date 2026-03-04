@@ -21,25 +21,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
-                var ord = e.Execution.Order;
-                if (ord == null) return;
-
-// Only bracket true entries (Buy/Sell), not exits/flatten/stop/target fills
-                var action = ord.OrderAction;
-                if (action != OrderAction.Buy && action != OrderAction.Sell)
-                    return;
-
-                // Only bracket orders that came from THIS tool (your tag from CreateOrder)
-                var sig = (ord.Name ?? "").Trim(); // depending on NT property availability; see note below
-                if (!sig.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                // If you used "STC:MANUAL" as the *signal name* and not Name, use the right property:
-                var fromSignal = (ord.FromEntrySignal ?? "").Trim();
-                if (!fromSignal.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                // ✅ Now it’s safe to bracket
+                // ✅ Brackets only submit if this fill matches a pending bracket entry-name.
                 TrySubmitBracketOnFill(_master, e.Execution);
 
                 var execId = e.Execution.ExecutionId ?? "";
@@ -62,17 +44,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterExecQty = Math.Abs(masterExecQty);
                 if (masterExecQty <= 0) return;
 
-                var masterAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
-
-                // For copying, we mirror the master *order action* direction.
-                // Sell = Sell (close long), BuyToCover = BuyToCover (close short), etc.
-                var followerAction = masterAction;
+                // Mirror the actual action that filled (includes exits)
+                var followerAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
 
                 CancellationToken token;
                 lock (_gate)
                 {
-                    var localCts = _cts;
-                    token = localCts.Token;
+                    token = _cts.Token;
                 }
 
                 Task.Run(async () =>
@@ -87,6 +65,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _submitLock.Release();
                     }
                 }, token);
+            }
+            
+            private void OnFollowerExecution(object sender, ExecutionEventArgs e)
+            {
+                if (!_armed) return;
+                if (e?.Execution == null) return;
+
+                // Only manage brackets for the instrument we’re operating on
+                if (_instrument == null) return;
+                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
+                    return;
+
+                var acc = e.Execution.Account;
+                if (acc == null) return;
+
+                // Brackets only submit if there's a pending entry name for this fill.
+                TrySubmitBracketOnFill(acc, e.Execution);
             }
  
             private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
@@ -148,30 +143,83 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     Log($"Copy -> {f.Name}: action={action}, qty={qty}, instr={instrSnap.FullName}");
 
-                    var ord = f.CreateOrder(
-                        instrSnap,
-                        action,
-                        OrderType.Market,
-                        OrderEntry.Manual,
-                        TimeInForce.Day,
-                        qty,
-                        0,
-                        0,
-                        string.Empty,
-                        $"STC:{execId}",
-                        DateTime.MaxValue,
-                        null
-                    );
+                    // If we have a template, submit with bracket tracking
+                    if (!string.IsNullOrWhiteSpace(atm) && !string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SubmitFollowerMarketWithBracket(f, instrSnap, action, qty, atm, execId);
+                    }
+                    else
+                    {
+                        var ord = f.CreateOrder(
+                            instrSnap,
+                            action,
+                            OrderType.Market,
+                            OrderEntry.Manual,
+                            TimeInForce.Day,
+                            qty,
+                            0,
+                            0,
+                            string.Empty,
+                            $"STC:{execId}",
+                            DateTime.MaxValue,
+                            null
+                        );
 
-                    f.Submit(new[] { ord });
+                        f.Submit(new[] { ord });
+                    }
+
                     RecordCopy();
 
                     if (StaggerMsPerFollower > 0)
                         await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
                 }
-
             }
 
+            private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string execId)
+            {
+                if (acc == null || instr == null) return;
+
+                if (!TryReadAtmTemplateBasic(atmTemplateName, out var stopTicks, out var targetTicks))
+                {
+                    Log($"Follower ATM template parse failed: '{atmTemplateName}'. Submitting entry only.");
+                    stopTicks = 0;
+                    targetTicks = 0;
+                }
+
+                // Unique entry name that we can match on ExecutionUpdate
+                var entryName = $"STC:ENTRY:{execId}:{acc.Name}";
+
+                var entry = acc.CreateOrder(
+                    instr,
+                    action,
+                    OrderType.Market,
+                    OrderEntry.Manual,
+                    TimeInForce.Day,
+                    qty,
+                    0,
+                    0,
+                    string.Empty,
+                    entryName,
+                    DateTime.MaxValue,
+                    null
+                );
+
+                lock (_gate)
+                {
+                    _pendingBrackets[entryName] = new PendingBracket
+                    {
+                        EntryName = entryName,
+                        Qty = qty,
+                        IsBuy = (action == OrderAction.Buy),
+                        StopTicks = Math.Max(0, stopTicks),
+                        TargetTicks = Math.Max(0, targetTicks)
+                    };
+                }
+
+                Log($"Follower submit -> {acc.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
+                acc.Submit(new[] { entry });
+            }
+            
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
             {
                 if (!_armed) return;
