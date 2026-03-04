@@ -21,6 +21,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
+                var ord = e.Execution.Order;
+                if (ord == null) return;
+
+// Only bracket true entries (Buy/Sell), not exits/flatten/stop/target fills
+                var action = ord.OrderAction;
+                if (action != OrderAction.Buy && action != OrderAction.Sell)
+                    return;
+
+                // Only bracket orders that came from THIS tool (your tag from CreateOrder)
+                var sig = (ord.Name ?? "").Trim(); // depending on NT property availability; see note below
+                if (!sig.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // If you used "STC:MANUAL" as the *signal name* and not Name, use the right property:
+                var fromSignal = (ord.FromEntrySignal ?? "").Trim();
+                if (!fromSignal.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // ✅ Now it’s safe to bracket
                 TrySubmitBracketOnFill(_master, e.Execution);
 
                 var execId = e.Execution.ExecutionId ?? "";
