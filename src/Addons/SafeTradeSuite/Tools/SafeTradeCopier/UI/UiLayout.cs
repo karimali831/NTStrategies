@@ -261,7 +261,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(_instrBox);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
-
             masterStack.Children.Add(_masterPnlText);
             masterStack.Children.Add(_masterPnlBar);
 

@@ -1,15 +1,44 @@
 ﻿using System;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using NinjaTrader.Cbi;
-using static System.Windows.Controls.Border;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
+    public sealed class ProgressToWidthConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            try
+            {
+                var value = values != null && values.Length > 0 ? System.Convert.ToDouble(values[0]) : 0.0;
+                var max   = values != null && values.Length > 1 ? System.Convert.ToDouble(values[1]) : 100.0;
+                var width = values != null && values.Length > 2 ? System.Convert.ToDouble(values[2]) : 0.0;
+
+                if (max <= 0 || width <= 0) return 0.0;
+
+                var p = value / max;
+                if (p < 0) p = 0;
+                if (p > 1) p = 1;
+
+                return p * width;
+            }
+            catch
+            {
+                return 0.0;
+            }
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+    
     public partial class SafeTradeCopierTool
     {
         private static ControlTemplate _roundedProgressTemplate;
@@ -98,18 +127,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SetBarValueAnimated(bar, remaining * 100.0);
             }
 
-            // subtle glow near extremes
-            if (bar.Value > 90) bar.Effect = GlowGreen;
-            else if (bar.Value < 10) bar.Effect = GlowRed;
+            var v = unrealized >= 0
+                ? Clamp01(unrealized / (targetRisk > 0 ? targetRisk : 1.0)) * 100.0
+                : (1.0 - Clamp01(Math.Abs(unrealized) / (stopRisk > 0 ? stopRisk : 1.0))) * 100.0;
+
+            if (v > 90) bar.Effect = GlowGreen;
+            else if (v < 10) bar.Effect = GlowRed;
             else bar.Effect = null;
         }
-    
-
+        
         private static void EnsureRoundedProgressBar(ProgressBar bar)
         {
             if (bar == null) return;
 
-            // avoid re-templating repeatedly
             if (bar.Tag as string == "STC_ROUNDED_PB") return;
 
             if (_roundedProgressTemplate == null)
@@ -127,37 +157,69 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             var template = new ControlTemplate(typeof(ProgressBar));
 
-            var outer = new FrameworkElementFactory(typeof(Border))
-            {
-                Name = "OuterBorder"
-            };
-            outer.SetValue(CornerRadiusProperty, new CornerRadius(6));
-            outer.SetValue(BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            // Outer track container
+            var outer = new FrameworkElementFactory(typeof(Border));
+            outer.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            outer.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            outer.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
             outer.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
 
+            // Grid hosts the fill
             var grid = new FrameworkElementFactory(typeof(Grid));
-
-            // The fill "indicator"
-            var indicator = new FrameworkElementFactory(typeof(Border))
-            {
-                Name = "PART_Indicator"
-            };
-            indicator.SetValue(CornerRadiusProperty, new CornerRadius(6));
-            indicator.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
-            indicator.SetValue(BackgroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
-            indicator.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
-
-            // ProgressBar uses this to size the indicator
-            indicator.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(FrameworkElement.HeightProperty));
-            indicator.SetValue(FrameworkElement.MarginProperty, new Thickness(0));
-
-            grid.AppendChild(indicator);
             outer.AppendChild(grid);
+
+            // Fill (rounded), clipped by outer border and width bound to Value/Maximum * ActualWidth
+            var fill = new FrameworkElementFactory(typeof(Border));
+            fill.Name = "PART_Indicator";
+            fill.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            fill.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            fill.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+            fill.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            fill.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Stretch);
+            fill.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            // Width binding: (Value/Maximum) * Outer.ActualWidth
+            var mb = new MultiBinding { Converter = new ProgressToWidthConverter() };
+            mb.Bindings.Add(new Binding("Value") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            mb.Bindings.Add(new Binding("Maximum") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+            mb.Bindings.Add(new Binding("ActualWidth") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
+
+            fill.SetBinding(FrameworkElement.WidthProperty, mb);
+
+            grid.AppendChild(fill);
 
             template.VisualTree = outer;
             return template;
         }
-        
-        
+
+        private static ControlTemplate BuildFillButtonTemplate()
+        {
+            // Uses ProgressBar.Foreground for fill brush (your gradient)
+            var t = new ControlTemplate(typeof(RepeatButton));
+
+            var b = new FrameworkElementFactory(typeof(Border));
+            b.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            b.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            b.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+            b.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            t.VisualTree = b;
+            return t;
+        }
+
+        private static ControlTemplate BuildTrackButtonTemplate()
+        {
+            // Remaining portion: transparent (outer border already has Background track color)
+            var t = new ControlTemplate(typeof(RepeatButton));
+
+            var b = new FrameworkElementFactory(typeof(Border));
+            b.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            b.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            b.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            b.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            t.VisualTree = b;
+            return t;
+        }
     }
 }

@@ -117,10 +117,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RenderPnlUi()
         {
-            var disp = _uiDispatcher ?? _window?.Dispatcher;
-            if (disp == null) return;
+            var display = _uiDispatcher ?? _window?.Dispatcher;
 
-            disp.InvokeAsync(() =>
+            display?.InvokeAsync(() =>
             {
                 var totalR = 0.0;
                 var totalU = 0.0;
@@ -128,7 +127,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // master
                 if (_masterBox?.SelectedItem is Account master)
                 {
-                    var mr = 0.0; var mu = 0.0;
+                    var mr = 0.0;
+                    var mu = 0.0;
                     lock (_uiPnl)
                     {
                         if (_uiPnl.TryGetValue(master.Name, out var snap))
@@ -145,12 +145,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _masterPnlText.Text = FormatPnL(mr, mu, "Master", shortened: false);
 
                     var instr = GetInstrument();
-                    
+
                     if (_masterPnlBar != null && instr != null)
                     {
-                        if (_engine.TryGetActiveBracketSpecForUi(master, instr, out var st, out var tk) &&
-                            TryGetInstrumentUnrealized(master, instr, out var uInstr, out var qInstr))
+                        if (_engine.TryGetActiveBracketSpecForUi(master, instr, out var st, out var tk))
                         {
+                            // If unrealized/qty isn't available yet, keep bar visible at 0% (smooth UI)
+                            var uInstr = 0.0;
+                            var qInstr = 1;
+
+                            if (TryGetInstrumentUnrealized(master, instr, out var uTmp, out var qTmp))
+                            {
+                                uInstr = uTmp;
+                                qInstr = Math.Max(1, qTmp);
+                            }
+
                             RenderFlipBar(_masterPnlBar, uInstr, qInstr, st, tk, instr);
                         }
                         else
@@ -159,7 +168,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             _masterPnlBar.Value = 0;
                         }
                     }
-                    
                 }
 
                 // followers
@@ -185,12 +193,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         row.PnlText.Text = FormatPnL(r, u, "Total", shortened: true);
 
                     var instr = GetInstrument();
-                    
+
                     if (row.PnlBar != null && instr != null)
                     {
-                          if (_engine.TryGetActiveBracketSpecForUi(acc, instr, out var st, out var tk) &&
-                            TryGetInstrumentUnrealized(acc, instr, out var uInstr, out var qInstr))
+                        if (_engine.TryGetActiveBracketSpecForUi(acc, instr, out var st, out var tk))
                         {
+                            var uInstr = 0.0;
+                            var qInstr = 1;
+
+                            if (TryGetInstrumentUnrealized(acc, instr, out var uTmp, out var qTmp))
+                            {
+                                uInstr = uTmp;
+                                qInstr = Math.Max(1, qTmp);
+                            }
+
                             RenderFlipBar(row.PnlBar, uInstr, qInstr, st, tk, instr);
                         }
                         else
