@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
@@ -39,32 +40,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (acc == null || instr == null) return;
 
                 // 1) Cancel any working orders on this instrument (ATM targets/stops live here)
+                var orders = new List<Order>();
                 try
                 {
-                    foreach (var o in acc.Orders)
+                    orders.AddRange(acc.Orders);
+                }
+                catch
+                {
+                    // if Orders enumeration fails, we still try to flatten net position below
+                }
+
+                try
+                {
+                    foreach (var o in orders)
                     {
                         if (o?.Instrument == null) continue;
                         if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
 
-                        // cancel anything still working-ish
                         if (o.OrderState == OrderState.Working ||
                             o.OrderState == OrderState.Accepted ||
                             o.OrderState == OrderState.Submitted)
                         {
-                            // NT supports cancelling orders via Account.Cancel
                             acc.Cancel(new[] { o });
                         }
                     }
                 }
                 catch
                 {
-                    // non-fatal: flatten should still try to submit market
+                    // non-fatal
                 }
 
                 // 2) Now flatten the net position
                 var net = GetNetPosition(acc, instr);
                 if (net == 0)
                 {
+                    ClearActiveBracket(acc, instr);
                     Log($"Flatten -> {acc.Name}: net=0 (nothing to do) instr={instr.FullName}");
                     return;
                 }

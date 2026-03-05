@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private ComboBox _masterAtmBox;
         private TextBlock _masterPnlText;
         private TextBlock _totalPnlText;
-
+        private ProgressBar _masterPnlBar;
         private Button _btnBuyMkt;
         private Button _btnSellMkt;
         private Button _btnFlattenAll;
@@ -42,13 +42,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public ComboBox AtmOverrideBox;
             public TextBlock PnlText;
             public Button FlattenBtn;
-
-            // ---- Compatibility wrappers (expected by Accounts.cs) ----
+            public ProgressBar PnlBar;
             public string AccountName => Account?.Name ?? "";
             public CheckBox IncludeCheck => EnabledCheck;
-
-            // We are not using a dedicated override checkbox in the UI.
-            // Accounts.cs will treat "override enabled" as: qty filled OR atm chosen.
             public CheckBox OverrideCheck => null;
             public TextBox QtyBox => QtyOverrideBox;
             public ComboBox AtmBox => AtmOverrideBox;
@@ -246,6 +242,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.WindowTextBrush,
                 FontWeight = FontWeights.SemiBold
             };
+            
+            _masterPnlBar = new ProgressBar
+            {
+                Height = 10,
+                Minimum = 0,
+                Maximum = 100,
+                Value = 0,
+                Margin = new Thickness(0, 6, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+
+            masterStack.Children.Add(_masterPnlText);
+            masterStack.Children.Add(_masterPnlBar);
 
             masterStack.Children.Add(masterTitle);
             masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
@@ -537,6 +546,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Foreground = SystemColors.ControlTextBrush,
                     Margin = new Thickness(6, 0, 6, 0)
                 };
+                
+                var pnlBar = new ProgressBar
+                {
+                    Height = 10,
+                    Minimum = 0,
+                    Maximum = 100,
+                    Value = 0,
+                    Margin = new Thickness(6, 2, 6, 0),
+                    Visibility = Visibility.Collapsed
+                };
 
                 var flatten = new Button
                 {
@@ -561,13 +580,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetColumn(enabled, 0);
                 Grid.SetColumn(qtyBox, 1);
                 Grid.SetColumn(atmBox, 2);
-                Grid.SetColumn(pnl, 3);
+                var pnlStack = new StackPanel { Orientation = Orientation.Vertical };
                 Grid.SetColumn(flatten, 4);
 
                 rowGrid.Children.Add(enabled);
                 rowGrid.Children.Add(qtyBox);
                 rowGrid.Children.Add(atmBox);
-                rowGrid.Children.Add(pnl);
+                pnlStack.Children.Add(pnl);
+                pnlStack.Children.Add(pnlBar);
+
+                Grid.SetColumn(pnlStack, 3);
+                rowGrid.Children.Add(pnlStack);
                 rowGrid.Children.Add(flatten);
 
                 var row = new FollowerRow
@@ -577,9 +600,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     QtyOverrideBox = qtyBox,
                     AtmOverrideBox = atmBox,
                     PnlText = pnl,
+                    PnlBar = pnlBar,
                     FlattenBtn = flatten
                 };
-
+                
                 // When user changes follower settings, we re-apply config (no re-arm UX)
                 enabled.Checked += (s, e) => ApplyConfigFromUi();
                 enabled.Unchecked += (s, e) => ApplyConfigFromUi();

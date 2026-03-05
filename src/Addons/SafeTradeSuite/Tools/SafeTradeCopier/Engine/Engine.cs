@@ -161,8 +161,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     foreach (var f in _followers)
                     {
-                        f.OrderUpdate += OnFollowerOrderUpdate;
-                        f.ExecutionUpdate += OnFollowerExecution;
+                        f.OrderUpdate -= OnFollowerOrderUpdate;
+                        f.ExecutionUpdate -= OnFollowerExecution;
                     }
                 }
 
@@ -193,7 +193,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _master.ExecutionUpdate += OnMasterExecution;
 
                 foreach (var f in _followers)
+                {
                     f.OrderUpdate += OnFollowerOrderUpdate;
+                    f.ExecutionUpdate += OnFollowerExecution;
+                }
 
                 // reset circuit-breaker bookkeeping
                 _seen.Clear();

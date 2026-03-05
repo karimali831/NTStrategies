@@ -8,7 +8,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         // Phase 1: read only StopLoss + Target ticks (single target)
-        public static bool TryReadAtmTemplateBasic(string templateName, out int stopTicks, out int targetTicks)
+        private static bool TryReadAtmTemplateBasic(string templateName, out int stopTicks, out int targetTicks)
         {
             stopTicks = 0;
             targetTicks = 0;

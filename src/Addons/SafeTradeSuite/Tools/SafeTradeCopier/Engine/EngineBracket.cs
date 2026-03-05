@@ -8,6 +8,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            private sealed class ActiveBracketSpec
+            {
+                public int StopTicks;
+                public int TargetTicks;
+            }
+
+            private readonly Dictionary<string, ActiveBracketSpec> _activeBracketByAccInstr =
+                new Dictionary<string, ActiveBracketSpec>(StringComparer.Ordinal);
+
+            private static string BracketKey(Account acc, Instrument instr)
+            {
+                return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
+            }
+            
+            private void ClearActiveBracket(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null) return;
+
+                lock (_gate)
+                {
+                    _activeBracketByAccInstr.Remove(BracketKey(acc, instr));
+                }
+            }
+
+            internal bool TryGetActiveBracketSpecForUi(Account acc, Instrument instr, out int stopTicks, out int targetTicks)
+            {
+                stopTicks = 0;
+                targetTicks = 0;
+                if (acc == null || instr == null) return false;
+
+                lock (_gate)
+                {
+                    if (!_activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out var spec))
+                        return false;
+
+                    stopTicks = spec.StopTicks;
+                    targetTicks = spec.TargetTicks;
+                    return true;
+                }
+            }
+            
             private sealed class PendingBracket
             {
                 public string EntryName;
@@ -105,7 +146,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
-                var tickSize = instr.MasterInstrument != null ? instr.MasterInstrument.TickSize : 0.0;
+                var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
                 if (tickSize <= 0)
                 {
                     Log($"Bracket skipped: invalid TickSize for {instr.FullName}.");
@@ -113,9 +154,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
-
-                var exitAction = pb.IsBuy ? OrderAction.Sell : OrderAction.Buy;
-
+                var exitAction = pb.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
+                
                 var orders = new List<Order>(2);
 
                 if (pb.TargetTicks > 0)
@@ -168,6 +208,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (orders.Count > 0)
                 {
+                    lock (_gate)
+                    {
+                        _activeBracketByAccInstr[BracketKey(master, instr)] = 
+                            new ActiveBracketSpec
+                            {
+                                StopTicks = pb.StopTicks,
+                                TargetTicks = pb.TargetTicks
+                            };
+                    }
+
                     master.Submit(orders.ToArray());
                     Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
                 }

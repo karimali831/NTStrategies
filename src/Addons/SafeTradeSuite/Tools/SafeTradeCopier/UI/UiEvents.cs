@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
@@ -142,6 +143,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (_masterPnlText != null)
                         _masterPnlText.Text = FormatPnL(totalR, totalU, "Master", shortened: false);
+
+                    var instr = GetInstrument();
+                    
+                    if (_masterPnlBar != null && instr != null)
+                    {
+                        if (_engine.TryGetActiveBracketSpecForUi(master, instr, out var st, out var tk) &&
+                            TryGetInstrumentUnrealized(master, instr, out var uInstr, out var qInstr))
+                        {
+                            RenderFlipBar(_masterPnlBar, uInstr, qInstr, st, tk, instr);
+                        }
+                        else
+                        {
+                            _masterPnlBar.Visibility = Visibility.Collapsed;
+                            _masterPnlBar.Value = 0;
+                        }
+                    }
+                    
                 }
 
                 // followers
@@ -165,6 +183,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (row.PnlText != null)
                         row.PnlText.Text = FormatPnL(r, u, "Total", shortened: true);
+
+                    var instr = GetInstrument();
+                    
+                    if (row.PnlBar != null && instr != null)
+                    {
+                          if (_engine.TryGetActiveBracketSpecForUi(acc, instr, out var st, out var tk) &&
+                            TryGetInstrumentUnrealized(acc, instr, out var uInstr, out var qInstr))
+                        {
+                            RenderFlipBar(row.PnlBar, uInstr, qInstr, st, tk, instr);
+                        }
+                        else
+                        {
+                            row.PnlBar.Visibility = Visibility.Collapsed;
+                            row.PnlBar.Value = 0;
+                        }
+                    }
                 }
 
                 if (_totalPnlText != null)
@@ -248,7 +282,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            public void UnsubscribeUiAccountEvents(IEnumerable<Account> accounts)
+        private void UnsubscribeUiAccountEvents(IEnumerable<Account> accounts)
             {
                 if (accounts == null) return;
 
@@ -259,8 +293,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     a.PositionUpdate -= OnUiPositionUpdate;
                 }
             }
-            
-         
             
             private void OnUiAccountItemUpdate(object sender, AccountItemEventArgs e)
             {
@@ -300,8 +332,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 RenderFlattenEnablementUi();
             }
-            
 
+            private Instrument GetInstrument()
+            {
+                var instrName = (_instrBox?.Text ?? "").Trim();
+                return string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
+            }
+            
+            private string GetInstrumentFullName()
+            {
+                var instr = GetInstrument();
+                return instr?.FullName ?? "";
+            }
+            
             private void RenderFlattenEnablementUi()
             {
                 var disp = _uiDispatcher ?? _window?.Dispatcher;
@@ -309,9 +352,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 disp.InvokeAsync(() =>
                 {
-                    var instrName = (_instrBox?.Text ?? "").Trim();
-                    var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
-                    var instrFull = instr?.FullName ?? "";
+                    var instr = GetInstrument();
+                    var instrFull = GetInstrumentFullName();
 
                     foreach (var row in _followerRows)
                     {

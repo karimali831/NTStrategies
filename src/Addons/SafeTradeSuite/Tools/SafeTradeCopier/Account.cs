@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // “Connected in Accounts panel” practical filter:
             // must have a connection object and be Connected.
             return Account.All
-                .Where(a => a != null && a.Connection != null && a.ConnectionStatus == ConnectionStatus.Connected)
+                .Where(a => a?.Connection != null && a.ConnectionStatus == ConnectionStatus.Connected)
                 .OrderBy(a => a.Name)
                 .ToList();
         }
