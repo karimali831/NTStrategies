@@ -41,6 +41,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
+            var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
+
             var ord = master.CreateOrder(
                 instr,
                 action,
@@ -51,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 0,
                 0,
                 string.Empty,
-                "STC:MANUAL",
+                entryName,
                 DateTime.MaxValue,
                 null
             );

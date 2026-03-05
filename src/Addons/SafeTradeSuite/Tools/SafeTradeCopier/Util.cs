@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -86,50 +83,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             return false;
-        }
-
-        private void RenderFlipBar(ProgressBar bar, double unrealized, int qty, int stopTicks, int targetTicks, Instrument instr)
-        {
-            if (bar == null) return;
-
-            // show only if we have an actual bracket spec
-            if (instr == null || qty <= 0 || (stopTicks <= 0 && targetTicks <= 0))
-            {
-                bar.Visibility = Visibility.Collapsed;
-                bar.Value = 0;
-                return;
-            }
-
-            var tickValue = GetTickValue(instr);
-            if (tickValue <= 0)
-            {
-                bar.Visibility = Visibility.Collapsed;
-                bar.Value = 0;
-                return;
-            }
-
-            var stopRisk = stopTicks > 0 ? stopTicks * tickValue * qty : 0.0;
-            var targetRisk = targetTicks > 0 ? targetTicks * tickValue * qty : 0.0;
-
-            bar.Visibility = Visibility.Visible;
-
-            if (unrealized >= 0)
-            {
-                // green 0..100 to target
-                var denom = targetRisk > 0 ? targetRisk : 1.0;
-                var p = Clamp01(unrealized / denom);
-                bar.Foreground = Brushes.DarkGreen;
-                bar.Value = p * 100.0;
-            }
-            else
-            {
-                // red flipped: 100..0 to stop
-                var denom = stopRisk > 0 ? stopRisk : 1.0;
-                var used = Clamp01(Math.Abs(unrealized) / denom);
-                var remaining = 1.0 - used;
-                bar.Foreground = Brushes.Maroon;
-                bar.Value = remaining * 100.0;
-            }
         }
     }
 }

@@ -80,6 +80,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Position.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\UiEvents.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\UiLayout.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\UiProgressBar.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Util.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\ToolRegistry.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />

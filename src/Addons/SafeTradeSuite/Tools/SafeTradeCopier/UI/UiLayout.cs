@@ -252,6 +252,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 6, 0, 0),
                 Visibility = Visibility.Collapsed
             };
+            EnsureRoundedProgressBar(_masterPnlBar);
 
             masterStack.Children.Add(masterTitle);
             masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
@@ -555,6 +556,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(6, 2, 6, 0),
                     Visibility = Visibility.Collapsed
                 };
+                EnsureRoundedProgressBar(pnlBar);
 
                 var flatten = new Button
                 {
