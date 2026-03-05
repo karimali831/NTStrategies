@@ -253,9 +253,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Visibility = Visibility.Collapsed
             };
 
-            masterStack.Children.Add(_masterPnlText);
-            masterStack.Children.Add(_masterPnlBar);
-
             masterStack.Children.Add(masterTitle);
             masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
             masterStack.Children.Add(_masterBox);
@@ -263,7 +260,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(_instrBox);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
+
             masterStack.Children.Add(_masterPnlText);
+            masterStack.Children.Add(_masterPnlBar);
 
             masterBorder.Child = masterStack;
             Grid.SetRow(masterBorder, 2);

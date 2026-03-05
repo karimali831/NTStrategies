@@ -142,7 +142,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalU += mu;
 
                     if (_masterPnlText != null)
-                        _masterPnlText.Text = FormatPnL(totalR, totalU, "Master", shortened: false);
+                        _masterPnlText.Text = FormatPnL(mr, mu, "Master", shortened: false);
 
                     var instr = GetInstrument();
                     
