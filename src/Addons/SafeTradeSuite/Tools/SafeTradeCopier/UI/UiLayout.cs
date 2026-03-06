@@ -14,7 +14,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TextBlock _headerStateText;
         private TextBox _statusBox;
         private Button _btnCopyOn;
-        private Button _btnCopyOff;
 
         private bool _readyState;
         private string _readyReason = "";
@@ -29,7 +28,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnSellMkt;
         private Button _btnFlattenAll;
         private CheckBox _chkSimOnly;
-        private bool _simOnlyMode = true; // default checked
+        private TextBlock _masterPnlBarStatusText;
+        private bool _simOnlyMode = true;
 
         // follower rows
         private sealed class FollowerRow
@@ -43,6 +43,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public TextBlock PnlText;
             public Button FlattenBtn;
             public ProgressBar PnlBar;
+            public TextBlock PnlBarStatusText;
             public string AccountName => Account?.Name ?? "";
             public CheckBox IncludeCheck => EnabledCheck;
             public CheckBox OverrideCheck => null;
@@ -188,7 +189,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = Brushes.Maroon,
                 Foreground = Brushes.White
             };
-            
+  
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
             _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
             _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
@@ -252,7 +253,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 6, 0, 0),
                 Visibility = Visibility.Collapsed
             };
-            EnsureRoundedProgressBar(_masterPnlBar);
+            EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
+            
+            _masterPnlBarStatusText = new TextBlock
+            {
+                Text = "",
+                Margin = new Thickness(0, 4, 0, 0),
+                Foreground = SystemColors.WindowTextBrush,
+                FontSize = 11,
+                Visibility = Visibility.Collapsed
+            };
 
             masterStack.Children.Add(masterTitle);
             masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
@@ -263,6 +273,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(qaRow);
             masterStack.Children.Add(_masterPnlText);
             masterStack.Children.Add(_masterPnlBar);
+            masterStack.Children.Add(_masterPnlBarStatusText);
 
             masterBorder.Child = masterStack;
             Grid.SetRow(masterBorder, 2);
@@ -304,23 +315,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             root.Children.Add(followersBorder);
 
             // ---------------- Copier buttons + Status ----------------
-            var bottom = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 10, 0, 0) };
+            var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
+            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status label
+            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status box
+
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             _btnCopyOn = new Button
             {
-                Content = "COPY ON",
+                Content = eng.CopyEnabled ? "Armed" : "Disarmed",
                 Height = 44,
-                Background = Brushes.DarkGreen,
+                Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon,
                 Foreground = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 6)
-            };
-            _btnCopyOff = new Button
-            {
-                Content = "COPY OFF",
-                Height = 44,
-                Background = Brushes.Maroon,
-                Foreground = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 6)
+                Margin = new Thickness(0, 0, 6, 6)
             };
 
             var btnClose = new Button
@@ -329,7 +338,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Height = 44,
                 Background = Brushes.DimGray,
                 Foreground = Brushes.White,
-                Margin = new Thickness(0, 0, 0, 6)
+                Margin = new Thickness(6, 0, 0, 6)
             };
 
             _statusBox = new TextBox
@@ -342,10 +351,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.ControlTextBrush
             };
 
+            var statusLbl = new TextBlock
+            {
+                Text = "Status:",
+                Foreground = SystemColors.WindowTextBrush,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            Grid.SetRow(_btnCopyOn, 0);
+            Grid.SetColumn(_btnCopyOn, 0);
+
+            Grid.SetRow(btnClose, 0);
+            Grid.SetColumn(btnClose, 1);
+
+            Grid.SetRow(statusLbl, 1);
+            Grid.SetColumnSpan(statusLbl, 2);
+
+            Grid.SetRow(_statusBox, 2);
+            Grid.SetColumnSpan(_statusBox, 2);
+
             bottom.Children.Add(_btnCopyOn);
-            bottom.Children.Add(_btnCopyOff);
             bottom.Children.Add(btnClose);
-            bottom.Children.Add(new TextBlock { Text = "Status:", Foreground = SystemColors.WindowTextBrush });
+            bottom.Children.Add(statusLbl);
             bottom.Children.Add(_statusBox);
 
             Grid.SetRow(bottom, 4);
@@ -354,10 +381,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // ---------------- Hook engine events ----------------
             eng.OnStatus += (msg) =>
             {
-                var disp = _uiDispatcher ?? _window?.Dispatcher;
-                if (disp == null) return;
+                var display = _uiDispatcher ?? _window?.Dispatcher;
+                if (display == null) return;
 
-                disp.InvokeAsync(() =>
+                display.InvokeAsync(() =>
                 {
                     _statusBox.AppendText($"{DateTime.Now:HH:mm:ss}  {msg}\n");
                     _statusBox.ScrollToEnd();
@@ -366,10 +393,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             eng.OnReadyChanged += (ready, reason) =>
             {
-                var disp = _uiDispatcher ?? _window?.Dispatcher;
-                if (disp == null) return;
+                var display = _uiDispatcher ?? _window?.Dispatcher;
+                if (display == null) return;
 
-                disp.InvokeAsync(() =>
+                display.InvokeAsync(() =>
                 {
                     _readyState = ready;
                     _readyReason = reason ?? "";
@@ -380,10 +407,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             eng.OnModeChanged += (armedIgnored, copyOn) =>
             {
-                var disp = _uiDispatcher ?? _window?.Dispatcher;
-                if (disp == null) return;
+                var display = _uiDispatcher ?? _window?.Dispatcher;
+                if (display == null) return;
 
-                disp.InvokeAsync(() =>
+                display.InvokeAsync(() =>
                 {
                     RenderHeader(copyOn);
                     RenderButtons(copyOn);
@@ -392,23 +419,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             void RenderButtons(bool copyOn)
             {
-                _btnCopyOn.IsEnabled = !copyOn;
-                _btnCopyOff.IsEnabled = copyOn;
-                _btnCopyOn.Content = copyOn ? "COPY ON (active)" : "COPY ON";
+                _btnCopyOn.IsEnabled = true;
+                _btnCopyOn.Content = copyOn ? "Armed" : "Disarmed";
+                _btnCopyOn.Background = copyOn ? Brushes.DarkGreen : Brushes.Maroon;
             }
 
             void RenderHeader(bool copyOn)
             {
                 var symbol = _readyState ? "✓" : "✗";
                 var readyLabel = _readyState ? "READY" : $"NOT READY ({_readyReason})";
-                _headerStateText.Text = $"{readyLabel}: {symbol}   |   COPY: {(copyOn ? "ON" : "OFF")}";
+                _headerStateText.Text = $"{readyLabel}: {symbol}   |   {(copyOn ? "ARMED" : "DISARMED")}";
             }
 
             // ---------------- Populate accounts + followers ----------------
             _masterBox.ItemsSource = accounts;
             _masterBox.DisplayMemberPath = "Name";
 
-// ✅ choose initial master correctly before building followers
+            // ✅ choose initial master correctly before building followers
             Account initialMaster = null;
             if (_simOnlyMode)
                 initialMaster = accounts.FirstOrDefault(IsSimAccount);
@@ -437,19 +464,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterBox.SelectionChanged += (s, e) =>
             {
                 RebuildFollowersAndRewire(eng, accounts);
+                RenderFlattenEnablementUi();
             };
+            
             _masterBox.DropDownOpened += (s, e) => UpdateMasterComboItemEnablement();
-            _instrBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
+            _instrBox.TextChanged += (s, e) =>
+            {
+                ApplyAndMaybeRewire();
+                RenderFlattenEnablementUi();
+            };
             _masterQtyBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
             _masterAtmBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
 
             _btnCopyOn.Click += (s, e) =>
             {
-                ApplyConfigFromUi();
-                eng.SetCopyEnabled(true);
-            };
+                if (!eng.CopyEnabled)
+                    ApplyConfigFromUi();
 
-            _btnCopyOff.Click += (s, e) => eng.SetCopyEnabled(false);
+                eng.SetCopyEnabled(!eng.CopyEnabled);
+            };
 
             btnClose.Click += (s, e) =>
             {
@@ -462,6 +495,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
             RenderHeader(copyOn: false);
             RenderButtons(copyOn: false);
+            RenderFlattenAllButtonState();
             
             return new ScrollViewer
             {
@@ -489,6 +523,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         eng.Log("Invalid instrument (must match NT instrument exactly).");
                         return;
                     }
+
+                    if (r.PnlBar != null)
+                        r.PnlBar.Tag = "ORDER_FILLED";
 
                     eng.EnsureFlatInstrument(r.Account, instr);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
@@ -555,16 +592,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(6, 2, 6, 0),
                     Visibility = Visibility.Collapsed
                 };
-                EnsureRoundedProgressBar(pnlBar);
+                EnsureRoundedProgressBar(pnlBar, alignRight: false);
+                
+                var pnlBarStatusText = new TextBlock
+                {
+                    Text = "",
+                    Margin = new Thickness(6, 2, 6, 0),
+                    Foreground = SystemColors.ControlTextBrush,
+                    FontSize = 11,
+                    Visibility = Visibility.Collapsed
+                };
 
                 var flatten = new Button
                 {
                     Content = "Flatten",
                     Height = 24,
-                    Background = Brushes.Maroon,
-                    Foreground = Brushes.White,
-                    IsEnabled = false
+                    Foreground = Brushes.White
                 };
+                RenderFlattenButtonState(flatten, enabled: false);
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 
@@ -588,6 +633,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 rowGrid.Children.Add(atmBox);
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
+                pnlStack.Children.Add(pnlBarStatusText);
 
                 Grid.SetColumn(pnlStack, 3);
                 rowGrid.Children.Add(pnlStack);
@@ -601,7 +647,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     AtmOverrideBox = atmBox,
                     PnlText = pnl,
                     PnlBar = pnlBar,
-                    FlattenBtn = flatten
+                    FlattenBtn = flatten,
+                    PnlBarStatusText = pnlBarStatusText,
                 };
                 
                 // When user changes follower settings, we re-apply config (no re-arm UX)
@@ -613,6 +660,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _followerRows.Add(row);
                 _followersPanel.Children.Add(rowGrid);
             }
+        }
+
+        private static void RenderFlattenButtonState(Button btn, bool enabled)
+        {
+            if (btn == null) 
+                return; 
+            
+            btn.IsEnabled = enabled; 
+            btn.Background = enabled ? Brushes.Maroon : Brushes.Gray; 
+            btn.Foreground = Brushes.White; 
+            btn.Opacity = enabled ? 1.0 : 0.65;
+        }
+        
+        private void RenderFlattenAllButtonState()
+        {
+            if (_btnFlattenAll == null) return;
+
+            var master = _masterBox?.SelectedItem as Account;
+            var instrFull = GetInstrumentFullName();
+
+            var canFlattenMaster = CanFlatten(master, instrFull);
+
+            var canFlattenFollowers = _followerRows.Any(r =>
+                r?.Account != null &&
+                r.EnabledCheck?.IsChecked == true &&
+                CanFlatten(r.Account, instrFull));
+
+            var canFlattenAny = canFlattenMaster || canFlattenFollowers;
+
+            _btnFlattenAll.IsEnabled = canFlattenAny;
+            _btnFlattenAll.Background = canFlattenAny ? Brushes.DarkRed : Brushes.Gray;
+            _btnFlattenAll.Foreground = Brushes.White;
+            _btnFlattenAll.Opacity = canFlattenAny ? 1.0 : 0.65;
         }
     }
 }

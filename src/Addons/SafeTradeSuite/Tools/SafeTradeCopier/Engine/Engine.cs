@@ -100,9 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    if (_copyEnabled)
-                        RewireUnsafe_NoLock("Config changed");
-
+                    RewireUnsafe_NoLock("Config changed");
                     RaiseReady_NoLock();
                 }
             }
@@ -154,16 +152,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void RewireUnsafe_NoLock(string reason)
             {
                 // Tear down old wiring (if any)
-                if (_armed)
-                {
-                    if (_master != null)
-                        _master.ExecutionUpdate -= OnMasterExecution;
+                if (_master != null)
+                    _master.ExecutionUpdate -= OnMasterExecution;
 
-                    foreach (var f in _followers)
-                    {
-                        f.OrderUpdate -= OnFollowerOrderUpdate;
-                        f.ExecutionUpdate -= OnFollowerExecution;
-                    }
+                foreach (var f in _followers)
+                {
+                    f.OrderUpdate -= OnFollowerOrderUpdate;
+                    f.ExecutionUpdate -= OnFollowerExecution;
                 }
 
                 // Apply current config into active fields used by copier
@@ -172,16 +167,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected && _master != null && !ReferenceEquals(a, _master))
                     .Distinct()
                     .ToList();
-                
+
                 SubscribePnl(_master);
                 foreach (var f in _followers) SubscribePnl(f);
 
                 _instrumentName = _configuredInstrumentName;
                 _instrument = _configuredInstrument;
 
-                // Reset shadow to current master position
+                // Always wire master execution if we have a valid master + instrument.
+                // This is required so master ATM/bracket orders work even with COPY OFF / no followers.
+                if (_master != null && _instrument != null)
+                    _master.ExecutionUpdate += OnMasterExecution;
 
-                // Arm only if we’re copy-enabled and ready
+                // Arm follower-copy logic only if copy is enabled and config is fully ready
                 if (!_copyEnabled || !IsReady_NoLock(out _))
                 {
                     _armed = false;
@@ -189,8 +187,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 _armed = true;
-
-                _master.ExecutionUpdate += OnMasterExecution;
 
                 foreach (var f in _followers)
                 {
@@ -213,21 +209,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void DisarmUnsafe_NoLock(string reason)
             {
+                if (_master != null)
+                    _master.ExecutionUpdate -= OnMasterExecution;
+
+                foreach (var f in _followers)
+                {
+                    f.OrderUpdate -= OnFollowerOrderUpdate;
+                    f.ExecutionUpdate -= OnFollowerExecution;
+                }
+
                 if (_armed)
                 {
-                    if (_master != null)
-                        _master.ExecutionUpdate -= OnMasterExecution;
-
-                    foreach (var f in _followers)
-                    {
-                        f.OrderUpdate -= OnFollowerOrderUpdate;
-                        f.ExecutionUpdate -= OnFollowerExecution;
-                    }
-                    
                     UnsubscribePnl(_master);
                     foreach (var f in _followers) UnsubscribePnl(f);
                 }
-
                 _armed = false;
 
                 // token swap

@@ -6,7 +6,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -41,37 +40,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     
     public partial class SafeTradeCopierTool
     {
-        private static ControlTemplate _roundedProgressTemplate;
-        
-        private static readonly Brush GreenGrad = new LinearGradientBrush(
-            Color.FromRgb(0, 180, 0),
-            Color.FromRgb(0, 90, 0),
-            90);
+        private static ControlTemplate _roundedProgressTemplateLeft;
+        private static ControlTemplate _roundedProgressTemplateRight;
 
-        private static readonly Brush RedGrad = new LinearGradientBrush(
-            Color.FromRgb(220, 40, 40),
-            Color.FromRgb(120, 0, 0),
-            90);
+        private static readonly Brush GreenGrad = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5),
+            GradientStops =
+            {
+                new GradientStop(Color.FromRgb(0, 180, 0), 0.0),
+                new GradientStop(Color.FromRgb(0, 90, 0), 1.0)
+            }
+        };
 
-        // private static readonly Effect GlowGreen = new DropShadowEffect
-        // {
-        //     Color = Colors.LimeGreen,
-        //     BlurRadius = 10,
-        //     ShadowDepth = 0
-        // };
-        //
-        // private static readonly Effect GlowRed = new DropShadowEffect
-        // {
-        //     Color = Colors.Red,
-        //     BlurRadius = 10,
-        //     ShadowDepth = 0
-        // };
+        private static readonly Brush RedGrad = new LinearGradientBrush
+        {
+            StartPoint = new Point(1, 0.5),
+            EndPoint = new Point(0, 0.5),
+            GradientStops =
+            {
+                new GradientStop(Color.FromRgb(220, 40, 40), 0.0),
+                new GradientStop(Color.FromRgb(120, 0, 0), 1.0)
+            }
+        };
         
         private static void SetBarValueAnimated(ProgressBar bar, double target)
         {
             if (bar == null) return;
 
-            // clamp
             if (target < bar.Minimum) target = bar.Minimum;
             if (target > bar.Maximum) target = bar.Maximum;
 
@@ -88,8 +85,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static void RenderFlipBar(ProgressBar bar, double unrealized, int qty, int stopTicks, int targetTicks, Instrument instr)
         {
             if (bar == null) return;
-
-            EnsureRoundedProgressBar(bar);
 
             if (instr == null || qty <= 0 || (stopTicks <= 0 && targetTicks <= 0))
             {
@@ -113,72 +108,128 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (unrealized >= 0)
             {
+                EnsureRoundedProgressBar(bar, alignRight: false);
+
                 var denom = targetRisk > 0 ? targetRisk : 1.0;
                 var p = Clamp01(unrealized / denom);
                 bar.Foreground = GreenGrad;
+                bar.Tag = "LIVE_POS";
                 SetBarValueAnimated(bar, p * 100.0);
             }
             else
             {
+                EnsureRoundedProgressBar(bar, alignRight: true);
+
                 var denom = stopRisk > 0 ? stopRisk : 1.0;
                 var used = Clamp01(Math.Abs(unrealized) / denom);
                 var remaining = 1.0 - used;
                 bar.Foreground = RedGrad;
+                bar.Tag = "LIVE_NEG";
                 SetBarValueAnimated(bar, remaining * 100.0);
             }
-
-            var v = unrealized >= 0
-                ? Clamp01(unrealized / (targetRisk > 0 ? targetRisk : 1.0)) * 100.0
-                : (1.0 - Clamp01(Math.Abs(unrealized) / (stopRisk > 0 ? stopRisk : 1.0))) * 100.0;
-
-            // if (v > 90) bar.Effect = GlowGreen;
-            // else if (v < 10) bar.Effect = GlowRed;
-            // else bar.Effect = null;
         }
         
-        private static void EnsureRoundedProgressBar(ProgressBar bar)
+        private static void EnsureRoundedProgressBar(ProgressBar bar, bool alignRight)
         {
             if (bar == null) return;
 
-            if (bar.Tag as string == "STC_ROUNDED_PB") return;
+            if (_roundedProgressTemplateLeft == null)
+                _roundedProgressTemplateLeft = BuildRoundedProgressTemplate(HorizontalAlignment.Left);
 
-            if (_roundedProgressTemplate == null)
-                _roundedProgressTemplate = BuildRoundedProgressTemplate();
+            if (_roundedProgressTemplateRight == null)
+                _roundedProgressTemplateRight = BuildRoundedProgressTemplate(HorizontalAlignment.Right);
 
-            bar.Template = _roundedProgressTemplate;
+            var wanted = alignRight ? _roundedProgressTemplateRight : _roundedProgressTemplateLeft;
+            if (!ReferenceEquals(bar.Template, wanted))
+                bar.Template = wanted;
+
             bar.BorderThickness = new Thickness(0);
-            bar.Background = new SolidColorBrush(Color.FromRgb(220, 220, 220)); // track
+            bar.Background = new SolidColorBrush(Color.FromRgb(220, 220, 220));
             bar.SnapsToDevicePixels = true;
+        }
+        
+        private void FinalizeBarOutcomeFromTag(ProgressBar bar)
+        {
+            if (bar == null) return;
 
-            bar.Tag = "STC_ROUNDED_PB";
+            var tag = bar.Tag as string;
+
+            if (string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
+                bar.Tag = "STOP_FILLED";
+            else if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal))
+                bar.Tag = "TARGET_FILLED";
+        }
+        
+        private void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
+        {
+            if (bar == null || statusText == null) return;
+
+            var tag = (bar.Tag as string) ?? "";
+
+            bar.Visibility = Visibility.Visible;
+
+            // stop any previous animation so final state renders exactly
+            bar.BeginAnimation(RangeBase.ValueProperty, null);
+
+            if (string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal))
+            {
+                EnsureRoundedProgressBar(bar, alignRight: true);
+                bar.Foreground = RedGrad;
+                bar.Value = 0;
+                statusText.Text = "Stop Filled";
+                statusText.Foreground = Brushes.IndianRed;
+            }
+            else if (string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal))
+            {
+                EnsureRoundedProgressBar(bar, alignRight: false);
+                bar.Foreground = GreenGrad;
+                bar.Value = 100;
+                statusText.Text = "Order Filled";
+                statusText.Foreground = Brushes.SteelBlue;
+            }
+            else
+            {
+                EnsureRoundedProgressBar(bar, alignRight: false);
+                bar.Foreground = GreenGrad;
+                bar.Value = 100;
+                statusText.Text = "Target Filled";
+                statusText.Foreground = Brushes.DarkGreen;
+            }
+
+            statusText.Visibility = Visibility.Visible;
         }
 
-        private static ControlTemplate BuildRoundedProgressTemplate()
+        private void ClearBarOutcome(TextBlock statusText)
+        {
+            if (statusText == null) return;
+            statusText.Text = "";
+            statusText.Visibility = Visibility.Collapsed;
+        }
+
+        private static ControlTemplate BuildRoundedProgressTemplate(HorizontalAlignment alignment)
         {
             var template = new ControlTemplate(typeof(ProgressBar));
 
-            // Outer track container
             var outer = new FrameworkElementFactory(typeof(Border));
             outer.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
             outer.SetValue(Border.BorderThicknessProperty, new Thickness(0));
             outer.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
             outer.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
 
-            // Grid hosts the fill
             var grid = new FrameworkElementFactory(typeof(Grid));
             outer.AppendChild(grid);
 
-            // Fill (rounded), clipped by outer border and width bound to Value/Maximum * ActualWidth
-            var fill = new FrameworkElementFactory(typeof(Border));
-            fill.Name = "PART_Indicator";
+            var fill = new FrameworkElementFactory(typeof(Border))
+            {
+                Name = "PART_Indicator"
+            };
             fill.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
             fill.SetValue(Border.BorderThicknessProperty, new Thickness(0));
             fill.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
-            fill.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            fill.SetValue(FrameworkElement.HorizontalAlignmentProperty, alignment);
             fill.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Stretch);
             fill.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
 
-            // Width binding: (Value/Maximum) * Outer.ActualWidth
             var mb = new MultiBinding { Converter = new ProgressToWidthConverter() };
             mb.Bindings.Add(new Binding("Value") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
             mb.Bindings.Add(new Binding("Maximum") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
@@ -190,36 +241,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             template.VisualTree = outer;
             return template;
-        }
-
-        private static ControlTemplate BuildFillButtonTemplate()
-        {
-            // Uses ProgressBar.Foreground for fill brush (your gradient)
-            var t = new ControlTemplate(typeof(RepeatButton));
-
-            var b = new FrameworkElementFactory(typeof(Border));
-            b.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-            b.SetValue(Border.BorderThicknessProperty, new Thickness(0));
-            b.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.ForegroundProperty));
-            b.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
-
-            t.VisualTree = b;
-            return t;
-        }
-
-        private static ControlTemplate BuildTrackButtonTemplate()
-        {
-            // Remaining portion: transparent (outer border already has Background track color)
-            var t = new ControlTemplate(typeof(RepeatButton));
-
-            var b = new FrameworkElementFactory(typeof(Border));
-            b.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-            b.SetValue(Border.BorderThicknessProperty, new Thickness(0));
-            b.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-            b.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
-
-            t.VisualTree = b;
-            return t;
         }
     }
 }

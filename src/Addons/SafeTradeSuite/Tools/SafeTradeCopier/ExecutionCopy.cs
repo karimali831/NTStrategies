@@ -20,6 +20,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
+                HandleBracketExitOutcome(_master, e.Execution);
+
                 // ✅ Always try to submit bracket (even if not armed / no followers)
                 TrySubmitBracketOnFill(_master, e.Execution);
 
@@ -99,6 +101,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var acc = e.Execution.Account;
                 if (acc == null) return;
+
+                HandleBracketExitOutcome(acc, e.Execution);
 
                 // Brackets only submit if there's a pending entry name for this fill.
                 TrySubmitBracketOnFill(acc, e.Execution);

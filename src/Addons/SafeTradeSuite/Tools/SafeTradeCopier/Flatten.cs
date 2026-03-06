@@ -128,6 +128,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             eng.Log($"Flatten All clicked. Instr={instr.FullName}");
+            
+            if (_masterPnlBar != null)
+                _masterPnlBar.Tag = "ORDER_FILLED";
 
             // Master + included followers (instrument-only)
             eng.EnsureFlatInstrument(master, instr);
@@ -136,11 +139,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (r?.Account == null) continue;
                 if (r.IncludeCheck?.IsChecked != true) continue;
+                
+                if (r.PnlBar != null)
+                    r.PnlBar.Tag = "ORDER_FILLED";
 
                 eng.EnsureFlatInstrument(r.Account, instr);
             }
 
             eng.Log("Flatten All submitted (instrument-only).");
+        }
+        
+        private bool CanFlatten(Account account, string instrFull)
+        {
+            if (account is null)
+                return false;
+                
+            int net;
+            var key = $"{account.Name}|{instrFull}";
+
+            lock (_uiNet)
+                _uiNet.TryGetValue(key, out net);
+
+            if (net == 0)
+            {
+                foreach (var p in account.Positions)
+                {
+                    if (p?.Instrument == null) continue;
+                    if (!string.Equals(p.Instrument.FullName, instrFull, StringComparison.Ordinal)) continue;
+                    net = p.Quantity;
+                    break;
+                }
+            }
+
+            return net != 0;
         }
     }
 }

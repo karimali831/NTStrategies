@@ -22,7 +22,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
             }
             
-            private void ClearActiveBracket(Account acc, Instrument instr)
+            public void ClearActiveBracket(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null) return;
 
@@ -221,6 +221,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     master.Submit(orders.ToArray());
                     Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
                 }
+            }
+            
+            private void HandleBracketExitOutcome(Account acc, Execution execution)
+            {
+                if (acc == null || execution?.Order == null) return;
+
+                var ord = execution.Order;
+                var instr = ord.Instrument;
+                if (instr == null) return;
+
+                var name = (ord.Name ?? "").Trim();
+
+                // Only care about our own exit orders
+                var isKnownExit =
+                    name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase);
+
+                if (!isKnownExit)
+                    return;
+
+                // If account is now flat on this instrument, bracket is complete
+                if (GetNetPosition(acc, instr) == 0)
+                    ClearActiveBracket(acc, instr);
             }
         }
     }

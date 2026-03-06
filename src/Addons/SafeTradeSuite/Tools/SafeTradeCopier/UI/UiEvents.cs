@@ -150,22 +150,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         if (_engine.TryGetActiveBracketSpecForUi(master, instr, out var st, out var tk))
                         {
-                            // If unrealized/qty isn't available yet, keep bar visible at 0% (smooth UI)
-                            var uInstr = 0.0;
-                            var qInstr = 1;
-
                             if (TryGetInstrumentUnrealized(master, instr, out var uTmp, out var qTmp))
                             {
-                                uInstr = uTmp;
-                                qInstr = Math.Max(1, qTmp);
+                                ClearBarOutcome(_masterPnlBarStatusText);
+                                RenderFlipBar(_masterPnlBar, uTmp, Math.Max(1, qTmp), st, tk, instr);
                             }
-
-                            RenderFlipBar(_masterPnlBar, uInstr, qInstr, st, tk, instr);
+                            else
+                            {
+                                // Bracket still cached, but position is already flat -> finalize outcome now
+                                FinalizeBarOutcomeFromTag(_masterPnlBar);
+                                ShowBarOutcome(_masterPnlBar, _masterPnlBarStatusText);
+                            }
                         }
                         else
                         {
-                            _masterPnlBar.Visibility = Visibility.Collapsed;
-                            _masterPnlBar.Value = 0;
+                            if (_masterPnlBar != null && _masterPnlBar.Tag is string)
+                            {
+                                FinalizeBarOutcomeFromTag(_masterPnlBar);
+                                ShowBarOutcome(_masterPnlBar, _masterPnlBarStatusText);
+                            }
+                            else
+                            {
+                                _masterPnlBar.Visibility = Visibility.Collapsed;
+                                _masterPnlBar.Value = 0;
+                                ClearBarOutcome(_masterPnlBarStatusText);
+                            }
                         }
                     }
                 }
@@ -198,21 +207,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         if (_engine.TryGetActiveBracketSpecForUi(acc, instr, out var st, out var tk))
                         {
-                            var uInstr = 0.0;
-                            var qInstr = 1;
-
                             if (TryGetInstrumentUnrealized(acc, instr, out var uTmp, out var qTmp))
                             {
-                                uInstr = uTmp;
-                                qInstr = Math.Max(1, qTmp);
+                                ClearBarOutcome(row.PnlBarStatusText);
+                                RenderFlipBar(row.PnlBar, uTmp, Math.Max(1, qTmp), st, tk, instr);
                             }
-
-                            RenderFlipBar(row.PnlBar, uInstr, qInstr, st, tk, instr);
+                            else
+                            {
+                                // Bracket still cached, but position is already flat -> finalize outcome now
+                                FinalizeBarOutcomeFromTag(row.PnlBar);
+                                ShowBarOutcome(row.PnlBar, row.PnlBarStatusText);
+                            }
                         }
                         else
                         {
-                            row.PnlBar.Visibility = Visibility.Collapsed;
-                            row.PnlBar.Value = 0;
+                            if (row.PnlBar != null && row.PnlBar.Tag is string)
+                            {
+                                FinalizeBarOutcomeFromTag(row.PnlBar);
+                                ShowBarOutcome(row.PnlBar, row.PnlBarStatusText);
+                            }
+                            else
+                            {
+                                row.PnlBar.Visibility = Visibility.Collapsed;
+                                row.PnlBar.Value = 0;
+                                ClearBarOutcome(row.PnlBarStatusText);
+                            }
                         }
                     }
                 }
@@ -228,7 +247,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (int.TryParse((s ?? "").Trim(), out var v) && v > 0) return v;
             return fallback;
         }
-        
         
         private void EnforceSimOnlyModeUi(List<Account> accounts)
         {
@@ -258,7 +276,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (r.QtyOverrideBox != null) r.QtyOverrideBox.IsEnabled = allow;
                 if (r.AtmOverrideBox != null) r.AtmOverrideBox.IsEnabled = allow;
-                if (r.FlattenBtn != null) r.FlattenBtn.IsEnabled = false; // PnL timer will re-enable when allowed+net!=0
+                if (r.FlattenBtn != null) RenderFlattenButtonState(r.FlattenBtn, enabled: false);
             }
 
             UpdateMasterComboItemEnablement();
@@ -360,13 +378,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var instr = GetInstrument();
                 return instr?.FullName ?? "";
             }
+
             
             private void RenderFlattenEnablementUi()
             {
-                var disp = _uiDispatcher ?? _window?.Dispatcher;
-                if (disp == null) return;
+                var display = _uiDispatcher ?? _window?.Dispatcher;
 
-                disp.InvokeAsync(() =>
+                display?.InvokeAsync(() =>
                 {
                     var instr = GetInstrument();
                     var instrFull = GetInstrumentFullName();
@@ -378,28 +396,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                         if (instr == null)
                         {
-                            row.FlattenBtn.IsEnabled = false;
-                            continue;
+                            var canFlatten = CanFlatten(row.Account, instrFull) && row.EnabledCheck?.IsChecked == true;
+                            RenderFlattenButtonState(row.FlattenBtn, canFlatten);
                         }
 
-                        var net = 0;
-                        var key = $"{row.Account.Name}|{instrFull}";
-
-                        lock (_uiNet)
-                            _uiNet.TryGetValue(key, out net);
-
-                        if (net == 0)
-                        {
-                            foreach (var p in row.Account.Positions)
-                            {
-                                if (p?.Instrument == null) continue;
-                                if (!string.Equals(p.Instrument.FullName, instrFull, StringComparison.Ordinal)) continue;
-                                net = p.Quantity;
-                                break;
-                            }
-                        }
-
-                        row.FlattenBtn.IsEnabled = net != 0 && row.EnabledCheck?.IsChecked == true;
+                        RenderFlattenAllButtonState();
                     }
                 }, DispatcherPriority.Background);
             }
