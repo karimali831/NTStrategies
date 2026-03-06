@@ -69,6 +69,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplate.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplateReader.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\ATM\AtmTemplateSpec.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Connection.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Core.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\EngineAccountMetrics.cs" />

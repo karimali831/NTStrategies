@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using NinjaTrader.Cbi;
 
 #endregion
 
@@ -66,6 +67,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _window.Closed += OnWindowClosed;
 
                     _window.Show();
+                    HookConnectionStatusUpdates();
                 }
                 catch
                 {
@@ -90,7 +92,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             lock (WindowGate)
             {
-                UnsubscribeUiAccountEvents(GetSelectableAccounts());
+                UnsubscribeUiAccountEvents(Account.All);
                 CloseInternal(closeWindow: true);
             }
         }
@@ -115,11 +117,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void CloseInternal(bool closeWindow)
         {
-            // Turn off copier + dispose engine
+            UnhookConnectionStatusUpdates();
+
             if (_engine != null)
             {
-                _engine.SetCopyEnabled(false); 
-                _engine.Dispose(); 
+                _engine.SetCopyEnabled(false);
+                _engine.Dispose();
                 _engine = null;
             }
 
@@ -137,6 +140,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             _window = null;
+            _uiDispatcher = null;
 
             // Clear UI refs / state
             _masterBox = null;

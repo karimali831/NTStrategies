@@ -53,19 +53,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Color.FromRgb(120, 0, 0),
             90);
 
-        private static readonly Effect GlowGreen = new DropShadowEffect
-        {
-            Color = Colors.LimeGreen,
-            BlurRadius = 10,
-            ShadowDepth = 0
-        };
-
-        private static readonly Effect GlowRed = new DropShadowEffect
-        {
-            Color = Colors.Red,
-            BlurRadius = 10,
-            ShadowDepth = 0
-        };
+        // private static readonly Effect GlowGreen = new DropShadowEffect
+        // {
+        //     Color = Colors.LimeGreen,
+        //     BlurRadius = 10,
+        //     ShadowDepth = 0
+        // };
+        //
+        // private static readonly Effect GlowRed = new DropShadowEffect
+        // {
+        //     Color = Colors.Red,
+        //     BlurRadius = 10,
+        //     ShadowDepth = 0
+        // };
         
         private static void SetBarValueAnimated(ProgressBar bar, double target)
         {
@@ -131,9 +131,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 ? Clamp01(unrealized / (targetRisk > 0 ? targetRisk : 1.0)) * 100.0
                 : (1.0 - Clamp01(Math.Abs(unrealized) / (stopRisk > 0 ? stopRisk : 1.0))) * 100.0;
 
-            if (v > 90) bar.Effect = GlowGreen;
-            else if (v < 10) bar.Effect = GlowRed;
-            else bar.Effect = null;
+            // if (v > 90) bar.Effect = GlowGreen;
+            // else if (v < 10) bar.Effect = GlowRed;
+            // else bar.Effect = null;
         }
         
         private static void EnsureRoundedProgressBar(ProgressBar bar)

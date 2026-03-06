@@ -9,8 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             if (eng == null) return;
 
-            var master = _masterBox?.SelectedItem as Account;
-            if (master == null)
+            if (!(_masterBox?.SelectedItem is Account master))
             {
                 eng.Log("Select a master account first.");
                 return;
