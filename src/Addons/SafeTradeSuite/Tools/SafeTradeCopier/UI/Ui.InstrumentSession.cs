@@ -5,24 +5,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private void AddInstrumentSession(string instrumentName)
-        {
-            SaveUiToActiveSession();
-
-            var session = new InstrumentSession
-            {
-                InstrumentName = instrumentName,
-                MasterAccount = _masterBox?.SelectedItem as Account,
-                MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1),
-                MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None"
-            };
-
-            _instrumentSessions.Add(session);
-            _activeInstrumentSession = session;
-
-            RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
-        }
+        private TabControl _instrumentTabs;
+        private Button _btnAddInstrumentTab;
+        private Button _btnRemoveInstrumentTab;
         
         private void RefreshInstrumentTabs()
         {
@@ -54,21 +39,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SwitchToSession(session);
         }
         
-        private void SwitchToSession(InstrumentSession session)
-        {
-            if (session == null) return;
-            if (ReferenceEquals(_activeInstrumentSession, session)) return;
-
-            SaveUiToActiveSession();
-            _activeInstrumentSession = session;
-            LoadActiveSessionToUi();
-        }
         
         private void SaveUiToActiveSession()
         {
             if (_activeInstrumentSession == null) return;
 
-            _activeInstrumentSession.InstrumentName = (_instrBox?.Text ?? "").Trim();
+            _activeInstrumentSession.InstrumentName = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
             _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
             _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
             _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
@@ -101,7 +77,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _suppressSessionUiEvents = true;
             try
             {
-                _instrBox.Text = _activeInstrumentSession.InstrumentName ?? "";
+                RefreshInstrumentSelectorItems();
+
+                var instrumentName = _activeInstrumentSession.InstrumentName ?? "";
+                if (!string.IsNullOrWhiteSpace(instrumentName) && !_instrumentSelector.Items.Contains(instrumentName))
+                    _instrumentSelector.Items.Add(instrumentName);
+
+                _instrumentSelector.SelectedItem = instrumentName;
 
                 _masterBox.SelectedItem = _activeInstrumentSession.MasterAccount;
                 _masterQtyBox.Text = (_activeInstrumentSession.MasterQty > 0 ? _activeInstrumentSession.MasterQty : 1).ToString();

@@ -113,33 +113,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var instrName = (_instrBox?.Text ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(instrName))
-            {
-                eng.Log("Instrument is empty.");
-                return;
-            }
-
-            var instr = Instrument.GetInstrument(instrName);
+            var instr = GetInstrument();
             if (instr == null)
             {
-                eng.Log("Invalid instrument (must match NT instrument exactly).");
+                eng.Log("Invalid instrument.");
                 return;
             }
 
             eng.Log($"Flatten All clicked. Instr={instr.FullName}");
-            
+
             if (_masterPnlBar != null)
                 _masterPnlBar.Tag = "ORDER_FILLED";
 
-            // Master + included followers (instrument-only)
             eng.EnsureFlatInstrument(master, instr);
 
             foreach (var r in _followerRows)
             {
                 if (r?.Account == null) continue;
                 if (r.IncludeCheck?.IsChecked != true) continue;
-                
+
                 if (r.PnlBar != null)
                     r.PnlBar.Tag = "ORDER_FILLED";
 

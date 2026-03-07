@@ -132,19 +132,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             RenderFlattenEnablementUi();
         }
-
-        private Instrument GetInstrument()
-        {
-            var instrName = (_instrBox?.Text ?? "").Trim();
-            return string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
-        }
         
-        private string GetInstrumentFullName()
-        {
-            var instr = GetInstrument();
-            return instr?.FullName ?? "";
-        }
-
         
         private void RenderFlattenEnablementUi()
         {

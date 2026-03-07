@@ -53,11 +53,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (eng == null) return;
                     if (r.Account == null) return;
 
-                    var instrName = (_instrBox?.Text ?? "").Trim();
-                    var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
+                    var instr = GetInstrument();
                     if (instr == null)
                     {
-                        eng.Log("Invalid instrument (must match NT instrument exactly).");
+                        eng.Log("Invalid instrument.");
                         return;
                     }
 

@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _chkSimOnly.Checked += (s, e) =>
             {
                 _simOnlyMode = true;
-                EnforceSimOnlyModeUi(accounts);
+                EnforceSimOnlyModeUi(GetSelectableAccounts());
                 ApplyConfigFromUi();
             };
 
@@ -129,7 +129,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             _masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
-            _instrBox = new TextBox { Height = 28, Text = "NQ 03-26", Margin = new Thickness(0, 0, 0, 8) };
+            _instrumentSelector = new ComboBox
+            {
+                Height = 28,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
 
             // Order buttons row (Buy / Sell / Flatten All)
             var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
@@ -242,7 +246,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
             masterStack.Children.Add(_masterBox);
             masterStack.Children.Add(new TextBlock { Text = "Instrument:", Foreground = SystemColors.WindowTextBrush });
-            masterStack.Children.Add(_instrBox);
+            masterStack.Children.Add(_instrumentSelector);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
             masterStack.Children.Add(_masterPnlText);
@@ -378,6 +382,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Grid.SetColumn(_statusBox, 0);
             Grid.SetColumnSpan(_statusBox, 3);
             
+            Grid.SetRow(_instrumentTabs, 0);
+            Grid.SetColumn(_instrumentTabs, 0);
+
+            Grid.SetRow(_btnAddInstrumentTab, 0);
+            Grid.SetColumn(_btnAddInstrumentTab, 1);
+
+            Grid.SetRow(_btnRemoveInstrumentTab, 0);
+            Grid.SetColumn(_btnRemoveInstrumentTab, 2);
+            
             bottom.Children.Add(_instrumentTabs);
             bottom.Children.Add(_btnAddInstrumentTab);
             bottom.Children.Add(_btnRemoveInstrumentTab);
@@ -462,7 +475,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectedItem = initialMaster;
             
-            EnsureInitialInstrumentSession();
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
             RenderFollowerRowsState();
@@ -471,6 +483,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
             foreach (var r in _followerRows)
                 LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+            
+            EnsureInitialInstrumentSession();
+            RefreshInstrumentSelectorItems();
+            RefreshInstrumentTabs();
+            LoadActiveSessionToUi();
 
             // ---------------- UI -> Engine wiring ----------------
             void ApplyAndMaybeRewire()
@@ -489,18 +506,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (_suppressSessionUiEvents) return;
 
+                SaveUiToActiveSession();
                 RebuildFollowersAndRewire(eng, accounts);
                 SaveUiToActiveSession();
                 ApplyConfigFromUi();
                 RenderFlattenEnablementUi();
+                RenderFlattenAllButtonState();
             };
             
             _masterBox.DropDownOpened += (s, e) => UpdateMasterComboItemEnablement();
-            _instrBox.TextChanged += (s, e) =>
+
+            _instrumentSelector.SelectionChanged += (s, e) =>
             {
-                ApplyAndMaybeRewire();
+                if (_suppressSessionUiEvents)
+                    return;
+
+                SaveUiToActiveSession();
+                RefreshInstrumentTabs();
+                ApplyConfigFromUi();
+
+                if (eng.CopyEnabled)
+                    eng.SetCopyEnabled(true);
+
                 RenderFlattenEnablementUi();
+                RenderFlattenAllButtonState();
             };
+
             _masterQtyBox.TextChanged += (s, e) => ApplyAndMaybeRewire();
             _masterAtmBox.SelectionChanged += (s, e) => ApplyAndMaybeRewire();
 
@@ -527,9 +558,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             _btnAddInstrumentTab.Click += (s, e) =>
             {
-                var newInstr = (_instrBox?.Text ?? "").Trim();
+                var available = GetAvailableInstruments();
+                var newInstr = available.FirstOrDefault(i =>
+                    !_instrumentSessions.Any(x => string.Equals(x.InstrumentName, i, StringComparison.OrdinalIgnoreCase)));
+
                 if (string.IsNullOrWhiteSpace(newInstr))
-                    newInstr = "NQ 03-26";
+                {
+                    eng.Log("No additional active instruments available to add.");
+                    return;
+                }
 
                 AddInstrumentSession(newInstr);
             };
@@ -553,11 +590,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 RefreshInstrumentTabs();
                 LoadActiveSessionToUi();
+                RenderFlattenAllButtonState();
             };
             
-            RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
-
             RenderHeader(copyOn: eng.CopyEnabled);
             RenderButtons(copyOn: eng.CopyEnabled);
             RenderFlattenAllButtonState();
@@ -569,7 +604,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Content = root
             };
         }
-        
         
         private static void RenderFlattenButtonState(Button btn, bool enabled)
         {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -17,33 +18,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private SafeCopierEngine _engine;
         private ComboBox _masterBox;
-        private TextBox _instrBox;
+        private ComboBox _instrumentSelector;
         private StackPanel _followersPanel;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
         
-        // Instrument tabs
-        private TabControl _instrumentTabs;
-        private Button _btnAddInstrumentTab;
-        private Button _btnRemoveInstrumentTab;
-
-        private readonly List<InstrumentSession> _instrumentSessions = new List<InstrumentSession>();
-        private InstrumentSession _activeInstrumentSession;
-        private bool _suppressSessionUiEvents;
-        
-        private void EnsureInitialInstrumentSession()
-        {
-            if (_instrumentSessions.Count > 0)
-                return;
-
-            var session = new InstrumentSession
-            {
-                InstrumentName = "NQ 03-26"
-            };
-
-            _instrumentSessions.Add(session);
-            _activeInstrumentSession = session;
-        }
-
         public void Show()
         {
             lock (WindowGate)
@@ -168,7 +146,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // Clear UI refs / state
             _masterBox = null;
-            _instrBox = null;
             _followersPanel = null;
 
             _btnBuyMkt = null;
