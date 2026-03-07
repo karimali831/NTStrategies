@@ -71,9 +71,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _window.Show();
                     HookConnectionStatusUpdates();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // If BuildUi throws or window creation fails, ensure we don't leave a half-created tool around
+                    LogUnhandled("SafeTradeCopierTool.Show()", ex);
                     CloseInternal(closeWindow: true);
                     throw;
                 }

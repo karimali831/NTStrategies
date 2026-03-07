@@ -1,4 +1,5 @@
-﻿using System.Windows.Controls;
+﻿using System;
+using System.Windows.Controls;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -42,52 +43,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void SaveUiToActiveSession()
         {
-            if (_activeInstrumentSession == null) return;
-
-            _activeInstrumentSession.InstrumentName = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
-            _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
-            _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
-            _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
-
-            _activeInstrumentSession.FollowersEnabled.Clear();
-            _activeInstrumentSession.FollowerQtyOverrides.Clear();
-            _activeInstrumentSession.FollowerAtmOverrides.Clear();
-
-            foreach (var r in _followerRows)
-            {
-                if (r?.Account == null) continue;
-
-                var accName = r.Account.Name;
-
-                _activeInstrumentSession.FollowersEnabled[accName] = r.EnabledCheck?.IsChecked == true;
-
-                var qtyText = (r.QtyOverrideBox?.Text ?? "").Trim();
-                if (int.TryParse(qtyText, out var qv) && qv > 0)
-                    _activeInstrumentSession.FollowerQtyOverrides[accName] = qv;
-
-                var atm = (r.AtmOverrideBox?.SelectedItem as string) ?? "(inherit master)";
-                _activeInstrumentSession.FollowerAtmOverrides[accName] = atm;
-            }
-        }
-        
-        private void LoadActiveSessionToUi()
-        {
-            if (_activeInstrumentSession == null) return;
-
-            _suppressSessionUiEvents = true;
             try
             {
-                RefreshInstrumentSelectorItems();
+                if (_activeInstrumentSession == null) return;
 
-                var instrumentName = _activeInstrumentSession.InstrumentName ?? "";
-                if (!string.IsNullOrWhiteSpace(instrumentName) && !_instrumentSelector.Items.Contains(instrumentName))
-                    _instrumentSelector.Items.Add(instrumentName);
+                _activeInstrumentSession.InstrumentName = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
+                _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
+                _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
 
-                _instrumentSelector.SelectedItem = instrumentName;
-
-                _masterBox.SelectedItem = _activeInstrumentSession.MasterAccount;
-                _masterQtyBox.Text = (_activeInstrumentSession.MasterQty > 0 ? _activeInstrumentSession.MasterQty : 1).ToString();
-                _masterAtmBox.SelectedItem = _activeInstrumentSession.MasterAtm ?? "None";
+                _activeInstrumentSession.FollowersEnabled.Clear();
+                _activeInstrumentSession.FollowerQtyOverrides.Clear();
+                _activeInstrumentSession.FollowerAtmOverrides.Clear();
 
                 foreach (var r in _followerRows)
                 {
@@ -95,31 +62,84 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     var accName = r.Account.Name;
 
-                    r.EnabledCheck.IsChecked =
-                        _activeInstrumentSession.FollowersEnabled.TryGetValue(accName, out var included) && included;
+                    _activeInstrumentSession.FollowersEnabled[accName] = r.EnabledCheck?.IsChecked == true;
 
-                    r.QtyOverrideBox.Text =
-                        _activeInstrumentSession.FollowerQtyOverrides.TryGetValue(accName, out var qv)
-                            ? qv.ToString()
-                            : "";
+                    var qtyText = (r.QtyOverrideBox?.Text ?? "").Trim();
+                    if (int.TryParse(qtyText, out var qv) && qv > 0)
+                        _activeInstrumentSession.FollowerQtyOverrides[accName] = qv;
 
-                    var atm =
-                        _activeInstrumentSession.FollowerAtmOverrides.TryGetValue(accName, out var av)
-                            ? av
-                            : "(inherit master)";
-
-                    r.AtmOverrideBox.SelectedItem = atm;
-                    RenderFollowerRowState(r);
+                    var atm = (r.AtmOverrideBox?.SelectedItem as string) ?? "(inherit master)";
+                    _activeInstrumentSession.FollowerAtmOverrides[accName] = atm;
                 }
             }
-            finally
+            catch (Exception ex)
             {
-                _suppressSessionUiEvents = false;
+                LogUnhandled("SafeTradeCopierTool.SaveUiToActiveSession()", ex);
+                throw;
             }
+        }
 
-            ApplyConfigFromUi();
-            RenderFlattenEnablementUi();
-            RenderFollowerRowsState();
+        private void LoadActiveSessionToUi()
+        {
+            try
+            {
+                if (_activeInstrumentSession == null) return;
+
+                _suppressSessionUiEvents = true;
+                try
+                {
+                    RefreshInstrumentSelectorItems();
+
+                    var instrumentName = _activeInstrumentSession.InstrumentName ?? "";
+                    if (!string.IsNullOrWhiteSpace(instrumentName) &&
+                        !_instrumentSelector.Items.Contains(instrumentName))
+                        _instrumentSelector.Items.Add(instrumentName);
+
+                    _instrumentSelector.SelectedItem = instrumentName;
+
+                    _masterBox.SelectedItem = _activeInstrumentSession.MasterAccount;
+                    _masterQtyBox.Text =
+                        (_activeInstrumentSession.MasterQty > 0 ? _activeInstrumentSession.MasterQty : 1).ToString();
+                    _masterAtmBox.SelectedItem = _activeInstrumentSession.MasterAtm ?? "None";
+
+                    foreach (var r in _followerRows)
+                    {
+                        if (r?.Account == null) continue;
+
+                        var accName = r.Account.Name;
+
+                        r.EnabledCheck.IsChecked =
+                            _activeInstrumentSession.FollowersEnabled.TryGetValue(accName, out var included) &&
+                            included;
+
+                        r.QtyOverrideBox.Text =
+                            _activeInstrumentSession.FollowerQtyOverrides.TryGetValue(accName, out var qv)
+                                ? qv.ToString()
+                                : "";
+
+                        var atm =
+                            _activeInstrumentSession.FollowerAtmOverrides.TryGetValue(accName, out var av)
+                                ? av
+                                : "(inherit master)";
+
+                        r.AtmOverrideBox.SelectedItem = atm;
+                        RenderFollowerRowState(r);
+                    }
+                }
+                finally
+                {
+                    _suppressSessionUiEvents = false;
+                }
+
+                ApplyConfigFromUi();
+                RenderFlattenEnablementUi();
+                RenderFollowerRowsState();
+            }
+            catch (Exception ex)
+            {
+                LogUnhandled("SafeTradeCopierTool.LoadActiveSessionToUi()", ex);
+                throw;
+            }
         }
     }
 }
