@@ -52,14 +52,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // ---------------- Header ----------------
             var headerArea = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 0, 8) };
-
-            // var header = new TextBlock
-            // {
-            //     Text = "Safe Trade Copier (v2)",
-            //     FontSize = 16,
-            //     Margin = new Thickness(0, 0, 0, 4),
-            //     Foreground = SystemColors.WindowTextBrush
-            // };
             
             _chkSimOnly = new CheckBox
             {
@@ -70,7 +62,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
             
             var accounts = GetSelectableAccounts();
-            
             SubscribeUiAccountEvents(accounts);
 
             _chkSimOnly.Checked += (s, e) =>
@@ -303,12 +294,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // ---------------- Copier buttons + Status ----------------
             var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
             bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
             bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status label
             bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status box
 
             bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            
+            _instrumentTabs = new TabControl
+            {
+                Height = 30,
+                Margin = new Thickness(0, 0, 6, 6),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            _btnAddInstrumentTab = new Button
+            {
+                Content = "+",
+                Width = 28,
+                Height = 28,
+                Margin = new Thickness(0, 0, 6, 6),
+                ToolTip = "Add instrument tab"
+            };
+
+            _btnRemoveInstrumentTab = new Button
+            {
+                Content = "×",
+                Width = 28,
+                Height = 28,
+                Margin = new Thickness(0, 0, 0, 6),
+                ToolTip = "Remove active instrument tab"
+            };
 
             _btnCopyOn = new Button
             {
@@ -345,21 +363,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 0, 0, 4)
             };
 
-            Grid.SetRow(_btnCopyOn, 0);
+            Grid.SetRow(_btnCopyOn, 1);
             Grid.SetColumn(_btnCopyOn, 0);
+            Grid.SetColumnSpan(_btnCopyOn, 2);
 
-            Grid.SetRow(btnClose, 0);
-            Grid.SetColumn(btnClose, 1);
+            Grid.SetRow(btnClose, 1);
+            Grid.SetColumn(btnClose, 2);
 
-            Grid.SetRow(statusLbl, 1);
-            Grid.SetColumnSpan(statusLbl, 2);
+            Grid.SetRow(statusLbl, 2);
+            Grid.SetColumn(statusLbl, 0);
+            Grid.SetColumnSpan(statusLbl, 3);
 
-            Grid.SetRow(_statusBox, 2);
-            Grid.SetColumnSpan(_statusBox, 2);
-
+            Grid.SetRow(_statusBox, 3);
+            Grid.SetColumn(_statusBox, 0);
+            Grid.SetColumnSpan(_statusBox, 3);
+            
+            bottom.Children.Add(_instrumentTabs);
+            bottom.Children.Add(_btnAddInstrumentTab);
+            bottom.Children.Add(_btnRemoveInstrumentTab);
+            
             bottom.Children.Add(_btnCopyOn);
             bottom.Children.Add(btnClose);
             bottom.Children.Add(statusLbl);
+            
             bottom.Children.Add(_statusBox);
 
             Grid.SetRow(bottom, 4);
@@ -436,6 +462,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectedItem = initialMaster;
             
+            EnsureInitialInstrumentSession();
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
             RenderFollowerRowsState();
@@ -448,14 +475,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // ---------------- UI -> Engine wiring ----------------
             void ApplyAndMaybeRewire()
             {
+                if (_suppressSessionUiEvents)
+                    return;
+
+                SaveUiToActiveSession();
                 ApplyConfigFromUi();
+
                 if (eng.CopyEnabled)
                     eng.SetCopyEnabled(true);
             }
 
             _masterBox.SelectionChanged += (s, e) =>
             {
+                if (_suppressSessionUiEvents) return;
+
                 RebuildFollowersAndRewire(eng, accounts);
+                SaveUiToActiveSession();
+                ApplyConfigFromUi();
                 RenderFlattenEnablementUi();
             };
             
@@ -489,12 +525,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HardClose();
             };
             
-            WireFollowerFlattenButtons(eng);
+            _btnAddInstrumentTab.Click += (s, e) =>
+            {
+                var newInstr = (_instrBox?.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(newInstr))
+                    newInstr = "NQ 03-26";
 
-            // initial config
-            ApplyConfigFromUi();
-            RenderHeader(copyOn: false);
-            RenderButtons(copyOn: false);
+                AddInstrumentSession(newInstr);
+            };
+
+            _btnRemoveInstrumentTab.Click += (s, e) =>
+            {
+                if (_activeInstrumentSession == null)
+                    return;
+
+                if (_instrumentSessions.Count <= 1)
+                    return;
+
+                var idx = _instrumentSessions.IndexOf(_activeInstrumentSession);
+                if (idx < 0)
+                    return;
+
+                var nextIdx = idx > 0 ? idx - 1 : 0;
+
+                _instrumentSessions.Remove(_activeInstrumentSession);
+                _activeInstrumentSession = _instrumentSessions[nextIdx];
+
+                RefreshInstrumentTabs();
+                LoadActiveSessionToUi();
+            };
+            
+            RefreshInstrumentTabs();
+            LoadActiveSessionToUi();
+
+            RenderHeader(copyOn: eng.CopyEnabled);
+            RenderButtons(copyOn: eng.CopyEnabled);
             RenderFlattenAllButtonState();
             
             return new ScrollViewer
@@ -505,229 +570,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
         }
         
-        private void WireFollowerFlattenButtons(SafeCopierEngine eng)
-        {
-            foreach (var r in _followerRows)
-            {
-                if (r?.FlattenBtn == null) continue;
-
-                r.FlattenBtn.Click += (s, e) =>
-                {
-                    if (eng == null) return;
-                    if (r.Account == null) return;
-
-                    var instrName = (_instrBox?.Text ?? "").Trim();
-                    var instr = string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
-                    if (instr == null)
-                    {
-                        eng.Log("Invalid instrument (must match NT instrument exactly).");
-                        return;
-                    }
-
-                    if (r.PnlBar != null)
-                        r.PnlBar.Tag = "ORDER_FILLED";
-
-                    eng.EnsureFlatInstrument(r.Account, instr);
-                    eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
-                };
-            }
-        }
         
-        private void BuildFollowerRows(List<Account> accounts)
-        {
-            _followerRows.Clear();
-            _followersPanel.Children.Clear();
-
-            var master = _masterBox?.SelectedItem as Account;
-            var masterName = master?.Name ?? "";
-
-            foreach (var acc in accounts)
-            {
-                if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
-                    continue;
-                
-                var rowGrid = new Grid
-                {
-                    Margin = new Thickness(2, 2, 2, 2),
-                    Background = TableRowAltBrush()
-                };
-                
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-                
-                var statusDot = new Border
-                {
-                    Width = 12,
-                    Height = 12,
-                    CornerRadius = new CornerRadius(6),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = DotBorderBrush(),
-                    Background = DotOffBrush(),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-              
-                var enabled = new CheckBox
-                {
-                    Content = null,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Tag = acc
-                };
-
-                ApplyCircularCheckBoxStyle(enabled);
-                enabled.ToolTip = "Enable follower";
-                
-                var accountText = new TextBlock
-                {
-                    Text = acc.Name,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(6, 0, 6, 0),
-                    Foreground = SystemColors.ControlTextBrush
-                };
-
-                var qtyBox = new TextBox
-                {
-                    Height = 24,
-                    Margin = new Thickness(6, 0, 6, 0),
-                    ToolTip = "Qty override (blank = inherit master)"
-                };
-
-                var atmBox = new ComboBox
-                {
-                    Height = 24,
-                    Margin = new Thickness(6, 0, 6, 0),
-                    MinWidth = 160
-                };
-
-                var pnl = new TextBlock
-                {
-                    Text = "R: 0.00  U: 0.00",
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = SystemColors.ControlTextBrush,
-                    Margin = new Thickness(6, 0, 6, 0)
-                };
-                
-                var pnlBar = new ProgressBar
-                {
-                    Height = 10,
-                    Minimum = 0,
-                    Maximum = 100,
-                    Value = 0,
-                    Margin = new Thickness(6, 2, 6, 0),
-                    Visibility = Visibility.Collapsed
-                };
-                EnsureRoundedProgressBar(pnlBar, alignRight: false);
-                
-                var pnlBarStatusText = new TextBlock
-                {
-                    Text = "",
-                    Margin = new Thickness(6, 2, 6, 0),
-                    Foreground = SystemColors.ControlTextBrush,
-                    FontSize = 11,
-                    Visibility = Visibility.Collapsed
-                };
-
-                var flatten = new Button
-                {
-                    Content = "Flatten",
-                    Height = 24,
-                    Foreground = Brushes.White
-                };
-                RenderFlattenButtonState(flatten, enabled: false);
-                
-                var allow = !_simOnlyMode || IsSimAccount(acc);
-
-                enabled.IsEnabled = allow;
-                if (!allow) enabled.IsChecked = false;
-
-                qtyBox.IsEnabled = allow;
-                atmBox.IsEnabled = allow;
-
-                // flatten stays disabled by default; PnL timer/net-position logic enables it when needed
-                flatten.IsEnabled = false;
-
-                var pnlStack = new StackPanel
-                {
-                    Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0)
-                };
-
-                Grid.SetColumn(statusDot, 0);
-                Grid.SetColumn(enabled, 1);
-                Grid.SetColumn(accountText, 2);
-                Grid.SetColumn(qtyBox, 3);
-                Grid.SetColumn(atmBox, 4);
-                Grid.SetColumn(pnlStack, 5);
-                Grid.SetColumn(flatten, 6);
-
-                pnlStack.Children.Add(pnl);
-                pnlStack.Children.Add(pnlBar);
-                pnlStack.Children.Add(pnlBarStatusText);
-
-                rowGrid.Children.Add(statusDot);
-                rowGrid.Children.Add(enabled);
-                rowGrid.Children.Add(accountText);
-                rowGrid.Children.Add(qtyBox);
-                rowGrid.Children.Add(atmBox);
-                rowGrid.Children.Add(pnlStack);
-                rowGrid.Children.Add(flatten);
-
-                var row = new FollowerRow
-                {
-                    Account = acc,
-                    StatusDot = statusDot,
-                    EnabledCheck = enabled,
-                    AccountText = accountText,
-                    QtyOverrideBox = qtyBox,
-                    AtmOverrideBox = atmBox,
-                    PnlText = pnl,
-                    PnlBar = pnlBar,
-                    FlattenBtn = flatten,
-                    PnlBarStatusText = pnlBarStatusText,
-                };
-                
-                // When user changes follower settings, we re-apply config (no re-arm UX)
-                enabled.Click += (s, e) =>
-                {
-                    RenderFollowerRowState(row);
-                    ApplyConfigFromUi();
-                    RenderFlattenEnablementUi();
-                };
-
-                enabled.Checked += (s, e) =>
-                {
-                    RenderFollowerRowState(row);
-                    RenderFlattenEnablementUi();
-                    ApplyConfigFromUi();
-                };
-
-                enabled.Unchecked += (s, e) =>
-                {
-                    RenderFollowerRowState(row);
-                    RenderFlattenEnablementUi();
-                    ApplyConfigFromUi();
-                };
-                
-                qtyBox.TextChanged += (s, e) => ApplyConfigFromUi();
-                atmBox.SelectionChanged += (s, e) => ApplyConfigFromUi();
-
-                RenderFollowerRowState(row);
-                
-                qtyBox.VerticalContentAlignment = VerticalAlignment.Center;
-                atmBox.VerticalContentAlignment = VerticalAlignment.Center;
-                flatten.VerticalAlignment = VerticalAlignment.Center;
-
-                _followerRows.Add(row);
-                _followersPanel.Children.Add(rowGrid);
-            }
-        }
-
         private static void RenderFlattenButtonState(Button btn, bool enabled)
         {
             if (btn == null) 

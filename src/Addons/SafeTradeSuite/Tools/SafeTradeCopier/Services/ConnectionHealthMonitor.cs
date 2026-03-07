@@ -1,7 +1,7 @@
 ﻿namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public class RiskSettings
+    public partial class SafeTradeCopierTool
     {
-        
+
     }
 }

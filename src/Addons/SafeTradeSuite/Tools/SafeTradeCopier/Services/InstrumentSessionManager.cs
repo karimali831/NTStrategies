@@ -1,7 +1,7 @@
 ﻿namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public class InstrumentSession
+    public partial class SafeTradeCopierTool
     {
-        
+
     }
 }

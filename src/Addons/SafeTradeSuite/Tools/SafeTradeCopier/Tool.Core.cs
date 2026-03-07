@@ -1,12 +1,9 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
-
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -23,6 +20,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TextBox _instrBox;
         private StackPanel _followersPanel;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
+        
+        // Instrument tabs
+        private TabControl _instrumentTabs;
+        private Button _btnAddInstrumentTab;
+        private Button _btnRemoveInstrumentTab;
+
+        private readonly List<InstrumentSession> _instrumentSessions = new List<InstrumentSession>();
+        private InstrumentSession _activeInstrumentSession;
+        private bool _suppressSessionUiEvents;
+        
+        private void EnsureInitialInstrumentSession()
+        {
+            if (_instrumentSessions.Count > 0)
+                return;
+
+            var session = new InstrumentSession
+            {
+                InstrumentName = "NQ 03-26"
+            };
+
+            _instrumentSessions.Add(session);
+            _activeInstrumentSession = session;
+        }
 
         public void Show()
         {
@@ -167,6 +187,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _followerRows.Clear();
             _lastAccountsSnapshot.Clear();
+            
+            _instrumentTabs = null;
+            _btnAddInstrumentTab = null;
+            _btnRemoveInstrumentTab = null;
+            _activeInstrumentSession = null;
+            _suppressSessionUiEvents = false;
+            _instrumentSessions.Clear();
         }
     }
 }
