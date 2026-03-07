@@ -317,92 +317,95 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
         private void UnsubscribeUiAccountEvents(IEnumerable<Account> accounts)
-            {
-                if (accounts == null) return;
+        {
+            if (accounts == null) return;
 
-                foreach (var a in accounts)
-                {
-                    if (a == null) continue;
-                    a.AccountItemUpdate -= OnUiAccountItemUpdate;
-                    a.PositionUpdate -= OnUiPositionUpdate;
-                }
+            foreach (var a in accounts)
+            {
+                if (a == null) continue;
+                a.AccountItemUpdate -= OnUiAccountItemUpdate;
+                a.PositionUpdate -= OnUiPositionUpdate;
             }
-            
-            private void OnUiAccountItemUpdate(object sender, AccountItemEventArgs e)
+        }
+        
+        private void OnUiAccountItemUpdate(object sender, AccountItemEventArgs e)
+        {
+            if (e?.Account == null) return;
+            if (e.Currency != Currency.UsDollar) return;
+
+            var name = e.Account.Name ?? "";
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            lock (_uiPnl)
             {
-                if (e?.Account == null) return;
-                if (e.Currency != Currency.UsDollar) return;
+                _uiPnl.TryGetValue(name, out var snap);
 
-                var name = e.Account.Name ?? "";
-                if (string.IsNullOrWhiteSpace(name)) return;
+                if (e.AccountItem == AccountItem.RealizedProfitLoss)
+                    snap.r = e.Value;
+                else if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
+                    snap.u = e.Value;
 
-                lock (_uiPnl)
-                {
-                    _uiPnl.TryGetValue(name, out var snap);
-
-                    if (e.AccountItem == AccountItem.RealizedProfitLoss)
-                        snap.r = e.Value;
-                    else if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
-                        snap.u = e.Value;
-
-                    _uiPnl[name] = snap;
-                }
-
-                RenderPnlUi();
+                _uiPnl[name] = snap;
             }
 
-            private void OnUiPositionUpdate(object sender, PositionEventArgs e)
-            {
-                var acc = sender as Account;
-                if (acc == null) return;
-                if (e?.Position == null) return;
+            RenderPnlUi();
+        }
 
-                var instrFull = e.Position.Instrument?.FullName ?? "";
-                var key = $"{acc.Name}|{instrFull}";
-                var qty = e.Position.Quantity;
+        private void OnUiPositionUpdate(object sender, PositionEventArgs e)
+        {
+            var acc = sender as Account;
+            if (acc == null) return;
+            if (e?.Position == null) return;
 
-                lock (_uiNet)
-                    _uiNet[key] = qty;
+            var instrFull = e.Position.Instrument?.FullName ?? "";
+            var key = $"{acc.Name}|{instrFull}";
+            var qty = e.Position.Quantity;
 
-                RenderFlattenEnablementUi();
-            }
+            lock (_uiNet)
+                _uiNet[key] = qty;
 
-            private Instrument GetInstrument()
-            {
-                var instrName = (_instrBox?.Text ?? "").Trim();
-                return string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
-            }
-            
-            private string GetInstrumentFullName()
+            RenderFlattenEnablementUi();
+        }
+
+        private Instrument GetInstrument()
+        {
+            var instrName = (_instrBox?.Text ?? "").Trim();
+            return string.IsNullOrWhiteSpace(instrName) ? null : Instrument.GetInstrument(instrName);
+        }
+        
+        private string GetInstrumentFullName()
+        {
+            var instr = GetInstrument();
+            return instr?.FullName ?? "";
+        }
+
+        
+        private void RenderFlattenEnablementUi()
+        {
+            var display = _uiDispatcher ?? _window?.Dispatcher;
+
+            display?.InvokeAsync(() =>
             {
                 var instr = GetInstrument();
-                return instr?.FullName ?? "";
-            }
+                var instrFull = GetInstrumentFullName();
 
-            
-            private void RenderFlattenEnablementUi()
-            {
-                var display = _uiDispatcher ?? _window?.Dispatcher;
-
-                display?.InvokeAsync(() =>
+                foreach (var row in _followerRows)
                 {
-                    var instr = GetInstrument();
-                    var instrFull = GetInstrumentFullName();
+                    if (row?.Account == null || row.FlattenBtn == null)
+                        continue;
 
-                    foreach (var row in _followerRows)
+                    if (instr == null)
                     {
-                        if (row?.Account == null || row.FlattenBtn == null)
-                            continue;
-
-                        if (instr == null)
-                        {
-                            var canFlatten = CanFlatten(row.Account, instrFull) && row.EnabledCheck?.IsChecked == true;
-                            RenderFlattenButtonState(row.FlattenBtn, canFlatten);
-                        }
-
-                        RenderFlattenAllButtonState();
+                        RenderFlattenButtonState(row.FlattenBtn, false);
+                        continue;
                     }
-                }, DispatcherPriority.Background);
-            }
+
+                    var canFlatten = CanFlatten(row.Account, instrFull) && row.EnabledCheck?.IsChecked == true;
+                    RenderFlattenButtonState(row.FlattenBtn, canFlatten);
+                }
+
+                RenderFlattenAllButtonState();
+            }, DispatcherPriority.Background);
+        }
     }
 }

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -30,27 +29,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private CheckBox _chkSimOnly;
         private TextBlock _masterPnlBarStatusText;
         private bool _simOnlyMode = true;
-
-        // follower rows
-        private sealed class FollowerRow
-        {
-            public Account Account;
-
-            // UI controls (current)
-            public CheckBox EnabledCheck;
-            public TextBox QtyOverrideBox;
-            public ComboBox AtmOverrideBox;
-            public TextBlock PnlText;
-            public Button FlattenBtn;
-            public ProgressBar PnlBar;
-            public TextBlock PnlBarStatusText;
-            public string AccountName => Account?.Name ?? "";
-            public CheckBox IncludeCheck => EnabledCheck;
-            public CheckBox OverrideCheck => null;
-            public TextBox QtyBox => QtyOverrideBox;
-            public ComboBox AtmBox => AtmOverrideBox;
-        }
-
+        
         private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
         
         private UIElement BuildUi(SafeCopierEngine eng)
@@ -299,12 +278,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.WindowTextBrush,
                 Margin = new Thickness(0, 0, 0, 6)
             });
+            
+            followersStack.Children.Add(BuildFollowerHeaderRow());
 
             _followersPanel = new StackPanel { Orientation = Orientation.Vertical };
             var followersScroll = new ScrollViewer
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = 220,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                CanContentScroll = true,
+                Height = 240,
                 Content = _followersPanel,
                 Background = SystemColors.ControlLightBrush
             };
@@ -478,10 +461,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnCopyOn.Click += (s, e) =>
             {
-                if (!eng.CopyEnabled)
-                    ApplyConfigFromUi();
+                if (eng.CopyEnabled)
+                {
+                    _userManuallyDisarmed = true;
+                    _autoRearmPending = false;
+                    eng.SetCopyEnabled(false);
+                    return;
+                }
 
-                eng.SetCopyEnabled(!eng.CopyEnabled);
+                _userManuallyDisarmed = false;
+                _autoRearmPending = false;
+                ApplyConfigFromUi();
+                eng.SetCopyEnabled(true);
             };
 
             btnClose.Click += (s, e) =>
@@ -546,18 +537,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
                     continue;
                 
-                var rowGrid = new Grid { Margin = new Thickness(2, 2, 2, 2) };
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });   // checkbox
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });                    // qty
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });                   // atm
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });                   // pnl
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });                    // flatten
+                var rowGrid = new Grid
+                {
+                    Margin = new Thickness(2, 2, 2, 2),
+                    Background = TableRowAltBrush()
+                };
                 
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                
+                var statusDot = new Border
+                {
+                    Width = 12,
+                    Height = 12,
+                    CornerRadius = new CornerRadius(6),
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = DotBorderBrush(),
+                    Background = DotOffBrush(),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+              
                 var enabled = new CheckBox
                 {
-                    Content = acc.Name,
-                    Tag = acc,
+                    Content = null,
+                    HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
+                    Tag = acc
+                };
+
+                ApplyCircularCheckBoxStyle(enabled);
+                
+                var accountText = new TextBlock
+                {
+                    Text = acc.Name,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 6, 0),
                     Foreground = SystemColors.ControlTextBrush
                 };
 
@@ -622,27 +642,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // flatten stays disabled by default; PnL timer/net-position logic enables it when needed
                 flatten.IsEnabled = false;
 
-                Grid.SetColumn(enabled, 0);
-                Grid.SetColumn(qtyBox, 1);
-                Grid.SetColumn(atmBox, 2);
-                var pnlStack = new StackPanel { Orientation = Orientation.Vertical };
-                Grid.SetColumn(flatten, 4);
+                var pnlStack = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0)
+                };
 
-                rowGrid.Children.Add(enabled);
-                rowGrid.Children.Add(qtyBox);
-                rowGrid.Children.Add(atmBox);
+                Grid.SetColumn(statusDot, 0);
+                Grid.SetColumn(enabled, 1);
+                Grid.SetColumn(accountText, 2);
+                Grid.SetColumn(qtyBox, 3);
+                Grid.SetColumn(atmBox, 4);
+                Grid.SetColumn(pnlStack, 5);
+                Grid.SetColumn(flatten, 6);
+
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
                 pnlStack.Children.Add(pnlBarStatusText);
 
-                Grid.SetColumn(pnlStack, 3);
+                rowGrid.Children.Add(statusDot);
+                rowGrid.Children.Add(enabled);
+                rowGrid.Children.Add(accountText);
+                rowGrid.Children.Add(qtyBox);
+                rowGrid.Children.Add(atmBox);
                 rowGrid.Children.Add(pnlStack);
                 rowGrid.Children.Add(flatten);
 
                 var row = new FollowerRow
                 {
                     Account = acc,
+                    StatusDot = statusDot,
                     EnabledCheck = enabled,
+                    AccountText = accountText,
                     QtyOverrideBox = qtyBox,
                     AtmOverrideBox = atmBox,
                     PnlText = pnl,
@@ -652,10 +683,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 
                 // When user changes follower settings, we re-apply config (no re-arm UX)
-                enabled.Checked += (s, e) => ApplyConfigFromUi();
-                enabled.Unchecked += (s, e) => ApplyConfigFromUi();
+                enabled.Click += (s, e) =>
+                {
+                    RenderFollowerRowState(row);
+                    ApplyConfigFromUi();
+                    RenderFlattenEnablementUi();
+                };
+
+                enabled.Checked += (s, e) =>
+                {
+                    RenderFollowerRowState(row);
+                    ApplyConfigFromUi();
+                };
+
+                enabled.Unchecked += (s, e) =>
+                {
+                    RenderFollowerRowState(row);
+                    ApplyConfigFromUi();
+                };
                 qtyBox.TextChanged += (s, e) => ApplyConfigFromUi();
                 atmBox.SelectionChanged += (s, e) => ApplyConfigFromUi();
+
+                RenderFollowerRowState(row);
+                
+                qtyBox.VerticalContentAlignment = VerticalAlignment.Center;
+                atmBox.VerticalContentAlignment = VerticalAlignment.Center;
+                flatten.VerticalAlignment = VerticalAlignment.Center;
 
                 _followerRows.Add(row);
                 _followersPanel.Children.Add(rowGrid);

@@ -1,11 +1,35 @@
-﻿using System.Windows.Threading;
+﻿using System.Linq;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private enum UiConnectionState
+        {
+            Connected,
+            Warning,
+            Disconnected
+        }
+        
         private bool _connectionStatusHooked;
+        private bool _autoRearmPending;
+        private bool _userManuallyDisarmed;
+        
+        private static UiConnectionState GetUiConnectionState(Account acc)
+        {
+            // If account is already shown in the NT Accounts list and has a connection object,
+            // treat it as usable unless we explicitly know it is disconnected.
+            if (acc?.Connection == null)
+                return UiConnectionState.Disconnected;
+
+            if (acc.ConnectionStatus == ConnectionStatus.Disconnected)
+                return UiConnectionState.Disconnected;
+
+            // We can map partial/order-only/price-only later if needed.
+            return UiConnectionState.Connected;
+        }
 
         private void HookConnectionStatusUpdates()
         {
@@ -30,6 +54,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             display?.InvokeAsync(() =>
             {
                 RefreshAccountsUi();
+                HandleFollowerConnectionSafety();
+                TryAutoRearmAfterReconnect();
+                RenderFlattenEnablementUi();
 
                 _engine?.Log(
                     $"Connection update: " +
@@ -37,6 +64,51 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"Order={e.Status} Price={e.PriceStatus}"
                 );
             }, DispatcherPriority.Background);
+        }
+        
+        private void TryAutoRearmAfterReconnect()
+        {
+            if (_engine == null) return;
+            if (_engine.CopyEnabled) return;
+            if (_userManuallyDisarmed) return;
+            if (!_autoRearmPending) return;
+            if (!HasAnyCheckedFollowers()) return;
+            if (!AllCheckedFollowersHealthy()) return;
+
+            ApplyConfigFromUi();
+            _engine.SetCopyEnabled(true);
+            _autoRearmPending = false;
+
+            _engine.Log("Copy auto-rearmed after connection recovered.");
+        }
+        
+        private void HandleFollowerConnectionSafety()
+        {
+            if (_engine == null) return;
+
+            var anySelectedBad = _followerRows.Any(r =>
+            {
+                if (r?.Account == null) return false;
+                if (r.EnabledCheck?.IsChecked != true) return false;
+
+                var state = GetUiConnectionState(r.Account);
+                return state != UiConnectionState.Connected;
+            });
+
+            if (!anySelectedBad)
+                return;
+
+            if (_engine.CopyEnabled)
+            {
+                _autoRearmPending = true;
+                _userManuallyDisarmed = false;
+
+                _engine.SetCopyEnabled(false);
+                _engine.Log("Copy disarmed: one or more selected followers lost connection.");
+            }
+
+            RenderFollowerRowsState();
+            ApplyConfigFromUi();
         }
     }
 }
