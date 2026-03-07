@@ -609,7 +609,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
             catch (Exception ex)
             {
-                LogUnhandled("SafeTradeCopierTool.BuildUi()", ex);
+                LogUnhandled("BuildUi()", ex);
                 throw;
             }
         }

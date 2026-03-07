@@ -22,26 +22,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void SubscribePnl(Account acc)
             {
+                if (acc == null)
+                    return;
+
                 acc.AccountItemUpdate -= OnAccountItemUpdate;
                 acc.AccountItemUpdate += OnAccountItemUpdate;
-                
+
                 var name = acc.Name ?? "";
-                if (!string.IsNullOrWhiteSpace(name))
+                if (string.IsNullOrWhiteSpace(name))
+                    return;
+
+                var r = 0.0;
+                var u = 0.0;
+
+                try
                 {
-                    var r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                    var u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+                    r = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                    u = acc.Get(AccountItem.UnrealizedProfitLoss, Currency.UsDollar);
+                }
+                catch
+                {
+                    // account metrics may not be available yet during startup/reconnect
+                }
 
-                    lock (_gate)
+                lock (_gate)
+                {
+                    if (!_pnlByAccount.TryGetValue(name, out var snap))
                     {
-                        if (!_pnlByAccount.TryGetValue(name, out var snap))
-                        {
-                            snap = new PnlSnap();
-                            _pnlByAccount[name] = snap;
-                        }
-
-                        snap.Realized = r;
-                        snap.Unrealized = u;
+                        snap = new PnlSnap();
+                        _pnlByAccount[name] = snap;
                     }
+
+                    snap.Realized = r;
+                    snap.Unrealized = u;
                 }
             }
 
@@ -81,9 +94,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 unrealized = 0;
                 if (acc == null) return false;
 
+                var name = acc.Name ?? "";
+                if (string.IsNullOrWhiteSpace(name)) return false;
+
                 lock (_gate)
                 {
-                    if (!_pnlByAccount.TryGetValue(acc.Name, out var snap))
+                    if (!_pnlByAccount.TryGetValue(name, out var snap))
                         return false;
 
                     realized = snap.Realized;

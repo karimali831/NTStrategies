@@ -137,7 +137,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
             catch (Exception ex)
             {
-                LogUnhandled("SafeTradeCopierTool.LoadActiveSessionToUi()", ex);
+                LogUnhandled("SaveUiToActiveSession()", ex);
                 throw;
             }
         }

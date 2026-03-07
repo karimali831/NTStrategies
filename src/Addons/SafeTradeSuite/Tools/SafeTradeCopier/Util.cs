@@ -17,38 +17,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return v.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
         }
         
-        private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
-        {
-            if (shortened)
-                return $"R: {FmtUsd(realized)}  |  U: {FmtUsd(unrealized)}";
-
-            return $"{prefix} PnL: Realized {FmtUsd(realized)} | Unrealized {FmtUsd(unrealized)}";
-        }
-
         // private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
         // {
-        //     var txt = "";
-        //     if (realized != 0 || unrealized != 0)
-        //     {
-        //         if (!shortened)
-        //             txt += $"{prefix} PnL: ";
-        //         
-        //         if (realized != 0)
-        //         {
-        //             txt += shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
+        //     if (shortened)
+        //         return $"R: {FmtUsd(realized)}  |  U: {FmtUsd(unrealized)}";
         //
-        //             if (unrealized != 0)
-        //                 txt += " | ";
-        //         }
-        //         
-        //         if (unrealized != 0)
-        //         {
-        //             txt += shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
-        //         }
-        //     }
-        //
-        //     return txt;
+        //     return $"{prefix} PnL: Realized {FmtUsd(realized)} | Unrealized {FmtUsd(unrealized)}";
         // }
+
+        private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
+        {
+            var txt = "";
+            if (realized != 0 || unrealized != 0)
+            {
+                if (!shortened)
+                    txt += $"{prefix} PnL: ";
+                
+                if (realized != 0)
+                {
+                    txt += shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
+        
+                    if (unrealized != 0)
+                        txt += " | ";
+                }
+                
+                if (unrealized != 0)
+                {
+                    txt += shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
+                }
+            }
+        
+            return txt;
+        }
         
         private static double Clamp01(double x)
         {
