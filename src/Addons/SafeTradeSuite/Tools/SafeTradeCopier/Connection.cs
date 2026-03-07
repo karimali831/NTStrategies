@@ -14,21 +14,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         }
         
         private bool _connectionStatusHooked;
-        private bool _autoRearmPending;
-        private bool _userManuallyDisarmed;
         
         private static UiConnectionState GetUiConnectionState(Account acc)
         {
-            // If account is already shown in the NT Accounts list and has a connection object,
-            // treat it as usable unless we explicitly know it is disconnected.
             if (acc?.Connection == null)
                 return UiConnectionState.Disconnected;
 
-            if (acc.ConnectionStatus == ConnectionStatus.Disconnected)
-                return UiConnectionState.Disconnected;
+            var status = acc.ConnectionStatus;
 
-            // We can map partial/order-only/price-only later if needed.
-            return UiConnectionState.Connected;
+            if (status == ConnectionStatus.Connected)
+                return UiConnectionState.Connected;
+
+            if (status == ConnectionStatus.ConnectionLost
+                || status == ConnectionStatus.Connecting)
+                return UiConnectionState.Warning;
+
+            return UiConnectionState.Disconnected;
         }
 
         private void HookConnectionStatusUpdates()
@@ -66,6 +67,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }, DispatcherPriority.Background);
         }
         
+        private bool HasAnyCheckedFollowers()
+        {
+            return _followerRows.Any(r =>
+                r?.Account != null &&
+                r.EnabledCheck?.IsChecked == true);
+        }
+
+        private bool AllCheckedFollowersHealthy()
+        {
+            return _followerRows
+                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
+                .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
+        }
+
         private void TryAutoRearmAfterReconnect()
         {
             if (_engine == null) return;

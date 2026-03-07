@@ -11,20 +11,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static Style _circularCheckBoxStyle;
         
-        private bool HasAnyCheckedFollowers()
-        {
-            return _followerRows.Any(r =>
-                r?.Account != null &&
-                r.EnabledCheck?.IsChecked == true);
-        }
-
-        private bool AllCheckedFollowersHealthy()
-        {
-            return _followerRows
-                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
-                .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
-        }
-        
         private Grid BuildFollowerHeaderRow()
         {
             var g = new Grid
@@ -41,7 +27,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
 
-            AddHeaderText(g, " ", 0);
+            AddHeaderText(g, "Status", 0);
             AddHeaderText(g, "On", 1);
             AddHeaderText(g, "Account", 2);
             AddHeaderText(g, "Qty", 3);
@@ -147,24 +133,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var warning = connState == UiConnectionState.Warning;
             var disconnected = connState == UiConnectionState.Disconnected;
 
+            var isChecked = row.EnabledCheck?.IsChecked == true;
+            var isArmed = _engine?.CopyEnabled == true;
+
             if (row.StatusDot != null)
             {
-                if (connected)
+                row.StatusDot.Visibility = Visibility.Visible;
+                row.StatusDot.BorderBrush = DotBorderBrush();
+
+                if (disconnected)
                 {
-                    // Healthy connection -> hide the separate status dot so we don't show "two checkboxes"
-                    row.StatusDot.Visibility = Visibility.Collapsed;
+                    row.StatusDot.Background = DotDisconnectedBrush();
+                    row.StatusDot.ToolTip = "Disconnected";
+                }
+                else if (warning)
+                {
+                    row.StatusDot.Background = DotWarningBrush();
+                    row.StatusDot.ToolTip = "Connecting or reconnecting";
+                }
+                else if (connected && isChecked && isArmed)
+                {
+                    row.StatusDot.Background = DotConnectedOnBrush();
+                    row.StatusDot.ToolTip = "Connected";
+                }
+                else if (connected && isChecked && !isArmed)
+                {
+                    row.StatusDot.Background = DotWarningBrush();
+                    row.StatusDot.ToolTip = "Disarmed";
                 }
                 else
                 {
-                    row.StatusDot.Visibility = Visibility.Visible;
-                    row.StatusDot.BorderBrush = DotBorderBrush();
-
-                    if (warning)
-                        row.StatusDot.Background = DotWarningBrush();
-                    else if (disconnected)
-                        row.StatusDot.Background = DotDisconnectedBrush();
-                    else
-                        row.StatusDot.Background = DotOffBrush();
+                    row.StatusDot.Background = DotOffBrush();
+                    row.StatusDot.ToolTip = "Connected";
                 }
             }
 
@@ -172,14 +172,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (row.EnabledCheck != null)
             {
-                if (!allowCheck)
-                    row.EnabledCheck.IsChecked = false;
-
                 row.EnabledCheck.IsEnabled = allowCheck;
                 row.EnabledCheck.Opacity = allowCheck ? 1.0 : 0.55;
+
+                if (!allowCheck)
+                    row.EnabledCheck.ToolTip = warning
+                        ? "Connecting or reconnecting"
+                        : "Disconnected";
+                else if (isChecked && !isArmed)
+                    row.EnabledCheck.ToolTip = "Selected but disarmed";
+                else if (isChecked && isArmed)
+                    row.EnabledCheck.ToolTip = "Selected and armed";
+                else
+                    row.EnabledCheck.ToolTip = "Click to enable follower";
             }
 
-            var allowEdits = allowCheck && row.EnabledCheck?.IsChecked == true;
+            var allowEdits = allowCheck && isChecked;
 
             if (row.QtyOverrideBox != null)
                 row.QtyOverrideBox.IsEnabled = allowEdits;

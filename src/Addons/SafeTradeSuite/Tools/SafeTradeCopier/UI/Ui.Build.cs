@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -16,6 +17,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private bool _readyState;
         private string _readyReason = "";
+        
+        private bool _autoRearmPending;
+        private bool _userManuallyDisarmed;
         
         // ---- V2 UI controls ----
         private TextBox _masterQtyBox;
@@ -385,7 +389,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _readyReason = reason ?? "";
                     RenderHeader(eng.CopyEnabled);
                     RenderButtons(eng.CopyEnabled);
-                });
+                    RenderFollowerRowsState();
+                    RenderFlattenEnablementUi();
+                }, DispatcherPriority.Background);
             };
 
             eng.OnModeChanged += (armedIgnored, copyOn) =>
@@ -397,7 +403,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     RenderHeader(copyOn);
                     RenderButtons(copyOn);
-                });
+                    RenderFollowerRowsState();
+                    RenderFlattenEnablementUi();
+                }, DispatcherPriority.Background);
             };
 
             void RenderButtons(bool copyOn)
@@ -430,6 +438,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
+            RenderFollowerRowsState();
 
             // ATMs
             LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
@@ -572,6 +581,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
 
                 ApplyCircularCheckBoxStyle(enabled);
+                enabled.ToolTip = "Enable follower";
                 
                 var accountText = new TextBlock
                 {
@@ -693,14 +703,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 enabled.Checked += (s, e) =>
                 {
                     RenderFollowerRowState(row);
+                    RenderFlattenEnablementUi();
                     ApplyConfigFromUi();
                 };
 
                 enabled.Unchecked += (s, e) =>
                 {
                     RenderFollowerRowState(row);
+                    RenderFlattenEnablementUi();
                     ApplyConfigFromUi();
                 };
+                
                 qtyBox.TextChanged += (s, e) => ApplyConfigFromUi();
                 atmBox.SelectionChanged += (s, e) => ApplyConfigFromUi();
 

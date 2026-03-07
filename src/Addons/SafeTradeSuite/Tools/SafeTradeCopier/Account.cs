@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Threading;
 using NinjaTrader.Cbi;
 #endregion
 
@@ -45,7 +44,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var accounts = GetSelectableAccounts();
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
 
-            // Only do a real master list refresh if account membership/status snapshot changed
             if (!SameSnapshot(_lastAccountsSnapshot, snap))
             {
                 _lastAccountsSnapshot = snap;
@@ -59,12 +57,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
             }
-
-            // Do NOT rebuild follower rows here.
-            // Do NOT re-wire flatten buttons here.
-
-            foreach (var r in _followerRows)
-                LoadAtmTemplatesInto(r?.AtmBox, includeInherit: true);
 
             foreach (var r in _followerRows)
             {
