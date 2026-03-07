@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
+using System.Windows.Media;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -48,30 +50,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var s in _instrumentSessions)
-            {
-                var n = (s?.InstrumentName ?? "").Trim();
-                if (!string.IsNullOrWhiteSpace(n))
-                    names.Add(n);
-            }
+            AddSessionInstruments(names);
+            AddPositionInstruments(names);
+            AddCurrentSelectedInstrument(names);
+            AddChartWindowInstruments(names);
 
-            foreach (var acc in Account.All)
-            {
-                if (acc?.Positions == null) continue;
+            var result = names
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .OrderBy(x => x)
+                .ToList();
 
-                foreach (var p in acc.Positions)
-                {
-                    var n = p?.Instrument?.FullName ?? "";
-                    if (!string.IsNullOrWhiteSpace(n))
-                        names.Add(n);
-                }
-            }
+            _engine?.Log("Available instruments: " + string.Join(", ", result));
 
-            var current = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
-            if (!string.IsNullOrWhiteSpace(current))
-                names.Add(current);
-
-            return names.OrderBy(x => x).ToList();
+            return result;
         }
 
         private void RefreshInstrumentSelectorItems()
@@ -118,6 +109,111 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SaveUiToActiveSession();
             _activeInstrumentSession = session;
             LoadActiveSessionToUi();
+        }
+        
+        private void AddSessionInstruments(HashSet<string> names)
+        {
+            foreach (var s in _instrumentSessions)
+            {
+                var n = (s?.InstrumentName ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(n))
+                    names.Add(n);
+            }
+        }
+
+        private void AddPositionInstruments(HashSet<string> names)
+        {
+            foreach (var acc in Account.All)
+            {
+                if (acc?.Positions == null)
+                    continue;
+
+                foreach (var p in acc.Positions)
+                {
+                    var n = p?.Instrument?.FullName ?? "";
+                    if (!string.IsNullOrWhiteSpace(n))
+                        names.Add(n);
+                }
+            }
+        }
+
+        private void AddCurrentSelectedInstrument(HashSet<string> names)
+        {
+            var current = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(current))
+                names.Add(current);
+
+            var active = (_activeInstrumentSession?.InstrumentName ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(active))
+                names.Add(active);
+        }
+        
+        private void AddChartWindowInstruments(HashSet<string> names)
+        {
+            if (names == null)
+                return;
+
+            var dispatcher = _uiDispatcher ?? _window?.Dispatcher ?? Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+
+            try
+            {
+                if (dispatcher.CheckAccess())
+                {
+                    AddChartWindowInstrumentsOnUiThread(names);
+                }
+                else
+                {
+                    dispatcher.Invoke(() => AddChartWindowInstrumentsOnUiThread(names));
+                }
+            }
+            catch (Exception ex)
+            {
+                _engine?.Log("AddChartWindowInstruments failed: " + ex.Message);
+            }
+        }
+        
+        private void AddChartWindowInstrumentsOnUiThread(HashSet<string> names)
+        {
+            var windows = Application.Current?.Windows;
+            if (windows == null)
+                return;
+
+            foreach (Window win in windows)
+            {
+                if (win == null)
+                    continue;
+
+                TryAddChartInstrumentsFromVisual(win, names);
+            }
+        }
+        
+        private void TryAddChartInstrumentsFromVisual(DependencyObject root, HashSet<string> names)
+        {
+            if (root == null || names == null)
+                return;
+
+            try
+            {
+                var prop = root.GetType().GetProperty("Instrument");
+                if (prop != null)
+                {
+                    var value = prop.GetValue(root, null);
+                    if (value is Instrument instr && !string.IsNullOrWhiteSpace(instr.FullName))
+                        names.Add(instr.FullName);
+                }
+            }
+            catch
+            {
+            }
+
+            var count = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                TryAddChartInstrumentsFromVisual(child, names);
+            }
         }
     }
 }
