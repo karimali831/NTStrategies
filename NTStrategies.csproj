@@ -84,6 +84,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.TemplateReader.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.TemplateSpec.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Tool.Logging.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Tool.Runtime.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Events\Ui.Events.General.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Events\Ui.Events.Config.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Events\Ui.Events.PnL.cs" />
@@ -98,7 +99,6 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Build.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.ProgressBar.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Util.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\ToolRegistry.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Strategies\ApexMicroPBLiveV3\ApexMicroPBLiveV3.cs" />

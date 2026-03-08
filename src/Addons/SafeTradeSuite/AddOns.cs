@@ -1,98 +1,199 @@
-﻿#region Using declarations 
-using System;
+﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu;
-using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools;
-using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
-
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
     public class AddOns : AddOnBase
     {
-        private static bool _registered;
         private Window _controlCenterWindow;
         private MenuManager _menuManager;
-        private ToolRegistry _tools;
-        
+        private readonly string _instanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        private bool _bootstrappedOpenCharts;
+
         protected override void OnStateChange()
         {
+            SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] OnStateChange -> {State}");
+
             if (State == State.SetDefaults)
             {
                 Name = "SafeTradeSuite";
                 Description = "SafeTrade Suite - tools for safer execution and account operations.";
-                
-                _tools = new ToolRegistry();
-                _tools.RegisterSingleton(SafeTradeSuiteMenuNodes.ToolKeys.SafeTradeCopier, () => new SafeTradeCopierTool());
             }
             else if (State == State.Terminated)
             {
                 _menuManager?.Dispose();
                 _menuManager = null;
-
-                _tools?.Dispose();
-                _tools = null;
-
                 _controlCenterWindow = null;
-                _registered = false;
+                _bootstrappedOpenCharts = false;
+
+                SafeTradeSuiteRuntime.DisposeCopierIfExists();
             }
+        }
+
+        public static System.Collections.Generic.List<string> GetChartInstruments()
+        {
+            return SafeTradeSuiteRuntime.GetChartInstrumentsSnapshot();
         }
 
         protected override void OnWindowCreated(Window w)
         {
-            if (w == null) return;
+            SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] OnWindowCreated");
 
-            var typeName = w.GetType().FullName ?? w.GetType().Name;
-            if (typeName.IndexOf("ControlCenter", StringComparison.OrdinalIgnoreCase) < 0)
-                return;
-
-            if (_registered) return;
-            _registered = true;
-
-            _controlCenterWindow = w;
-
-            _controlCenterWindow.Dispatcher.InvokeAsync(async () =>
+            try
             {
-                for (var i = 0; i < 50; i++)
-                {
-                    if (TryInitMenu(_controlCenterWindow))
-                        break;
+                if (w == null)
+                    return;
 
-                    await Task.Delay(100);
+                var typeName = w.GetType().FullName ?? w.GetType().Name;
+                var title = w.Title ?? "";
+
+                SafeTradeSuiteRuntime.PrintLog("Window type: " + typeName);
+                SafeTradeSuiteRuntime.PrintLog("Window title: " + (string.IsNullOrWhiteSpace(title) ? "<null-title>" : title));
+
+                RegisterChartWindowIfApplicable(w);
+
+                if (typeName.IndexOf("ControlCenter", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    SafeTradeSuiteRuntime.PrintLog("Skipping non-ControlCenter window.");
+                    return;
                 }
-            }, DispatcherPriority.Loaded);
+
+                _controlCenterWindow = w;
+
+                if (!_bootstrappedOpenCharts)
+                {
+                    _bootstrappedOpenCharts = true;
+                    BootstrapExistingChartWindows();
+                }
+
+                _controlCenterWindow.Dispatcher.InvokeAsync(async () =>
+                {
+                    for (var i = 0; i < 50; i++)
+                    {
+                        if (TryInitMenu(_controlCenterWindow))
+                            break;
+
+                        await Task.Delay(100);
+                    }
+                }, DispatcherPriority.Loaded);
+            }
+            catch (Exception ex)
+            {
+                SafeTradeSuiteRuntime.PrintLog("OnWindowCreated error: " + ex);
+            }
         }
 
         protected override void OnWindowDestroyed(Window w)
         {
-            if (w == null) return;
+            SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] OnWindowDestroyed");
 
-            if (_controlCenterWindow != null && ReferenceEquals(w, _controlCenterWindow))
+            try
             {
-                _menuManager?.Dispose();
-                _menuManager = null;
+                if (w == null)
+                    return;
 
-                // Keep tools alive across CC rebuilds, or dispose here if you prefer.
-                // I’m leaving them alive so tools don’t get torn down when CC recreates visuals.
-                _controlCenterWindow = null;
+                var typeName = w.GetType().FullName ?? w.GetType().Name;
+                if (typeName.IndexOf("Chart", StringComparison.OrdinalIgnoreCase) < 0)
+                    return;
+
+                var title = w.Title ?? "";
+                if (!title.StartsWith("Chart - ", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                var instrument = title.Substring("Chart - ".Length).Trim();
+                SafeTradeSuiteRuntime.RemoveChartInstrument(instrument);
             }
+            catch (Exception ex)
+            {
+                SafeTradeSuiteRuntime.PrintLog("OnWindowDestroyed error: " + ex);
+            }
+        }
+
+        private void BootstrapExistingChartWindows()
+        {
+            try
+            {
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher == null)
+                {
+                    SafeTradeSuiteRuntime.PrintLog("BootstrapExistingChartWindows: no app dispatcher.");
+                    return;
+                }
+
+                dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var windows = Application.Current?.Windows?.Cast<Window>().ToList();
+                        if (windows == null)
+                        {
+                            SafeTradeSuiteRuntime.PrintLog("BootstrapExistingChartWindows: windows collection is null.");
+                            return;
+                        }
+
+                        SafeTradeSuiteRuntime.PrintLog($"BootstrapExistingChartWindows: scanning {windows.Count} windows.");
+
+                        foreach (var win in windows)
+                        {
+                            RegisterChartWindowIfApplicable(win);
+                        }
+
+                        var snapshot = SafeTradeSuiteRuntime.GetChartInstrumentsSnapshot();
+                        SafeTradeSuiteRuntime.PrintLog(
+                            snapshot.Count == 0
+                                ? "BootstrapExistingChartWindows: no chart instruments found."
+                                : "BootstrapExistingChartWindows: " + string.Join(", ", snapshot));
+                    }
+                    catch (Exception ex)
+                    {
+                        SafeTradeSuiteRuntime.PrintLog("BootstrapExistingChartWindows failed: " + ex);
+                    }
+                }, DispatcherPriority.Loaded);
+            }
+            catch (Exception ex)
+            {
+                SafeTradeSuiteRuntime.PrintLog("BootstrapExistingChartWindows outer failure: " + ex);
+            }
+        }
+
+        private static void RegisterChartWindowIfApplicable(Window w)
+        {
+            if (w == null)
+                return;
+
+            var typeName = w.GetType().FullName ?? w.GetType().Name;
+            if (typeName.IndexOf("Chart", StringComparison.OrdinalIgnoreCase) < 0)
+                return;
+
+            var title = w.Title ?? "";
+            if (!title.StartsWith("Chart - ", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var instrument = title.Substring("Chart - ".Length).Trim();
+            if (string.IsNullOrWhiteSpace(instrument))
+                return;
+
+            SafeTradeSuiteRuntime.RegisterChartInstrument(instrument);
         }
 
         private bool TryInitMenu(Window cc)
         {
-            if (cc == null) return false;
+            if (cc == null)
+                return false;
 
             if (_menuManager == null)
                 _menuManager = new MenuManager(cc);
-            
 
             var toolsRoot = _menuManager.FindToolsRootMenuItem();
-            if (toolsRoot == null) return false;
+            if (toolsRoot == null)
+                return false;
 
-            var nodes = SafeTradeSuiteMenuNodes.Build(_tools);
+            var nodes = SafeTradeSuiteMenuNodes.Build(() => SafeTradeSuiteRuntime.GetOrCreateCopier().Show());
 
             _menuManager.HookToolsMenu(toolsRoot, nodes);
             return true;

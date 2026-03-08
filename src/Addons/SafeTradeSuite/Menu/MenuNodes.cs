@@ -1,20 +1,10 @@
-﻿#region Using declarations
-using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools;
-using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
-#endregion
-
-namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
+﻿namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 {
     public static class SafeTradeSuiteMenuNodes
     {
         private const string SuiteHeader = "SafeTrade Suite";
-        
-        public static class ToolKeys
-        {
-            public const string SafeTradeCopier = "SafeTradeSuite.SafeTradeCopier";
-        }
 
-        public static MenuNode[] Build(ToolRegistry tools)
+        public static MenuNode[] Build(System.Action openSafeTradeCopier)
         {
             return new[]
             {
@@ -26,7 +16,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
                         new MenuNode(
                             header: "SafeTradeCopier",
                             automationId: "SafeTradeSuite_SafeTradeCopier",
-                            onClick: () => tools.Get<SafeTradeCopierTool>(ToolKeys.SafeTradeCopier).Show()
+                            onClick: openSafeTradeCopier
                         )
                     }
                 )

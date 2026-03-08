@@ -38,6 +38,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private UIElement BuildUi(SafeCopierEngine eng)
         {
+            SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] BuildUi()");
+            
             try
             {
                 var root = new Grid
@@ -71,13 +73,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _simOnlyMode = true;
                     EnforceSimOnlyModeUi(GetSelectableAccounts());
                     ApplyConfigFromUi();
+                    RenderFollowerRowsState();
+                    RenderFlattenEnablementUi();
+                    RenderFlattenAllButtonState();
                 };
 
                 _chkSimOnly.Unchecked += (s, e) =>
                 {
                     _simOnlyMode = false;
-                    EnforceSimOnlyModeUi(accounts);
+                    EnforceSimOnlyModeUi(GetSelectableAccounts());
                     ApplyConfigFromUi();
+                    RenderFollowerRowsState();
+                    RenderFlattenEnablementUi();
+                    RenderFlattenAllButtonState();
                 };
 
                 headerArea.Children.Add(_chkSimOnly);
@@ -486,10 +494,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 foreach (var r in _followerRows)
                     LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
                 
-                EnsureInitialInstrumentSession();
-                RefreshInstrumentSelectorItems();
-                RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
+                // EnsureInitialInstrumentSession();
+                // RefreshInstrumentSelectorItems();
+                // RefreshInstrumentTabs();
+                // LoadActiveSessionToUi();
 
                 // ---------------- UI -> Engine wiring ----------------
                 void ApplyAndMaybeRewire()
@@ -506,12 +514,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _masterBox.SelectionChanged += (s, e) =>
                 {
-                    if (_suppressSessionUiEvents) return;
+                    if (_suppressSessionUiEvents)
+                        return;
+    
+                    var latestAccounts = GetSelectableAccounts();
 
                     SaveUiToActiveSession();
-                    RebuildFollowersAndRewire(eng, accounts);
-                    SaveUiToActiveSession();
-                    ApplyConfigFromUi();
+                    RebuildFollowersAndRewire(eng, latestAccounts);
+                    LoadActiveSessionToUi();
                     RenderFlattenEnablementUi();
                     RenderFlattenAllButtonState();
                 };
@@ -571,29 +581,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
 
                     AddInstrumentSession(newInstr);
+                    RefreshInstrumentSelectorItems();
                 };
 
-                _btnRemoveInstrumentTab.Click += (s, e) =>
-                {
-                    if (_activeInstrumentSession == null)
-                        return;
-
-                    if (_instrumentSessions.Count <= 1)
-                        return;
-
-                    var idx = _instrumentSessions.IndexOf(_activeInstrumentSession);
-                    if (idx < 0)
-                        return;
-
-                    var nextIdx = idx > 0 ? idx - 1 : 0;
-
-                    _instrumentSessions.Remove(_activeInstrumentSession);
-                    _activeInstrumentSession = _instrumentSessions[nextIdx];
-
-                    RefreshInstrumentTabs();
-                    LoadActiveSessionToUi();
-                    RenderFlattenAllButtonState();
-                };
+               
                 
                 RenderHeader(copyOn: eng.CopyEnabled);
                 RenderButtons(copyOn: eng.CopyEnabled);

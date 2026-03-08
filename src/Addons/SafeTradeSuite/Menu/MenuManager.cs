@@ -1,11 +1,8 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
-
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 {
@@ -37,7 +34,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 
         public MenuManager(Window controlCenterWindow)
         {
-            this._controlCenterWindow = controlCenterWindow;
+            _controlCenterWindow = controlCenterWindow;
         }
 
         public MenuItem FindToolsRootMenuItem()
@@ -52,7 +49,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
         {
             if (toolsRoot == null) return;
 
-            this._toolsRoot = toolsRoot;
+            _toolsRoot = toolsRoot;
 
             if (!_hooked)
             {
@@ -70,7 +67,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             if (_toolsRoot == null) return;
         }
 
-        private void InjectMenuTree(MenuItem toolsRoot, MenuNode[] suiteNodes)
+        private static void InjectMenuTree(MenuItem toolsRoot, MenuNode[] suiteNodes)
         {
             if (toolsRoot == null) return;
             if (suiteNodes == null || suiteNodes.Length == 0) return;
@@ -85,7 +82,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             }
         }
 
-        private void EnsureSuiteSeparator(MenuItem toolsRoot)
+        private static void EnsureSuiteSeparator(MenuItem toolsRoot)
         {
             var existing = FindChildSeparatorByAutomationId(toolsRoot, SuiteSeparatorAutomationId);
             if (existing != null) return;
@@ -95,7 +92,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             toolsRoot.Items.Add(sep);
         }
 
-        private void EnsureNode(ItemsControl parent, MenuNode node, MenuItem refMi)
+        private static void EnsureNode(ItemsControl parent, MenuNode node, MenuItem refMi)
         {
             if (parent == null || node == null) return;
 
@@ -146,7 +143,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             }
         }
 
-        private MenuItem FindFirstNativeMenuItem(MenuItem toolsRoot)
+        private static MenuItem FindFirstNativeMenuItem(MenuItem toolsRoot)
         {
             // Use first menu item that is not our suite root as a font/style reference
             foreach (var obj in toolsRoot.Items)
@@ -168,7 +165,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             return null;
         }
 
-        private void ApplyMenuStyleFromReference(MenuItem target, MenuItem reference)
+        private static void ApplyMenuStyleFromReference(MenuItem target, MenuItem reference)
         {
             if (target == null || reference == null) return;
 
@@ -178,7 +175,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             target.FontWeight = reference.FontWeight;
         }
 
-        private Separator FindChildSeparatorByAutomationId(MenuItem parent, string automationId)
+        private static Separator FindChildSeparatorByAutomationId(MenuItem parent, string automationId)
         {
             if (parent == null) return null;
 
@@ -194,7 +191,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             return null;
         }
 
-        private MenuItem FindChildMenuItemByAutomationId(ItemsControl parent, string automationId)
+        private static MenuItem FindChildMenuItemByAutomationId(ItemsControl parent, string automationId)
         {
             if (parent == null || string.IsNullOrWhiteSpace(automationId)) return null;
 
@@ -211,7 +208,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             return null;
         }
 
-        private MenuItem FindChildMenuItemByHeader(ItemsControl parent, string headerText)
+        private static MenuItem FindChildMenuItemByHeader(ItemsControl parent, string headerText)
         {
             if (parent == null || string.IsNullOrWhiteSpace(headerText)) return null;
 

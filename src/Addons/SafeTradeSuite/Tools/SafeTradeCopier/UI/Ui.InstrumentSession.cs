@@ -40,6 +40,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SwitchToSession(session);
         }
         
+        private void SwitchToSession(InstrumentSession session)
+        {
+            if (session == null) return;
+            if (ReferenceEquals(_activeInstrumentSession, session)) return;
+
+            SaveUiToActiveSession();
+            _activeInstrumentSession = session;
+            LoadActiveSessionToUi();
+        }
         
         private void SaveUiToActiveSession()
         {
