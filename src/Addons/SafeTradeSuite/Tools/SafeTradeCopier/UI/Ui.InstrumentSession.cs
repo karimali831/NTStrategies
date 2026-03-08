@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,6 +18,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_instrumentTabs == null)
                 return;
 
+            SyncSessionsToAvailableInstruments();
+
             _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
             _instrumentTabs.Items.Clear();
 
@@ -26,12 +29,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (string.IsNullOrWhiteSpace(headerText))
                     headerText = "(instrument)";
 
-                var textBlock = new TextBlock
-                {
-                    Text = headerText,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
                 var closeButton = new Button
                 {
                     Content = "×",
@@ -39,41 +36,50 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Height = 16,
                     Padding = new Thickness(0),
                     Margin = new Thickness(6, 0, 0, 0),
-                    Opacity = 0,
+                    Visibility = Visibility.Collapsed,
                     Focusable = false,
                     Tag = session,
                     ToolTip = "Remove instrument",
                     Background = Brushes.Transparent,
                     BorderThickness = new Thickness(0),
+                    Foreground = SystemColors.ControlTextBrush,
+                    HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
-                closeButton.Click -= OnInstrumentTabCloseClick;
                 closeButton.Click += OnInstrumentTabCloseClick;
 
-                var headerBorder = new Border
+                var textBlock = new TextBlock
                 {
-                    Background = Brushes.Transparent,
-                    Padding = new Thickness(0)
+                    Text = headerText,
+                    VerticalAlignment = VerticalAlignment.Center
                 };
 
                 var headerPanel = new StackPanel
                 {
-                    Orientation = Orientation.Horizontal
+                    Orientation = Orientation.Horizontal,
+                    Margin = new Thickness(0)
                 };
 
                 headerPanel.Children.Add(textBlock);
                 headerPanel.Children.Add(closeButton);
-                headerBorder.Child = headerPanel;
 
                 var tab = new TabItem
                 {
-                    Header = headerBorder,
+                    Header = headerPanel,
                     Tag = session
                 };
 
-                tab.MouseEnter += (s, e) => closeButton.Opacity = 1.0;
-                tab.MouseLeave += (s, e) => closeButton.Opacity = 0.0;
+                tab.MouseEnter += (s, e) =>
+                {
+                    if (_instrumentSessions.Count > 1)
+                        closeButton.Visibility = Visibility.Visible;
+                };
+
+                tab.MouseLeave += (s, e) =>
+                {
+                    closeButton.Visibility = Visibility.Collapsed;
+                };
 
                 _instrumentTabs.Items.Add(tab);
 
@@ -97,6 +103,87 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             _instrumentTabs.SelectionChanged += OnInstrumentTabsSelectionChanged;
+        }
+                
+        private void SyncSessionsToAvailableInstruments()
+        {
+            var available = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var instrument in GetAvailableInstruments())
+            {
+                var normalized = NormalizeInstrumentName(instrument);
+                if (IsValidInstrumentName(normalized))
+                    available.Add(normalized);
+            }
+
+            if (_instrumentSelector != null)
+            {
+                foreach (var obj in _instrumentSelector.Items)
+                {
+                    var normalized = NormalizeInstrumentName(obj as string);
+                    if (IsValidInstrumentName(normalized))
+                        available.Add(normalized);
+                }
+            }
+
+            // remove blank placeholders once real instruments exist
+            if (available.Count > 0)
+            {
+                _instrumentSessions.RemoveAll(x =>
+                    x != null &&
+                    string.IsNullOrWhiteSpace(NormalizeInstrumentName(x.InstrumentName)));
+            }
+
+            foreach (var instrument in available)
+            {
+                var exists = _instrumentSessions.Any(x =>
+                    string.Equals(
+                        NormalizeInstrumentName(x?.InstrumentName),
+                        instrument,
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (!exists)
+                {
+                    _instrumentSessions.Add(new InstrumentSession
+                    {
+                        InstrumentName = instrument
+                    });
+                }
+            }
+
+            // de-dupe sessions by instrument name
+            var deduped = _instrumentSessions
+                .Where(x => x != null)
+                .GroupBy(x => NormalizeInstrumentName(x.InstrumentName), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            _instrumentSessions.Clear();
+            _instrumentSessions.AddRange(deduped);
+
+            if (_instrumentSessions.Count == 0)
+            {
+                _instrumentSessions.Add(new InstrumentSession
+                {
+                    InstrumentName = ""
+                });
+            }
+
+            if (_activeInstrumentSession != null)
+            {
+                var activeName = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
+                var match = _instrumentSessions.FirstOrDefault(x =>
+                    string.Equals(
+                        NormalizeInstrumentName(x?.InstrumentName),
+                        activeName,
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (match != null)
+                    _activeInstrumentSession = match;
+            }
+
+            if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
+                _activeInstrumentSession = _instrumentSessions[0];
         }
         
         private void OnInstrumentTabCloseClick(object sender, RoutedEventArgs e)
@@ -126,14 +213,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             LoadActiveSessionToUi();
         }
 
-        private void ActivateOrCreateInstrumentSession(string instrumentName)
+        private void ActivateOrCreateInstrumentSession(string instrumentName, bool refreshSelector = true)
         {
             var normalized = NormalizeInstrumentName(instrumentName);
             if (!IsValidInstrumentName(normalized))
                 return;
 
-            SaveUiToActiveSession();
             RememberInstrument(normalized);
+
+            // remove placeholder empty sessions once a real instrument is chosen
+            _instrumentSessions.RemoveAll(x =>
+                x != null &&
+                string.IsNullOrWhiteSpace(NormalizeInstrumentName(x.InstrumentName)));
 
             var existing = _instrumentSessions.FirstOrDefault(x =>
                 string.Equals(
@@ -143,12 +234,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (existing != null)
             {
-                _activeInstrumentSession = existing;
-                RefreshInstrumentSelectorItems();
+                if (!ReferenceEquals(_activeInstrumentSession, existing))
+                {
+                    SaveUiToActiveSession();
+                    _activeInstrumentSession = existing;
+                }
+
+                if (refreshSelector)
+                    RefreshInstrumentSelectorItems();
+
                 RefreshInstrumentTabs();
                 LoadActiveSessionToUi();
                 return;
             }
+
+            SaveUiToActiveSession();
 
             var session = new InstrumentSession
             {
@@ -161,7 +261,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentSessions.Add(session);
             _activeInstrumentSession = session;
 
-            RefreshInstrumentSelectorItems();
+            if (refreshSelector)
+                RefreshInstrumentSelectorItems();
+
             RefreshInstrumentTabs();
             LoadActiveSessionToUi();
         }
@@ -184,16 +286,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (idx < 0)
                 return;
 
-            _instrumentSessions.Remove(sessionToRemove);
+            _instrumentSessions.RemoveAt(idx);
 
-            if (!IsInstrumentUsedByAnySession(instrumentToMaybeForget))
+            if (!IsInstrumentUsedByAnySession(instrumentToMaybeForget, sessionToRemove))
                 ForgetInstrument(instrumentToMaybeForget);
 
-            var nextIdx = Math.Min(idx, _instrumentSessions.Count - 1);
-            _activeInstrumentSession = nextIdx >= 0 ? _instrumentSessions[nextIdx] : null;
-
-            if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
-                _activeInstrumentSession = _instrumentSessions[0];
+            if (_instrumentSessions.Count > 0)
+            {
+                var nextIdx = Math.Min(idx, _instrumentSessions.Count - 1);
+                _activeInstrumentSession = _instrumentSessions[nextIdx];
+            }
+            else
+            {
+                _activeInstrumentSession = null;
+            }
 
             RefreshInstrumentSelectorItems();
             RefreshInstrumentTabs();

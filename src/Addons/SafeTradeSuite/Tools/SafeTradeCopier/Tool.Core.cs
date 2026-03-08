@@ -121,11 +121,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (_allowWindowClose) return;
+            if (_allowWindowClose)
+                return;
 
-            // X button hides (keeps tool alive)
             e.Cancel = true;
-            _window?.Hide();
+            HardClose();
         }
 
         private void OnWindowClosed(object sender, EventArgs e)
@@ -136,6 +136,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 CloseInternal(closeWindow: false); // already closed
             }
         }
+        
 
         private void CloseInternal(bool closeWindow)
         {
@@ -164,6 +165,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _window = null;
             _uiDispatcher = null;
+            _allowWindowClose = false;
 
             // Clear UI refs / state
             _masterBox = null;

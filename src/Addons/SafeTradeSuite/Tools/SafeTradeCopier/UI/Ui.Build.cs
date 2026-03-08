@@ -299,15 +299,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var followersStack = new StackPanel { Orientation = Orientation.Vertical };
 
-                followersStack.Children.Add(new TextBlock
+                var followersTitleRow = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+                followersTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                followersTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var followersTitleText = new TextBlock
                 {
                     Text = "Followers (override qty/ATM per account)",
                     FontSize = 13,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = SystemColors.WindowTextBrush,
-                    Margin = new Thickness(0, 0, 0, 6)
-                });
-                
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                _btnCopyOn = new Button
+                {
+                    Height = 28,
+                    MinWidth = 120,
+                    Padding = new Thickness(10, 2, 10, 2),
+                    Margin = new Thickness(10, 0, 0, 0),
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Content = eng.CopyEnabled ? "● Armed" : "● Disarmed",
+                    Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon
+                };
+
+                Grid.SetColumn(followersTitleText, 0);
+                Grid.SetColumn(_btnCopyOn, 1);
+
+                followersTitleRow.Children.Add(followersTitleText);
+                followersTitleRow.Children.Add(_btnCopyOn);
+
+                followersStack.Children.Add(followersTitleRow);
                 followersStack.Children.Add(BuildFollowerHeaderRow());
 
                 _followersPanel = new StackPanel { Orientation = Orientation.Vertical };
@@ -328,7 +353,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 // ---------------- Copier buttons + Status ----------------
                 var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
-                bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status label
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status box
@@ -342,26 +366,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(0, 0, 6, 6),
                     HorizontalAlignment = HorizontalAlignment.Stretch
                 };
-
-                _btnCopyOn = new Button
-                {
-                    Content = eng.CopyEnabled ? "Armed" : "Disarmed",
-                    Height = 44,
-                    MinWidth = 140,
-                    Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon,
-                    Foreground = Brushes.White,
-                    Margin = new Thickness(0, 0, 6, 6)
-                };
-
-                var btnClose = new Button
-                {
-                    Content = "Close",
-                    Height = 44,
-                    MinWidth = 140,
-                    Background = Brushes.DimGray,
-                    Foreground = Brushes.White,
-                    Margin = new Thickness(6, 0, 0, 6)
-                };
+                
 
                 _statusBox = new TextBox
                 {
@@ -380,26 +385,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(0, 0, 0, 4)
                 };
 
-                Grid.SetRow(_btnCopyOn, 0);
-                Grid.SetColumn(_btnCopyOn, 0);
-
-                Grid.SetRow(btnClose, 0);
-                Grid.SetColumn(btnClose, 1);
-
+   
                 Grid.SetRow(_instrumentTabs, 1);
                 Grid.SetColumn(_instrumentTabs, 0);
                 Grid.SetColumnSpan(_instrumentTabs, 2);
-
-                Grid.SetRow(statusLbl, 2);
+                
+                Grid.SetRow(statusLbl, 1);
                 Grid.SetColumn(statusLbl, 0);
-                Grid.SetColumnSpan(statusLbl, 2);
+                Grid.SetColumnSpan(statusLbl, 3);
 
-                Grid.SetRow(_statusBox, 3);
+                Grid.SetRow(_statusBox, 2);
                 Grid.SetColumn(_statusBox, 0);
-                Grid.SetColumnSpan(_statusBox, 2);
-
-                bottom.Children.Add(_btnCopyOn);
-                bottom.Children.Add(btnClose);
+                Grid.SetColumnSpan(_statusBox, 3);
+                
                 bottom.Children.Add(_instrumentTabs);
                 bottom.Children.Add(statusLbl);
                 bottom.Children.Add(_statusBox);
@@ -452,8 +450,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 void RenderButtons(bool copyOn)
                 {
+                    if (_btnCopyOn == null)
+                        return;
+
                     _btnCopyOn.IsEnabled = true;
-                    _btnCopyOn.Content = copyOn ? "Armed" : "Disarmed";
+                    _btnCopyOn.Content = copyOn ? "● Armed" : "● Disarmed";
                     _btnCopyOn.Background = copyOn ? Brushes.DarkGreen : Brushes.Maroon;
                 }
 
@@ -527,7 +528,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (!IsValidInstrumentName(instrumentName))
                         return;
 
-                    ActivateOrCreateInstrumentSession(instrumentName);
+                    ActivateOrCreateInstrumentSession(instrumentName, refreshSelector: false);
 
                     if (eng.CopyEnabled)
                         eng.SetCopyEnabled(true);
@@ -552,7 +553,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    ActivateOrCreateInstrumentSession(typed);
+                    ActivateOrCreateInstrumentSession(typed, refreshSelector: true);
                     RenderFlattenAllButtonState();
                 };
                 
@@ -568,7 +569,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (!IsValidInstrumentName(instrumentName))
                         return;
 
-                    ActivateOrCreateInstrumentSession(instrumentName);
+                    ActivateOrCreateInstrumentSession(instrumentName, refreshSelector: true);
                     RenderFlattenEnablementUi();
                     RenderFlattenAllButtonState();
                 };
@@ -592,11 +593,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     eng.SetCopyEnabled(true);
                 };
 
-                btnClose.Click += (s, e) =>
-                {
-                    HardClose();
-                };
-                
                 RenderHeader(copyOn: eng.CopyEnabled);
                 RenderButtons(copyOn: eng.CopyEnabled);
                 RenderFlattenAllButtonState();
