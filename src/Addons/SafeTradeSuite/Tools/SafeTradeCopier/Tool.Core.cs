@@ -15,7 +15,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static readonly object WindowGate = new object();
         private Dispatcher _uiDispatcher;
         private bool _allowWindowClose;
-
+        private bool _isClosing;
         private SafeCopierEngine _engine;
         private ComboBox _masterBox;
         private ComboBox _instrumentSelector;
@@ -56,6 +56,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
+                _isClosing = false;
                 _engine = new SafeCopierEngine();
 
                 try
@@ -121,19 +122,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            _isClosing = true;
+
             if (_allowWindowClose)
                 return;
 
-            e.Cancel = true;
-            HardClose();
+            // Treat the window X as a real close now
+            _allowWindowClose = true;
+            UnsubscribeUiAccountEvents(Account.All);
         }
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
-            // If it closes for real, ensure full cleanup
             lock (WindowGate)
             {
-                CloseInternal(closeWindow: false); // already closed
+                CloseInternal(closeWindow: false);
             }
         }
         
@@ -141,6 +144,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void CloseInternal(bool closeWindow)
         {
             SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] CloseInternal(closeWindow={closeWindow})");
+            
+            _isClosing = true;
             UnhookConnectionStatusUpdates();
 
             if (_engine != null)

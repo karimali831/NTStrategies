@@ -31,12 +31,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Background = TableRowAltBrush()
                 };
                 
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
                 
                 var statusDot = new Border
@@ -86,10 +86,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var pnl = new TextBlock
                 {
-                    Text = "R: 0.00  U: 0.00",
+                    Text = "R $0.00   •   U $0.00",
                     VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = SystemColors.ControlTextBrush,
-                    Margin = new Thickness(6, 0, 6, 0)
+                    Foreground = Brushes.DimGray,
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12,
+                    Margin = new Thickness(6, 0, 6, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
                 };
                 
                 var pnlBar = new ProgressBar
@@ -106,9 +109,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var pnlBarStatusText = new TextBlock
                 {
                     Text = "",
-                    Margin = new Thickness(6, 2, 6, 0),
-                    Foreground = SystemColors.ControlTextBrush,
-                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.DimGray,
+                    Margin = new Thickness(6, 0, 6, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
                     Visibility = Visibility.Collapsed
                 };
 
@@ -116,7 +122,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Content = "Flatten",
                     Height = 24,
-                    Foreground = Brushes.White
+                    Width = 96,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
                 };
                 RenderFlattenButtonState(flatten, enabled: false);
                 
@@ -223,19 +232,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = TableHeaderBrush()
             };
 
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            
 
             AddHeaderText(g, "Status", 0);
             AddHeaderText(g, "On", 1);
             AddHeaderText(g, "Account", 2);
-            AddHeaderText(g, "Qty", 3);
-            AddHeaderText(g, "ATM", 4);
+            AddHeaderText(g, "Override Qty", 3);
+            AddHeaderText(g, "Override ATM", 4);
             AddHeaderText(g, "PnL", 5);
             AddHeaderText(g, "Flatten", 6);
 

@@ -18,8 +18,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_instrumentTabs == null)
                 return;
 
-            SyncSessionsToAvailableInstruments();
-
             _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
             _instrumentTabs.Items.Clear();
 
@@ -32,53 +30,57 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var closeButton = new Button
                 {
                     Content = "×",
-                    Width = 16,
-                    Height = 16,
-                    Padding = new Thickness(0),
-                    Margin = new Thickness(6, 0, 0, 0),
-                    Visibility = Visibility.Collapsed,
-                    Focusable = false,
                     Tag = session,
-                    ToolTip = "Remove instrument",
+                    Width = 18,
+                    Height = 18,
+                    MinWidth = 18,
+                    MinHeight = 18,
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(2, 0, 0, 0),
+                    Visibility = Visibility.Visible,
+                    Focusable = false,
                     Background = Brushes.Transparent,
                     BorderThickness = new Thickness(0),
-                    Foreground = SystemColors.ControlTextBrush,
+                    Foreground = Brushes.DimGray,
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
                     HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    ToolTip = "Remove instrument"
                 };
 
+                closeButton.MouseEnter += (s,e) => closeButton.Foreground = Brushes.Red;
+                closeButton.MouseLeave += (s,e) => closeButton.Foreground = Brushes.DimGray;
                 closeButton.Click += OnInstrumentTabCloseClick;
 
                 var textBlock = new TextBlock
                 {
                     Text = headerText,
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
                 };
 
-                var headerPanel = new StackPanel
+                var headerPanel = new DockPanel
                 {
-                    Orientation = Orientation.Horizontal,
+                    LastChildFill = false,
+                    MinWidth = 92,
                     Margin = new Thickness(0)
                 };
 
-                headerPanel.Children.Add(textBlock);
+                DockPanel.SetDock(closeButton, Dock.Right);
+                DockPanel.SetDock(textBlock, Dock.Left);
+
                 headerPanel.Children.Add(closeButton);
+                headerPanel.Children.Add(textBlock);
 
                 var tab = new TabItem
                 {
                     Header = headerPanel,
-                    Tag = session
-                };
-
-                tab.MouseEnter += (s, e) =>
-                {
-                    if (_instrumentSessions.Count > 1)
-                        closeButton.Visibility = Visibility.Visible;
-                };
-
-                tab.MouseLeave += (s, e) =>
-                {
-                    closeButton.Visibility = Visibility.Collapsed;
+                    Tag = session,
+                    MinWidth = 92,
+                    Padding = new Thickness(6, 2, 6, 2)
                 };
 
                 _instrumentTabs.Items.Add(tab);
@@ -210,6 +212,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             SaveUiToActiveSession();
             _activeInstrumentSession = session;
+
+            RefreshInstrumentSelectorItems();
+            RefreshInstrumentTabs();
             LoadActiveSessionToUi();
         }
 
@@ -370,7 +375,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _instrumentSelector.Text = instrumentName;
                     _instrumentSelector.SelectedItem = instrumentName;
 
-                    _masterBox.SelectedItem = _activeInstrumentSession.MasterAccount;
+                    var targetMaster = _activeInstrumentSession.MasterAccount;
+                    if (targetMaster == null)
+                        targetMaster = _masterBox.SelectedItem as Account ?? GetSelectableAccounts().FirstOrDefault(IsSimAccount) ?? GetSelectableAccounts().FirstOrDefault();
+
+                    _masterBox.SelectedItem = targetMaster;
+
+                    if (_activeInstrumentSession.MasterAccount == null)
+                        _activeInstrumentSession.MasterAccount = targetMaster;
                     _masterQtyBox.Text =
                         (_activeInstrumentSession.MasterQty > 0 ? _activeInstrumentSession.MasterQty : 1).ToString();
                     _masterAtmBox.SelectedItem = _activeInstrumentSession.MasterAtm ?? "None";

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows.Media;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -24,31 +25,52 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         //
         //     return $"{prefix} PnL: Realized {FmtUsd(realized)} | Unrealized {FmtUsd(unrealized)}";
         // }
-
+        
         private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
         {
-            var txt = "";
-            if (realized != 0 || unrealized != 0)
-            {
-                if (!shortened)
-                    txt += $"{prefix} PnL: ";
-                
-                if (realized != 0)
-                {
-                    txt += shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
-        
-                    if (unrealized != 0)
-                        txt += " | ";
-                }
-                
-                if (unrealized != 0)
-                {
-                    txt += shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
-                }
-            }
-        
-            return txt;
+            if (shortened)
+                return $"R {FmtUsd(realized)}   •   U {FmtUsd(unrealized)}";
+
+            return $"{prefix}   R {FmtUsd(realized)}   •   U {FmtUsd(unrealized)}";
         }
+        
+        private static Brush GetPnlBrush(double realized, double unrealized)
+        {
+            var total = realized + unrealized;
+
+            if (total > 0.009)
+                return Brushes.DarkGreen;
+
+            if (total < -0.009)
+                return Brushes.Firebrick;
+
+            return Brushes.DimGray;
+        }
+
+        // private static string FormatPnL(double realized, double unrealized, string prefix, bool shortened)
+        // {
+        //     var txt = "";
+        //     if (realized != 0 || unrealized != 0)
+        //     {
+        //         if (!shortened)
+        //             txt += $"{prefix} PnL: ";
+        //         
+        //         if (realized != 0)
+        //         {
+        //             txt += shortened ? $"R: {FmtUsd(realized)}" : $"Realized {FmtUsd(realized)}";
+        //
+        //             if (unrealized != 0)
+        //                 txt += " | ";
+        //         }
+        //         
+        //         if (unrealized != 0)
+        //         {
+        //             txt += shortened ? $"U: {FmtUsd(unrealized)}" : $"Unrealized {FmtUsd(unrealized)}";
+        //         }
+        //     }
+        //
+        //     return txt;
+        // }
         
         private static double Clamp01(double x)
         {

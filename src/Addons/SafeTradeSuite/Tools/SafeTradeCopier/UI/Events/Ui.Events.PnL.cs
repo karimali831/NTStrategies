@@ -13,10 +13,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RenderPnlUi()
         {
-            var display = _uiDispatcher ?? _window?.Dispatcher;
+            if (_isClosing)
+                return;
 
-            display?.InvokeAsync(() =>
+            var display = _uiDispatcher ?? _window?.Dispatcher;
+            if (display == null || display.HasShutdownStarted || display.HasShutdownFinished)
+                return;
+
+            display.InvokeAsync(() =>
             {
+                if (_isClosing || _window == null)
+                    return;
                 var totalR = 0.0;
                 var totalU = 0.0;
 
@@ -36,9 +43,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     totalR += mr;
                     totalU += mu;
-
+                    
                     if (_masterPnlText != null)
+                    {
                         _masterPnlText.Text = FormatPnL(mr, mu, "Master", shortened: false);
+                        _masterPnlText.Foreground = GetPnlBrush(mr, mu);
+                    }
 
                     var instr = GetInstrument();
 
@@ -94,8 +104,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalR += r;
                     totalU += u;
 
-                    if (row.PnlText != null)
-                        row.PnlText.Text = FormatPnL(r, u, "Total", shortened: true);
+                    if (_totalPnlText != null)
+                    {
+                        _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", shortened: false);
+                        _totalPnlText.Foreground = GetPnlBrush(totalR, totalU);
+                    }
 
                     var instr = GetInstrument();
 
@@ -133,7 +146,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (_totalPnlText != null)
+                {
                     _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", shortened: false);
+                    _totalPnlText.Foreground = GetPnlBrush(totalR, totalU);
+                }
                 
             }, DispatcherPriority.Background);
         }
