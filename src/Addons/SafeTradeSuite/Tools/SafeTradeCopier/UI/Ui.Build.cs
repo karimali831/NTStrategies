@@ -139,11 +139,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
 
                 _masterBox = new ComboBox { Height = 28, Margin = new Thickness(0, 0, 0, 6) };
+                var instrumentRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+                instrumentRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                instrumentRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
                 _instrumentSelector = new ComboBox
                 {
                     Height = 28,
-                    Margin = new Thickness(0, 0, 0, 8)
+                    Margin = new Thickness(0, 0, 6, 0),
+                    IsEditable = true,
+                    IsTextSearchEnabled = false,
+                    StaysOpenOnEdit = true
                 };
+
+                _btnAddInstrumentTab = new Button
+                {
+                    Content = "+",
+                    Width = 28,
+                    Height = 28,
+                    ToolTip = "Add instrument tab"
+                };
+
+                Grid.SetColumn(_instrumentSelector, 0);
+                Grid.SetColumn(_btnAddInstrumentTab, 1);
+                instrumentRow.Children.Add(_instrumentSelector);
+                instrumentRow.Children.Add(_btnAddInstrumentTab);
 
                 // Order buttons row (Buy / Sell / Flatten All)
                 var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
@@ -256,7 +276,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterStack.Children.Add(new TextBlock { Text = "Master account:", Foreground = SystemColors.WindowTextBrush });
                 masterStack.Children.Add(_masterBox);
                 masterStack.Children.Add(new TextBlock { Text = "Instrument:", Foreground = SystemColors.WindowTextBrush });
-                masterStack.Children.Add(_instrumentSelector);
+                masterStack.Children.Add(instrumentRow);
                 masterStack.Children.Add(orderRow);
                 masterStack.Children.Add(qaRow);
                 masterStack.Children.Add(_masterPnlText);
@@ -315,7 +335,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 
                 _instrumentTabs = new TabControl
                 {
@@ -324,23 +343,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     HorizontalAlignment = HorizontalAlignment.Stretch
                 };
 
-                _btnAddInstrumentTab = new Button
-                {
-                    Content = "+",
-                    Width = 28,
-                    Height = 28,
-                    Margin = new Thickness(0, 0, 6, 6),
-                    ToolTip = "Add instrument tab"
-                };
-
-                _btnRemoveInstrumentTab = new Button
-                {
-                    Content = "×",
-                    Width = 28,
-                    Height = 28,
-                    Margin = new Thickness(0, 0, 0, 6),
-                    ToolTip = "Remove active instrument tab"
-                };
+     
 
                 _btnCopyOn = new Button
                 {
@@ -382,7 +385,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetColumnSpan(_btnCopyOn, 2);
 
                 Grid.SetRow(btnClose, 1);
-                Grid.SetColumn(btnClose, 2);
+                Grid.SetColumn(btnClose, 1);
 
                 Grid.SetRow(statusLbl, 2);
                 Grid.SetColumn(statusLbl, 0);
@@ -394,17 +397,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 Grid.SetRow(_instrumentTabs, 0);
                 Grid.SetColumn(_instrumentTabs, 0);
-
-                Grid.SetRow(_btnAddInstrumentTab, 0);
-                Grid.SetColumn(_btnAddInstrumentTab, 1);
-
-                Grid.SetRow(_btnRemoveInstrumentTab, 0);
-                Grid.SetColumn(_btnRemoveInstrumentTab, 2);
                 
                 bottom.Children.Add(_instrumentTabs);
-                bottom.Children.Add(_btnAddInstrumentTab);
-                bottom.Children.Add(_btnRemoveInstrumentTab);
-                
                 bottom.Children.Add(_btnCopyOn);
                 bottom.Children.Add(btnClose);
                 bottom.Children.Add(statusLbl);
@@ -493,11 +487,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
                 foreach (var r in _followerRows)
                     LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
-                
-                // EnsureInitialInstrumentSession();
-                // RefreshInstrumentSelectorItems();
-                // RefreshInstrumentTabs();
-                // LoadActiveSessionToUi();
 
                 // ---------------- UI -> Engine wiring ----------------
                 void ApplyAndMaybeRewire()
@@ -527,19 +516,60 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 
                 _masterBox.DropDownOpened += (s, e) => UpdateMasterComboItemEnablement();
-
                 _instrumentSelector.SelectionChanged += (s, e) =>
                 {
                     if (_suppressSessionUiEvents)
                         return;
 
-                    SaveUiToActiveSession();
-                    RefreshInstrumentTabs();
-                    ApplyConfigFromUi();
+                    var instrumentName = GetSelectedInstrumentName();
+                    if (string.IsNullOrWhiteSpace(instrumentName))
+                        return;
+
+                    if (!IsValidInstrumentName(instrumentName))
+                        return;
+
+                    ActivateOrCreateInstrumentSession(instrumentName);
 
                     if (eng.CopyEnabled)
                         eng.SetCopyEnabled(true);
 
+                    RenderFlattenEnablementUi();
+                    RenderFlattenAllButtonState();
+                };
+                
+                _btnAddInstrumentTab.Click += (s, e) =>
+                {
+                    var typed = GetSelectedInstrumentName();
+
+                    if (string.IsNullOrWhiteSpace(typed))
+                    {
+                        ShowFriendlyError("Instrument required", "Please type or select an instrument first.");
+                        return;
+                    }
+
+                    if (!IsValidInstrumentName(typed))
+                    {
+                        ShowFriendlyError("Invalid instrument", "Please enter a valid NinjaTrader instrument, for example: NQ 03-26");
+                        return;
+                    }
+
+                    ActivateOrCreateInstrumentSession(typed);
+                    RenderFlattenAllButtonState();
+                };
+                
+                _instrumentSelector.LostKeyboardFocus += (s, e) =>
+                {
+                    if (_suppressSessionUiEvents)
+                        return;
+
+                    var instrumentName = GetSelectedInstrumentName();
+                    if (string.IsNullOrWhiteSpace(instrumentName))
+                        return;
+
+                    if (!IsValidInstrumentName(instrumentName))
+                        return;
+
+                    ActivateOrCreateInstrumentSession(instrumentName);
                     RenderFlattenEnablementUi();
                     RenderFlattenAllButtonState();
                 };
@@ -568,27 +598,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     HardClose();
                 };
                 
-                _btnAddInstrumentTab.Click += (s, e) =>
-                {
-                    var available = GetAvailableInstruments();
-                    var newInstr = available.FirstOrDefault(i =>
-                        !_instrumentSessions.Any(x => string.Equals(x.InstrumentName, i, StringComparison.OrdinalIgnoreCase)));
-
-                    if (string.IsNullOrWhiteSpace(newInstr))
-                    {
-                        eng.Log("No additional active instruments available to add.");
-                        return;
-                    }
-
-                    AddInstrumentSession(newInstr);
-                    RefreshInstrumentSelectorItems();
-                };
-
-               
-                
                 RenderHeader(copyOn: eng.CopyEnabled);
                 RenderButtons(copyOn: eng.CopyEnabled);
                 RenderFlattenAllButtonState();
+                
+                EnsureInitialInstrumentSession();
+                RefreshInstrumentSelectorItems();
+                RefreshInstrumentTabs();
+                LoadActiveSessionToUi();
                 
                 return new ScrollViewer
                 {

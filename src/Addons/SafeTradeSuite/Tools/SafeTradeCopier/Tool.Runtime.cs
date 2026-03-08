@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
@@ -9,10 +8,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
     internal static class SafeTradeSuiteRuntime
     {
         private static readonly object Gate = new object();
-        private static readonly HashSet<string> ChartInstruments =
+        private static readonly object CopierGate = new object();
+
+        private static readonly HashSet<string> SavedInstruments =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly object CopierGate = new object();
         private static SafeTradeCopierTool _copier;
 
         public static SafeTradeCopierTool GetOrCreateCopier()
@@ -52,45 +52,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
             }
         }
 
-        public static void RegisterChartInstrument(string instrumentName)
+        public static void RememberInstrument(string instrumentName)
         {
-            var n = (instrumentName ?? "").Trim();
+            var n = NormalizeInstrumentName(instrumentName);
             if (string.IsNullOrWhiteSpace(n))
                 return;
 
             lock (Gate)
             {
-                if (ChartInstruments.Add(n))
-                    PrintLog("Chart instrument registered: " + n);
+                SavedInstruments.Add(n);
             }
         }
 
-        public static void RemoveChartInstrument(string instrumentName)
+        public static void ForgetInstrument(string instrumentName)
         {
-            var n = (instrumentName ?? "").Trim();
+            var n = NormalizeInstrumentName(instrumentName);
             if (string.IsNullOrWhiteSpace(n))
                 return;
 
             lock (Gate)
             {
-                if (ChartInstruments.Remove(n))
-                    PrintLog("Chart instrument removed: " + n);
+                SavedInstruments.Remove(n);
             }
         }
 
-        public static List<string> GetChartInstrumentsSnapshot()
+        public static List<string> GetSavedInstrumentsSnapshot()
         {
             lock (Gate)
             {
-                return ChartInstruments
+                return SavedInstruments
                     .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Select(x => x.Trim())
-                    .Where(x => !string.Equals(x, "Chart", StringComparison.OrdinalIgnoreCase))
-                    .Where(x => Instrument.GetInstrument(x) != null)
+                    .Select(NormalizeInstrumentName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(x => x)
                     .ToList();
             }
+        }
+
+        private static string NormalizeInstrumentName(string instrumentName)
+        {
+            return (instrumentName ?? "").Trim().ToUpperInvariant();
         }
 
         public static void PrintLog(string msg)

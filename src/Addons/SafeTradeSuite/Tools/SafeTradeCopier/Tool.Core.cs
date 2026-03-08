@@ -75,32 +75,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     };
 
                     _uiDispatcher = _window.Dispatcher;
-                    _window.Closing += OnWindowClosing;
-                    _window.Closed += OnWindowClosed;
-
-                    _window.Show();
-                    SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] New window shown.");
-                    HookConnectionStatusUpdates();
-
                     _uiDispatcher.InvokeAsync(() =>
                     {
                         EnsureInitialInstrumentSession();
-                        StartInstrumentRefreshTimer();
-
-                        RefreshInstrumentSelectorIfNeeded();
-
-                        if (_activeInstrumentSession != null &&
-                            string.IsNullOrWhiteSpace(_activeInstrumentSession.InstrumentName))
-                        {
-                            var first = GetSelectedInstrumentName();
-                            if (!string.IsNullOrWhiteSpace(first))
-                                _activeInstrumentSession.InstrumentName = first;
-                        }
-
+                        // EnsureStartupInstrumentSelection();
+                        RefreshInstrumentSelectorItems();
                         RefreshInstrumentTabs();
                         LoadActiveSessionToUi();
                         RenderFlattenAllButtonState();
                     }, DispatcherPriority.Loaded);
+                    
+                    _window.Closing += OnWindowClosing;
+                    _window.Closed += OnWindowClosed;
+
+                    _window.Show();
+                    HookConnectionStatusUpdates();
                 }
                 catch (Exception ex)
                 {
@@ -160,13 +149,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _engine = null;
             }
 
-            if (_instrumentRefreshTimer != null)
-            {
-                _instrumentRefreshTimer.Stop();
-                _instrumentRefreshTimer.Tick -= OnInstrumentRefreshTimerTick;
-                _instrumentRefreshTimer = null;
-            }
-
             // Close window (optionally)
             if (closeWindow && _window != null)
             {
@@ -206,101 +188,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentTabs = null;
             _btnAddInstrumentTab = null;
-            _btnRemoveInstrumentTab = null;
             _activeInstrumentSession = null;
             _suppressSessionUiEvents = false;
             _instrumentSessions.Clear();
-        }
-
-        private void StartInstrumentRefreshTimer()
-        {
-            if (_uiDispatcher == null)
-                return;
-
-            if (_instrumentRefreshTimer != null)
-                return;
-
-            lock (WindowGate)
-            {
-                _instrumentRefreshTimer = new DispatcherTimer(
-                    TimeSpan.FromSeconds(1),
-                    DispatcherPriority.Background,
-                    OnInstrumentRefreshTimerTick,
-                    _uiDispatcher);
-            }
-
-            _instrumentRefreshTimer.Start();
-            SafeTradeSuiteRuntime.PrintLog("Instrument refresh timer started.");
-        }
-
-        private void OnInstrumentRefreshTimerTick(object sender, EventArgs e)
-        {
-            try
-            {
-                RefreshInstrumentSelectorIfNeeded();
-            }
-            catch (Exception ex)
-            {
-                LogUnhandled("OnInstrumentRefreshTimerTick()", ex);
-            }
-        }
-
-        private void RefreshInstrumentSelectorIfNeeded()
-        {
-            var latest = GetAvailableInstruments();
-
-            var changed =
-                latest.Count != _lastInstrumentSnapshot.Count ||
-                !latest.SequenceEqual(_lastInstrumentSnapshot, StringComparer.OrdinalIgnoreCase);
-
-            if (!changed)
-                return;
-
-            _lastInstrumentSnapshot = latest.ToList();
-
-            SafeTradeSuiteRuntime.PrintLog(
-                latest.Count == 0
-                    ? $"Copier[{_toolId}] Instrument selector refresh -> <none>"
-                    : $"Copier[{_toolId}] Instrument selector refresh -> {string.Join(", ", latest)}");
-
-            var selected = GetSelectedInstrumentName();
-
-            _suppressSessionUiEvents = true;
-            try
-            {
-                _instrumentSelector.ItemsSource = null;
-                _instrumentSelector.Items.Clear();
-
-                foreach (var item in latest)
-                    _instrumentSelector.Items.Add(item);
-
-                if (!string.IsNullOrWhiteSpace(selected) && _instrumentSelector.Items.Contains(selected))
-                {
-                    _instrumentSelector.SelectedItem = selected;
-                }
-                else if (_activeInstrumentSession != null &&
-                         !string.IsNullOrWhiteSpace(_activeInstrumentSession.InstrumentName) &&
-                         _instrumentSelector.Items.Contains(_activeInstrumentSession.InstrumentName))
-                {
-                    _instrumentSelector.SelectedItem = _activeInstrumentSession.InstrumentName;
-                }
-                else if (_instrumentSelector.Items.Count > 0)
-                {
-                    _instrumentSelector.SelectedIndex = 0;
-
-                    if (_activeInstrumentSession != null)
-                        _activeInstrumentSession.InstrumentName = _instrumentSelector.SelectedItem as string ?? "";
-                }
-            }
-            finally
-            {
-                _suppressSessionUiEvents = false;
-            }
-
-            RefreshInstrumentTabs();
-            ApplyConfigFromUi();
-            RenderFlattenEnablementUi();
-            RenderFlattenAllButtonState();
         }
     }
 }
