@@ -126,13 +126,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (!IsValidInstrumentName(normalized))
                         continue;
 
-                    var exists = _instrumentSessions.Any(x =>
-                        string.Equals(
-                            NormalizeInstrumentName(x?.InstrumentName),
-                            normalized,
-                            System.StringComparison.OrdinalIgnoreCase));
-
-                    if (exists)
+                    if (_instrumentSessions.Any(x =>
+                            string.Equals(
+                                NormalizeInstrumentName(x?.InstrumentName),
+                                normalized,
+                                System.StringComparison.OrdinalIgnoreCase)))
                         continue;
 
                     _instrumentSessions.Add(new InstrumentSession

@@ -328,13 +328,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 // ---------------- Copier buttons + Status ----------------
                 var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
-                bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
+                bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status label
                 bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status box
 
                 bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 
                 _instrumentTabs = new TabControl
                 {
@@ -343,12 +343,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     HorizontalAlignment = HorizontalAlignment.Stretch
                 };
 
-     
-
                 _btnCopyOn = new Button
                 {
                     Content = eng.CopyEnabled ? "Armed" : "Disarmed",
                     Height = 44,
+                    MinWidth = 140,
                     Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon,
                     Foreground = Brushes.White,
                     Margin = new Thickness(0, 0, 6, 6)
@@ -358,6 +357,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Content = "Close",
                     Height = 44,
+                    MinWidth = 140,
                     Background = Brushes.DimGray,
                     Foreground = Brushes.White,
                     Margin = new Thickness(6, 0, 0, 6)
@@ -380,29 +380,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(0, 0, 0, 4)
                 };
 
-                Grid.SetRow(_btnCopyOn, 1);
+                Grid.SetRow(_btnCopyOn, 0);
                 Grid.SetColumn(_btnCopyOn, 0);
-                Grid.SetColumnSpan(_btnCopyOn, 2);
 
-                Grid.SetRow(btnClose, 1);
+                Grid.SetRow(btnClose, 0);
                 Grid.SetColumn(btnClose, 1);
+
+                Grid.SetRow(_instrumentTabs, 1);
+                Grid.SetColumn(_instrumentTabs, 0);
+                Grid.SetColumnSpan(_instrumentTabs, 2);
 
                 Grid.SetRow(statusLbl, 2);
                 Grid.SetColumn(statusLbl, 0);
-                Grid.SetColumnSpan(statusLbl, 3);
+                Grid.SetColumnSpan(statusLbl, 2);
 
                 Grid.SetRow(_statusBox, 3);
                 Grid.SetColumn(_statusBox, 0);
-                Grid.SetColumnSpan(_statusBox, 3);
-                
-                Grid.SetRow(_instrumentTabs, 0);
-                Grid.SetColumn(_instrumentTabs, 0);
-                
-                bottom.Children.Add(_instrumentTabs);
+                Grid.SetColumnSpan(_statusBox, 2);
+
                 bottom.Children.Add(_btnCopyOn);
                 bottom.Children.Add(btnClose);
+                bottom.Children.Add(_instrumentTabs);
                 bottom.Children.Add(statusLbl);
-                
                 bottom.Children.Add(_statusBox);
 
                 Grid.SetRow(bottom, 4);

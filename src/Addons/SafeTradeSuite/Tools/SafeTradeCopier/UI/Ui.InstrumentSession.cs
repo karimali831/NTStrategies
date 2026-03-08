@@ -12,87 +12,92 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TabControl _instrumentTabs;
         private Button _btnAddInstrumentTab;
 
-    private void RefreshInstrumentTabs()
-    {
-        if (_instrumentTabs == null)
-            return;
-
-        _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
-        _instrumentTabs.Items.Clear();
-
-        foreach (var session in _instrumentSessions)
+        private void RefreshInstrumentTabs()
         {
-            var headerText = NormalizeInstrumentName(session?.InstrumentName);
-            if (string.IsNullOrWhiteSpace(headerText))
-                headerText = "(instrument)";
+            if (_instrumentTabs == null)
+                return;
 
-            var textBlock = new TextBlock
+            _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
+            _instrumentTabs.Items.Clear();
+
+            foreach (var session in _instrumentSessions)
             {
-                Text = headerText,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+                var headerText = NormalizeInstrumentName(session?.InstrumentName);
+                if (string.IsNullOrWhiteSpace(headerText))
+                    headerText = "(instrument)";
 
-            var closeButton = new Button
-            {
-                Content = "×",
-                Width = 16,
-                Height = 16,
-                Padding = new Thickness(0),
-                Margin = new Thickness(6, 0, 0, 0),
-                Opacity = 0,
-                Focusable = false,
-                Tag = session,
-                ToolTip = "Remove instrument",
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            closeButton.Click -= OnInstrumentTabCloseClick;
-            closeButton.Click += OnInstrumentTabCloseClick;
-
-            var headerPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Background = Brushes.Transparent
-            };
-
-            headerPanel.Children.Add(textBlock);
-            headerPanel.Children.Add(closeButton);
-
-            headerPanel.MouseEnter += (s, e) => closeButton.Opacity = 1.0;
-            headerPanel.MouseLeave += (s, e) => closeButton.Opacity = 0.0;
-
-            var tab = new TabItem
-            {
-                Header = headerPanel,
-                Tag = session
-            };
-
-            _instrumentTabs.Items.Add(tab);
-
-            if (ReferenceEquals(session, _activeInstrumentSession))
-                _instrumentTabs.SelectedItem = tab;
-        }
-
-        if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
-            _activeInstrumentSession = _instrumentSessions[0];
-
-        if (_instrumentTabs.SelectedItem == null && _activeInstrumentSession != null)
-        {
-            foreach (var obj in _instrumentTabs.Items)
-            {
-                if (obj is TabItem tab && ReferenceEquals(tab.Tag, _activeInstrumentSession))
+                var textBlock = new TextBlock
                 {
+                    Text = headerText,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                var closeButton = new Button
+                {
+                    Content = "×",
+                    Width = 16,
+                    Height = 16,
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(6, 0, 0, 0),
+                    Opacity = 0,
+                    Focusable = false,
+                    Tag = session,
+                    ToolTip = "Remove instrument",
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                closeButton.Click -= OnInstrumentTabCloseClick;
+                closeButton.Click += OnInstrumentTabCloseClick;
+
+                var headerBorder = new Border
+                {
+                    Background = Brushes.Transparent,
+                    Padding = new Thickness(0)
+                };
+
+                var headerPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal
+                };
+
+                headerPanel.Children.Add(textBlock);
+                headerPanel.Children.Add(closeButton);
+                headerBorder.Child = headerPanel;
+
+                var tab = new TabItem
+                {
+                    Header = headerBorder,
+                    Tag = session
+                };
+
+                tab.MouseEnter += (s, e) => closeButton.Opacity = 1.0;
+                tab.MouseLeave += (s, e) => closeButton.Opacity = 0.0;
+
+                _instrumentTabs.Items.Add(tab);
+
+                if (ReferenceEquals(session, _activeInstrumentSession))
                     _instrumentTabs.SelectedItem = tab;
-                    break;
+            }
+
+            if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
+                _activeInstrumentSession = _instrumentSessions[0];
+
+            if (_instrumentTabs.SelectedItem == null && _activeInstrumentSession != null)
+            {
+                foreach (var obj in _instrumentTabs.Items)
+                {
+                    if (obj is TabItem tab && ReferenceEquals(tab.Tag, _activeInstrumentSession))
+                    {
+                        _instrumentTabs.SelectedItem = tab;
+                        break;
+                    }
                 }
             }
-        }
 
-        _instrumentTabs.SelectionChanged += OnInstrumentTabsSelectionChanged;
-    }
+            _instrumentTabs.SelectionChanged += OnInstrumentTabsSelectionChanged;
+        }
         
         private void OnInstrumentTabCloseClick(object sender, RoutedEventArgs e)
         {
@@ -127,6 +132,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!IsValidInstrumentName(normalized))
                 return;
 
+            SaveUiToActiveSession();
             RememberInstrument(normalized);
 
             var existing = _instrumentSessions.FirstOrDefault(x =>
@@ -143,8 +149,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 LoadActiveSessionToUi();
                 return;
             }
-
-            SaveUiToActiveSession();
 
             var session = new InstrumentSession
             {
@@ -204,7 +208,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_activeInstrumentSession == null)
                     return;
 
-                _activeInstrumentSession.InstrumentName = NormalizeInstrumentName(GetSelectedInstrumentName());
+                var selectedInstrument = NormalizeInstrumentName(GetSelectedInstrumentName());
+                if (IsValidInstrumentName(selectedInstrument))
+                    _activeInstrumentSession.InstrumentName = selectedInstrument;
+
                 _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
                 _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
                 _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
