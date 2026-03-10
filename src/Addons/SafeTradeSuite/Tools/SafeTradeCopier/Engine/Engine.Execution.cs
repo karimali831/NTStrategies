@@ -28,7 +28,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 // Copy requires normal arming/safety
-                if (!_armed || !_copyEnabled) return;
+                if (!Armed || !_copyEnabled) return;
 
                 var execId = e.Execution.ExecutionId ?? "";
                 if (string.IsNullOrWhiteSpace(execId))
@@ -89,7 +89,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void OnFollowerExecution(object sender, ExecutionEventArgs e)
             {
-                if (!_armed) return;
+                if (!Armed) return;
                 if (e?.Execution == null) return;
 
                 // Only manage brackets for the instrument we’re operating on

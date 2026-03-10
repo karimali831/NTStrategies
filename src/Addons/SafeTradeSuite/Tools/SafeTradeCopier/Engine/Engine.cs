@@ -22,7 +22,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private string _configuredInstrumentName;
             private Instrument _configuredInstrument;
 
-            private volatile bool _armed;
+            public volatile bool Armed;
             private volatile bool _copyEnabled;
             private readonly object _gate = new object();
 
@@ -87,8 +87,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
 
                     // subscribe new
-                    SubscribePnl(_configuredMaster);
-                    foreach (var f in _configuredFollowers) SubscribePnl(f);
+                    lock (_gate)
+                    {
+                        _configuredMaster = masterAccount;
+                    }
+
+                    SubscribePnl(masterAccount);
+                    foreach (var f in _configuredFollowers) 
+                        SubscribePnl(f);
                     
                     if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
@@ -107,7 +113,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void RaiseModeChanged_NoLock()
             {
-                OnModeChanged?.Invoke(_armed, _copyEnabled);
+                OnModeChanged?.Invoke(Armed, _copyEnabled);
             }
 
             private void RaiseReady_NoLock(string reasonOverride = null)
@@ -182,11 +188,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // Arm follower-copy logic only if copy is enabled and config is fully ready
                 if (!_copyEnabled || !IsReady_NoLock(out _))
                 {
-                    _armed = false;
+                    Armed = false;
                     return;
                 }
 
-                _armed = true;
+                Armed = true;
 
                 foreach (var f in _followers)
                 {
@@ -218,12 +224,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     f.ExecutionUpdate -= OnFollowerExecution;
                 }
 
-                if (_armed)
+                if (Armed)
                 {
                     UnsubscribePnl(_master);
                     foreach (var f in _followers) UnsubscribePnl(f);
                 }
-                _armed = false;
+                Armed = false;
 
                 // token swap
                 var oldCts = _cts;

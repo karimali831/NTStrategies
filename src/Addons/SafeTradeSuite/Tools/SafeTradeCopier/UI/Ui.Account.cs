@@ -109,6 +109,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _uiPnl[name] = snap;
             }
 
+            RefreshStatusBar();
             RenderPnlUi();
         }
     }

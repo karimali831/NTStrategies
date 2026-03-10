@@ -248,6 +248,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 enabled.Checked += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
+                    RefreshStatusBar();
                     RenderFollowerRowState(row);
                     RenderFlattenEnablementUi();
                     SaveUiToActiveSession();
@@ -257,6 +258,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 enabled.Unchecked += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
+                    RefreshStatusBar();
                     RenderFollowerRowState(row);
                     RenderFlattenEnablementUi();
                     SaveUiToActiveSession();

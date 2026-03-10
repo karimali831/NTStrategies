@@ -20,7 +20,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
             }
             
-            
             public void SetCopyEnabled(bool enabled)
             {
                 lock (_gate)

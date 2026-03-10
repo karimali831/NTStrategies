@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
 
-        private void RememberInstrument(string instrumentName)
+        private static void RememberInstrument(string instrumentName)
         {
             var n = NormalizeInstrumentName(instrumentName);
             if (!IsValidInstrumentName(n))
@@ -54,7 +54,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SafeTradeSuiteRuntime.RememberInstrument(n);
         }
 
-        private void ForgetInstrument(string instrumentName)
+        private static void ForgetInstrument(string instrumentName)
         {
             var n = NormalizeInstrumentName(instrumentName);
             if (string.IsNullOrWhiteSpace(n))
@@ -164,7 +164,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             string.Equals(
                                 NormalizeInstrumentName(x?.InstrumentName),
                                 normalized,
-                                System.StringComparison.OrdinalIgnoreCase)))
+                                StringComparison.OrdinalIgnoreCase)))
                         continue;
 
                     _instrumentSessions.Add(new InstrumentSession

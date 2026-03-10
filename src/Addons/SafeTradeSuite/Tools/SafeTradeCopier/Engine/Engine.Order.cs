@@ -310,7 +310,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
             {
-                if (!_armed) return;
+                if (!Armed) return;
                 if (e?.Order == null) return;
 
                 if (string.IsNullOrWhiteSpace(e.Order.Name) || !e.Order.Name.StartsWith("STC:", StringComparison.Ordinal))

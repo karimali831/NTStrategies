@@ -2,6 +2,11 @@
 {
     public partial class SafeTradeCopierTool
     {
-
+        public enum CopierStatusState
+        {
+            Red,
+            Yellow,
+            Green
+        }
     }
 }

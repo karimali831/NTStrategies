@@ -21,6 +21,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return n.StartsWith("Sim", StringComparison.OrdinalIgnoreCase)
                    || n.StartsWith("Playback", StringComparison.OrdinalIgnoreCase);
         }
+
+        private Account GetMasterAccount()
+        {
+            return _masterBox?.SelectedItem as Account;
+        }
+        
+        private bool IsMasterConnected()
+        {
+            var master = GetMasterAccount();
+
+            if (master == null)
+                return false;
+
+            return GetUiConnectionState(master) == UiConnectionState.Connected;
+        }
         
         private void RefreshAccountsUi()
         {
@@ -29,7 +44,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_followersPanel == null) return;
             if (_engine == null) return;
 
-            var prevMasterName = (_masterBox.SelectedItem as Account)?.Name ?? "";
+            var masterAcc = GetMasterAccount();
+            var prevMasterName = masterAcc?.Name ?? "";
 
             var prevFollowers = new Dictionary<string, PrevFollowerState>(StringComparer.Ordinal);
             foreach (var r in _followerRows)
@@ -87,14 +103,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private bool HasAnyCheckedFollowers()
         {
             return _followerRows.Any(r =>
-                r?.Account != null &&
                 r.EnabledCheck?.IsChecked == true);
         }
-
+        
         private bool AllCheckedFollowersHealthy()
         {
             return _followerRows
-                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
+                .Where(r => r.EnabledCheck?.IsChecked == true)
                 .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         

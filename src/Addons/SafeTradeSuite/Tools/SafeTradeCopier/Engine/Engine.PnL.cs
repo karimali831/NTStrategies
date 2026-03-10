@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     // account metrics may not be available yet during startup/reconnect
                 }
 
-                lock (_gate)
+                lock (_pnlByAccount)
                 {
                     if (!_pnlByAccount.TryGetValue(name, out var snap))
                     {
@@ -68,23 +68,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var name = e.Account.Name ?? "";
                 if (string.IsNullOrWhiteSpace(name)) return;
-                
-                lock (_gate)
-                { 
+
+                lock (_pnlByAccount)
+                {
                     if (!_pnlByAccount.TryGetValue(name, out var snap))
                     {
                         snap = new PnlSnap();
                         _pnlByAccount[name] = snap;
                     }
-        
+
                     if (e.AccountItem == AccountItem.RealizedProfitLoss)
                         snap.Realized = e.Value;
-                    
+
                     if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
                         snap.Unrealized = e.Value;
                 }
             }
-            
         }
     }
 }

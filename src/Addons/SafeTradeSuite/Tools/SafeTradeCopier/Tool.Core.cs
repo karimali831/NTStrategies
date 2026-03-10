@@ -10,11 +10,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private readonly string _toolId = Guid.NewGuid().ToString("N").Substring(0, 8);
-        private static Window _window;
         private static readonly object WindowGate = new object();
-        private Dispatcher _uiDispatcher;
         private bool _allowWindowClose;
         private bool _isClosing;
+        
+        private static Window _window;
+        private Dispatcher _uiDispatcher;
         private SafeCopierEngine _engine;
         private ComboBox _masterBox;
         private ComboBox _instrumentSelector;
@@ -24,7 +25,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public void Show()
         {
             SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] Show()");
-            SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] WindowExists={(_window != null)}");
+            SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] WindowExists={_window != null}");
 
             lock (WindowGate)
             {
@@ -147,7 +148,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 var w = _window;
 
-                // detach handlers to avoid re-entrancy weirdness
                 w.Closing -= OnWindowClosing;
                 w.Closed -= OnWindowClosed;
 
@@ -168,9 +168,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _btnFlattenAll = null;
 
             _btnCopyOn = null;
-
             _statusBox = null;
-            _headerStateText = null;
 
             _masterQtyBox = null;
             _masterAtmBox = null;
