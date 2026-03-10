@@ -33,7 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.ControlTextBrush
             };
 
-            var statusLbl = new TextBlock
+            _statusLabel = new TextBlock
             {
                 Text = "Status:",
                 Foreground = SystemColors.WindowTextBrush,
@@ -43,18 +43,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Grid.SetRow(_instrumentTabs, 0);
             Grid.SetColumn(_instrumentTabs, 0);
 
-            Grid.SetRow(statusLbl, 1);
-            Grid.SetColumn(statusLbl, 0);
+            Grid.SetRow(_statusLabel, 1);
+            Grid.SetColumn(_statusLabel, 0);
 
             Grid.SetRow(_statusBox, 2);
             Grid.SetColumn(_statusBox, 0);
 
+
             bottom.Children.Add(_instrumentTabs);
-            bottom.Children.Add(statusLbl);
+            bottom.Children.Add(_statusLabel);
             bottom.Children.Add(_statusBox);
 
             Grid.SetRow(bottom, 5);
             root.Children.Add(bottom);
+            
+            ApplyStatusBoxVisibility();
         }
     }
 }

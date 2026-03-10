@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         {
                             if (TryGetInstrumentUnrealized(master, instr, out var uTmp, out var qTmp))
                             {
-                                ClearBarOutcome(_masterPnlBarStatusText);
+                                ClearBarOutcome(_masterPnlBarStatusText, _masterPnlBar);
                                 RenderFlipBar(_masterPnlBar, uTmp, Math.Max(1, qTmp), st, tk, instr);
                             }
                             else
@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             {
                                 _masterPnlBar.Visibility = Visibility.Collapsed;
                                 _masterPnlBar.Value = 0;
-                                ClearBarOutcome(_masterPnlBarStatusText);
+                                ClearBarOutcome(_masterPnlBarStatusText, _masterPnlBar);
                             }
                         }
                     }
@@ -112,7 +112,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         {
                             if (TryGetInstrumentUnrealized(acc, instr, out var uTmp, out var qTmp))
                             {
-                                ClearBarOutcome(row.PnlBarStatusText);
+                                ClearBarOutcome(row.PnlBarStatusText, row.PnlBar);
                                 RenderFlipBar(row.PnlBar, uTmp, Math.Max(1, qTmp), st, tk, instr);
                             }
                             else
@@ -133,7 +133,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             {
                                 row.PnlBar.Visibility = Visibility.Collapsed;
                                 row.PnlBar.Value = 0;
-                                ClearBarOutcome(row.PnlBarStatusText);
+                                ClearBarOutcome(row.PnlBarStatusText, row.PnlBar);
                             }
                         }
                     }

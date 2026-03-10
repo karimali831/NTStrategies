@@ -21,6 +21,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (acc == null)
                     return;
+                
+                SafeTradeSuiteRuntime.PrintLog($"[SUB PNL] {acc?.Name}");
 
                 acc.AccountItemUpdate -= OnAccountItemUpdate;
                 acc.AccountItemUpdate += OnAccountItemUpdate;
@@ -58,16 +60,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void UnsubscribePnl(Account acc)
             {
                 if (acc == null) return;
+                SafeTradeSuiteRuntime.PrintLog($"[UNSUB PNL] {acc?.Name}");
                 acc.AccountItemUpdate -= OnAccountItemUpdate;
             }
 
             private void OnAccountItemUpdate(object sender, AccountItemEventArgs e)
             {
-                if (e?.Account == null) return;
-                if (e.Currency != Currency.UsDollar) return;
+                if (e?.Account == null) 
+                    return;
+
+                if (e.Currency != Currency.UsDollar) 
+                    return;
+
+                if (e.AccountItem != AccountItem.RealizedProfitLoss &&
+                    e.AccountItem != AccountItem.UnrealizedProfitLoss)
+                    return;
 
                 var name = e.Account.Name ?? "";
-                if (string.IsNullOrWhiteSpace(name)) return;
+                if (string.IsNullOrWhiteSpace(name)) 
+                    return;
 
                 lock (_pnlByAccount)
                 {
@@ -79,8 +90,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (e.AccountItem == AccountItem.RealizedProfitLoss)
                         snap.Realized = e.Value;
-
-                    if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
+                    else
                         snap.Unrealized = e.Value;
                 }
             }

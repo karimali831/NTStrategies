@@ -64,38 +64,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     .Where(a => a != null && masterAccount != null && !ReferenceEquals(a, masterAccount))
                     .Distinct()
                     .ToList() ?? new List<Account>();
+                
 
                 var name = instrName ?? "";
                 var instr = string.IsNullOrWhiteSpace(name) ? null : Instrument.GetInstrument(name);
+                
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[APPLY CONFIG] master={masterAccount?.Name} followers={followersClean.Count} instr={name} atm={masterAtm}");
+
+                Account oldMaster;
+                List<Account> oldFollowers;
 
                 lock (_gate)
                 {
-                    // PnL subscriptions: unsubscribe old, subscribe new
-                    var oldMaster = _configuredMaster;
-                    var oldFollowers = _configuredFollowers ?? new List<Account>();
+                    oldMaster = _configuredMaster;
+                    oldFollowers = _configuredFollowers?.ToList() ?? new List<Account>();
+                }
 
-                    UnsubscribePnl(oldMaster);
-                    foreach (var f in oldFollowers) UnsubscribePnl(f);
+                UnsubscribePnl(oldMaster);
+                foreach (var f in oldFollowers)
+                    UnsubscribePnl(f);
 
-                    // overwrite config
+                lock (_gate)
+                {
                     _configuredMaster = masterAccount;
                     _configuredFollowers = followersClean;
                     _configuredInstrumentName = name;
                     _configuredInstrument = instr;
                     _configuredMasterAtm = string.IsNullOrWhiteSpace(masterAtm) ? "None" : masterAtm.Trim();
-                    _configuredFollowerQtyOverrides = followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
-                    _configuredFollowerAtmOverrides = followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
+                    _configuredFollowerQtyOverrides =
+                        followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
+                    _configuredFollowerAtmOverrides =
+                        followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
+                }
 
-                    // subscribe new
-                    lock (_gate)
-                    {
-                        _configuredMaster = masterAccount;
-                    }
+                SubscribePnl(masterAccount);
+                foreach (var f in followersClean)
+                    SubscribePnl(f);
 
-                    SubscribePnl(masterAccount);
-                    foreach (var f in _configuredFollowers) 
-                        SubscribePnl(f);
-                    
+                lock (_gate)
+                {
                     if (_copyEnabled && !IsReady_NoLock(out var reason))
                     {
                         _copyEnabled = false;
@@ -157,6 +165,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void RewireUnsafe_NoLock(string reason)
             {
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[REWIRE] reason={reason} copyEnabled={_copyEnabled} armed={Armed} master={_configuredMaster?.Name} followers={_configuredFollowers?.Count ?? 0} instr={_configuredInstrumentName}");
+                
                 // Tear down old wiring (if any)
                 if (_master != null)
                     _master.ExecutionUpdate -= OnMasterExecution;
@@ -173,10 +184,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     .Where(a => a != null && a.ConnectionStatus == ConnectionStatus.Connected && _master != null && !ReferenceEquals(a, _master))
                     .Distinct()
                     .ToList();
-
-                SubscribePnl(_master);
-                foreach (var f in _followers) SubscribePnl(f);
-
+                
                 _instrumentName = _configuredInstrumentName;
                 _instrument = _configuredInstrument;
 

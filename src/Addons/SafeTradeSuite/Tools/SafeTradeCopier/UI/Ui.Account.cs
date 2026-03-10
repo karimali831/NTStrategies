@@ -91,11 +91,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void OnUiAccountItemUpdate(object sender, AccountItemEventArgs e)
         {
-            if (e?.Account == null) return;
-            if (e.Currency != Currency.UsDollar) return;
+            if (e?.Account == null) 
+                return;
+
+            if (e.Currency != Currency.UsDollar) 
+                return;
+
+            if (e.AccountItem != AccountItem.RealizedProfitLoss &&
+                e.AccountItem != AccountItem.UnrealizedProfitLoss)
+                return;
 
             var name = e.Account.Name ?? "";
-            if (string.IsNullOrWhiteSpace(name)) return;
+            if (string.IsNullOrWhiteSpace(name)) 
+                return;
 
             lock (_uiPnl)
             {
@@ -103,13 +111,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (e.AccountItem == AccountItem.RealizedProfitLoss)
                     snap.r = e.Value;
-                else if (e.AccountItem == AccountItem.UnrealizedProfitLoss)
+                else
                     snap.u = e.Value;
 
                 _uiPnl[name] = snap;
             }
 
-            RefreshStatusBar();
             RenderPnlUi();
         }
     }

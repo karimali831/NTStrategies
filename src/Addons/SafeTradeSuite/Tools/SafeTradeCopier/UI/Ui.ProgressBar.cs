@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -40,6 +42,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     
     public partial class SafeTradeCopierTool
     {
+        private static readonly Dictionary<ProgressBar, DispatcherTimer> BarHideTimers =
+            new Dictionary<ProgressBar, DispatcherTimer>();
+
         private static ControlTemplate _roundedProgressTemplateLeft;
         private static ControlTemplate _roundedProgressTemplateRight;
 
@@ -67,16 +72,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void SetBarValueAnimated(ProgressBar bar, double target)
         {
-            if (bar == null) return;
+            if (bar == null)
+                return;
 
             if (target < bar.Minimum) target = bar.Minimum;
             if (target > bar.Maximum) target = bar.Maximum;
 
+            // if bar hasn't measured yet, just set directly
+            if (bar.ActualWidth <= 0)
+            {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
+                bar.Value = target;
+                return;
+            }
+
+            var current = bar.Value;
+
+            if (Math.Abs(current - target) < 0.01)
+            {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
+                bar.Value = target;
+                return;
+            }
+
             var anim = new DoubleAnimation
             {
+                From = current,
                 To = target,
-                Duration = TimeSpan.FromMilliseconds(140),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                Duration = TimeSpan.FromMilliseconds(45)
             };
 
             bar.BeginAnimation(RangeBase.ValueProperty, anim, HandoffBehavior.SnapshotAndReplace);
@@ -85,6 +108,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static void RenderFlipBar(ProgressBar bar, double unrealized, int qty, int stopTicks, int targetTicks, Instrument instr)
         {
             if (bar == null) return;
+            StopHideTimer(bar);
 
             if (instr == null || qty <= 0 || (stopTicks <= 0 && targetTicks <= 0))
             {
@@ -157,7 +181,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var wanted = alignRight ? _roundedProgressTemplateRight : _roundedProgressTemplateLeft;
             if (!ReferenceEquals(bar.Template, wanted))
+            {
                 bar.Template = wanted;
+                bar.ApplyTemplate();
+            }
 
             bar.BorderThickness = new Thickness(0);
             bar.Background = new SolidColorBrush(Color.FromRgb(220, 220, 220));
@@ -178,48 +205,90 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
         {
-            if (bar == null || statusText == null) return;
+            if (bar == null || statusText == null)
+                return;
+
+            StopHideTimer(bar);
 
             var tag = (bar.Tag as string) ?? "";
 
-            bar.Visibility = Visibility.Visible;
-
             // stop any previous animation so final state renders exactly
             bar.BeginAnimation(RangeBase.ValueProperty, null);
+
+            string outcomeText;
+            Brush outcomeBrush;
 
             if (string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal))
             {
                 EnsureRoundedProgressBar(bar, alignRight: true);
                 bar.Foreground = RedGrad;
                 bar.Value = 0;
-                statusText.Text = "Stop Filled";
-                statusText.Foreground = Brushes.IndianRed;
+                outcomeText = "Stop Filled";
+                outcomeBrush = Brushes.IndianRed;
             }
             else if (string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal))
             {
                 EnsureRoundedProgressBar(bar, alignRight: false);
                 bar.Foreground = GreenGrad;
                 bar.Value = 100;
-                statusText.Text = "Order Filled";
-                statusText.Foreground = Brushes.SteelBlue;
+                outcomeText = "Order Filled";
+                outcomeBrush = Brushes.SteelBlue;
             }
             else
             {
                 EnsureRoundedProgressBar(bar, alignRight: false);
                 bar.Foreground = GreenGrad;
                 bar.Value = 100;
-                statusText.Text = "Target Filled";
-                statusText.Foreground = Brushes.DarkGreen;
+                outcomeText = "Target Filled";
+                outcomeBrush = Brushes.DarkGreen;
             }
 
-            statusText.Visibility = Visibility.Visible;
-        }
-
-        private static void ClearBarOutcome(TextBlock statusText)
-        {
-            if (statusText == null) return;
             statusText.Text = "";
             statusText.Visibility = Visibility.Collapsed;
+            bar.Visibility = Visibility.Visible;
+
+            var hideTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(850)
+            };
+
+            hideTimer.Tick += (s, e) =>
+            {
+                hideTimer.Stop();
+                BarHideTimers.Remove(bar);
+
+                bar.Visibility = Visibility.Collapsed;
+                statusText.Text = outcomeText;
+                statusText.Foreground = outcomeBrush;
+                statusText.Visibility = Visibility.Visible;
+            };
+
+            BarHideTimers[bar] = hideTimer;
+            hideTimer.Start();
+        }
+
+        private static void ClearBarOutcome(TextBlock statusText, ProgressBar bar = null)
+        {
+            if (bar != null)
+                StopHideTimer(bar);
+
+            if (statusText == null)
+                return;
+
+            statusText.Text = "";
+            statusText.Visibility = Visibility.Collapsed;
+        }
+        
+        private static void StopHideTimer(ProgressBar bar)
+        {
+            if (bar == null)
+                return;
+
+            if (BarHideTimers.TryGetValue(bar, out var existing))
+            {
+                existing.Stop();
+                BarHideTimers.Remove(bar);
+            }
         }
 
         private static ControlTemplate BuildRoundedProgressTemplate(HorizontalAlignment alignment)

@@ -6,6 +6,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private Window _settingsWindow;
+        private bool _showStatusBox = false;
+        private TextBlock _statusLabel;
 
         private void OpenSettingsPanel()
         {
@@ -23,7 +25,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var simMode = new CheckBox
             {
                 Content = "Simulation Mode",
-                IsChecked = _simOnlyMode
+                IsChecked = _simOnlyMode,
+                Margin = new Thickness(0, 0, 0, 8)
             };
 
             simMode.Checked += (s,e) =>
@@ -38,7 +41,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 OnSimModeChanged();
             };
 
+            var showStatusBox = new CheckBox
+            {
+                Content = "Show status log",
+                IsChecked = _showStatusBox
+            };
+
+            showStatusBox.Checked += (s, e) =>
+            {
+                _showStatusBox = true;
+                ApplyStatusBoxVisibility();
+            };
+
+            showStatusBox.Unchecked += (s, e) =>
+            {
+                _showStatusBox = false;
+                ApplyStatusBoxVisibility();
+            };
+
             stack.Children.Add(simMode);
+            stack.Children.Add(showStatusBox);
 
             _settingsWindow = new Window
             {
@@ -62,6 +84,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderFlattenAllButtonState();
 
             RefreshStatusBar();
+        }
+        
+        private void ApplyStatusBoxVisibility()
+        {
+            var visibility = _showStatusBox ? Visibility.Visible : Visibility.Collapsed;
+
+            if (_statusLabel != null)
+                _statusLabel.Visibility = visibility;
+
+            if (_statusBox != null)
+                _statusBox.Visibility = visibility;
         }
     }
 }

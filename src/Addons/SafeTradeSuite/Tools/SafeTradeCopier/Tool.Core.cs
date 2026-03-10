@@ -168,6 +168,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _btnFlattenAll = null;
 
             _btnCopyOn = null;
+            _statusLabel = null;
             _statusBox = null;
 
             _masterQtyBox = null;
@@ -177,7 +178,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _followerRows.Clear();
             _lastAccountsSnapshot.Clear();
-
+            
             _instrumentTabs = null;
             _btnAddInstrumentTab = null;
             _activeInstrumentSession = null;
