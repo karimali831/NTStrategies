@@ -7,107 +7,57 @@ using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    public partial class SafeTradeCopierTool : IDisposable
+    public partial class SafeTradeCopierTool
     {
-        public partial class SafeCopierEngine : IDisposable
+        public partial class SafeCopierEngine
         {
-            private void OnMasterExecution(object sender, ExecutionEventArgs e)
+            public void SubmitMasterMarketWithBracket(Account master, Instrument instr, OrderAction action, int qty, string atmTemplateName)
             {
-                if (e?.Execution == null) return;
-                if (_master == null || e.Execution.Account != _master) return;
-                if (_instrument == null) return;
-
-                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
-                    return;
-
-                HandleBracketExitOutcome(_master, e.Execution);
-
-                // ✅ Always try to submit bracket (even if not armed / no followers)
-                TrySubmitBracketOnFill(_master, e.Execution);
-
-                // ✅ Only COPY on *entry* executions created by STC
-                if (!IsStcEntryExecution(e.Execution.Order))
-                    return;
-
-                // Copy requires normal arming/safety
-                if (!_armed || !_copyEnabled) return;
-
-                var execId = e.Execution.ExecutionId ?? "";
-                if (string.IsNullOrWhiteSpace(execId))
-                    execId = $"{e.Execution.Time.Ticks}_{e.Execution.Price}_{e.Execution.Quantity}_{e.Execution.MarketPosition}";
-
-                if (!AllowCopyNow())
+                if (master == null || instr == null)
                 {
-                    lock (_gate)
-                    {
-                        _copyEnabled = false;
-                        DisarmUnsafe_NoLock("Circuit breaker: too many copies in short window");
-                        RaiseModeChanged_NoLock();
-                        RaiseReady_NoLock(reasonOverride: "Circuit breaker tripped");
-                    }
+                    Log("SubmitMasterMarketWithBracket: missing master/instrument.");
                     return;
                 }
 
-                var masterExecQty = (int)Math.Round((double)e.Execution.Quantity, MidpointRounding.AwayFromZero);
-                masterExecQty = Math.Abs(masterExecQty);
-                if (masterExecQty <= 0) return;
+                if (!TryReadAtmTemplateBasic(atmTemplateName, out var stopTicks, out var targetTicks))
+                {
+                    Log($"ATM template parse failed: '{atmTemplateName}'. Submitting entry only.");
+                    stopTicks = 0;
+                    targetTicks = 0;
+                }
 
-                var masterAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
-                var followerAction = masterAction;
+                var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
+                var entry = master.CreateOrder(
+                    instr,
+                    action,
+                    OrderType.Market,
+                    OrderEntry.Manual,
+                    TimeInForce.Day,
+                    qty,
+                    0,
+                    0,
+                    string.Empty,
+                    entryName,
+                    DateTime.MaxValue,
+                    null
+                );
 
-                CancellationToken token;
                 lock (_gate)
                 {
-                    token = _cts.Token;
+                    _pendingBrackets[entryName] = new PendingBracket
+                    {
+                        EntryName = entryName,
+                        Qty = qty,
+                        IsBuy = (action == OrderAction.Buy),
+                        StopTicks = Math.Max(0, stopTicks),
+                        TargetTicks = Math.Max(0, targetTicks)
+                    };
                 }
 
-                Task.Run(async () =>
-                {
-                    await _submitLock.WaitAsync(token).ConfigureAwait(false);
-                    try
-                    {
-                        await CopyToFollowers(execId, followerAction, masterExecQty, token).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        _submitLock.Release();
-                    }
-                }, token);
-            }
-
-            private static bool IsStcEntryExecution(Order ord)
-            {
-                if (ord == null) return false;
-
-                var name = (ord.Name ?? "").Trim();
-                var fromSignal = (ord.FromEntrySignal ?? "").Trim();
-
-                // ✅ Only treat STC entries as copy-eligible
-                if (name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase)) return true;
-                if (fromSignal.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase)) return true;
-
-                return false;
+                Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
+                master.Submit(new[] { entry });
             }
             
-            private void OnFollowerExecution(object sender, ExecutionEventArgs e)
-            {
-                if (!_armed) return;
-                if (e?.Execution == null) return;
-
-                // Only manage brackets for the instrument we’re operating on
-                if (_instrument == null) return;
-                if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
-                    return;
-
-                var acc = e.Execution.Account;
-                if (acc == null) return;
-
-                HandleBracketExitOutcome(acc, e.Execution);
-
-                // Brackets only submit if there's a pending entry name for this fill.
-                TrySubmitBracketOnFill(acc, e.Execution);
-            }
- 
             private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
             {
                 if (_seen.Count > 5000)
@@ -198,7 +148,121 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
                 }
             }
+            
+            private void TrySubmitBracketOnFill(Account master, Execution execution)
+            {
+                if (master == null || execution == null) return;
 
+                var ord = execution.Order;
+                if (ord == null) return;
+
+                var name = ord.Name ?? "";
+                if (string.IsNullOrWhiteSpace(name)) return;
+
+                PendingBracket pb;
+                lock (_gate)
+                {
+                    if (!_pendingBrackets.TryGetValue(name, out pb))
+                        return;
+
+                    // only submit once (first fill)
+                    _pendingBrackets.Remove(name);
+                }
+
+                if (pb.StopTicks <= 0 && pb.TargetTicks <= 0)
+                    return;
+
+                var fillPrice = execution.Price;
+                if (fillPrice <= 0)
+                {
+                    Log($"Bracket skipped: invalid fill price for {name}.");
+                    return;
+                }
+
+                var instr = ord.Instrument;
+                if (instr == null)
+                {
+                    Log($"Bracket skipped: missing instrument for {name}.");
+                    return;
+                }
+
+                var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
+                if (tickSize <= 0)
+                {
+                    Log($"Bracket skipped: invalid TickSize for {instr.FullName}.");
+                    return;
+                }
+
+                var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
+                var exitAction = pb.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
+                
+                var orders = new List<Order>(2);
+
+                if (pb.TargetTicks > 0)
+                {
+                    var tgtPrice = pb.IsBuy
+                        ? fillPrice + pb.TargetTicks * tickSize
+                        : fillPrice - pb.TargetTicks * tickSize;
+
+                    var tgt = master.CreateOrder(
+                        instr,
+                        exitAction,
+                        OrderType.Limit,
+                        OrderEntry.Manual,
+                        TimeInForce.Day,
+                        pb.Qty,
+                        tgtPrice,
+                        0,
+                        oco,
+                        "STC:TP",
+                        DateTime.MaxValue,
+                        null
+                    );
+
+                    orders.Add(tgt);
+                }
+
+                if (pb.StopTicks > 0)
+                {
+                    var stpPrice = pb.IsBuy
+                        ? fillPrice - pb.StopTicks * tickSize
+                        : fillPrice + pb.StopTicks * tickSize;
+
+                    var stp = master.CreateOrder(
+                        instr,
+                        exitAction,
+                        OrderType.StopMarket,
+                        OrderEntry.Manual,
+                        TimeInForce.Day,
+                        pb.Qty,
+                        0,
+                        stpPrice,
+                        oco,
+                        "STC:SL",
+                        DateTime.MaxValue,
+                        null
+                    );
+
+                    orders.Add(stp);
+                }
+
+                if (orders.Count > 0)
+                {
+                    lock (_gate)
+                    {
+                        _activeBracketByAccInstr[BracketKey(master, instr)] = 
+                            new ActiveBracketSpec
+                            {
+                                StopTicks = pb.StopTicks,
+                                TargetTicks = pb.TargetTicks
+                            };
+                    }
+
+                    master.Submit(orders.ToArray());
+                    Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
+                }
+            }
+            
             private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string execId)
             {
                 if (acc == null || instr == null) return;
@@ -271,19 +335,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            private int ResolveFollowerQty(Account follower, int masterExecQty)
-            {
-                if (follower == null) return masterExecQty;
-
-                if (_configuredFollowerQtyOverrides != null &&
-                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q) &&
-                    q > 0)
-                    return q;
-
-                // inherit master execution qty (most consistent for strategy/manual)
-                return masterExecQty;
-            }
-
             private string ResolveFollowerAtm(Account follower)
             {
                 if (follower == null) return _configuredMasterAtm ?? "None";
@@ -299,6 +350,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 return _configuredMasterAtm ?? "None";
+            }
+            
+            private int ResolveFollowerQty(Account follower, int masterExecQty)
+            {
+                if (follower == null) return masterExecQty;
+
+                if (_configuredFollowerQtyOverrides != null &&
+                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q) &&
+                    q > 0)
+                    return q;
+
+                // inherit master execution qty (most consistent for strategy/manual)
+                return masterExecQty;
             }
         }
     }

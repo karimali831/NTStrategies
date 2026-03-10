@@ -45,10 +45,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalU += mu;
                     
                     if (_masterPnlText != null)
-                    {
-                        _masterPnlText.Text = FormatPnL(mr, mu, "Master", shortened: false);
-                        _masterPnlText.Foreground = GetPnlBrush(mr, mu);
-                    }
+                        SetPnlText(_masterPnlText, "Master", mr, mu, shortened: false);
 
                     var instr = GetInstrument();
 
@@ -104,11 +101,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalR += r;
                     totalU += u;
 
-                    if (_totalPnlText != null)
-                    {
-                        _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", shortened: false);
-                        _totalPnlText.Foreground = GetPnlBrush(totalR, totalU);
-                    }
+                    if (row.PnlText != null)
+                        SetPnlText(row.PnlText, "", r, u, shortened: true);
 
                     var instr = GetInstrument();
 
@@ -146,10 +140,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (_totalPnlText != null)
-                {
-                    _totalPnlText.Text = FormatPnL(totalR, totalU, "Total", shortened: false);
-                    _totalPnlText.Foreground = GetPnlBrush(totalR, totalU);
-                }
+                    SetPnlText(_totalPnlText, "Total", totalR, totalU, shortened: false);
                 
             }, DispatcherPriority.Background);
         }

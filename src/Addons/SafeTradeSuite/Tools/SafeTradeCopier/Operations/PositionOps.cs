@@ -27,44 +27,89 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return 0;
         }
-
-        private static bool SameInstrument(Instrument a, Instrument b)
+        
+        private void FlattenAllSelected(SafeCopierEngine eng)
         {
-            if (a == null || b == null) return false;
-            if (ReferenceEquals(a, b)) return true;
+            if (eng == null) return;
 
-            // strongest: FullName match (case-insensitive)
-            var af = (a.FullName ?? "").Trim();
-            var bf = (b.FullName ?? "").Trim();
-            if (af.Length > 0 && bf.Length > 0 &&
-                string.Equals(af, bf, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // fallback: master instrument name match (NQ/ES etc)
-            var am = a.MasterInstrument?.Name ?? "";
-            var bm = b.MasterInstrument?.Name ?? "";
-            if (!string.IsNullOrWhiteSpace(am) &&
-                string.Equals(am, bm, StringComparison.OrdinalIgnoreCase))
+            if (!(_masterBox?.SelectedItem is Account master))
             {
-                // still require same expiry if both look like futures contracts
-                // (this prevents matching NQ 03-26 to NQ 06-26)
-                // If your FullName is like "NQ 03-26", keep it strict by month-year token.
-                var atok = ExtractExpiryToken(af);
-                var btok = ExtractExpiryToken(bf);
-                if (atok.Length == 0 || btok.Length == 0) return true;
-                return string.Equals(atok, btok, StringComparison.OrdinalIgnoreCase);
+                eng.Log("Select a master account first.");
+                return;
+            }
+
+            var instr = GetInstrument();
+            if (instr == null)
+            {
+                eng.Log("Invalid instrument.");
+                return;
+            }
+
+            eng.Log($"Flatten All clicked. Instr={instr.FullName}");
+
+            if (_masterPnlBar != null)
+                _masterPnlBar.Tag = "ORDER_FILLED";
+
+            eng.EnsureFlatInstrument(master, instr);
+
+            foreach (var r in _followerRows)
+            {
+                if (r?.Account == null) continue;
+                if (r.IncludeCheck?.IsChecked != true) continue;
+
+                if (r.PnlBar != null)
+                    r.PnlBar.Tag = "ORDER_FILLED";
+
+                eng.EnsureFlatInstrument(r.Account, instr);
+            }
+
+            eng.Log("Flatten All submitted (instrument-only).");
+        }
+        
+        private bool CanFlatten(Account account, string instrFull)
+        {
+            if (account is null)
+                return false;
+                
+            int net;
+            var key = $"{account.Name}|{instrFull}";
+
+            lock (_uiNet)
+                _uiNet.TryGetValue(key, out net);
+
+            if (net == 0)
+            {
+                foreach (var p in account.Positions)
+                {
+                    if (p?.Instrument == null) continue;
+                    if (!string.Equals(p.Instrument.FullName, instrFull, StringComparison.Ordinal)) continue;
+                    net = p.Quantity;
+                    break;
+                }
+            }
+
+            return net != 0;
+        }
+        
+        private static bool TryGetInstrumentUnrealized(Account acc, Instrument instr, out double unrealized, out int absQty)
+        {
+            unrealized = 0;
+            absQty = 0;
+            if (acc == null || instr == null) return false;
+
+            foreach (var pos in acc.Positions)
+            {
+                if (pos?.Instrument == null) continue;
+                if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
+
+                absQty = Math.Abs((int)Math.Round((double)pos.Quantity, MidpointRounding.AwayFromZero));
+                unrealized = pos.GetUnrealizedProfitLoss(PerformanceUnit.Currency);
+                return absQty > 0;
             }
 
             return false;
         }
         
-        private static string ExtractExpiryToken(string fullName)
-        {
-            // expects "... 03-26" or "... 12-25"
-            if (string.IsNullOrWhiteSpace(fullName)) return "";
-            var parts = fullName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2) return "";
-            return parts[parts.Length - 1].Trim();
-        }
+        
     }
 }

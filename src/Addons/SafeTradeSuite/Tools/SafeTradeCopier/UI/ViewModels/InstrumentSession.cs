@@ -13,9 +13,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public int MasterQty = 1;
             public string MasterAtm = "None";
 
-            public Dictionary<string, bool> FollowersEnabled = new Dictionary<string, bool>(StringComparer.Ordinal);
-            public Dictionary<string, int> FollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
-            public Dictionary<string, string> FollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
+            public readonly Dictionary<string, bool> FollowersEnabled = new Dictionary<string, bool>(StringComparer.Ordinal);
+            public readonly Dictionary<string, int> FollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
+            public readonly Dictionary<string, string> FollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
 
             public bool UserManuallyDisarmed;
             public bool AutoRearmPending;

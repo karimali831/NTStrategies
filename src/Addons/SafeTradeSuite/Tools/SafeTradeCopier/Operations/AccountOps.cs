@@ -1,20 +1,25 @@
-﻿#region Using declarations
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NinjaTrader.Cbi;
-#endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private List<Account> GetSelectableAccounts()
+        private static List<Account> GetSelectableAccounts()
         {
             return Account.All
                 .Where(a => a?.Connection != null)
                 .OrderBy(a => a.Name)
                 .ToList();
+        }
+        
+        private static bool IsSimAccount(Account acc)
+        {
+            var n = acc?.Name ?? "";
+            return n.StartsWith("Sim", StringComparison.OrdinalIgnoreCase)
+                   || n.StartsWith("Playback", StringComparison.OrdinalIgnoreCase);
         }
         
         private void RefreshAccountsUi()
@@ -77,6 +82,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             EnforceSimOnlyModeUi(accounts);
             RenderFollowerRowsState();
             ApplyConfigFromUi();
+        }
+        
+        private bool HasAnyCheckedFollowers()
+        {
+            return _followerRows.Any(r =>
+                r?.Account != null &&
+                r.EnabledCheck?.IsChecked == true);
+        }
+
+        private bool AllCheckedFollowersHealthy()
+        {
+            return _followerRows
+                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
+                .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)

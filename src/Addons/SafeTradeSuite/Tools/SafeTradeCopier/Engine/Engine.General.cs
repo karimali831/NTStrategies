@@ -6,7 +6,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            
             private bool AllowCopyNow()
             {
                 var cutoff = DateTime.UtcNow.AddSeconds(-2).Ticks;
@@ -21,11 +20,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
             }
             
-
-            public static string FmtMoney(double v)
-            {
-                return v.ToString("+#,0.00;-#,0.00;0.00");
-            }
             
             public void SetCopyEnabled(bool enabled)
             {

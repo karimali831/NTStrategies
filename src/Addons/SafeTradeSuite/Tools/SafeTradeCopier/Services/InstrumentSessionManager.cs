@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using NinjaTrader.Cbi;
-using NinjaTrader.Data;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -112,6 +112,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 names.Add(current);
 
             return names.OrderBy(x => x).ToList();
+        }
+        
+        private void NormalizeInstrumentSessions()
+        {
+            var activeName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
+
+            var deduped = _instrumentSessions
+                .Where(x => x != null)
+                .GroupBy(x => NormalizeInstrumentName(x.InstrumentName), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            _instrumentSessions.Clear();
+            _instrumentSessions.AddRange(deduped);
+
+            if (_instrumentSessions.Count == 0)
+            {
+                _activeInstrumentSession = null;
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(activeName))
+            {
+                _activeInstrumentSession = _instrumentSessions.FirstOrDefault(x =>
+                   string.Equals(
+                       NormalizeInstrumentName(x?.InstrumentName),
+                       activeName,
+                       StringComparison.OrdinalIgnoreCase))
+               ?? _instrumentSessions[0];
+            }
+            else
+            {
+                _activeInstrumentSession = _instrumentSessions[0];
+            }
         }
 
         private void EnsureInitialInstrumentSession()

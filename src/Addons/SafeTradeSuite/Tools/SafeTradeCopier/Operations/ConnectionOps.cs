@@ -67,20 +67,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }, DispatcherPriority.Background);
         }
         
-        private bool HasAnyCheckedFollowers()
-        {
-            return _followerRows.Any(r =>
-                r?.Account != null &&
-                r.EnabledCheck?.IsChecked == true);
-        }
-
-        private bool AllCheckedFollowersHealthy()
-        {
-            return _followerRows
-                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
-                .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
-        }
-
         private void TryAutoRearmAfterReconnect()
         {
             if (_engine == null) return;

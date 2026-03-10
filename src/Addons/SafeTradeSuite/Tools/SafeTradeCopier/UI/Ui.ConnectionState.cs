@@ -4,7 +4,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private Brush DotDisconnectedBrush()
+        private static Brush DotDisconnectedBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(190, 70, 70))

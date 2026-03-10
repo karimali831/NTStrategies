@@ -8,12 +8,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static int ParseQtyOrDefault(string s, int fallback)
-        {
-            if (int.TryParse((s ?? "").Trim(), out var v) && v > 0) return v;
-            return fallback;
-        }
-        
+
         private void EnforceSimOnlyModeUi(List<Account> accounts)
         {
             if (accounts == null) return;
@@ -67,20 +62,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         }
         
         private void SubscribeUiAccountEvents(IEnumerable<Account> accounts)
+        {
+            if (accounts == null) return;
+
+            foreach (var a in accounts)
             {
-                if (accounts == null) return;
+                if (a == null) continue;
 
-                foreach (var a in accounts)
-                {
-                    if (a == null) continue;
+                a.AccountItemUpdate -= OnUiAccountItemUpdate;
+                a.AccountItemUpdate += OnUiAccountItemUpdate;
 
-                    a.AccountItemUpdate -= OnUiAccountItemUpdate;
-                    a.AccountItemUpdate += OnUiAccountItemUpdate;
-
-                    a.PositionUpdate -= OnUiPositionUpdate;
-                    a.PositionUpdate += OnUiPositionUpdate;
-                }
+                a.PositionUpdate -= OnUiPositionUpdate;
+                a.PositionUpdate += OnUiPositionUpdate;
             }
+        }
 
         private void UnsubscribeUiAccountEvents(IEnumerable<Account> accounts)
         {
@@ -115,51 +110,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             RenderPnlUi();
-        }
-
-        private void OnUiPositionUpdate(object sender, PositionEventArgs e)
-        {
-            var acc = sender as Account;
-            if (acc == null) return;
-            if (e?.Position == null) return;
-
-            var instrFull = e.Position.Instrument?.FullName ?? "";
-            var key = $"{acc.Name}|{instrFull}";
-            var qty = e.Position.Quantity;
-
-            lock (_uiNet)
-                _uiNet[key] = qty;
-
-            RenderFlattenEnablementUi();
-        }
-        
-        
-        private void RenderFlattenEnablementUi()
-        {
-            var display = _uiDispatcher ?? _window?.Dispatcher;
-
-            display?.InvokeAsync(() =>
-            {
-                var instr = GetInstrument();
-                var instrFull = GetInstrumentFullName();
-
-                foreach (var row in _followerRows)
-                {
-                    if (row?.Account == null || row.FlattenBtn == null)
-                        continue;
-
-                    if (instr == null)
-                    {
-                        RenderFlattenButtonState(row.FlattenBtn, false);
-                        continue;
-                    }
-
-                    var canFlatten = CanFlatten(row.Account, instrFull) && row.EnabledCheck?.IsChecked == true;
-                    RenderFlattenButtonState(row.FlattenBtn, canFlatten);
-                }
-
-                RenderFlattenAllButtonState();
-            }, DispatcherPriority.Background);
         }
     }
 }

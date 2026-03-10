@@ -487,6 +487,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 BuildFollowerRows(accounts);
                 EnforceSimOnlyModeUi(accounts);
                 RenderFollowerRowsState();
+                WireFollowerFlattenButtons(eng);
 
                 // ATMs
                 LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
@@ -620,42 +621,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 LogUnhandled("BuildUi()", ex);
                 throw;
             }
-        }
-        
-        private static void RenderFlattenButtonState(Button btn, bool enabled)
-        {
-            if (btn == null)
-                return;
-
-            btn.IsEnabled = enabled;
-            btn.Background = enabled ? Brushes.Maroon : Brushes.Gray;
-            btn.Foreground = Brushes.White;
-            btn.Opacity = enabled ? 1.0 : 0.60;
-            btn.ToolTip = enabled
-                ? "Flatten this follower position"
-                : "No open position for this instrument";
-        }
-        
-        private void RenderFlattenAllButtonState()
-        {
-            if (_btnFlattenAll == null) return;
-
-            var master = _masterBox?.SelectedItem as Account;
-            var instrFull = GetInstrumentFullName();
-
-            var canFlattenMaster = CanFlatten(master, instrFull);
-
-            var canFlattenFollowers = _followerRows.Any(r =>
-                r?.Account != null &&
-                r.EnabledCheck?.IsChecked == true &&
-                CanFlatten(r.Account, instrFull));
-
-            var canFlattenAny = canFlattenMaster || canFlattenFollowers;
-
-            _btnFlattenAll.IsEnabled = canFlattenAny;
-            _btnFlattenAll.Background = canFlattenAny ? Brushes.DarkRed : Brushes.Gray;
-            _btnFlattenAll.Foreground = Brushes.White;
-            _btnFlattenAll.Opacity = canFlattenAny ? 1.0 : 0.65;
         }
     }
 }

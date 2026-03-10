@@ -5,14 +5,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private bool IsDarkTheme()
+        private static bool IsDarkTheme()
         {
             var c = SystemColors.WindowColor;
             var luminance = (0.2126 * c.R) + (0.7152 * c.G) + (0.0722 * c.B);
             return luminance < 140;
         }
         
-        private Brush DotConnectedOnBrush()
+        private static Brush DotConnectedOnBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(38, 200, 78))
@@ -26,26 +26,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 : new SolidColorBrush(Color.FromRgb(230, 140, 0));
         }
 
-        private Brush DotOffBrush()
+        private static Brush DotOffBrush()
         {
             return Brushes.Transparent;
         }
 
-        private Brush DotBorderBrush()
+        private static Brush DotBorderBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(120, 120, 120))
                 : new SolidColorBrush(Color.FromRgb(150, 150, 150));
         }
 
-        private Brush TableHeaderBrush()
+        private static Brush TableHeaderBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(38, 38, 38))
                 : new SolidColorBrush(Color.FromRgb(240, 240, 240));
         }
 
-        private Brush TableRowAltBrush()
+        private static Brush TableRowAltBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(30, 30, 30))

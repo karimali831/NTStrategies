@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,6 +16,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             if (_instrumentTabs == null)
                 return;
+
+            NormalizeInstrumentSessions();
 
             _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
             _instrumentTabs.Items.Clear();
@@ -106,87 +107,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentTabs.SelectionChanged += OnInstrumentTabsSelectionChanged;
         }
-                
-        private void SyncSessionsToAvailableInstruments()
-        {
-            var available = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var instrument in GetAvailableInstruments())
-            {
-                var normalized = NormalizeInstrumentName(instrument);
-                if (IsValidInstrumentName(normalized))
-                    available.Add(normalized);
-            }
-
-            if (_instrumentSelector != null)
-            {
-                foreach (var obj in _instrumentSelector.Items)
-                {
-                    var normalized = NormalizeInstrumentName(obj as string);
-                    if (IsValidInstrumentName(normalized))
-                        available.Add(normalized);
-                }
-            }
-
-            // remove blank placeholders once real instruments exist
-            if (available.Count > 0)
-            {
-                _instrumentSessions.RemoveAll(x =>
-                    x != null &&
-                    string.IsNullOrWhiteSpace(NormalizeInstrumentName(x.InstrumentName)));
-            }
-
-            foreach (var instrument in available)
-            {
-                var exists = _instrumentSessions.Any(x =>
-                    string.Equals(
-                        NormalizeInstrumentName(x?.InstrumentName),
-                        instrument,
-                        StringComparison.OrdinalIgnoreCase));
-
-                if (!exists)
-                {
-                    _instrumentSessions.Add(new InstrumentSession
-                    {
-                        InstrumentName = instrument
-                    });
-                }
-            }
-
-            // de-dupe sessions by instrument name
-            var deduped = _instrumentSessions
-                .Where(x => x != null)
-                .GroupBy(x => NormalizeInstrumentName(x.InstrumentName), StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .ToList();
-
-            _instrumentSessions.Clear();
-            _instrumentSessions.AddRange(deduped);
-
-            if (_instrumentSessions.Count == 0)
-            {
-                _instrumentSessions.Add(new InstrumentSession
-                {
-                    InstrumentName = ""
-                });
-            }
-
-            if (_activeInstrumentSession != null)
-            {
-                var activeName = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
-                var match = _instrumentSessions.FirstOrDefault(x =>
-                    string.Equals(
-                        NormalizeInstrumentName(x?.InstrumentName),
-                        activeName,
-                        StringComparison.OrdinalIgnoreCase));
-
-                if (match != null)
-                    _activeInstrumentSession = match;
-            }
-
-            if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
-                _activeInstrumentSession = _instrumentSessions[0];
-        }
         
         private void OnInstrumentTabCloseClick(object sender, RoutedEventArgs e)
         {
@@ -241,7 +161,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (!ReferenceEquals(_activeInstrumentSession, existing))
                 {
-                    SaveUiToActiveSession();
+                    SaveUiToActiveSession(saveInstrumentName: false);
                     _activeInstrumentSession = existing;
                 }
 
@@ -253,7 +173,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            SaveUiToActiveSession();
+            SaveUiToActiveSession(saveInstrumentName: false);
 
             var session = new InstrumentSession
             {
@@ -265,6 +185,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentSessions.Add(session);
             _activeInstrumentSession = session;
+
+            NormalizeInstrumentSessions();
 
             if (refreshSelector)
                 RefreshInstrumentSelectorItems();
@@ -314,14 +236,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void SaveUiToActiveSession()
         {
+            SaveUiToActiveSession(saveInstrumentName: true);
+        }
+
+        private void SaveUiToActiveSession(bool saveInstrumentName)
+        {
             try
             {
                 if (_activeInstrumentSession == null)
                     return;
 
-                var selectedInstrument = NormalizeInstrumentName(GetSelectedInstrumentName());
-                if (IsValidInstrumentName(selectedInstrument))
-                    _activeInstrumentSession.InstrumentName = selectedInstrument;
+                if (saveInstrumentName)
+                {
+                    var selectedInstrument = NormalizeInstrumentName(GetSelectedInstrumentName());
+                    if (IsValidInstrumentName(selectedInstrument))
+                        _activeInstrumentSession.InstrumentName = selectedInstrument;
+                }
 
                 _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
                 _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
@@ -352,7 +282,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 LogUnhandled("SafeTradeCopierTool.SaveUiToActiveSession()", ex);
                 throw;
-            }
+            } 
         }
 
         private void LoadActiveSessionToUi()

@@ -129,6 +129,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
+        private static double Clamp01(double x)
+        {
+            if (x < 0) return 0;
+            if (x > 1) return 1;
+            return x;
+        }
+        
+        private static double GetTickValue(Instrument instr)
+        {
+            if (instr?.MasterInstrument == null) return 0.0;
+            var tickSize = instr.MasterInstrument.TickSize;
+            var pointValue = instr.MasterInstrument.PointValue;
+            if (tickSize <= 0 || pointValue <= 0) return 0.0;
+            return tickSize * pointValue;
+        }
+        
         private static void EnsureRoundedProgressBar(ProgressBar bar, bool alignRight)
         {
             if (bar == null) return;
@@ -148,7 +164,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             bar.SnapsToDevicePixels = true;
         }
         
-        private void FinalizeBarOutcomeFromTag(ProgressBar bar)
+        private static void FinalizeBarOutcomeFromTag(ProgressBar bar)
         {
             if (bar == null) return;
 
@@ -160,7 +176,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 bar.Tag = "TARGET_FILLED";
         }
         
-        private void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
+        private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
         {
             if (bar == null || statusText == null) return;
 
@@ -199,7 +215,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             statusText.Visibility = Visibility.Visible;
         }
 
-        private void ClearBarOutcome(TextBlock statusText)
+        private static void ClearBarOutcome(TextBlock statusText)
         {
             if (statusText == null) return;
             statusText.Text = "";
@@ -241,6 +257,64 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             template.VisualTree = outer;
             return template;
+        }
+        
+        private static Brush GetPnlValueBrush(double value)
+        {
+            if (value > 0.009)
+                return Brushes.DarkGreen;
+
+            if (value < -0.009)
+                return Brushes.Firebrick;
+
+            return Brushes.DimGray;
+        }
+
+        private static void SetPnlText(TextBlock tb, string prefix, double realized, double unrealized, bool shortened)
+        {
+            if (tb == null)
+                return;
+
+            tb.Inlines.Clear();
+
+            if (!shortened)
+            {
+                tb.Inlines.Add(new System.Windows.Documents.Run(prefix + "  ")
+                {
+                    Foreground = Brushes.DimGray,
+                    FontWeight = FontWeights.SemiBold
+                });
+            }
+
+            tb.Inlines.Add(new System.Windows.Documents.Run("R ")
+            {
+                Foreground = Brushes.DimGray,
+                FontWeight = FontWeights.SemiBold
+            });
+
+            tb.Inlines.Add(new System.Windows.Documents.Run(FmtUsd(realized))
+            {
+                Foreground = GetPnlValueBrush(realized),
+                FontWeight = FontWeights.SemiBold
+            });
+
+            tb.Inlines.Add(new System.Windows.Documents.Run("   •   ")
+            {
+                Foreground = Brushes.DimGray,
+                FontWeight = FontWeights.SemiBold
+            });
+
+            tb.Inlines.Add(new System.Windows.Documents.Run("U ")
+            {
+                Foreground = Brushes.DimGray,
+                FontWeight = FontWeights.SemiBold
+            });
+
+            tb.Inlines.Add(new System.Windows.Documents.Run(FmtUsd(unrealized))
+            {
+                Foreground = GetPnlValueBrush(unrealized),
+                FontWeight = FontWeights.SemiBold
+            });
         }
     }
 }

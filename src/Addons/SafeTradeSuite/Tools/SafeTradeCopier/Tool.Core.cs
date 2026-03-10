@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -21,9 +20,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private ComboBox _instrumentSelector;
         private StackPanel _followersPanel;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
-
-        private DispatcherTimer _instrumentRefreshTimer;
-        private List<string> _lastInstrumentSnapshot = new List<string>();
 
         public void Show()
         {
@@ -110,16 +106,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
 
-        // If you still want to call HardClose() from UI code, keep it as a wrapper
-        private void HardClose()
-        {
-            lock (WindowGate)
-            {
-                UnsubscribeUiAccountEvents(Account.All);
-                CloseInternal(closeWindow: true);
-            }
-        }
-
+        
         private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _isClosing = true;
