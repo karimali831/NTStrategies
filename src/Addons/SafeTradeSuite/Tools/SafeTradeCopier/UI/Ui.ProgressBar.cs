@@ -66,8 +66,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var hasBracket = _engine.TryGetActiveBracketSpecForUi(account, instr, out var st, out var tk);
 
-            double uTmp = 0.0;
-            int qTmp = 0;
+            var uTmp = 0.0;
+            var qTmp = 0;
             var hasOpenPosition = false;
 
             if (hasBracket)
@@ -106,7 +106,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                 }
 
-                ShowBarOutcome(bar, statusText, rFinal, uFinal);
+                ShowBarOutcome(bar, statusText);
                 return;
             }
 
@@ -272,42 +272,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void FinalizeBarOutcomeFromTag(ProgressBar bar)
         {
-            if (bar == null)
-                return;
+            if (bar == null) return;
 
             var tag = bar.Tag as string;
 
-            if (string.IsNullOrWhiteSpace(tag))
-            {
-                bar.Tag = "ORDER_FILLED_NEUTRAL";
-                return;
-            }
-
-            if (string.Equals(tag, "TARGET_FILLED", StringComparison.Ordinal) ||
-                string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED_POS", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED_NEG", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED_NEUTRAL", StringComparison.Ordinal))
-                return;
-
-            if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal))
-            {
-                bar.Tag = "ORDER_FILLED_POS";
-                return;
-            }
-
             if (string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
-            {
-                bar.Tag = "ORDER_FILLED_NEG";
-                return;
-            }
-
-            if (!tag.StartsWith("OUTCOME_", StringComparison.Ordinal))
-                bar.Tag = "ORDER_FILLED_NEUTRAL";
+                bar.Tag = "STOP_FILLED";
+            else if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal))
+                bar.Tag = "TARGET_FILLED";
         }
         
-        private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText, double realized, double unrealized)
+        
+        private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
         {
             if (bar == null || statusText == null)
                 return;
@@ -377,7 +353,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var hideTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(1500)
+                Interval = TimeSpan.FromMilliseconds(2000)
             };
 
             hideTimer.Tick += (s, e) =>

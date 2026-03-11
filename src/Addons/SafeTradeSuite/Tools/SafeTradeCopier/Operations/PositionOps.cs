@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             eng.Log($"Flatten All clicked. Instr={instr.FullName}");
 
             if (_masterPnlBar != null)
-                _masterPnlBar.Tag = GetOrderFilledOutcomeTag(master, instr);
+                _masterPnlBar.Tag = "ORDER_FILLED";
 
             eng.EnsureFlatInstrument(master, instr);
 
@@ -58,7 +58,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (r.IncludeCheck?.IsChecked != true) continue;
 
                 if (r.PnlBar != null)
-                    r.PnlBar.Tag = GetOrderFilledOutcomeTag(r.Account, instr);
+                    r.PnlBar.Tag = "ORDER_FILLED";
 
                 eng.EnsureFlatInstrument(r.Account, instr);
             }
@@ -108,23 +108,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             return false;
-        }
-        
-        private static string GetOrderFilledOutcomeTag(Account acc, Instrument instr)
-        {
-            if (acc == null || instr == null)
-                return "ORDER_FILLED_NEUTRAL";
-
-            if (!TryGetInstrumentUnrealized(acc, instr, out var unrealized, out var absQty) || absQty <= 0)
-                return "ORDER_FILLED_NEUTRAL";
-
-            if (unrealized > 0.009)
-                return "ORDER_FILLED_POS";
-
-            if (unrealized < -0.009)
-                return "ORDER_FILLED_NEG";
-
-            return "ORDER_FILLED_NEUTRAL";
         }
     }
 }

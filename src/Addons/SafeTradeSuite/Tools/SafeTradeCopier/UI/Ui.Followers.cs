@@ -67,6 +67,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
                     
+                    if (r.PnlBar != null)
+                        r.PnlBar.Tag = "ORDER_FILLED";
+                    
                     eng.EnsureFlatInstrument(r.Account, instr);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
                 };
@@ -94,11 +97,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
                 rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
                 
                 var statusDot = new Border
                 {
@@ -162,6 +166,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Minimum = 0,
                     Maximum = 100,
                     Value = 0,
+                    Width = 180,
                     Margin = new Thickness(6, 2, 6, 0),
                     Visibility = Visibility.Collapsed
                 };
@@ -179,16 +184,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Visibility = Visibility.Collapsed
                 };
 
+                // Flatten
                 var flatten = new Button
                 {
-                    Content = "Flatten",
+                    Content = "❌",
                     Height = 24,
-                    Width = 96,
+                    Width = 20,
                     Foreground = Brushes.White,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 RenderFlattenButtonState(flatten, enabled: false);
+                
+                // Free trade
+                var freeTrade = new Button
+                {
+                    Content = "✓",
+                    Height = 24,
+                    Width = 20,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 
@@ -214,6 +231,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetColumn(atmBox, 4);
                 Grid.SetColumn(pnlStack, 5);
                 Grid.SetColumn(flatten, 6);
+                Grid.SetColumn(freeTrade, 7);
 
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
@@ -226,6 +244,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 rowGrid.Children.Add(atmBox);
                 rowGrid.Children.Add(pnlStack);
                 rowGrid.Children.Add(flatten);
+                rowGrid.Children.Add(freeTrade);
 
                 var row = new FollowerRow
                 {
@@ -297,11 +316,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });
             
 
             AddHeaderText(g, "Status", 0);
@@ -311,6 +331,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "Override ATM", 4);
             AddHeaderText(g, "PnL", 5);
             AddHeaderText(g, "Flatten", 6);
+            AddHeaderText(g, "Free Trade", 7);
 
             return g;
         }

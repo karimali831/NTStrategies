@@ -181,27 +181,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             qaRow.Children.Add(atmLbl);
             qaRow.Children.Add(_masterAtmBox);
 
-            var masterPnlWrap = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 6, 0, 0)
-            };
-
             _masterPnlText = new TextBlock
             {
                 Text = "Master   R $0.00   •   U $0.00",
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(0, 6, 0, 2),
                 Foreground = Brushes.DimGray,
                 FontWeight = FontWeights.SemiBold,
-                FontSize = 12,
-                HorizontalAlignment = HorizontalAlignment.Left
+                FontSize = 12
             };
 
-            var masterPnlBarWrap = new Grid
+            var masterPnlRow = new Grid
             {
-                HorizontalAlignment = HorizontalAlignment.Left
+                Margin = new Thickness(0, 6, 0, 0)
             };
+            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
 
             _masterPnlBar = new ProgressBar
             {
@@ -209,36 +203,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
+                Width = 180,
+                Margin = new Thickness(0, 0, 12, 0),
                 Visibility = Visibility.Collapsed,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            _masterPnlBar.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding("ActualWidth")
-            {
-                Source = _masterPnlText
-            });
-
             EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
+
+            Grid.SetColumn(_masterPnlBar, 0);
+            masterPnlRow.Children.Add(_masterPnlBar);
 
             _masterPnlBarStatusText = new TextBlock
             {
                 Text = "",
-                Margin = new Thickness(0, 4, 0, 0),
-                Foreground = SystemColors.WindowTextBrush,
-                FontSize = 11,
-                Visibility = Visibility.Collapsed,
-                HorizontalAlignment = HorizontalAlignment.Left
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.DimGray,
+                Margin = new Thickness(0, 0, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Visibility = Visibility.Collapsed
             };
-
-            masterPnlBarWrap.Children.Add(_masterPnlBar);
-
-            masterPnlWrap.Children.Add(_masterPnlText);
-            masterPnlWrap.Children.Add(masterPnlBarWrap);
-            masterPnlWrap.Children.Add(_masterPnlBarStatusText);
 
             masterStack.Children.Add(masterTopRow);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
-            masterStack.Children.Add(masterPnlWrap);
+            masterStack.Children.Add(_masterPnlText);
+            masterStack.Children.Add(masterPnlRow);
+            masterStack.Children.Add(_masterPnlBarStatusText);
 
             var masterFieldset = BuildFieldset("Master", masterStack);
             Grid.SetRow(masterFieldset, 3);
