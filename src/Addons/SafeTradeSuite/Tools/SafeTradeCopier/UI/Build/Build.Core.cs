@@ -131,6 +131,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshInstrumentSelectorItems();
                 RefreshInstrumentTabs();
                 LoadActiveSessionToUi();
+                RefreshStatusBar();
                 
                 return new ScrollViewer
                 {

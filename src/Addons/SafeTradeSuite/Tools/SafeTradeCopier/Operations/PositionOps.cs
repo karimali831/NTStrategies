@@ -46,20 +46,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             eng.Log($"Flatten All clicked. Instr={instr.FullName}");
-
-            if (_masterPnlBar != null)
-                _masterPnlBar.Tag = "ORDER_FILLED";
-
             eng.EnsureFlatInstrument(master, instr);
 
             foreach (var r in _followerRows)
             {
                 if (r?.Account == null) continue;
                 if (r.IncludeCheck?.IsChecked != true) continue;
-
-                if (r.PnlBar != null)
-                    r.PnlBar.Tag = "ORDER_FILLED";
-
+                
                 eng.EnsureFlatInstrument(r.Account, instr);
             }
 

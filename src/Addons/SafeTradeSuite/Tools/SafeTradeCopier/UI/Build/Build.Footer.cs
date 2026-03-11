@@ -6,13 +6,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private TextBox _statusBox;
+        private RowDefinition _footerStatusLabelRow;
+        private RowDefinition _footerStatusBoxRow;
         
         private void RenderFooter(Grid root)
         {
             var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
             bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
-            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status label
-            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status box
+            _footerStatusLabelRow = new RowDefinition { Height = GridLength.Auto };
+            _footerStatusBoxRow = new RowDefinition { Height = GridLength.Auto };
+            bottom.RowDefinitions.Add(_footerStatusLabelRow); // status label
+            bottom.RowDefinitions.Add(_footerStatusBoxRow);   // status box
 
             bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 
@@ -28,7 +32,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = 140,
+                Height = 110,
+                MinHeight = 110,
                 Background = SystemColors.ControlLightBrush,
                 Foreground = SystemColors.ControlTextBrush
             };

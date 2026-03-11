@@ -44,9 +44,69 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static readonly Dictionary<ProgressBar, DispatcherTimer> BarHideTimers =
             new Dictionary<ProgressBar, DispatcherTimer>();
-
+        private readonly Dictionary<string, string> _barDiagCache = new Dictionary<string, string>(StringComparer.Ordinal);
         private static ControlTemplate _roundedProgressTemplateLeft;
         private static ControlTemplate _roundedProgressTemplateRight;
+
+        private void RenderProgressBar(ProgressBar bar, TextBlock statusText, Account account)
+        {
+            if (bar == null || statusText == null || account == null || _engine == null)
+                return;
+
+            var instr = GetInstrument();
+            if (instr == null)
+            {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
+                bar.Visibility = Visibility.Collapsed;
+                bar.Value = 0;
+                bar.Tag = null;
+                ClearBarOutcome(statusText, bar);
+                return;
+            }
+
+            var hasBracket = _engine.TryGetActiveBracketSpecForUi(account, instr, out var st, out var tk);
+
+            double uTmp = 0.0;
+            int qTmp = 0;
+            var hasOpenPosition = false;
+
+            if (hasBracket)
+                hasOpenPosition = TryGetInstrumentUnrealized(account, instr, out uTmp, out qTmp);
+
+            if (hasOpenPosition)
+            {
+                ClearBarOutcome(statusText, bar);
+                LogBarDiagnostics(account, instr, uTmp, Math.Max(1, qTmp), st, tk);
+                RenderFlipBar(bar, uTmp, Math.Max(1, qTmp), st, tk, instr);
+                return;
+            }
+
+            var tag = bar.Tag as string ?? "";
+            var canFinalizeNow =
+                string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal) ||
+                string.Equals(tag, "LIVE_POS", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal);
+
+            if (canFinalizeNow)
+            {
+                FinalizeBarOutcomeFromTag(bar);
+                ShowBarOutcome(bar, statusText);
+                return;
+            }
+
+            bar.BeginAnimation(RangeBase.ValueProperty, null);
+            bar.Visibility = Visibility.Collapsed;
+            bar.Value = 0;
+
+            var existingTag = bar.Tag as string;
+            if (string.IsNullOrWhiteSpace(existingTag) ||
+                (!existingTag.StartsWith("OUTCOME_DONE:", StringComparison.Ordinal) &&
+                 !existingTag.StartsWith("OUTCOME_PENDING:", StringComparison.Ordinal)))
+            {
+                bar.Tag = null;
+                ClearBarOutcome(statusText, bar);
+            }
+        }
 
         private static readonly Brush GreenGrad = new LinearGradientBrush
         {
@@ -107,11 +167,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void RenderFlipBar(ProgressBar bar, double unrealized, int qty, int stopTicks, int targetTicks, Instrument instr)
         {
-            if (bar == null) return;
+            if (bar == null)
+                return;
+
             StopHideTimer(bar);
 
             if (instr == null || qty <= 0 || (stopTicks <= 0 && targetTicks <= 0))
             {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
                 bar.Visibility = Visibility.Collapsed;
                 bar.Value = 0;
                 return;
@@ -120,6 +183,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var tickValue = GetTickValue(instr);
             if (tickValue <= 0)
             {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
                 bar.Visibility = Visibility.Collapsed;
                 bar.Value = 0;
                 return;
@@ -146,10 +210,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var denom = stopRisk > 0 ? stopRisk : 1.0;
                 var used = Clamp01(Math.Abs(unrealized) / denom);
-                var remaining = 1.0 - used;
                 bar.Foreground = RedGrad;
                 bar.Tag = "LIVE_NEG";
-                SetBarValueAnimated(bar, remaining * 100.0);
+                SetBarValueAnimated(bar, used * 100.0);
             }
         }
         
@@ -193,7 +256,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void FinalizeBarOutcomeFromTag(ProgressBar bar)
         {
-            if (bar == null) return;
+            if (bar == null)
+                return;
 
             var tag = bar.Tag as string;
 
@@ -212,9 +276,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var tag = (bar.Tag as string) ?? "";
 
-            // stop any previous animation so final state renders exactly
             bar.BeginAnimation(RangeBase.ValueProperty, null);
 
+            string outcomeCode;
             string outcomeText;
             Brush outcomeBrush;
 
@@ -222,7 +286,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 EnsureRoundedProgressBar(bar, alignRight: true);
                 bar.Foreground = RedGrad;
-                bar.Value = 0;
+                bar.Value = 100;
+                outcomeCode = "STOP_FILLED";
                 outcomeText = "Stop Filled";
                 outcomeBrush = Brushes.IndianRed;
             }
@@ -231,6 +296,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 EnsureRoundedProgressBar(bar, alignRight: false);
                 bar.Foreground = GreenGrad;
                 bar.Value = 100;
+                outcomeCode = "ORDER_FILLED";
                 outcomeText = "Order Filled";
                 outcomeBrush = Brushes.SteelBlue;
             }
@@ -239,17 +305,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 EnsureRoundedProgressBar(bar, alignRight: false);
                 bar.Foreground = GreenGrad;
                 bar.Value = 100;
+                outcomeCode = "TARGET_FILLED";
                 outcomeText = "Target Filled";
                 outcomeBrush = Brushes.DarkGreen;
             }
 
+            bar.Visibility = Visibility.Visible;
             statusText.Text = "";
             statusText.Visibility = Visibility.Collapsed;
-            bar.Visibility = Visibility.Visible;
+
+            bar.Tag = "OUTCOME_PENDING:" + outcomeCode;
 
             var hideTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(850)
+                Interval = TimeSpan.FromMilliseconds(1000)
             };
 
             hideTimer.Tick += (s, e) =>
@@ -258,6 +327,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 BarHideTimers.Remove(bar);
 
                 bar.Visibility = Visibility.Collapsed;
+                bar.Tag = "OUTCOME_DONE:" + outcomeCode;
+
                 statusText.Text = outcomeText;
                 statusText.Foreground = outcomeBrush;
                 statusText.Visibility = Visibility.Visible;
@@ -270,7 +341,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static void ClearBarOutcome(TextBlock statusText, ProgressBar bar = null)
         {
             if (bar != null)
+            {
                 StopHideTimer(bar);
+
+                var tag = bar.Tag as string;
+                if (!string.IsNullOrWhiteSpace(tag) &&
+                    tag.StartsWith("OUTCOME_", StringComparison.Ordinal))
+                {
+                    bar.Tag = null;
+                }
+            }
 
             if (statusText == null)
                 return;
@@ -384,6 +464,55 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = GetPnlValueBrush(unrealized),
                 FontWeight = FontWeights.SemiBold
             });
+        }
+        
+        private void LogBarDiagnostics(Account account, Instrument instr, double unrealized, int qty, int stopTicks, int targetTicks)
+        {
+            if (account == null || instr == null || qty <= 0)
+                return;
+
+            var tickValue = GetTickValue(instr);
+            if (tickValue <= 0)
+                return;
+
+            var stopRisk = stopTicks > 0 ? stopTicks * tickValue * qty : 0.0;
+            var targetRisk = targetTicks > 0 ? targetTicks * tickValue * qty : 0.0;
+
+            string mode;
+            double pct;
+            string mathText;
+
+            if (unrealized >= 0)
+            {
+                var denom = targetRisk > 0 ? targetRisk : 1.0;
+                var raw = unrealized / denom;
+                var clamped = Clamp01(raw);
+                pct = clamped * 100.0;
+                mode = "POS";
+                mathText = $"pct = Clamp01({unrealized:0.00} / {denom:0.00}) * 100 = {pct:0.0}";
+            }
+            else
+            {
+                var denom = stopRisk > 0 ? stopRisk : 1.0;
+                var rawUsed = Math.Abs(unrealized) / denom;
+                var used = Clamp01(rawUsed);
+                pct = used * 100.0;
+                mode = "NEG";
+                mathText = $"pct = Clamp01({Math.Abs(unrealized):0.00} / {denom:0.00}) * 100 = {pct:0.0}";
+            }
+
+            var key = account.Name + "|" + instr.FullName;
+            var line =
+                $"[BAR DIAG] acc={account.Name} instr={instr.FullName} " +
+                $"u={unrealized:0.00} qty={qty} stTicks={stopTicks} tkTicks={targetTicks} " +
+                $"tickValue={tickValue:0.00} stopRisk={stopRisk:0.00} targetRisk={targetRisk:0.00} " +
+                $"mode={mode} {mathText}";
+
+            if (_barDiagCache.TryGetValue(key, out var prev) && prev == line)
+                return;
+
+            _barDiagCache[key] = line;
+            SafeTradeSuiteRuntime.PrintLog(line);
         }
     }
 }

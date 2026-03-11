@@ -66,10 +66,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         eng.Log("Invalid instrument.");
                         return;
                     }
-
-                    if (r.PnlBar != null)
-                        r.PnlBar.Tag = "ORDER_FILLED";
-
+                    
                     eng.EnsureFlatInstrument(r.Account, instr);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
                 };

@@ -29,56 +29,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return _statusBar;
         }
-
-        private void RenderStatusBar(
-            bool masterConnected,
-            bool copyEnabled,
-            bool armed,
-            bool simMode,
-            bool anyFollowerEnabled,
-            bool anyFollowerConnected,
-            bool globalLock,
-            string reason)
-        {
-            if (_statusBar == null || _statusBarText == null)
-                return;
-
-            CopierStatusState state;
-
-            if (!masterConnected || globalLock)
-            {
-                state = CopierStatusState.Red;
-            }
-            else if (!simMode && copyEnabled && armed && anyFollowerEnabled && anyFollowerConnected)
-            {
-                state = CopierStatusState.Green;
-            }
-            else
-            {
-                state = CopierStatusState.Yellow;
-            }
-
-            switch (state)
-            {
-                case CopierStatusState.Red:
-
-                    _statusBar.Background = Brushes.DarkRed;
-                    _statusBarText.Text = $"NOT READY • {reason}";
-                    break;
-
-                case CopierStatusState.Green:
-
-                    _statusBar.Background = Brushes.DarkGreen;
-                    _statusBarText.Text = "READY • LIVE • COPIER ARMED";
-                    break;
-
-                default:
-
-                    _statusBar.Background = Brushes.Goldenrod;
-                    _statusBarText.Text = $"READY • {reason}";
-                    break;
-            }
-        }
         
         private string GetReadyReason()
         {
@@ -107,7 +57,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return "";
         }
         
-
         
         private void RefreshStatusBar()
         {
