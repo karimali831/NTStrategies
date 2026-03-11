@@ -57,8 +57,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (eng.ApplyFreeTrade(masterAcc, instr, _freeTradeMinProfitPoints))
                     eng.Log($"Free Trade applied -> {masterAcc.Name} ({instr.FullName})");
             }
-
-            RenderBreakEvenEnablementUi();
         }
 
         private void FreeTradeAllSelected(SafeCopierEngine eng)
@@ -89,7 +87,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints);
-            RenderBreakEvenEnablementUi();
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)

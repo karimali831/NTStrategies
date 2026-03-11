@@ -77,7 +77,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshAccountsUi();
                 HandleFollowerConnectionSafety();
                 TryAutoRearmAfterReconnect();
-                RenderFlattenEnablementUi();
 
                 _engine?.Log(
                     $"Connection update: " +

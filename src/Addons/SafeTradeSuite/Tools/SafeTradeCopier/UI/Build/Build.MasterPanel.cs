@@ -14,6 +14,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnSellMkt;
         private Button _btnFlattenAll;
         private TextBlock _masterPnlBarStatusText;
+        private Button _btnFreeTradeAll;
+        private Button _btnMasterFreeTrade;
         
         private void RenderMasterPanel(SafeCopierEngine eng, Grid root)
         {
@@ -125,7 +127,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold
             };
-
+            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Free Trade All");
+            
             _btnFlattenAll = new Button
             {
                 Content = "Flatten All",
@@ -133,7 +136,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(6, 0, 0, 0),
                 Background = Brushes.Maroon,
                 Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold
+                FontWeight = FontWeights.SemiBold,
+                IsEnabled = false,
+                Opacity = 0.6
             };
             
             _btnFreeTradeAll.Click += (s, e) => FreeTradeAllSelected(eng);
@@ -286,7 +291,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SaveUiToActiveSession();
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 LoadActiveSessionToUi();
-                RenderFlattenEnablementUi();
                 RenderFlattenAllButtonState();
             };
 
@@ -309,7 +313,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (eng.CopyEnabled)
                     eng.SetCopyEnabled(true);
 
-                RenderFlattenEnablementUi();
                 RenderFlattenAllButtonState();
             };
 
@@ -346,7 +349,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 ActivateOrCreateInstrumentSession(instrumentName, refreshSelector: true);
-                RenderFlattenEnablementUi();
                 RenderFlattenAllButtonState();
             };
 

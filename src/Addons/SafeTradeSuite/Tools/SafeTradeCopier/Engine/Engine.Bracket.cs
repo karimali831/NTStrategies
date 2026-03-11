@@ -47,20 +47,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return true;
                 }
             }
-            
-            internal bool TryGetActiveBracketSpecForUi(Account acc, Instrument instr, out ActiveBracketSpec spec)
-            {
-                spec = null;
-                if (acc == null || instr == null)
-                    return false;
 
-                lock (_gate)
-                {
-                    return _activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out spec);
-                }
-            }
-            
-            internal bool TryGetActiveBracketSpec(Account acc, Instrument instr, out ActiveBracketSpec spec)
+            private bool TryGetActiveBracketSpec(Account acc, Instrument instr, out ActiveBracketSpec spec)
             {
                 spec = null;
                 if (acc == null || instr == null)
@@ -72,7 +60,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            internal void UpdateActiveBracketSpec(Account acc, Instrument instr, Action<ActiveBracketSpec> update)
+            private void UpdateActiveBracketSpec(Account acc, Instrument instr, Action<ActiveBracketSpec> update)
             {
                 if (acc == null || instr == null || update == null)
                     return;

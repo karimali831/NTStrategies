@@ -297,7 +297,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 ApplyConfigFromUi();
-                RenderFlattenEnablementUi();
                 RenderFollowerRowsState();
             }
             catch (Exception ex)

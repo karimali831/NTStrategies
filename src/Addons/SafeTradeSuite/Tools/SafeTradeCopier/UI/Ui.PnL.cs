@@ -23,6 +23,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (_isClosing || _window == null)
                     return;
+
                 var totalR = 0.0;
                 var totalU = 0.0;
 
@@ -42,7 +43,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     totalR += mr;
                     totalU += mu;
-                    
+
                     if (_masterPnlText != null)
                         SetPnlText(_masterPnlText, "Master", mr, mu, shortened: false);
 
@@ -55,7 +56,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var acc = row?.Account;
                     if (acc == null) continue;
 
-                    var r = 0.0; var u = 0.0;
+                    var r = 0.0;
+                    var u = 0.0;
                     lock (_uiPnl)
                     {
                         if (_uiPnl.TryGetValue(acc.Name, out var snap))
@@ -70,13 +72,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (row.PnlText != null)
                         SetPnlText(row.PnlText, "", r, u, shortened: true);
-                    
+
                     RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
                 }
 
                 if (_totalPnlText != null)
                     SetPnlText(_totalPnlText, "Total", totalR, totalU, shortened: false);
-                
+
+                RenderFlattenEnablementUi();
+                RenderBreakEvenEnablementUi();
+
             }, DispatcherPriority.Background);
         }
     }

@@ -22,8 +22,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             lock (_uiNet)
                 _uiNet[key] = qty;
-
-            RenderFlattenEnablementUi();
         }
         
         
@@ -51,7 +49,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RenderFlattenButtonState(row.FlattenBtn, canFlatten);
                 }
 
-                RenderBreakEvenEnablementUi();
                 RenderFlattenAllButtonState();
             }, DispatcherPriority.Background);
         }
@@ -95,22 +92,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void RenderBreakEvenEnablementUi()
         {
             var display = _uiDispatcher ?? _window?.Dispatcher;
-
+     
             display?.InvokeAsync(() =>
             {
                 var instr = GetInstrument();
                 if (instr == null)
                 {
                     if (_btnMasterFreeTrade != null)
-                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false);
+                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false, "Free Trade");
 
                     if (_btnFreeTradeAll != null)
-                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false);
+                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Free Trade All");
 
                     foreach (var row in _followerRows)
                     {
                         if (row?.FreeTradeBtn != null)
-                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false);
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✔");
                     }
 
                     return;
@@ -123,7 +120,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
                     var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster);
+                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster, "Free Trade");
                     anyCanApplyOrUndo |= canUndoMaster || canApplyMaster;
                 }
 
@@ -135,31 +132,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var enabledFollower = row.EnabledCheck?.IsChecked == true;
                     if (!enabledFollower || _freeTradeMinProfitPoints <= 0)
                     {
-                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false);
+                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✔");
                         continue;
                     }
 
                     var canUndo = _engine != null && _engine.CanUndoFreeTrade(row.Account, instr, out _);
                     var canApply = _engine != null && _engine.CanApplyFreeTrade(row.Account, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo);
+                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo, "✔");
                     anyCanApplyOrUndo |= canUndo || canApply;
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _freeTradeMinProfitPoints > 0, false);
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _freeTradeMinProfitPoints > 0, false, "Free Trade All");
             }, DispatcherPriority.Background);
         }
 
-        private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode)
+        private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode, string btnText)
         {
             if (btn == null)
                 return;
 
             btn.IsEnabled = enabled;
-            btn.Content = undoMode ? "Undo" : "BE";
+            btn.Content = undoMode ? "Undo" : btnText;
             btn.Background = enabled
-                ? (undoMode ? Brushes.DarkOrange : Brushes.SteelBlue)
+                ? undoMode ? Brushes.DarkOrange : Brushes.SteelBlue
                 : Brushes.Gray;
             btn.Foreground = Brushes.White;
             btn.Opacity = enabled ? 1.0 : 0.60;

@@ -11,8 +11,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TextBlock _statusLabel;
         private double _freeTradeMinProfitPoints = 1.0;
         private TextBox _freeTradeMinProfitPointsBox;
-        private Button _btnFreeTradeAll;
-        private Button _btnMasterFreeTrade;
 
         private void OpenSettingsPanel()
         {
@@ -120,8 +118,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _freeTradeMinProfitPoints = pts;
                 _freeTradeMinProfitPointsBox.Text = _freeTradeMinProfitPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-
-                RenderBreakEvenEnablementUi();
             };
 
             stack.Children.Add(simMode);
@@ -144,12 +140,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             EnforceSimOnlyModeUi(GetSelectableAccounts());
             ApplyConfigFromUi();
-
             RenderFollowerRowsState();
-            RenderFlattenEnablementUi();
-            RenderBreakEvenEnablementUi();
             RenderFlattenAllButtonState();
-
             RefreshStatusBar();
         }
         

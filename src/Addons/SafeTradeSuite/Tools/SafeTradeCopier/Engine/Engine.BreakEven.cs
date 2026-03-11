@@ -185,44 +185,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 var newStopPrice = spec.EntryPrice;
-                var exitAction = spec.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
                 var qty = Math.Max(1, spec.Qty);
-                var oco = string.IsNullOrWhiteSpace(spec.StopOco)
-                    ? "STC:BRK:" + Guid.NewGuid().ToString("N")
-                    : spec.StopOco;
 
                 try
                 {
-                    acc.Cancel(new[] { stop });
+                    stop.QuantityChanged = qty;
+                    stop.StopPriceChanged = newStopPrice;
+                    acc.Change(new[] { stop });
                 }
                 catch (Exception ex)
                 {
-                    Log($"[BE] APPLY cancel failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
-                    return false;
-                }
-
-                var replacement = acc.CreateOrder(
-                    instr,
-                    exitAction,
-                    OrderType.StopMarket,
-                    OrderEntry.Manual,
-                    TimeInForce.Day,
-                    qty,
-                    0,
-                    newStopPrice,
-                    oco,
-                    "STC:SL",
-                    DateTime.MaxValue,
-                    null
-                );
-
-                try
-                {
-                    acc.Submit(new[] { replacement });
-                }
-                catch (Exception ex)
-                {
-                    Log($"[BE] APPLY submit failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
+                    Log($"[BE] APPLY change failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
                     return false;
                 }
 
@@ -230,8 +203,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     x.CurrentStopPrice = newStopPrice;
                     x.IsFreeTradeApplied = true;
-                    x.StopOrderName = "STC:SL";
-                    x.StopOco = oco;
                 });
 
                 Log(
@@ -261,44 +232,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 var restoreStopPrice = spec.OriginalStopPrice;
-                var exitAction = spec.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
                 var qty = Math.Max(1, spec.Qty);
-                var oco = string.IsNullOrWhiteSpace(spec.StopOco)
-                    ? "STC:BRK:" + Guid.NewGuid().ToString("N")
-                    : spec.StopOco;
 
                 try
                 {
-                    acc.Cancel(new[] { stop });
+                    stop.QuantityChanged = qty;
+                    stop.StopPriceChanged = restoreStopPrice;
+                    acc.Change(new[] { stop });
                 }
                 catch (Exception ex)
                 {
-                    Log($"[BE] UNDO cancel failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
-                    return false;
-                }
-
-                var replacement = acc.CreateOrder(
-                    instr,
-                    exitAction,
-                    OrderType.StopMarket,
-                    OrderEntry.Manual,
-                    TimeInForce.Day,
-                    qty,
-                    0,
-                    restoreStopPrice,
-                    oco,
-                    "STC:SL",
-                    DateTime.MaxValue,
-                    null
-                );
-
-                try
-                {
-                    acc.Submit(new[] { replacement });
-                }
-                catch (Exception ex)
-                {
-                    Log($"[BE] UNDO submit failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
+                    Log($"[BE] UNDO change failed acc={acc.Name} instr={instr.FullName} msg={ex.Message}");
                     return false;
                 }
 
@@ -306,8 +250,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     x.CurrentStopPrice = restoreStopPrice;
                     x.IsFreeTradeApplied = false;
-                    x.StopOrderName = "STC:SL";
-                    x.StopOco = oco;
                 });
 
                 Log(
@@ -318,10 +260,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return true;
             }
 
-            internal int ApplyFreeTradeAll(IEnumerable<Account> accounts, Instrument instr, double minProfitPoints)
+            internal void ApplyFreeTradeAll(IEnumerable<Account> accounts, Instrument instr, double minProfitPoints)
             {
-                if (accounts == null || instr == null || minProfitPoints <= 0)
-                    return 0;
+                if (accounts == null || instr == null || minProfitPoints <= 0) return;
 
                 var applied = 0;
 
@@ -332,7 +273,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 Log($"[BE] APPLY ALL instr={instr.FullName} applied={applied}");
-                return applied;
             }
 
             private static Order FindWorkingManagedStop(Account acc, Instrument instr, ActiveBracketSpec spec)
