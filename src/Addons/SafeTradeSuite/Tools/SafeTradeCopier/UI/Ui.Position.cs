@@ -130,7 +130,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         continue;
 
                     var enabledFollower = row.EnabledCheck?.IsChecked == true;
-                    if (!enabledFollower || _freeTradeMinProfitPoints <= 0)
+                    if (!enabledFollower || !_breakEvenEnabled)
                     {
                         RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✔");
                         continue;
@@ -144,7 +144,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _freeTradeMinProfitPoints > 0, false, "Free Trade All");
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "Free Trade All");
             }, DispatcherPriority.Background);
         }
 
@@ -156,7 +156,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             btn.IsEnabled = enabled;
             btn.Content = undoMode ? "Undo" : btnText;
             btn.Background = enabled
-                ? undoMode ? Brushes.DarkOrange : Brushes.SteelBlue
+                ? undoMode ? Brushes.DarkOrange : Brushes.Purple
                 : Brushes.Gray;
             btn.Foreground = Brushes.White;
             btn.Opacity = enabled ? 1.0 : 0.60;

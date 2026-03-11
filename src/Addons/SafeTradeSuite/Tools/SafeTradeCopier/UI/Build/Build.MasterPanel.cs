@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterBox = new ComboBox
             {
                 Height = 30,
-                Margin = new Thickness(0, 0, 14, 0)
+                Margin = new Thickness(0, 0, 14, 0),
             };
 
             var instrumentLbl = new TextBlock
@@ -223,7 +223,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
-                Width = 180,
+                Width = 150,
                 Margin = new Thickness(0, 0, 12, 0),
                 Visibility = Visibility.Collapsed,
                 HorizontalAlignment = HorizontalAlignment.Left

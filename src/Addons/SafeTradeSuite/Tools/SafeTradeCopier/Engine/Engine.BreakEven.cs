@@ -25,9 +25,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return false;
                 }
 
-                if (minProfitPoints <= 0)
+                if (minProfitPoints < 0)
                 {
-                    reason = "Feature disabled";
+                    reason = "Invalid min profit points";
                     return false;
                 }
 
@@ -166,7 +166,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return true;
             }
 
-            internal bool ApplyFreeTrade(Account acc, Instrument instr, double minProfitPoints)
+            internal bool ApplyFreeTrade(Account acc, Instrument instr, double minProfitPoints, double plusPoints)
             {
                 if (!CanApplyFreeTrade(acc, instr, minProfitPoints, out var reason))
                 {
@@ -184,7 +184,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return false;
                 }
 
-                var newStopPrice = spec.EntryPrice;
+                var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
+                if (tickSize <= 0)
+                {
+                    Log($"[BE] SKIP acc={acc?.Name} instr={instr?.FullName} reason=invalid-ticksize");
+                    return false;
+                }
+
+                var offsetPoints = Math.Max(0.0, plusPoints);
+
+                var oldStopPrice = spec.CurrentStopPrice;
+
+                var newStopPrice = spec.IsBuy
+                    ? spec.EntryPrice + offsetPoints
+                    : spec.EntryPrice - offsetPoints;
+
+                newStopPrice = Math.Round(newStopPrice / tickSize, MidpointRounding.AwayFromZero) * tickSize;
                 var qty = Math.Max(1, spec.Qty);
 
                 try
@@ -208,7 +223,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Log(
                     $"[BE] APPLY acc={acc.Name} instr={instr.FullName} " +
                     $"side={(spec.IsBuy ? "Long" : "Short")} " +
-                    $"entry={spec.EntryPrice:0.00} oldStop={spec.CurrentStopPrice:0.00} newStop={newStopPrice:0.00}");
+                    $"entry={spec.EntryPrice:0.00} plusPts={plusPoints:0.##} oldStop={oldStopPrice:0.00} newStop={newStopPrice:0.00}");
 
                 return true;
             }
@@ -260,15 +275,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return true;
             }
 
-            internal void ApplyFreeTradeAll(IEnumerable<Account> accounts, Instrument instr, double minProfitPoints)
+            internal void ApplyFreeTradeAll(IEnumerable<Account> accounts, Instrument instr, double minProfitPoints, double plusPoints)
             {
-                if (accounts == null || instr == null || minProfitPoints <= 0) return;
+                if (accounts == null || instr == null) return;
 
                 var applied = 0;
 
                 foreach (var acc in accounts.Where(a => a != null).Distinct())
                 {
-                    if (ApplyFreeTrade(acc, instr, minProfitPoints))
+                    if (ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints))
                         applied++;
                 }
 

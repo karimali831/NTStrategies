@@ -96,9 +96,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    if (_freeTradeMinProfitPoints <= 0)
+                    if (!_breakEvenEnabled)
                     {
-                        eng.Log("Free Trade disabled in Settings.");
+                        eng.Log("Break-even disabled in Settings.");
                         return;
                     }
 
@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     else
                     {
-                        if (eng.ApplyFreeTrade(r.Account, instr, _freeTradeMinProfitPoints))
+                        if (eng.ApplyFreeTrade(r.Account, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints))
                             eng.Log($"Free Trade applied -> {r.Account.Name} ({instr.FullName})");
                     }
                 };
@@ -199,8 +199,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Minimum = 0,
                     Maximum = 100,
                     Value = 0,
-                    Width = 160,
-                    Margin = new Thickness(6, 2, 6, 0),
+                    Width = 150,
+                    Margin = new Thickness(6, 2, 6, 2),
                     Visibility = Visibility.Collapsed
                 };
                 EnsureRoundedProgressBar(pnlBar, alignRight: false);

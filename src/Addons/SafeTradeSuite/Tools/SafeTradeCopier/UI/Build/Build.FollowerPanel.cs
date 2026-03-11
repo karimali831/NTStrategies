@@ -19,7 +19,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var followersTitleRow = new Grid
             {
-                Margin = new Thickness(0, 0, 0, 6)
+                Margin = new Thickness(0, 0, 0, 2)
             };
 
             followersTitleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Height = 28,
                 MinWidth = 120,
-                Padding = new Thickness(10, 2, 10, 2),
+                Padding = new Thickness(10, 0, 10, 0),
                 Margin = new Thickness(10, 0, 0, 0),
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Brushes.White,

@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FreeTradeMasterSelected(SafeCopierEngine eng)
         {
-            if (!( _masterBox?.SelectedItem is Account masterAcc))
+            if (!(_masterBox?.SelectedItem is Account masterAcc))
                 return;
 
             var instr = GetInstrument();
@@ -41,9 +41,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            if (_freeTradeMinProfitPoints <= 0)
+            if (!_breakEvenEnabled)
             {
-                eng.Log("Free Trade disabled in Settings.");
+                eng.Log("Break-even disabled in Settings.");
                 return;
             }
 
@@ -54,9 +54,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
             else
             {
-                if (eng.ApplyFreeTrade(masterAcc, instr, _freeTradeMinProfitPoints))
+                if (eng.ApplyFreeTrade(masterAcc, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints))
                     eng.Log($"Free Trade applied -> {masterAcc.Name} ({instr.FullName})");
             }
+
+            RenderBreakEvenEnablementUi();
         }
 
         private void FreeTradeAllSelected(SafeCopierEngine eng)
@@ -68,9 +70,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            if (_freeTradeMinProfitPoints <= 0)
+            if (!_breakEvenEnabled)
             {
-                eng.Log("Free Trade disabled in Settings.");
+                eng.Log("Break-even disabled in Settings.");
                 return;
             }
 
@@ -86,7 +88,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 accounts.Add(r.Account);
             }
 
-            eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints);
+            eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints);
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)
