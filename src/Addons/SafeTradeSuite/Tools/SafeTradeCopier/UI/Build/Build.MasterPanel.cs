@@ -190,16 +190,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 FontSize = 12
             };
 
+            var masterPnlRow = new Grid
+            {
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+
             _masterPnlBar = new ProgressBar
             {
                 Height = 10,
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
-                Margin = new Thickness(0, 6, 0, 0),
-                Visibility = Visibility.Collapsed
+                Width = 420,
+                Margin = new Thickness(0, 0, 12, 0),
+                Visibility = Visibility.Collapsed,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
             EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
+
+            Grid.SetColumn(_masterPnlBar, 0);
+            masterPnlRow.Children.Add(_masterPnlBar);
 
             _masterPnlBarStatusText = new TextBlock
             {
@@ -207,14 +219,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 4, 0, 0),
                 Foreground = SystemColors.WindowTextBrush,
                 FontSize = 11,
-                Visibility = Visibility.Collapsed
+                Visibility = Visibility.Collapsed,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
 
             masterStack.Children.Add(masterTopRow);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
             masterStack.Children.Add(_masterPnlText);
-            masterStack.Children.Add(_masterPnlBar);
+            masterStack.Children.Add(masterPnlRow);
             masterStack.Children.Add(_masterPnlBarStatusText);
 
             var masterFieldset = BuildFieldset("Master", masterStack);

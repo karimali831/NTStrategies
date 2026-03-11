@@ -90,7 +90,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (canFinalizeNow)
             {
                 FinalizeBarOutcomeFromTag(bar);
-                ShowBarOutcome(bar, statusText);
+
+                var rFinal = 0.0;
+                var uFinal = 0.0;
+
+                lock (_uiPnl)
+                {
+                    if (_uiPnl.TryGetValue(account.Name, out var snap))
+                    {
+                        rFinal = snap.r;
+                        uFinal = snap.u;
+                    }
+                }
+
+                ShowBarOutcome(bar, statusText, rFinal, uFinal);
                 return;
             }
 
@@ -159,7 +172,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 From = current,
                 To = target,
-                Duration = TimeSpan.FromMilliseconds(45)
+                Duration = TimeSpan.FromMilliseconds(80)
             };
 
             bar.BeginAnimation(RangeBase.ValueProperty, anim, HandoffBehavior.SnapshotAndReplace);
@@ -261,13 +274,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var tag = bar.Tag as string;
 
-            if (string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
-                bar.Tag = "STOP_FILLED";
-            else if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal))
-                bar.Tag = "TARGET_FILLED";
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                bar.Tag = "ORDER_FILLED";
+                return;
+            }
+
+            if (string.Equals(tag, "TARGET_FILLED", StringComparison.Ordinal) ||
+                string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal))
+                return;
+
+            if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal) ||
+                string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
+            {
+                bar.Tag = "ORDER_FILLED";
+            }
         }
         
-        private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText)
+        private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText, double realized, double unrealized)
         {
             if (bar == null || statusText == null)
                 return;
@@ -281,36 +306,43 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             string outcomeCode;
             string outcomeText;
             Brush outcomeBrush;
+            Brush fillBrush;
+            bool alignRight;
 
             if (string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal))
             {
-                EnsureRoundedProgressBar(bar, alignRight: true);
-                bar.Foreground = RedGrad;
-                bar.Value = 100;
                 outcomeCode = "STOP_FILLED";
                 outcomeText = "Stop Filled";
                 outcomeBrush = Brushes.IndianRed;
+                fillBrush = RedGrad;
+                alignRight = true;
             }
-            else if (string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal))
+            else if (string.Equals(tag, "TARGET_FILLED", StringComparison.Ordinal))
             {
-                EnsureRoundedProgressBar(bar, alignRight: false);
-                bar.Foreground = GreenGrad;
-                bar.Value = 100;
-                outcomeCode = "ORDER_FILLED";
-                outcomeText = "Order Filled";
-                outcomeBrush = Brushes.SteelBlue;
-            }
-            else
-            {
-                EnsureRoundedProgressBar(bar, alignRight: false);
-                bar.Foreground = GreenGrad;
-                bar.Value = 100;
                 outcomeCode = "TARGET_FILLED";
                 outcomeText = "Target Filled";
                 outcomeBrush = Brushes.DarkGreen;
+                fillBrush = GreenGrad;
+                alignRight = false;
+            }
+            else
+            {
+                outcomeCode = "ORDER_FILLED";
+                outcomeText = "Order Filled";
+
+                var finalPnl = realized + unrealized;
+                var positive = finalPnl >= 0;
+
+                outcomeBrush = positive ? Brushes.DarkGreen : Brushes.IndianRed;
+                fillBrush = positive ? GreenGrad : RedGrad;
+                alignRight = !positive;
             }
 
+            EnsureRoundedProgressBar(bar, alignRight: alignRight);
+            bar.Foreground = fillBrush;
+            bar.Value = 100;
             bar.Visibility = Visibility.Visible;
+
             statusText.Text = "";
             statusText.Visibility = Visibility.Collapsed;
 
@@ -318,7 +350,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var hideTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(1000)
+                Interval = TimeSpan.FromMilliseconds(1500)
             };
 
             hideTimer.Tick += (s, e) =>
