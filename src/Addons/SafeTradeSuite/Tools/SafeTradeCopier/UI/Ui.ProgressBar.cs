@@ -85,7 +85,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var canFinalizeNow =
                 string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal) ||
                 string.Equals(tag, "LIVE_POS", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal);
+                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_POS", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_NEG", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_NEUTRAL", StringComparison.Ordinal);
 
             if (canFinalizeNow)
             {
@@ -276,20 +279,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (string.IsNullOrWhiteSpace(tag))
             {
-                bar.Tag = "ORDER_FILLED";
+                bar.Tag = "ORDER_FILLED_NEUTRAL";
                 return;
             }
 
             if (string.Equals(tag, "TARGET_FILLED", StringComparison.Ordinal) ||
                 string.Equals(tag, "STOP_FILLED", StringComparison.Ordinal) ||
-                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal))
+                string.Equals(tag, "ORDER_FILLED", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_POS", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_NEG", StringComparison.Ordinal) ||
+                string.Equals(tag, "ORDER_FILLED_NEUTRAL", StringComparison.Ordinal))
                 return;
 
-            if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal) ||
-                string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
+            if (string.Equals(tag, "LIVE_POS", StringComparison.Ordinal))
             {
-                bar.Tag = "ORDER_FILLED";
+                bar.Tag = "ORDER_FILLED_POS";
+                return;
             }
+
+            if (string.Equals(tag, "LIVE_NEG", StringComparison.Ordinal))
+            {
+                bar.Tag = "ORDER_FILLED_NEG";
+                return;
+            }
+
+            if (!tag.StartsWith("OUTCOME_", StringComparison.Ordinal))
+                bar.Tag = "ORDER_FILLED_NEUTRAL";
         }
         
         private static void ShowBarOutcome(ProgressBar bar, TextBlock statusText, double realized, double unrealized)
@@ -330,12 +345,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 outcomeCode = "ORDER_FILLED";
                 outcomeText = "Order Filled";
 
-                var finalPnl = realized + unrealized;
-                var positive = finalPnl >= 0;
-
-                outcomeBrush = positive ? Brushes.DarkGreen : Brushes.IndianRed;
-                fillBrush = positive ? GreenGrad : RedGrad;
-                alignRight = !positive;
+                if (string.Equals(tag, "ORDER_FILLED_POS", StringComparison.Ordinal))
+                {
+                    outcomeBrush = Brushes.DarkGreen;
+                    fillBrush = GreenGrad;
+                    alignRight = false;
+                }
+                else if (string.Equals(tag, "ORDER_FILLED_NEG", StringComparison.Ordinal))
+                {
+                    outcomeBrush = Brushes.IndianRed;
+                    fillBrush = RedGrad;
+                    alignRight = true;
+                }
+                else
+                {
+                    outcomeBrush = Brushes.SteelBlue;
+                    fillBrush = GreenGrad;
+                    alignRight = false;
+                }
             }
 
             EnsureRoundedProgressBar(bar, alignRight: alignRight);

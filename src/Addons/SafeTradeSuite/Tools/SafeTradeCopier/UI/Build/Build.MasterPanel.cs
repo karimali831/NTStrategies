@@ -181,21 +181,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             qaRow.Children.Add(atmLbl);
             qaRow.Children.Add(_masterAtmBox);
 
+            var masterPnlWrap = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+
             _masterPnlText = new TextBlock
             {
                 Text = "Master   R $0.00   •   U $0.00",
-                Margin = new Thickness(0, 6, 0, 2),
+                Margin = new Thickness(0, 0, 0, 2),
                 Foreground = Brushes.DimGray,
                 FontWeight = FontWeights.SemiBold,
-                FontSize = 12
+                FontSize = 12,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
 
-            var masterPnlRow = new Grid
+            var masterPnlBarWrap = new Grid
             {
-                Margin = new Thickness(0, 6, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Left
             };
-            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
-            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
 
             _masterPnlBar = new ProgressBar
             {
@@ -203,15 +209,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
-                Width = 420,
-                Margin = new Thickness(0, 0, 12, 0),
                 Visibility = Visibility.Collapsed,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
+            _masterPnlBar.SetBinding(FrameworkElement.WidthProperty, new System.Windows.Data.Binding("ActualWidth")
+            {
+                Source = _masterPnlText
+            });
 
-            Grid.SetColumn(_masterPnlBar, 0);
-            masterPnlRow.Children.Add(_masterPnlBar);
+            EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
 
             _masterPnlBarStatusText = new TextBlock
             {
@@ -223,12 +229,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HorizontalAlignment = HorizontalAlignment.Left
             };
 
+            masterPnlBarWrap.Children.Add(_masterPnlBar);
+
+            masterPnlWrap.Children.Add(_masterPnlText);
+            masterPnlWrap.Children.Add(masterPnlBarWrap);
+            masterPnlWrap.Children.Add(_masterPnlBarStatusText);
+
             masterStack.Children.Add(masterTopRow);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
-            masterStack.Children.Add(_masterPnlText);
-            masterStack.Children.Add(masterPnlRow);
-            masterStack.Children.Add(_masterPnlBarStatusText);
+            masterStack.Children.Add(masterPnlWrap);
 
             var masterFieldset = BuildFieldset("Master", masterStack);
             Grid.SetRow(masterFieldset, 3);
