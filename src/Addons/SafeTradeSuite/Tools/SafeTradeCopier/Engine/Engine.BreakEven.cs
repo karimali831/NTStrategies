@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (spec.IsFreeTradeApplied)
                 {
-                    reason = "Already free trade";
+                    reason = "Already Break-even";
                     return false;
                 }
 
@@ -139,7 +139,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (!spec.IsFreeTradeApplied)
                 {
-                    reason = "Free trade not applied";
+                    reason = "Break-even not applied";
                     return false;
                 }
 

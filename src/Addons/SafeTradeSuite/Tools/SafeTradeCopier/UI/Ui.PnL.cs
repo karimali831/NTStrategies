@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     totalU += mu;
 
                     if (_masterPnlText != null)
-                        SetPnlText(_masterPnlText, "Master", mr, mu, shortened: false);
+                        SetPnlText(_masterPnlText, "", mr, mu, shortened: false);
 
                     RenderProgressBar(_masterPnlBar, _masterPnlBarStatusText, master);
                 }

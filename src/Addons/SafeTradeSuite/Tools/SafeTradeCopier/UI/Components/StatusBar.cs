@@ -74,7 +74,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 case CopierStatusState.Green:
 
                     _statusBar.Background = Brushes.DarkGreen;
-                    _statusBarText.Text = "READY • LIVE • ARMED";
+                    _statusBarText.Text = "READY • LIVE • COPIER ARMED";
                     break;
 
                 default:

@@ -99,10 +99,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (instr == null)
                 {
                     if (_btnMasterFreeTrade != null)
-                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false, "Free Trade");
+                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false,"Break-even");
 
                     if (_btnFreeTradeAll != null)
-                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Free Trade All");
+                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Break-even All");
 
                     foreach (var row in _followerRows)
                     {
@@ -120,7 +120,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
                     var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster, "Free Trade");
+                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster,"Break-even");
                     anyCanApplyOrUndo |= canUndoMaster || canApplyMaster;
                 }
 
@@ -144,7 +144,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "Free Trade All");
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "Break-even All");
             }, DispatcherPriority.Background);
         }
 
@@ -154,9 +154,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             btn.IsEnabled = enabled;
-            btn.Content = undoMode ? "Undo" : btnText;
+            btn.Content = undoMode ? "Undo BE" : btnText;
             btn.Background = enabled
-                ? undoMode ? Brushes.DarkOrange : Brushes.Purple
+                ? undoMode ? Brushes.DarkOrange : Brushes.BlueViolet
                 : Brushes.Gray;
             btn.Foreground = Brushes.White;
             btn.Opacity = enabled ? 1.0 : 0.60;

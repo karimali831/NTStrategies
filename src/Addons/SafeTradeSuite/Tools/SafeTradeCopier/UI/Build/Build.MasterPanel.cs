@@ -120,14 +120,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             _btnFreeTradeAll = new Button
             {
-                Content = "Free Trade All",
+                Content = "Break-even All",
                 Height = 36,
                 Margin = new Thickness(6, 0, 6, 0),
                 Background = Brushes.SteelBlue,
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold
             };
-            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Free Trade All");
+            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Break-even All");
             
             _btnFlattenAll = new Button
             {
@@ -164,7 +164,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var qtyLbl = new TextBlock
             {
-                Text = "Order qty:",
+                Text = "Order Qty:",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 Foreground = SystemColors.WindowTextBrush
@@ -257,7 +257,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnMasterFreeTrade = new Button
             {
-                Content = "Free Trade",
+                Content = "Break-even",
                 Height = 24,
                 MinWidth = 90,
                 Margin = new Thickness(8, 0, 0, 0),

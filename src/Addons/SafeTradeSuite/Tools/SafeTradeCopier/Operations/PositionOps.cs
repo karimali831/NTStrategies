@@ -50,12 +50,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (eng.CanUndoFreeTrade(masterAcc, instr, out _))
             {
                 if (eng.UndoFreeTrade(masterAcc, instr))
-                    eng.Log($"Free Trade undone -> {masterAcc.Name} ({instr.FullName})");
+                    eng.Log($"Break-even undone -> {masterAcc.Name} ({instr.FullName})");
             }
             else
             {
                 if (eng.ApplyFreeTrade(masterAcc, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints))
-                    eng.Log($"Free Trade applied -> {masterAcc.Name} ({instr.FullName})");
+                    eng.Log($"Break-even applied -> {masterAcc.Name} ({instr.FullName})");
             }
 
             RenderBreakEvenEnablementUi();

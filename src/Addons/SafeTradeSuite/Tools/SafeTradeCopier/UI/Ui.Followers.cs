@@ -105,12 +105,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (eng.CanUndoFreeTrade(r.Account, instr, out _))
                     {
                         if (eng.UndoFreeTrade(r.Account, instr))
-                            eng.Log($"Free Trade undone -> {r.Account.Name} ({instr.FullName})");
+                            eng.Log($"Break-even undone -> {r.Account.Name} ({instr.FullName})");
                     }
                     else
                     {
                         if (eng.ApplyFreeTrade(r.Account, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints))
-                            eng.Log($"Free Trade applied -> {r.Account.Name} ({instr.FullName})");
+                            eng.Log($"Break-even applied -> {r.Account.Name} ({instr.FullName})");
                     }
                 };
             }
@@ -200,7 +200,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Maximum = 100,
                     Value = 0,
                     Width = 150,
-                    Margin = new Thickness(6, 2, 6, 2),
+                    Margin = new Thickness(0, 2, 0, 2),
                     Visibility = Visibility.Collapsed
                 };
                 EnsureRoundedProgressBar(pnlBar, alignRight: false);
@@ -229,7 +229,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 RenderFlattenButtonState(flatten, enabled: false);
                 
-                // Free trade
+                // Break-even
                 var freeTrade = new Button
                 {
                     Content = "✓",
@@ -348,7 +348,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Override ATM
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // PnL
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75) });   // BE
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });   // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75) });   // Flatten
         }
         
         private static Grid BuildFollowerHeaderRow()
@@ -367,7 +367,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "Override Qty", 3);
             AddHeaderText(g, "Override ATM", 4);
             AddHeaderText(g, "PnL", 5);
-            AddHeaderText(g, "Free Trade", 6);
+            AddHeaderText(g,"Break-even", 6);
             AddHeaderText(g, "Flatten", 7);
 
             return g;

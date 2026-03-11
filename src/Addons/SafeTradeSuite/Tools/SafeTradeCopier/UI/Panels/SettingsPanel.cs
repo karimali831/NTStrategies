@@ -130,7 +130,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var minProfitHint = new TextBlock
             {
-                Text = "Required before BE allowed",
+                Text = "Required before Break-even Allowed",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Foreground = Brushes.DimGray
