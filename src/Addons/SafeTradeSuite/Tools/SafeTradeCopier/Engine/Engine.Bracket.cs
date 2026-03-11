@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            private bool TryGetActiveBracketSpec(Account acc, Instrument instr, out ActiveBracketSpec spec)
+            public bool TryGetActiveBracketSpec(Account acc, Instrument instr, out ActiveBracketSpec spec)
             {
                 spec = null;
                 if (acc == null || instr == null)

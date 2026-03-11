@@ -170,7 +170,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 // Tear down old wiring (if any)
                 if (_master != null)
+                {
                     _master.ExecutionUpdate -= OnMasterExecution;
+                    _master.OrderUpdate -= OnMasterOrderUpdate;
+                }
 
                 foreach (var f in _followers)
                 {
@@ -188,10 +191,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _instrumentName = _configuredInstrumentName;
                 _instrument = _configuredInstrument;
 
-                // Always wire master execution if we have a valid master + instrument.
-                // This is required so master ATM/bracket orders work even with COPY OFF / no followers.
+                // Always wire master execution + order updates if we have a valid master + instrument.
+                // This is required so master ATM/bracket orders and manual chart edits stay synced
+                // even with COPY OFF / no followers.
                 if (_master != null && _instrument != null)
+                {
                     _master.ExecutionUpdate += OnMasterExecution;
+                    _master.OrderUpdate += OnMasterOrderUpdate;
+                }
 
                 // Arm follower-copy logic only if copy is enabled and config is fully ready
                 if (!_copyEnabled || !IsReady_NoLock(out _))

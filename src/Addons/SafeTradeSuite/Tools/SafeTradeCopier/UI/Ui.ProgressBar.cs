@@ -64,7 +64,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var hasBracket = _engine.TryGetActiveBracketSpecForUi(account, instr, out var st, out var tk);
+            var hasBracket = _engine.TryGetActiveBracketSpec(account, instr, out var spec);
 
             var uTmp = 0.0;
             var qTmp = 0;
@@ -73,11 +73,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (hasBracket)
                 hasOpenPosition = TryGetInstrumentUnrealized(account, instr, out uTmp, out qTmp);
 
-            if (hasOpenPosition)
+            if (hasOpenPosition && spec != null)
             {
                 ClearBarOutcome(statusText, bar);
-                LogBarDiagnostics(account, instr, uTmp, Math.Max(1, qTmp), st, tk);
-                RenderFlipBar(bar, uTmp, Math.Max(1, qTmp), st, tk, instr);
+
+                var qty = Math.Max(1, qTmp);
+
+                LogBarDiagnostics(account, instr, uTmp, qty, spec);
+                RenderFlipBar(bar, uTmp, qty, spec, instr);
                 return;
             }
 
@@ -93,19 +96,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (canFinalizeNow)
             {
                 FinalizeBarOutcomeFromTag(bar);
-
-                var rFinal = 0.0;
-                var uFinal = 0.0;
-
-                lock (_uiPnl)
-                {
-                    if (_uiPnl.TryGetValue(account.Name, out var snap))
-                    {
-                        rFinal = snap.r;
-                        uFinal = snap.u;
-                    }
-                }
-
                 ShowBarOutcome(bar, statusText);
                 return;
             }
@@ -181,14 +171,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             bar.BeginAnimation(RangeBase.ValueProperty, anim, HandoffBehavior.SnapshotAndReplace);
         }
         
-        private static void RenderFlipBar(ProgressBar bar, double unrealized, int qty, int stopTicks, int targetTicks, Instrument instr)
+        private static void RenderFlipBar(
+            ProgressBar bar,
+            double unrealized,
+            int qty,
+            SafeCopierEngine.ActiveBracketSpec spec,
+            Instrument instr)
         {
             if (bar == null)
                 return;
 
             StopHideTimer(bar);
 
-            if (instr == null || qty <= 0 || (stopTicks <= 0 && targetTicks <= 0))
+            if (instr == null || spec == null || qty <= 0)
             {
                 bar.BeginAnimation(RangeBase.ValueProperty, null);
                 bar.Visibility = Visibility.Collapsed;
@@ -197,7 +192,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             var tickValue = GetTickValue(instr);
-            if (tickValue <= 0)
+            if (tickValue <= 0 || spec.EntryPrice <= 0)
             {
                 bar.BeginAnimation(RangeBase.ValueProperty, null);
                 bar.Visibility = Visibility.Collapsed;
@@ -205,8 +200,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var stopRisk = stopTicks > 0 ? stopTicks * tickValue * qty : 0.0;
-            var targetRisk = targetTicks > 0 ? targetTicks * tickValue * qty : 0.0;
+            var stopRisk = 0.0;
+            var targetRisk = 0.0;
+
+            if (spec.CurrentStopPrice > 0)
+                stopRisk = Math.Abs(spec.EntryPrice - spec.CurrentStopPrice) / instr.MasterInstrument.TickSize * tickValue * qty;
+
+            if (spec.TargetPrice > 0)
+                targetRisk = Math.Abs(spec.TargetPrice - spec.EntryPrice) / instr.MasterInstrument.TickSize * tickValue * qty;
+
+            if (stopRisk <= 0 && targetRisk <= 0)
+            {
+                bar.BeginAnimation(RangeBase.ValueProperty, null);
+                bar.Visibility = Visibility.Collapsed;
+                bar.Value = 0;
+                return;
+            }
 
             bar.Visibility = Visibility.Visible;
 
@@ -501,17 +510,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             });
         }
         
-        private void LogBarDiagnostics(Account account, Instrument instr, double unrealized, int qty, int stopTicks, int targetTicks)
+        private void LogBarDiagnostics(Account account, Instrument instr, double unrealized, int qty, SafeCopierEngine.ActiveBracketSpec spec)
         {
-            if (account == null || instr == null || qty <= 0)
+            if (account == null || instr == null || spec == null || qty <= 0)
                 return;
 
             var tickValue = GetTickValue(instr);
-            if (tickValue <= 0)
+            var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
+            if (tickValue <= 0 || tickSize <= 0)
                 return;
 
-            var stopRisk = stopTicks > 0 ? stopTicks * tickValue * qty : 0.0;
-            var targetRisk = targetTicks > 0 ? targetTicks * tickValue * qty : 0.0;
+            var stopRisk = 0.0;
+            var targetRisk = 0.0;
+
+            if (spec.CurrentStopPrice > 0 && spec.EntryPrice > 0)
+                stopRisk = Math.Abs(spec.EntryPrice - spec.CurrentStopPrice) / tickSize * tickValue * qty;
+
+            if (spec.TargetPrice > 0 && spec.EntryPrice > 0)
+                targetRisk = Math.Abs(spec.TargetPrice - spec.EntryPrice) / tickSize * tickValue * qty;
 
             string mode;
             double pct;
@@ -539,7 +555,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var key = account.Name + "|" + instr.FullName;
             var line =
                 $"[BAR DIAG] acc={account.Name} instr={instr.FullName} " +
-                $"u={unrealized:0.00} qty={qty} stTicks={stopTicks} tkTicks={targetTicks} " +
+                $"u={unrealized:0.00} qty={qty} " +
+                $"entry={spec.EntryPrice:0.00} stop={spec.CurrentStopPrice:0.00} target={spec.TargetPrice:0.00} " +
                 $"tickValue={tickValue:0.00} stopRisk={stopRisk:0.00} targetRisk={targetRisk:0.00} " +
                 $"mode={mode} {mathText}";
 

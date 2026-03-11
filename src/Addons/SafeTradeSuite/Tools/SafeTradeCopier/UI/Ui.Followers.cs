@@ -346,7 +346,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Override Qty
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Override ATM
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // PnL
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75) });   // BE
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });   // Flatten
         }
