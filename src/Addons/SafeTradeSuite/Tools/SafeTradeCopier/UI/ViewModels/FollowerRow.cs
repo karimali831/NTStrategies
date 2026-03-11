@@ -19,6 +19,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public Button FlattenBtn;
             public ProgressBar PnlBar;
             public TextBlock PnlBarStatusText;
+            public Button FreeTradeBtn { get; set; }
 
             public string AccountName => Account?.Name ?? "";
             public CheckBox IncludeCheck => EnabledCheck;

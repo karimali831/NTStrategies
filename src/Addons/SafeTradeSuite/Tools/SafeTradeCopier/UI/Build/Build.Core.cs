@@ -79,6 +79,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RefreshStatusBar();
                         RenderButtons(eng.CopyEnabled);
                         RenderFollowerRowsState();
+                        RenderBreakEvenEnablementUi();
                         RenderFlattenEnablementUi();
                     }, DispatcherPriority.Background);
                 };
@@ -96,6 +97,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RefreshStatusBar();
                         RenderButtons(copyOn);
                         RenderFollowerRowsState();
+                        RenderBreakEvenEnablementUi();
                         RenderFlattenEnablementUi();
                     }, DispatcherPriority.Background);
                 };
@@ -118,6 +120,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 EnforceSimOnlyModeUi(accounts);
                 RenderFollowerRowsState();
                 WireFollowerFlattenButtons(eng);
+                WireFollowerFreeTradeButtons(eng);
 
                 // ATMs
                 LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
@@ -132,6 +135,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshInstrumentTabs();
                 LoadActiveSessionToUi();
                 RefreshStatusBar();
+                RenderBreakEvenEnablementUi();
                 
                 return new ScrollViewer
                 {

@@ -248,16 +248,49 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (orders.Count > 0)
                 {
+                    var currentStopPrice = 0.0;
+                    var targetPrice = 0.0;
+                    string stopOrderName = null;
+                    string targetOrderName = null;
+
+                    if (pb.TargetTicks > 0)
+                    {
+                        targetPrice = pb.IsBuy
+                            ? fillPrice + pb.TargetTicks * tickSize
+                            : fillPrice - pb.TargetTicks * tickSize;
+
+                        targetOrderName = "STC:TP";
+                    }
+
+                    if (pb.StopTicks > 0)
+                    {
+                        currentStopPrice = pb.IsBuy
+                            ? fillPrice - pb.StopTicks * tickSize
+                            : fillPrice + pb.StopTicks * tickSize;
+
+                        stopOrderName = "STC:SL";
+                    }
+
                     lock (_gate)
                     {
-                        _activeBracketByAccInstr[BracketKey(master, instr)] = 
+                        _activeBracketByAccInstr[BracketKey(master, instr)] =
                             new ActiveBracketSpec
                             {
                                 StopTicks = pb.StopTicks,
-                                TargetTicks = pb.TargetTicks
+                                TargetTicks = pb.TargetTicks,
+                                IsBuy = pb.IsBuy,
+                                Qty = pb.Qty,
+                                EntryPrice = fillPrice,
+                                OriginalStopPrice = currentStopPrice,
+                                CurrentStopPrice = currentStopPrice,
+                                TargetPrice = targetPrice,
+                                IsFreeTradeApplied = false,
+                                StopOrderName = stopOrderName,
+                                TargetOrderName = targetOrderName,
+                                StopOco = oco
                             };
                     }
-
+                    
                     master.Submit(orders.ToArray());
                     Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
                 }

@@ -51,6 +51,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RenderFlattenButtonState(row.FlattenBtn, canFlatten);
                 }
 
+                RenderBreakEvenEnablementUi();
                 RenderFlattenAllButtonState();
             }, DispatcherPriority.Background);
         }
@@ -89,6 +90,79 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _btnFlattenAll.Background = canFlattenAny ? Brushes.DarkRed : Brushes.Gray;
             _btnFlattenAll.Foreground = Brushes.White;
             _btnFlattenAll.Opacity = canFlattenAny ? 1.0 : 0.65;
+        }
+        
+        private void RenderBreakEvenEnablementUi()
+        {
+            var display = _uiDispatcher ?? _window?.Dispatcher;
+
+            display?.InvokeAsync(() =>
+            {
+                var instr = GetInstrument();
+                if (instr == null)
+                {
+                    if (_btnMasterFreeTrade != null)
+                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false);
+
+                    if (_btnFreeTradeAll != null)
+                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false);
+
+                    foreach (var row in _followerRows)
+                    {
+                        if (row?.FreeTradeBtn != null)
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false);
+                    }
+
+                    return;
+                }
+
+                var anyCanApplyOrUndo = false;
+
+                if (_btnMasterFreeTrade != null && _masterBox?.SelectedItem is Account master)
+                {
+                    var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
+                    var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);
+
+                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster);
+                    anyCanApplyOrUndo |= canUndoMaster || canApplyMaster;
+                }
+
+                foreach (var row in _followerRows)
+                {
+                    if (row?.Account == null || row.FreeTradeBtn == null)
+                        continue;
+
+                    var enabledFollower = row.EnabledCheck?.IsChecked == true;
+                    if (!enabledFollower || _freeTradeMinProfitPoints <= 0)
+                    {
+                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false);
+                        continue;
+                    }
+
+                    var canUndo = _engine != null && _engine.CanUndoFreeTrade(row.Account, instr, out _);
+                    var canApply = _engine != null && _engine.CanApplyFreeTrade(row.Account, instr, _freeTradeMinProfitPoints, out _);
+
+                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo);
+                    anyCanApplyOrUndo |= canUndo || canApply;
+                }
+
+                if (_btnFreeTradeAll != null)
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _freeTradeMinProfitPoints > 0, false);
+            }, DispatcherPriority.Background);
+        }
+
+        private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode)
+        {
+            if (btn == null)
+                return;
+
+            btn.IsEnabled = enabled;
+            btn.Content = undoMode ? "Undo" : "BE";
+            btn.Background = enabled
+                ? (undoMode ? Brushes.DarkOrange : Brushes.SteelBlue)
+                : Brushes.Gray;
+            btn.Foreground = Brushes.White;
+            btn.Opacity = enabled ? 1.0 : 0.60;
         }
     }
 }

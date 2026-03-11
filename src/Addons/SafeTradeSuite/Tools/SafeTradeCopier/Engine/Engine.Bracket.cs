@@ -8,27 +8,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            private sealed class ActiveBracketSpec
-            {
-                public int StopTicks;
-                public int TargetTicks;
-            }
-
             private readonly Dictionary<string, ActiveBracketSpec> _activeBracketByAccInstr =
                 new Dictionary<string, ActiveBracketSpec>(StringComparer.Ordinal);
+            
+            private readonly Dictionary<string, PendingBracket> _pendingBrackets =
+                new Dictionary<string, PendingBracket>(StringComparer.Ordinal);
+
 
             private static string BracketKey(Account acc, Instrument instr)
             {
                 return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
             }
-            
-            public void ClearActiveBracket(Account acc, Instrument instr)
+
+            private void ClearActiveBracket(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null) return;
 
                 lock (_gate)
                 {
                     _activeBracketByAccInstr.Remove(BracketKey(acc, instr));
+                    _pendingBrackets.Remove(BracketKey(acc, instr));
                 }
             }
 
@@ -49,18 +48,50 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            private sealed class PendingBracket
+            internal bool TryGetActiveBracketSpecForUi(Account acc, Instrument instr, out ActiveBracketSpec spec)
             {
-                public string EntryName;
-                public int Qty;
-                public bool IsBuy;
-                public int StopTicks;
-                public int TargetTicks;
+                spec = null;
+                if (acc == null || instr == null)
+                    return false;
+
+                lock (_gate)
+                {
+                    return _activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out spec);
+                }
+            }
+            
+            internal bool TryGetActiveBracketSpec(Account acc, Instrument instr, out ActiveBracketSpec spec)
+            {
+                spec = null;
+                if (acc == null || instr == null)
+                    return false;
+
+                lock (_gate)
+                {
+                    return _activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out spec);
+                }
             }
 
-            private readonly Dictionary<string, PendingBracket> _pendingBrackets =
-                new Dictionary<string, PendingBracket>(StringComparer.Ordinal);
+            internal void UpdateActiveBracketSpec(Account acc, Instrument instr, Action<ActiveBracketSpec> update)
+            {
+                if (acc == null || instr == null || update == null)
+                    return;
+
+                lock (_gate)
+                {
+                    if (_activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out var spec))
+                        update(spec);
+                }
+            }
             
+            internal bool HasActiveBracket(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return false;
+
+                lock (_gate)
+                    return _activeBracketByAccInstr.ContainsKey(BracketKey(acc, instr));
+            }
             
             private void HandleBracketExitOutcome(Account acc, Execution execution)
             {

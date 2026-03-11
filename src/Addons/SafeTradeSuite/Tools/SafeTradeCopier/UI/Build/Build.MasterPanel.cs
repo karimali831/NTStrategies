@@ -94,6 +94,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             _btnBuyMkt = new Button
             {
@@ -114,6 +115,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold
             };
+            
+            _btnFreeTradeAll = new Button
+            {
+                Content = "Free Trade All",
+                Height = 36,
+                Margin = new Thickness(6, 0, 6, 0),
+                Background = Brushes.SteelBlue,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold
+            };
 
             _btnFlattenAll = new Button
             {
@@ -124,16 +135,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold
             };
-
+            
+            _btnFreeTradeAll.Click += (s, e) => FreeTradeAllSelected(eng);
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
             _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
             _btnSellMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: false);
 
             Grid.SetColumn(_btnBuyMkt, 0);
             Grid.SetColumn(_btnSellMkt, 1);
-            Grid.SetColumn(_btnFlattenAll, 2);
+            Grid.SetColumn(_btnFreeTradeAll, 2);
+            Grid.SetColumn(_btnFlattenAll, 3);
+
             orderRow.Children.Add(_btnBuyMkt);
             orderRow.Children.Add(_btnSellMkt);
+            orderRow.Children.Add(_btnFreeTradeAll);
             orderRow.Children.Add(_btnFlattenAll);
 
             var qaRow = new Grid { Margin = new Thickness(0, 0, 0, 6) };
@@ -228,7 +243,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(masterTopRow);
             masterStack.Children.Add(orderRow);
             masterStack.Children.Add(qaRow);
-            masterStack.Children.Add(_masterPnlText);
+            var masterPnlTopRow = new Grid
+            {
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _btnMasterFreeTrade = new Button
+            {
+                Content = "Free Trade",
+                Height = 24,
+                MinWidth = 90,
+                Margin = new Thickness(8, 0, 0, 0),
+                Background = Brushes.SteelBlue,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            _btnMasterFreeTrade.Click += (s, e) => FreeTradeMasterSelected(eng);
+
+            Grid.SetColumn(_masterPnlText, 0);
+            Grid.SetColumn(_btnMasterFreeTrade, 1);
+            masterPnlTopRow.Children.Add(_masterPnlText);
+            masterPnlTopRow.Children.Add(_btnMasterFreeTrade);
+
+            masterStack.Children.Add(masterPnlTopRow);
             masterStack.Children.Add(masterPnlRow);
             masterStack.Children.Add(_masterPnlBarStatusText);
 

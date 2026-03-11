@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -26,6 +27,69 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             return 0;
+        }
+        
+        private void FreeTradeMasterSelected(SafeCopierEngine eng)
+        {
+            if (!( _masterBox?.SelectedItem is Account masterAcc))
+                return;
+
+            var instr = GetInstrument();
+            if (instr == null)
+            {
+                eng.Log("Invalid instrument.");
+                return;
+            }
+
+            if (_freeTradeMinProfitPoints <= 0)
+            {
+                eng.Log("Free Trade disabled in Settings.");
+                return;
+            }
+
+            if (eng.CanUndoFreeTrade(masterAcc, instr, out _))
+            {
+                if (eng.UndoFreeTrade(masterAcc, instr))
+                    eng.Log($"Free Trade undone -> {masterAcc.Name} ({instr.FullName})");
+            }
+            else
+            {
+                if (eng.ApplyFreeTrade(masterAcc, instr, _freeTradeMinProfitPoints))
+                    eng.Log($"Free Trade applied -> {masterAcc.Name} ({instr.FullName})");
+            }
+
+            RenderBreakEvenEnablementUi();
+        }
+
+        private void FreeTradeAllSelected(SafeCopierEngine eng)
+        {
+            var instr = GetInstrument();
+            if (instr == null)
+            {
+                eng.Log("Invalid instrument.");
+                return;
+            }
+
+            if (_freeTradeMinProfitPoints <= 0)
+            {
+                eng.Log("Free Trade disabled in Settings.");
+                return;
+            }
+
+            var accounts = new List<Account>();
+
+            if (_masterBox?.SelectedItem is Account masterAcc)
+                accounts.Add(masterAcc);
+
+            foreach (var r in _followerRows)
+            {
+                if (r?.Account == null) continue;
+                if (r.EnabledCheck?.IsChecked != true) continue;
+                accounts.Add(r.Account);
+            }
+
+            eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints);
+            RenderBreakEvenEnablementUi();
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)

@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // rewire follower flatten button handlers (NEW button instances)
             WireFollowerFlattenButtons(eng);
+            WireFollowerFreeTradeButtons(eng);
 
             // update engine config
             ApplyConfigFromUi();
@@ -76,7 +77,48 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-         private void BuildFollowerRows(List<Account> accounts)
+        private void WireFollowerFreeTradeButtons(SafeCopierEngine eng)
+        {
+            foreach (var r in _followerRows)
+            {
+                if (r?.FreeTradeBtn == null)
+                    continue;
+
+                r.FreeTradeBtn.Click += (s, e) =>
+                {
+                    if (eng == null || r.Account == null)
+                        return;
+
+                    var instr = GetInstrument();
+                    if (instr == null)
+                    {
+                        eng.Log("Invalid instrument.");
+                        return;
+                    }
+
+                    if (_freeTradeMinProfitPoints <= 0)
+                    {
+                        eng.Log("Free Trade disabled in Settings.");
+                        return;
+                    }
+
+                    if (eng.CanUndoFreeTrade(r.Account, instr, out _))
+                    {
+                        if (eng.UndoFreeTrade(r.Account, instr))
+                            eng.Log($"Free Trade undone -> {r.Account.Name} ({instr.FullName})");
+                    }
+                    else
+                    {
+                        if (eng.ApplyFreeTrade(r.Account, instr, _freeTradeMinProfitPoints))
+                            eng.Log($"Free Trade applied -> {r.Account.Name} ({instr.FullName})");
+                    }
+
+                    RenderBreakEvenEnablementUi();
+                };
+            }
+        }
+        
+        private void BuildFollowerRows(List<Account> accounts)
         {
             _followerRows.Clear();
             _followersPanel.Children.Clear();
@@ -206,6 +248,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 };
+                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false);
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 
@@ -257,6 +300,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     PnlText = pnl,
                     PnlBar = pnlBar,
                     FlattenBtn = flatten,
+                    FreeTradeBtn = freeTrade,
                     PnlBarStatusText = pnlBarStatusText,
                 };
                 
