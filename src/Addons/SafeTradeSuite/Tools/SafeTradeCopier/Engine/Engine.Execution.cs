@@ -27,9 +27,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     orderName.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase);
 
                 HandleBracketExitOutcome(_master, e.Execution);
-
                 // Always try to submit bracket for STC entry fills
                 TrySubmitBracketOnFill(_master, e.Execution);
+                TryFlattenFollowersOnMasterFlat();
 
                 // If master exit filled and master is now flat, flatten followers that follow master exit
                 if (isMasterExitExecution && GetNetPosition(_master, _instrument) == 0)
@@ -103,7 +103,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void OnFollowerExecution(object sender, ExecutionEventArgs e)
             {
-                if (!Armed) return;
                 if (e?.Execution == null) return;
 
                 // Only manage brackets for the instrument we’re operating on

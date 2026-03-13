@@ -19,10 +19,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 var name = (e.Order.Name ?? "").Trim();
-                if (!name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+
+                HandlePendingEntryCleanup(e.Order);
+
+                if (name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+                    SyncBracketFromOrderUpdate(e.Order);
+
+                TryFlattenFollowersOnMasterFlat();
+            }
+            
+            private void HandlePendingEntryCleanup(Order order)
+            {
+                if (order == null)
                     return;
 
-                SyncBracketFromOrderUpdate(e.Order);
+                var name = (order.Name ?? "").Trim();
+                if (!name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (order.OrderState != OrderState.Rejected &&
+                    order.OrderState != OrderState.Cancelled)
+                    return;
+
+                RemovePendingBracketForEntry(name);
+                Log($"[SYNC] ENTRY CLEARED acc={order.Account?.Name} instr={order.Instrument?.FullName} state={order.OrderState}");
             }
             
             private void SyncBracketFromOrderUpdate(Order order)

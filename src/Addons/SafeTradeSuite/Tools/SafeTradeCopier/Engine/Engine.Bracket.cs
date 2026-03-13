@@ -87,6 +87,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     ClearActiveBracket(acc, instr);
             }
             
+            private void RemovePendingBracketForEntry(string entryName)
+            {
+                if (string.IsNullOrWhiteSpace(entryName))
+                    return;
+
+                lock (_gate)
+                {
+                    _pendingBrackets.Remove(entryName);
+                }
+            }
+            
             private string ResolveFollowerAtm(Account follower)
             {
                 if (follower == null)
@@ -109,7 +120,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 return _configuredMasterAtm ?? "None";
             }
-
         }
     }
 }

@@ -6,6 +6,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     { 
         private Window _settingsWindow;
+        private ContentControl _riskFieldsetHost;
 
         private void OpenSettingsPanel()
         {
@@ -25,14 +26,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             // ---------------- Break-even ----------------
             var beFieldset = RenderBreakEvenFieldset();
-            
+
             // ---------------- Risk ----------------
+            _riskFieldsetHost = new ContentControl
+            {
+                Content = RenderRiskFieldset()
+            };
+
+            root.Children.Add(generalFieldset);
+            root.Children.Add(beFieldset);
+            root.Children.Add(_riskFieldsetHost);
+            
             var riskFieldset = RenderRiskFieldset();
 
             root.Children.Add(generalFieldset);
             root.Children.Add(beFieldset);
             root.Children.Add(riskFieldset);
-
+            root.Children.Add(_riskFieldsetHost);
+            
             // ---------------- Settings Window ----------------
             _settingsWindow = new Window
             {
@@ -49,6 +60,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _settingsWindow.Closed += (s, e) => _settingsWindow = null;
             _settingsWindow.Show();
+        }
+        
+        private void RefreshRiskFieldset()
+        {
+            if (_riskFieldsetHost == null)
+                return;
+
+            _riskFieldsetHost.Content = RenderRiskFieldset();
         }
     }
 }

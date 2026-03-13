@@ -66,6 +66,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderFollowerRowsState();
             RenderFlattenAllButtonState();
             RefreshStatusBar();
+            RefreshRiskFieldset();
         }
         
         private void ApplyStatusBoxVisibility()

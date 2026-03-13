@@ -103,6 +103,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 acc.Submit(new[] { ord });
             }
             
+            private void TryFlattenFollowersOnMasterFlat()
+            {
+                if (_master == null || _instrument == null)
+                    return;
+
+                if (GetNetPosition(_master, _instrument) != 0)
+                    return;
+
+                FlattenFollowersThatUseMasterExit(_instrument);
+            }
+            
             private void FlattenFollowersThatUseMasterExit(Instrument instr)
             {
                 if (instr == null)
@@ -112,7 +123,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
-                    followersToFlatten = _followers
+                    followersToFlatten = (_configuredFollowers ?? new List<Account>())
                         .Where(f => f != null && f.ConnectionStatus == ConnectionStatus.Connected && FollowerUsesMasterExit(f))
                         .Distinct()
                         .ToList();
@@ -122,6 +133,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     try
                     {
+                        if (GetNetPosition(f, instr) == 0)
+                            continue;
+
                         EnsureFlatInstrument(f, instr);
                         Log($"Follow-master-exit flatten -> {f.Name} ({instr.FullName})");
                     }

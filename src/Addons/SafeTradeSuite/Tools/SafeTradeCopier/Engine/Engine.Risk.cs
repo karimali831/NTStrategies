@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -8,14 +7,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            // Risk-settings
-            private double _masterMaxDailyProfit;
-            private double _masterMaxDailyLoss;
-
-            private readonly Dictionary<string, bool> _followerUseMasterRisk = new Dictionary<string, bool>(StringComparer.Ordinal);
-            private readonly Dictionary<string, double> _followerMaxDailyProfit = new Dictionary<string, double>(StringComparer.Ordinal);
-            private readonly Dictionary<string, double> _followerMaxDailyLoss = new Dictionary<string, double>(StringComparer.Ordinal);
-            
             private double GetEffectiveMaxDailyProfit(Account acc)
             {
                 if (acc == null)
@@ -97,6 +88,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     reason = "No account";
                     return false;
                 }
+                
+                var maxProfit = GetEffectiveMaxDailyProfit(acc);
+                var maxLoss = GetEffectiveMaxDailyLoss(acc);
+
+                if (maxProfit <= 0 && maxLoss <= 0)
+                {
+                    reason = "";
+                    return true;
+                }
 
                 if (!TryGetRealizedPnl(acc, out var realized))
                 {
@@ -104,14 +104,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return false;
                 }
 
-                var maxProfit = GetEffectiveMaxDailyProfit(acc);
                 if (maxProfit > 0 && realized >= maxProfit)
                 {
                     reason = $"Daily profit lock hit ({realized:0.00} >= {maxProfit:0.00})";
                     return false;
                 }
 
-                var maxLoss = GetEffectiveMaxDailyLoss(acc);
+           
                 if (maxLoss > 0 && realized <= -maxLoss)
                 {
                     reason = $"Daily loss lock hit ({realized:0.00} <= -{maxLoss:0.00})";

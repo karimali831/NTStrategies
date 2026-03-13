@@ -291,6 +291,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SaveUiToActiveSession();
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 LoadActiveSessionToUi();
+                RefreshRiskFieldset();
                 RenderFlattenAllButtonState();
             };
 
