@@ -111,17 +111,43 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
                     }
 
-                    var atm = ResolveFollowerAtm(f);
-                    if (!string.IsNullOrWhiteSpace(atm) && !string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
-                        Log($"Follower {f.Name} ATM override: {atm} (stored; attach not enabled from AddOn yet)");
+                    var bracketMode = ResolveFollowerAtm(f);
+                    var followMasterExit = FollowerUsesMasterExit(f);
+                    var hasOwnBracket =
+                        !string.IsNullOrWhiteSpace(bracketMode) &&
+                        !string.Equals(bracketMode, "None", StringComparison.OrdinalIgnoreCase) &&
+                        !followMasterExit;
 
-                    Log($"Copy -> {f.Name}: action={action}, qty={qty}, instr={instrSnap.FullName}");
+                    Log(
+                        $"Copy -> {f.Name}: action={action}, qty={qty}, instr={instrSnap.FullName}, " +
+                        $"mode={(followMasterExit ? "FOLLOW_MASTER_EXIT" : hasOwnBracket ? $"OWN_BRACKET:{bracketMode}" : "ENTRY_ONLY")}");
 
-                    // If we have a template, submit with bracket tracking
-                    if (!string.IsNullOrWhiteSpace(atm) && !string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+                    // follower has its own bracket
+                    if (hasOwnBracket)
                     {
-                        SubmitFollowerMarketWithBracket(f, instrSnap, action, qty, atm, execId);
+                        SubmitFollowerMarketWithBracket(f, instrSnap, action, qty, bracketMode, execId);
                     }
+                    // follower entry only, exits when master exits
+                    else if (followMasterExit)
+                    {
+                        var ord = f.CreateOrder(
+                            instrSnap,
+                            action,
+                            OrderType.Market,
+                            OrderEntry.Manual,
+                            TimeInForce.Day,
+                            qty,
+                            0,
+                            0,
+                            string.Empty,
+                            $"STC:ENTRY:{execId}",
+                            DateTime.MaxValue,
+                            null
+                        );
+
+                        f.Submit(new[] { ord });
+                    }
+                    // entry only, no follower bracket
                     else
                     {
                         var ord = f.CreateOrder(
@@ -147,6 +173,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (StaggerMsPerFollower > 0)
                         await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
                 }
+            }
+            
+            private bool FollowerUsesMasterExit(Account follower)
+            {
+                if (follower == null)
+                    return false;
+
+                if (_configuredFollowerAtmOverrides != null &&
+                    _configuredFollowerAtmOverrides.TryGetValue(follower.Name, out var a))
+                {
+                    return string.Equals(
+                        (a ?? "").Trim(),
+                        "(follow master exit)",
+                        StringComparison.OrdinalIgnoreCase);
+                }
+
+                return false;
             }
             
             private void TrySubmitBracketOnFill(Account master, Execution execution)
@@ -371,22 +414,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            private string ResolveFollowerAtm(Account follower)
-            {
-                if (follower == null) return _configuredMasterAtm ?? "None";
-
-                if (_configuredFollowerAtmOverrides != null &&
-                    _configuredFollowerAtmOverrides.TryGetValue(follower.Name, out var a) &&
-                    !string.IsNullOrWhiteSpace(a))
-                {
-                    a = a.Trim();
-                    if (string.Equals(a, "(inherit master)", StringComparison.OrdinalIgnoreCase))
-                        return _configuredMasterAtm ?? "None";
-                    return a;
-                }
-
-                return _configuredMasterAtm ?? "None";
-            }
             
             private int ResolveFollowerQty(Account follower, int masterExecQty)
             {

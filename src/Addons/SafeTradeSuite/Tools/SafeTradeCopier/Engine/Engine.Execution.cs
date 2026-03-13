@@ -18,16 +18,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
+                var ord = e.Execution.Order;
+                var orderName = (ord?.Name ?? "").Trim();
+
+                var isMasterExitExecution =
+                    orderName.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
+                    orderName.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
+                    orderName.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase);
+
                 HandleBracketExitOutcome(_master, e.Execution);
 
-                // ✅ Always try to submit bracket (even if not armed / no followers)
+                // Always try to submit bracket for STC entry fills
                 TrySubmitBracketOnFill(_master, e.Execution);
 
-                // ✅ Only COPY on *entry* executions created by STC
+                // If master exit filled and master is now flat, flatten followers that follow master exit
+                if (isMasterExitExecution && GetNetPosition(_master, _instrument) == 0)
+                {
+                    FlattenFollowersThatUseMasterExit(_instrument);
+                    return;
+                }
+
+                // Only COPY on entry executions created by STC
                 if (!IsStcEntryExecution(e.Execution.Order))
                     return;
 
-                // Copy requires normal arming/safety
                 if (!Armed || !_copyEnabled) return;
 
                 var execId = e.Execution.ExecutionId ?? "";

@@ -27,24 +27,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 lock (_gate)
                 {
                     _activeBracketByAccInstr.Remove(BracketKey(acc, instr));
-                    _pendingBrackets.Remove(BracketKey(acc, instr));
-                }
-            }
-
-            internal bool TryGetActiveBracketSpecForUi(Account acc, Instrument instr, out int stopTicks, out int targetTicks)
-            {
-                stopTicks = 0;
-                targetTicks = 0;
-                if (acc == null || instr == null) return false;
-
-                lock (_gate)
-                {
-                    if (!_activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out var spec))
-                        return false;
-
-                    stopTicks = spec.StopTicks;
-                    targetTicks = spec.TargetTicks;
-                    return true;
                 }
             }
 
@@ -104,6 +86,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (GetNetPosition(acc, instr) == 0)
                     ClearActiveBracket(acc, instr);
             }
+            
+            private string ResolveFollowerAtm(Account follower)
+            {
+                if (follower == null)
+                    return _configuredMasterAtm ?? "None";
+
+                if (_configuredFollowerAtmOverrides != null &&
+                    _configuredFollowerAtmOverrides.TryGetValue(follower.Name, out var a) &&
+                    !string.IsNullOrWhiteSpace(a))
+                {
+                    a = a.Trim();
+
+                    if (string.Equals(a, "(inherit master)", StringComparison.OrdinalIgnoreCase))
+                        return _configuredMasterAtm ?? "None";
+
+                    if (string.Equals(a, "(follow master exit)", StringComparison.OrdinalIgnoreCase))
+                        return "(follow master exit)";
+
+                    return a;
+                }
+
+                return _configuredMasterAtm ?? "None";
+            }
+
         }
     }
 }

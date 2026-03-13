@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
@@ -100,6 +101,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 );
 
                 acc.Submit(new[] { ord });
+            }
+            
+            private void FlattenFollowersThatUseMasterExit(Instrument instr)
+            {
+                if (instr == null)
+                    return;
+
+                List<Account> followersToFlatten;
+
+                lock (_gate)
+                {
+                    followersToFlatten = _followers
+                        .Where(f => f != null && f.ConnectionStatus == ConnectionStatus.Connected && FollowerUsesMasterExit(f))
+                        .Distinct()
+                        .ToList();
+                }
+
+                foreach (var f in followersToFlatten)
+                {
+                    try
+                    {
+                        EnsureFlatInstrument(f, instr);
+                        Log($"Follow-master-exit flatten -> {f.Name} ({instr.FullName})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Follow-master-exit flatten failed -> {f?.Name} ({instr?.FullName}) msg={ex.Message}");
+                    }
+                }
             }
         }
     }

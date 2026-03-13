@@ -7,57 +7,88 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private const string InheritMasterBracketOption = "(inherit master)";
+        private const string FollowMasterExitBracketOption = "(follow master exit)";
+
         private static string NormalizeAtm(string s)
         {
             s = (s ?? "").Trim();
             if (string.IsNullOrWhiteSpace(s)) return "None";
             return s;
         }
-        
+
+        private static bool IsFollowerFollowMasterExitOption(string s)
+        {
+            return string.Equals(
+                NormalizeAtm(s),
+                FollowMasterExitBracketOption,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsFollowerInheritMasterOption(string s)
+        {
+            return string.Equals(
+                NormalizeAtm(s),
+                InheritMasterBracketOption,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void LoadAtmTemplatesInto(ComboBox combo, bool includeInherit)
         {
-            if (combo == null) return;
+            if (combo == null)
+                return;
 
             var items = new List<string>();
+
             if (includeInherit)
-                items.Add("(inherit master)");
+            {
+                items.Add(InheritMasterBracketOption);
+                items.Add(FollowMasterExitBracketOption);
+            }
 
             items.Add("None");
 
-            try
-            {
-                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var folder = System.IO.Path.Combine(docs, "NinjaTrader 8", "templates", "AtmStrategy");
+            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var folder = System.IO.Path.Combine(docs, "NinjaTrader 8", "templates", "AtmStrategy");
 
-                if (System.IO.Directory.Exists(folder))
+            if (System.IO.Directory.Exists(folder))
+            {
+                foreach (var f in System.IO.Directory.GetFiles(folder, "*.xml"))
                 {
-                    foreach (var f in System.IO.Directory.GetFiles(folder, "*.xml"))
-                    {
-                        var name = System.IO.Path.GetFileNameWithoutExtension(f);
-                        if (!string.IsNullOrWhiteSpace(name))
-                            items.Add(name);
-                    }
+                    var name = System.IO.Path.GetFileNameWithoutExtension(f);
+                    if (!string.IsNullOrWhiteSpace(name))
+                        items.Add(name);
                 }
             }
-            catch
-            {
-                // non-critical
-            }
 
-            items = items
+            var special = new List<string>();
+            if (includeInherit)
+            {
+                special.Add(InheritMasterBracketOption);
+                special.Add(FollowMasterExitBracketOption);
+            }
+            special.Add("None");
+
+            var atmItems = items
+                .Except(special, StringComparer.OrdinalIgnoreCase)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            combo.ItemsSource = items;
+            var finalItems = new List<string>();
+            foreach (var s in special.Distinct(StringComparer.OrdinalIgnoreCase))
+                finalItems.Add(s);
 
-            // default selection
-            if (includeInherit && items.Contains("(inherit master)"))
-                combo.SelectedItem = "(inherit master)";
-            else if (items.Contains("None"))
+            finalItems.AddRange(atmItems);
+
+            combo.ItemsSource = finalItems;
+
+            if (includeInherit && finalItems.Contains(InheritMasterBracketOption))
+                combo.SelectedItem = InheritMasterBracketOption;
+            else if (finalItems.Contains("None"))
                 combo.SelectedItem = "None";
             else
-                combo.SelectedItem = items.FirstOrDefault();
+                combo.SelectedItem = finalItems.FirstOrDefault();
         }
     }
 }

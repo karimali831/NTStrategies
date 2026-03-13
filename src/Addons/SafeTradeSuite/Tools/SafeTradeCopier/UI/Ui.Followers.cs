@@ -14,36 +14,62 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static Style _circularCheckBoxStyle;
         
-         private void RebuildFollowersAndRewire(SafeCopierEngine eng, List<Account> accounts)
+        private void RebuildFollowersAndRewire(SafeCopierEngine eng, List<Account> accounts)
         {
-            // preserve follower selections by account name (optional but nice)
             var selected = new HashSet<string>(
-                _followerRows.Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null).Select(r => r.Account.Name),
+                _followerRows
+                    .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
+                    .Select(r => r.Account.Name),
                 StringComparer.Ordinal);
 
-            // rebuild rows (excludes current master)
+            var qtyOverrides = _followerRows
+                .Where(r => r?.Account != null)
+                .ToDictionary(
+                    r => r.Account.Name,
+                    r => r.QtyOverrideBox?.Text ?? "",
+                    StringComparer.Ordinal);
+
+            var bracketSelections = _followerRows
+                .Where(r => r?.Account != null)
+                .ToDictionary(
+                    r => r.Account.Name,
+                    r => NormalizeAtm(r.AtmOverrideBox?.SelectedItem as string),
+                    StringComparer.Ordinal);
+
             BuildFollowerRows(accounts);
 
-            // restore selections
             foreach (var r in _followerRows)
             {
-                if (r?.Account == null) continue;
-                if (r.EnabledCheck == null) continue;
-                r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
+                if (r?.Account == null)
+                    continue;
+
+                if (r.EnabledCheck != null)
+                    r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
             }
 
-            // sim-only enforcement after rebuild
             EnforceSimOnlyModeUi(accounts);
 
-            // reload ATMs into NEW combo instances
             foreach (var r in _followerRows)
+            {
                 LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
 
-            // rewire follower flatten button handlers (NEW button instances)
+                if (r?.Account == null)
+                    continue;
+
+                if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
+                    r.QtyOverrideBox.Text = qtyText;
+
+                if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
+                    r.AtmOverrideBox != null &&
+                    r.AtmOverrideBox.Items.Contains(bracket))
+                {
+                    r.AtmOverrideBox.SelectedItem = bracket;
+                }
+            }
+
             WireFollowerFlattenButtons(eng);
             WireFollowerFreeTradeButtons(eng);
 
-            // update engine config
             ApplyConfigFromUi();
 
             if (eng.CopyEnabled)
@@ -179,7 +205,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Height = 24,
                     Margin = new Thickness(6, 0, 6, 0),
-                    MinWidth = 125
+                    MinWidth = 125,
+                    ToolTip = "(inherit master) = use master ATM, (follow master exit) = no follower bracket, exit when master exits"
                 };
 
                 var pnl = new TextBlock
@@ -365,7 +392,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "On", 1);
             AddHeaderText(g, "Account", 2);
             AddHeaderText(g, "Override Qty", 3);
-            AddHeaderText(g, "Override ATM", 4);
+            AddHeaderText(g, "Bracket", 4);
             AddHeaderText(g, "PnL", 5);
             AddHeaderText(g,"Break-even", 6);
             AddHeaderText(g, "Flatten", 7);
