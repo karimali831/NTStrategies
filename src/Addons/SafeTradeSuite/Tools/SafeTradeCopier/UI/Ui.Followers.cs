@@ -71,6 +71,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             WireFollowerFreeTradeButtons(eng);
 
             ApplyConfigFromUi();
+            RefreshRiskFieldset();
 
             if (eng.CopyEnabled)
                 eng.SetCopyEnabled(true);
@@ -216,7 +217,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Foreground = Brushes.DimGray,
                     FontWeight = FontWeights.SemiBold,
                     FontSize = 12,
-                    Margin = new Thickness(6, 0, 6, 0),
+                    Margin = new Thickness(10, 0, 10, 0),
                     TextTrimming = TextTrimming.CharacterEllipsis
                 };
                 

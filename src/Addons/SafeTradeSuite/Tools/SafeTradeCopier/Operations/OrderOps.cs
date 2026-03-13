@@ -24,40 +24,70 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var qty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
             var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
-            
+
             if (!eng.CanEnterForRisk(master, out var riskReason))
             {
                 eng.Log($"Master blocked by risk -> {master.Name}: {riskReason}");
                 return;
             }
 
-            var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
-
-            if (!string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+            var currentNet = GetNetPosition(master, instr);
+            if (currentNet != 0)
             {
-                eng.SubmitMasterMarketWithBracket(master, instr, action, qty, atm);
+                var confirmed = ShowConfirmDialog(
+                    _window,
+                    "Confirm additional entry",
+                    $"There is already an open position on {master.Name} for {instr.FullName} (net {currentNet}).\n\nSubmitting another market order may increase exposure.\n\nDo you want to continue?",
+                    okText: "Submit order",
+                    cancelText: "Cancel");
+
+                if (!confirmed)
+                {
+                    eng.Log("Master submit cancelled by user.");
+                    return;
+                }
+            }
+
+            var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
+            var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
+
+            if (!eng.TryBeginMasterManualSubmit(master, instr, action, qty, atm, entryName, out var submitGuardReason))
+            {
+                eng.Log(submitGuardReason);
                 return;
             }
 
-            var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
+            try
+            {
+                if (!string.Equals(atm, "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    eng.SubmitMasterMarketWithBracket(master, instr, action, qty, atm, entryName);
+                    return;
+                }
 
-            var ord = master.CreateOrder(
-                instr,
-                action,
-                OrderType.Market,
-                OrderEntry.Manual,
-                TimeInForce.Day,
-                qty,
-                0,
-                0,
-                string.Empty,
-                entryName,
-                DateTime.MaxValue,
-                null
-            );
+                var ord = master.CreateOrder(
+                    instr,
+                    action,
+                    OrderType.Market,
+                    OrderEntry.Manual,
+                    TimeInForce.Day,
+                    qty,
+                    0,
+                    0,
+                    string.Empty,
+                    entryName,
+                    DateTime.MaxValue,
+                    null
+                );
 
-            eng.Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName}");
-            master.Submit(new[] { ord });
+                eng.Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName}");
+                master.Submit(new[] { ord });
+            }
+            catch (Exception ex)
+            {
+                eng.ResetMasterManualSubmit(entryName);
+                eng.Log($"Master submit failed -> {master.Name}: {ex.Message}");
+            }
         }
     }
 }

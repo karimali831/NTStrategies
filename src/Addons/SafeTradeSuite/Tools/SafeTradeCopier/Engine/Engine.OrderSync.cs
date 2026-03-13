@@ -21,6 +21,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var name = (e.Order.Name ?? "").Trim();
 
                 HandlePendingEntryCleanup(e.Order);
+                CompleteMasterManualSubmit(e.Order);
 
                 if (name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
                     SyncBracketFromOrderUpdate(e.Order);

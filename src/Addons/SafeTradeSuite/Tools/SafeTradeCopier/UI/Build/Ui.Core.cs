@@ -79,6 +79,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RefreshStatusBar();
                         RenderButtons(eng.CopyEnabled);
                         RenderFollowerRowsState();
+                        RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
                 };
 
@@ -95,6 +96,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RefreshStatusBar();
                         RenderButtons(copyOn);
                         RenderFollowerRowsState();
+                        RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
                 };
                 

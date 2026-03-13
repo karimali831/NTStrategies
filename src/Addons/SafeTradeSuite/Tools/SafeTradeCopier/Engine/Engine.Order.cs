@@ -11,13 +11,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            public void SubmitMasterMarketWithBracket(Account master, Instrument instr, OrderAction action, int qty, string atmTemplateName)
+            public void SubmitMasterMarketWithBracket(
+                Account master, 
+                Instrument instr, 
+                OrderAction action, 
+                int qty, 
+                string atmTemplateName, 
+                string entryName)
             {
                 if (master == null || instr == null)
                 {
                     Log("SubmitMasterMarketWithBracket: missing master/instrument.");
                     return;
                 }
+
+                if (string.IsNullOrWhiteSpace(entryName))
+                    entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
 
                 if (!TryReadAtmTemplateBasic(atmTemplateName, out var stopTicks, out var targetTicks))
                 {
@@ -26,7 +35,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     targetTicks = 0;
                 }
 
-                var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
                 var entry = master.CreateOrder(
                     instr,
                     action,
@@ -392,14 +400,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
             {
-                if (e?.Order == null) return;
-
-                if (string.IsNullOrWhiteSpace(e.Order.Name) || !e.Order.Name.StartsWith("STC:", StringComparison.Ordinal))
+                if (e?.Order == null)
                     return;
 
+                var name = (e.Order.Name ?? "").Trim();
+                if (!name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                HandlePendingEntryCleanup(e.Order);
                 SyncBracketFromOrderUpdate(e.Order);
 
-                if (!Armed) return;
+                if (!Armed)
+                    return;
 
                 if (e.Order.OrderState == OrderState.Rejected)
                 {

@@ -147,6 +147,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "Break-even All");
             }, DispatcherPriority.Background);
         }
+        
+        private void RenderMasterSubmitButtonsState()
+        {
+            var pending = _engine != null && _engine.IsMasterSubmitInFlight();
+
+            if (_btnBuyMkt != null)
+                _btnBuyMkt.IsEnabled = !pending;
+
+            if (_btnSellMkt != null)
+                _btnSellMkt.IsEnabled = !pending;
+        }
 
         private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode, string btnText)
         {
