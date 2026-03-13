@@ -98,7 +98,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         [NinjaScriptProperty]
         [Display(Name="Require pullback", Order=9, GroupName="01-General")]
-        public bool RequirePullback { get; set; } = true;
+        public bool RequirePullbackTouched { get; set; } = true;
+        
+        [NinjaScriptProperty]
+        [Display(Name="Use EMAs for entry", Order=10, GroupName="01-General")]
+        public bool UseEMAsForEntry { get; set; } = true;
         
         //-- FILTERS --//
         [NinjaScriptProperty]

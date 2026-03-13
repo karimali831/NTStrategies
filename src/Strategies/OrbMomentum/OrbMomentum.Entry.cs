@@ -57,7 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 			    if (!blockPrimary)
 				{
-					if (reEntryWaitPullback && RequirePullback)
+					if (reEntryWaitPullback)
 					{
 						if (RunnerPullbackTouched(reEntryDir, out var pbFail))
 						{

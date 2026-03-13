@@ -1,10 +1,6 @@
 ﻿#region Using declarations
 using System;
-using NinjaTrader.Cbi;
-using NinjaTrader.Data;
-using NinjaTrader.NinjaScript;
-using System.ComponentModel.DataAnnotations;
-using NinjaTrader.NinjaScript.Indicators;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -194,7 +190,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             failReason = "ok";
 
-            if (!RequirePullback)
+            if (!UseEMAsForEntry)
                 return true;
             
             var minTicks = Math.Max(0, EntryEmaMinProximityTicks);
@@ -264,6 +260,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             failReason = "ok";
 
+            if (!RequirePullbackTouched)
+                return true;
+            
             var pbTicks = Math.Max(1, RunnerPullbackTicks);
 
             if (dir > 0)
@@ -303,7 +302,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Early-entry mode: use last CLOSED bar for structure
             if (dir > 0)
             {
-                if (!(emaFast[1] > emaSlow[1]))
+                if (!(emaFast[1] > emaSlow[1]) && UseEMAsForEntry)
                 {
                     failReason = "ema-structure-fail (need emaFast > emaSlow)";
                     return false;
@@ -311,7 +310,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (dir < 0)
             {
-                if (!(emaFast[1] < emaSlow[1]))
+                if (!(emaFast[1] < emaSlow[1]) && UseEMAsForEntry)
                 {
                     failReason = "ema-structure-fail (need emaFast < emaSlow)";
                     return false;
@@ -359,7 +358,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         failReason = $"confirm-not-bullish (i={j})";
                         return false;
                     }
-                    if (!(Close[j] > emaFast[ej] && Close[j] > emaSlow[ej]))
+                    if (!(Close[j] > emaFast[ej] && Close[j] > emaSlow[ej]) && UseEMAsForEntry)
                     {
                         failReason = $"confirm-close-not-above-both-emas (i={j})";
                         return false;
@@ -372,7 +371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         failReason = $"confirm-not-bearish (i={j})";
                         return false;
                     }
-                    if (!(Close[j] < emaFast[ej] && Close[j] < emaSlow[ej]))
+                    if (!(Close[j] < emaFast[ej] && Close[j] < emaSlow[ej]) && UseEMAsForEntry)
                     {
                         failReason = $"confirm-close-not-below-both-emas (i={j})";
                         return false;
