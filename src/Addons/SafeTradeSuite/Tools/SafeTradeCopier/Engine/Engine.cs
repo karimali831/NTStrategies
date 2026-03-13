@@ -45,6 +45,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private Dictionary<string, int> _configuredFollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
             private Dictionary<string, string> _configuredFollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
+            
+            private double _configuredMasterMaxDailyProfit;
+            private double _configuredMasterMaxDailyLoss;
+
+            private Dictionary<string, bool> _configuredFollowerUseMasterRisk =
+                new Dictionary<string, bool>(StringComparer.Ordinal);
+
+            private Dictionary<string, double> _configuredFollowerMaxDailyProfit =
+                new Dictionary<string, double>(StringComparer.Ordinal);
+
+            private Dictionary<string, double> _configuredFollowerMaxDailyLoss =
+                new Dictionary<string, double>(StringComparer.Ordinal);
 
             public bool CopyEnabled
             {
@@ -58,7 +70,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 int masterQty,
                 string masterAtm,
                 Dictionary<string, int> followerQtyOverridesByAccountName,
-                Dictionary<string, string> followerAtmOverridesByAccountName)
+                Dictionary<string, string> followerAtmOverridesByAccountName,
+                double masterMaxDailyProfit,
+                double masterMaxDailyLoss,
+                Dictionary<string, bool> followerUseMasterRiskByAccountName,
+                Dictionary<string, double> followerMaxDailyProfitByAccountName,
+                Dictionary<string, double> followerMaxDailyLossByAccountName)
             {
                 var followersClean = followerAccounts?
                     .Where(a => a != null && masterAccount != null && !ReferenceEquals(a, masterAccount))
@@ -96,6 +113,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
                     _configuredFollowerAtmOverrides =
                         followerAtmOverridesByAccountName ?? new Dictionary<string, string>(StringComparer.Ordinal);
+                    _configuredMasterMaxDailyProfit = Math.Max(0, masterMaxDailyProfit);
+                    _configuredMasterMaxDailyLoss = Math.Max(0, masterMaxDailyLoss);
+
+                    _configuredFollowerUseMasterRisk =
+                        followerUseMasterRiskByAccountName ?? new Dictionary<string, bool>(StringComparer.Ordinal);
+
+                    _configuredFollowerMaxDailyProfit =
+                        followerMaxDailyProfitByAccountName ?? new Dictionary<string, double>(StringComparer.Ordinal);
+
+                    _configuredFollowerMaxDailyLoss =
+                        followerMaxDailyLossByAccountName ?? new Dictionary<string, double>(StringComparer.Ordinal);
                 }
 
                 SubscribePnl(masterAccount);
@@ -231,7 +259,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void DisarmUnsafe_NoLock(string reason)
             {
                 if (_master != null)
+                {
                     _master.ExecutionUpdate -= OnMasterExecution;
+                    _master.OrderUpdate -= OnMasterOrderUpdate;
+                }
 
                 foreach (var f in _followers)
                 {

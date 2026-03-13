@@ -103,6 +103,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var key = $"{execId}|{f.Name}|{instrSnap.FullName}";
                     if (!_seen.TryAdd(key, DateTime.UtcNow.Ticks))
                         continue;
+                    
+                    if (!CanEnterForRisk(f, out var riskReason))
+                    {
+                        Log($"Copy skipped -> {f.Name}: {riskReason}");
+                        continue;
+                    }
 
                     var qty = ResolveFollowerQty(f, masterExecQty);
                     if (qty <= 0 || qty > MaxAbsQtyPerFollower)
@@ -342,7 +348,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string execId)
             {
                 if (acc == null || instr == null) return;
-
+                
                 if (!TryReadAtmTemplateBasic(atmTemplateName, out var stopTicks, out var targetTicks))
                 {
                     Log($"Follower ATM template parse failed: '{atmTemplateName}'. Submitting entry only.");

@@ -8,6 +8,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private CopierUiConfig _lastAppliedConfig;
+        private double _masterMaxDailyProfit;
+        private double _masterMaxDailyLoss;
+
+        private readonly Dictionary<string, bool> _followerUseMasterRisk = new Dictionary<string, bool>(StringComparer.Ordinal);
+        private readonly Dictionary<string, double> _followerMaxDailyProfit = new Dictionary<string, double>(StringComparer.Ordinal);
+        private readonly Dictionary<string, double> _followerMaxDailyLoss = new Dictionary<string, double>(StringComparer.Ordinal);
         
         private void ApplyConfigFromUi()
         {
@@ -28,7 +34,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterQty: config.MasterQty,
                 masterAtm: config.MasterAtm,
                 followerQtyOverridesByAccountName: config.FollowerQtyOverrides,
-                followerAtmOverridesByAccountName: config.FollowerAtmOverrides
+                followerAtmOverridesByAccountName: config.FollowerAtmOverrides,
+                masterMaxDailyProfit: config.MasterMaxDailyProfit,
+                masterMaxDailyLoss: config.MasterMaxDailyLoss,
+                followerUseMasterRiskByAccountName: config.FollowerUseMasterRisk,
+                followerMaxDailyProfitByAccountName: config.FollowerMaxDailyProfit,
+                followerMaxDailyLossByAccountName: config.FollowerMaxDailyLoss
             );
 
             _lastAppliedConfig = config;
@@ -56,6 +67,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var followers = new List<Account>();
             var qtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
             var atmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
+            var useMasterRisk = new Dictionary<string, bool>(StringComparer.Ordinal);
+            var followerMaxProfit = new Dictionary<string, double>(StringComparer.Ordinal);
+            var followerMaxLoss = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var r in _followerRows)
             {
@@ -83,6 +97,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     aText = "(inherit master)";
 
                 atmOverrides[r.Account.Name] = aText;
+
+                var useMaster = true;
+                if (_followerUseMasterRisk.TryGetValue(r.Account.Name, out var storedUseMaster))
+                    useMaster = storedUseMaster;
+
+                useMasterRisk[r.Account.Name] = useMaster;
+
+                if (_followerMaxDailyProfit.TryGetValue(r.Account.Name, out var fp))
+                    followerMaxProfit[r.Account.Name] = fp;
+
+                if (_followerMaxDailyLoss.TryGetValue(r.Account.Name, out var fl))
+                    followerMaxLoss[r.Account.Name] = fl;
             }
 
             return new CopierUiConfig
@@ -93,7 +119,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 MasterAtm = masterAtm,
                 Followers = followers,
                 FollowerQtyOverrides = qtyOverrides,
-                FollowerAtmOverrides = atmOverrides
+                FollowerAtmOverrides = atmOverrides,
+                MasterMaxDailyProfit = _masterMaxDailyProfit,
+                MasterMaxDailyLoss = _masterMaxDailyLoss,
+                FollowerUseMasterRisk = useMasterRisk,
+                FollowerMaxDailyProfit = followerMaxProfit,
+                FollowerMaxDailyLoss = followerMaxLoss
             };
         }
         
@@ -147,6 +178,49 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return false;
 
                 if (!string.Equals(val ?? "", kv.Value ?? "", StringComparison.Ordinal))
+                    return false;
+            }
+            
+            // Risk
+            if (Math.Abs(a.MasterMaxDailyProfit - b.MasterMaxDailyProfit) > 0.0000001)
+                return false;
+
+            if (Math.Abs(a.MasterMaxDailyLoss - b.MasterMaxDailyLoss) > 0.0000001)
+                return false;
+
+            if (a.FollowerUseMasterRisk.Count != b.FollowerUseMasterRisk.Count)
+                return false;
+
+            foreach (var kv in a.FollowerUseMasterRisk)
+            {
+                if (!b.FollowerUseMasterRisk.TryGetValue(kv.Key, out var val))
+                    return false;
+
+                if (val != kv.Value)
+                    return false;
+            }
+
+            if (a.FollowerMaxDailyProfit.Count != b.FollowerMaxDailyProfit.Count)
+                return false;
+
+            foreach (var kv in a.FollowerMaxDailyProfit)
+            {
+                if (!b.FollowerMaxDailyProfit.TryGetValue(kv.Key, out var val))
+                    return false;
+
+                if (Math.Abs(val - kv.Value) > 0.0000001)
+                    return false;
+            }
+
+            if (a.FollowerMaxDailyLoss.Count != b.FollowerMaxDailyLoss.Count)
+                return false;
+
+            foreach (var kv in a.FollowerMaxDailyLoss)
+            {
+                if (!b.FollowerMaxDailyLoss.TryGetValue(kv.Key, out var val))
+                    return false;
+
+                if (Math.Abs(val - kv.Value) > 0.0000001)
                     return false;
             }
 

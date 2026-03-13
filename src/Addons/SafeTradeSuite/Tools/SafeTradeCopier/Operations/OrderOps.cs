@@ -24,6 +24,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var qty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
             var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
+            
+            if (!eng.CanEnterForRisk(master, out var riskReason))
+            {
+                eng.Log($"Master blocked by risk -> {master.Name}: {riskReason}");
+                return;
+            }
 
             var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
 
