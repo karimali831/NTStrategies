@@ -278,9 +278,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterStack.Children.Add(_masterPnlBarStatusText);
 
             var masterFieldset = BuildFieldset("Master", masterStack);
-            Grid.SetRow(masterFieldset, 3);
+            Grid.SetColumn(masterFieldset, 0);
             root.Children.Add(masterFieldset);
-
+            
             _masterBox.SelectionChanged += (s, e) =>
             {
                 if (_suppressSessionUiEvents)

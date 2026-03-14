@@ -22,6 +22,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             lock (_uiNet)
                 _uiNet[key] = qty;
+
+            InvalidatePositionsPanel();
         }
         
         

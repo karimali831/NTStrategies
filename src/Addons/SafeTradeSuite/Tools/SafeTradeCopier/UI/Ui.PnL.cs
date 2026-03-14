@@ -81,7 +81,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 RenderFlattenEnablementUi();
                 RenderBreakEvenEnablementUi();
-
+                InvalidatePositionsPanel();
             }, DispatcherPriority.Background);
         }
     }

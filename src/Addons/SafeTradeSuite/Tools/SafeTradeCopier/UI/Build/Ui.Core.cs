@@ -33,17 +33,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status bar
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // totals pnl
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // master
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // top panels
                 root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // followers
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // bottom/status
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // footer/status
 
 
                 // ---------------- Header ----------------
                 RenderHeader(root);
+                
+                // ---------------- Top panels: Master + Positions ----------------
+                var topPanelsGrid = new Grid
+                {
+                    Margin = new Thickness(0, 0, 0, 0)
+                };
 
-                // ---------------- Master ----------------
-                RenderMasterPanel(eng, root);
+                topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
 
+                topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(12)
+                });
+
+                topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+
+                Grid.SetRow(topPanelsGrid, 4);
+                root.Children.Add(topPanelsGrid);
+
+                RenderMasterPanel(eng, topPanelsGrid);
+                RenderPositionsPanel(topPanelsGrid);
+                
                 // ---------------- Followers ----------------
                 RenderFollowerPanel(eng, root);
 

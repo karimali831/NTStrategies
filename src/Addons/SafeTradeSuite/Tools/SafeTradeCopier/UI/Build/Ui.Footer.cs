@@ -59,7 +59,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             bottom.Children.Add(_statusLabel);
             bottom.Children.Add(_statusBox);
 
-            Grid.SetRow(bottom, 5);
+            Grid.SetRow(bottom, 6);
             root.Children.Add(bottom);
             
             ApplyStatusBoxVisibility();

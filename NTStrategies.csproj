@@ -104,6 +104,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Ui.Header.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Ui.InstrumentTabs.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Ui.MasterPanel.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Ui.PositionsPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Components\Ui.ConfirmDialog.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Components\Ui.MenuBar.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Components\Ui.StatusBar.cs" />
@@ -114,6 +115,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Settings\Ui.General.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Config.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Account.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Helper.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.PnL.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Position.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\Ui.FollowerRow.cs" />

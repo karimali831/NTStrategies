@@ -77,7 +77,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             followersStack.Children.Add(followersScroll);
 
             var followersFieldset = BuildFieldset("Followers", followersStack);
-            Grid.SetRow(followersFieldset, 4);
+            
+            Grid.SetRow(followersFieldset, 5);
             root.Children.Add(followersFieldset);
 
             _btnCopyOn.Click += (s, e) =>
