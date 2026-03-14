@@ -34,51 +34,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Instrument label
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Instrument
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Add button
+            
+            var accountLbl = CreateFormLabel("Account");
 
-            var accountLbl = new TextBlock
-            {
-                Text = "Account",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Foreground = SystemColors.WindowTextBrush,
-                FontWeight = FontWeights.SemiBold
-            };
+            _masterBox = CreateFormComboBox(minWidth: 240, margin: new Thickness(0, 0, 14, 0));
 
-            _masterBox = new ComboBox
-            {
-                Height = 30,
-                Margin = new Thickness(0, 0, 14, 0),
-            };
+            var instrumentLbl = CreateFormLabel("Instrument");
 
-            var instrumentLbl = new TextBlock
-            {
-                Text = "Instrument",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Foreground = SystemColors.WindowTextBrush,
-                FontWeight = FontWeights.SemiBold
-            };
+            _instrumentSelector = CreateFormComboBox(minWidth: 220, margin: new Thickness(0, 0, 8, 0), editable: true);
+            _instrumentSelector.IsTextSearchEnabled = false;
+            _instrumentSelector.StaysOpenOnEdit = true;
 
-            _instrumentSelector = new ComboBox
-            {
-                Height = 30,
-                Margin = new Thickness(0, 0, 8, 0),
-                IsEditable = true,
-                IsTextSearchEnabled = false,
-                StaysOpenOnEdit = true
-            };
-
-            _btnAddInstrumentTab = new Button
-            {
-                Content = "+",
-                Width = 34,
-                Height = 30,
-                ToolTip = "Add instrument tab",
-                Background = Brushes.DodgerBlue,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.Bold,
-                BorderBrush = Brushes.DodgerBlue
-            };
+            _btnAddInstrumentTab = CreateFormButton(
+                text: "+",
+                tone: FormButtonTone.Primary,
+                style: FormButtonStyle.Solid,
+                width: 34,
+                height: InputHeight(),
+                margin: new Thickness(0));
+            _btnAddInstrumentTab.ToolTip = "Add instrument tab";
+            _btnAddInstrumentTab.FontWeight = FontWeights.Bold;
 
             Grid.SetColumn(accountLbl, 0);
             Grid.SetColumn(_masterBox, 1);
@@ -98,48 +73,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            _btnBuyMkt = new Button
-            {
-                Content = "Buy Market",
-                Height = 36,
-                Margin = new Thickness(0, 0, 6, 0),
-                Background = Brushes.ForestGreen,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold
-            };
+            _btnBuyMkt = CreateFormButton(
+                text: "Buy",
+                tone: FormButtonTone.Success,
+                style: FormButtonStyle.Solid,
+                margin: new Thickness(0, 0, 6, 0));
 
-            _btnSellMkt = new Button
-            {
-                Content = "Sell Market",
-                Height = 36,
-                Margin = new Thickness(6, 0, 6, 0),
-                Background = Brushes.Firebrick,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold
-            };
-            
-            _btnFreeTradeAll = new Button
-            {
-                Content = "Break-even All",
-                Height = 36,
-                Margin = new Thickness(6, 0, 6, 0),
-                Background = Brushes.SteelBlue,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold
-            };
+            _btnSellMkt = CreateFormButton(
+                text: "Sell",
+                tone: FormButtonTone.Danger,
+                style: FormButtonStyle.Solid,
+                margin: new Thickness(6, 0, 6, 0));
+
+            _btnFreeTradeAll = CreateFormButton(
+                text: "Break-even All",
+                tone: FormButtonTone.Primary,
+                style: FormButtonStyle.Outline,
+                margin: new Thickness(6, 0, 6, 0));
             RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Break-even All");
-            
-            _btnFlattenAll = new Button
-            {
-                Content = "Flatten All",
-                Height = 36,
-                Margin = new Thickness(6, 0, 0, 0),
-                Background = Brushes.Maroon,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold,
-                IsEnabled = false,
-                Opacity = 0.6
-            };
+
+            _btnFlattenAll = CreateFormButton(
+                text: "Flatten All",
+                tone: FormButtonTone.Danger,
+                style: FormButtonStyle.Outline,
+                margin: new Thickness(6, 0, 0, 0));
+            ApplyButtonTheme(_btnFlattenAll, FormButtonTone.Danger, FormButtonStyle.Outline, enabled: false);
+
             
             _btnFreeTradeAll.Click += (s, e) => FreeTradeAllSelected(eng);
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
@@ -169,13 +128,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 0, 8, 0),
                 Foreground = SystemColors.WindowTextBrush
             };
-
-            _masterQtyBox = new TextBox
-            {
-                Height = 26,
-                Text = "1",
-                Margin = new Thickness(0, 0, 14, 0)
-            };
+            
+            _masterQtyBox = CreateFormTextBox("1", 90, new Thickness(0, 0, 14, 0));
 
             var atmLbl = new TextBlock
             {
@@ -185,11 +139,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = SystemColors.WindowTextBrush
             };
 
-            _masterAtmBox = new ComboBox
-            {
-                Height = 26,
-                MinWidth = 180
-            };
+            _masterAtmBox = CreateFormComboBox(minWidth: 180);
 
             Grid.SetColumn(qtyLbl, 0);
             Grid.SetColumn(_masterQtyBox, 1);
@@ -255,19 +205,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            _btnMasterFreeTrade = new Button
-            {
-                Content = "Break-even",
-                Height = 24,
-                MinWidth = 90,
-                Margin = new Thickness(8, 0, 0, 0),
-                Background = Brushes.SteelBlue,
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold
-            };
+            _btnMasterFreeTrade = CreateFormButton(
+                text: "Break-even",
+                tone: FormButtonTone.Primary,
+                style: FormButtonStyle.Outline,
+                width: 100,
+                height: SmallButtonHeight(),
+                margin: new Thickness(8, 0, 0, 0));
 
             _btnMasterFreeTrade.Click += (s, e) => FreeTradeMasterSelected(eng);
-
+            
             Grid.SetColumn(_masterPnlText, 0);
             Grid.SetColumn(_btnMasterFreeTrade, 1);
             masterPnlTopRow.Children.Add(_masterPnlText);

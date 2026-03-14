@@ -31,6 +31,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return UiConnectionState.Disconnected;
         }
+        
+        private static string GetAccountConnectionLabel(Account acc)
+        {
+            if (acc == null)
+                return "";
+
+            var name = (acc.Connection?.Options?.Name ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(name))
+                return name;
+
+            var text = acc.ConnectionStatus.ToString();
+            return !string.IsNullOrWhiteSpace(text) ? text : "";
+        }
 
         private void HookConnectionStatusUpdates()
         {

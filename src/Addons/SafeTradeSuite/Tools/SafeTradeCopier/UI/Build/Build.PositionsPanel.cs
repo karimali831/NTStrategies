@@ -111,9 +111,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var openCount = GetOpenPositionCount(acc);
                 var netQty = instr == null ? 0 : GetNetPosition(acc, instr);
 
-                var connText = acc.ConnectionStatus == ConnectionStatus.Connected
-                    ? "Live"
-                    : acc.ConnectionStatus.ToString();
+                var connText = GetAccountConnectionLabel(acc);
+                if (string.IsNullOrWhiteSpace(connText))
+                    connText = acc.ConnectionStatus == ConnectionStatus.Connected ? "Connected" : acc.ConnectionStatus.ToString();
 
                 var lockText = "OK";
                 if (_engine != null && !_engine.CanEnterForRisk(acc, out var riskReason))
