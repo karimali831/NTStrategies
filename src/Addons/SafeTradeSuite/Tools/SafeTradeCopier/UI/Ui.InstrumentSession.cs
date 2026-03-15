@@ -13,7 +13,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private TabControl _instrumentTabs;
         private Border _btnAddInstrumentTab;
-        private TabItem _draggingTabItem;
         private Point _instrumentTabDragStart;
         private InstrumentSession _draggingInstrumentSession;
         
@@ -104,18 +103,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-        private void SetDraggingTabVisual(bool dragging)
-        {
-            if (_draggingTabItem == null)
-                return;
-
-            _draggingTabItem.Opacity = dragging ? 0.55 : 1.0;
-        }
-
         private void OnInstrumentTabHeaderMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            _draggingTabItem = GetInstrumentTabItemFromDropSource(sender as DependencyObject);
-            
             if (IsInstrumentTabCloseButtonSource(e.OriginalSource as DependencyObject))
             {
                 _draggingInstrumentSession = null;
@@ -180,18 +169,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             var dragSession = _draggingInstrumentSession;
-            SetDraggingTabVisual(true);
 
             DragDrop.DoDragDrop(
                 _instrumentTabs,
                 new DataObject(typeof(InstrumentSession), dragSession),
                 DragDropEffects.Move);
             
-            SetDraggingTabVisual(false);
-            _draggingTabItem = null;
-
             _draggingInstrumentSession = null;
             _isInstrumentTabDragging = false;
+            
             HideInstrumentTabInsertIndicator();
         }
 
