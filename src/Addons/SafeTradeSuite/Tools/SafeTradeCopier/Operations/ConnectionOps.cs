@@ -90,9 +90,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshAccountsUi();
                 HandleFollowerConnectionSafety();
                 TryAutoRearmAfterReconnect();
+                RefreshStatusBar();
 
                 _engine?.Log(
-                    $"Connection update: " +
+                    "Connection update: " +
                     $"Conn={(e.Connection?.Options?.Name ?? "Unknown")} " +
                     $"Order={e.Status} Price={e.PriceStatus}"
                 );

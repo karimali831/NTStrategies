@@ -5,15 +5,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static TextBlock CreateFormLabel(string text, Thickness? margin = null)
+        private static TextBlock CreateFormLabel(string text, double? width = null, Thickness? margin = null)
         {
             return new TextBlock
             {
                 Text = text ?? "",
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = margin ?? new Thickness(0, 0, 8, 0),
+                Margin = margin ?? new Thickness(0, 0, 0, 0),
                 Foreground = PrimaryTextBrush(),
-                FontWeight = FontWeights.SemiBold
+                FontWeight = FontWeights.SemiBold,
+                Width = width ?? 80
             };
         }
 
@@ -23,7 +24,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Text = text ?? "",
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = margin ?? new Thickness(8, 0, 0, 0),
+                Margin = margin ?? new Thickness(0, 0, 0, 0),
                 Foreground = SecondaryTextBrush()
             };
         }

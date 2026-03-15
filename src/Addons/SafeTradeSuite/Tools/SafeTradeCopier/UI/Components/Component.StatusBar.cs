@@ -57,7 +57,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return "";
         }
         
-        
         private void RefreshStatusBar()
         {
             var state = GetStatusState();

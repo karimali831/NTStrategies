@@ -101,10 +101,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (instr == null)
                 {
                     if (_btnMasterFreeTrade != null)
-                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false,"Break-even");
+                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false,"BE");
 
                     if (_btnFreeTradeAll != null)
-                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Break-even All");
+                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "BE All");
 
                     foreach (var row in _followerRows)
                     {
@@ -122,7 +122,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
                     var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster,"Break-even");
+                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster,"BE");
                     anyCanApplyOrUndo |= canUndoMaster || canApplyMaster;
                 }
 
@@ -146,7 +146,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "Break-even All");
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "BE All");
             }, DispatcherPriority.Background);
         }
         

@@ -130,8 +130,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 // ✅ choose initial master correctly before building followers
                 Account initialMaster = null;
+
                 if (_simOnlyMode)
-                    initialMaster = accounts.FirstOrDefault(IsSimAccount);
+                {
+                    initialMaster =
+                        accounts.FirstOrDefault(a =>
+                            a != null &&
+                            IsSimAccount(a) &&
+                            string.Equals(GetAccountConnectionLabel(a), "Playback", StringComparison.OrdinalIgnoreCase) &&
+                            GetUiConnectionState(a) == UiConnectionState.Connected)
+                        ?? accounts.FirstOrDefault(a =>
+                            a != null &&
+                            IsSimAccount(a) &&
+                            GetUiConnectionState(a) == UiConnectionState.Connected)
+                        ?? accounts.FirstOrDefault(IsSimAccount);
+                }
 
                 if (initialMaster == null)
                     initialMaster = accounts.FirstOrDefault();

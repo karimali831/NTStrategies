@@ -38,7 +38,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = margin ?? new Thickness(0),
                 FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
                 BorderThickness = new Thickness(1),
-                Padding = new Thickness(10, 0, 10, 0)
+                Padding = new Thickness(2, 0, 2, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
             };
 
             ApplyButtonTheme(btn, tone, style, enabled: true);

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 BorderThickness = new Thickness(1),
                 BorderBrush = SystemColors.ActiveBorderBrush,
                 CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(14, 18, 14, 14),
+                Padding = new Thickness(10, 18, 10, 14),
                 Background = SystemColors.WindowBrush,
                 Child = content
             };

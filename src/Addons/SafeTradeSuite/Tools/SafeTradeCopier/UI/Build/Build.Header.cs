@@ -20,7 +20,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
             _totalPnlText = new TextBlock
             {
-                Text = "Total   R $0.00   •   U $0.00",
+                Text = "Total Unrealized $0.00",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.DimGray,

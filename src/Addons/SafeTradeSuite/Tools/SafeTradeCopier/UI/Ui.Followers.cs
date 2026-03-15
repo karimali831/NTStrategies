@@ -212,7 +212,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var pnl = new TextBlock
                 {
-                    Text = "R $0.00   •   U $0.00",
+                    Text = "Unrealized $0.00",
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = Brushes.DimGray,
                     FontWeight = FontWeights.SemiBold,
@@ -395,7 +395,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "Override Qty", 3);
             AddHeaderText(g, "Bracket", 4);
             AddHeaderText(g, "PnL", 5);
-            AddHeaderText(g,"Break-even", 6);
+            AddHeaderText(g, "BE", 6);
             AddHeaderText(g, "Flatten", 7);
 
             return g;
