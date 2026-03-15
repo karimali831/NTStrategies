@@ -51,8 +51,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 LastChildFill = false,
                 MinWidth = 92,
-                Margin = new Thickness(0)
+                Margin = new Thickness(0),
+                Tag = session
             };
+
+            headerPanel.PreviewMouseLeftButtonDown += OnInstrumentTabHeaderMouseLeftButtonDown;
+            headerPanel.MouseMove += OnInstrumentTabHeaderMouseMove;
 
             DockPanel.SetDock(closeButton, Dock.Right);
             DockPanel.SetDock(textBlock, Dock.Left);
