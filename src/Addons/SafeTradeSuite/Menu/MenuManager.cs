@@ -72,14 +72,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             if (toolsRoot == null) return;
             if (suiteNodes == null || suiteNodes.Length == 0) return;
 
+            RemoveExistingSuiteNodes(toolsRoot);
+
             var refMi = FindFirstNativeMenuItem(toolsRoot);
 
             EnsureSuiteSeparator(toolsRoot);
 
             foreach (var rootNode in suiteNodes)
-            {
                 EnsureNode(toolsRoot, rootNode, refMi);
-            }
         }
 
         private static void EnsureSuiteSeparator(MenuItem toolsRoot)
@@ -94,7 +94,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
 
         private static void EnsureNode(ItemsControl parent, MenuNode node, MenuItem refMi)
         {
-            if (parent == null || node == null) return;
+            if (parent == null || node == null)
+                return;
 
             var existing = FindChildMenuItemByAutomationId(parent, node.AutomationId)
                            ?? FindChildMenuItemByHeader(parent, node.Header);
@@ -102,45 +103,73 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Menu
             MenuItem mi;
             if (existing == null)
             {
-                mi = new MenuItem { Header = node.Header };
+                mi = new MenuItem
+                {
+                    Header = node.Header
+                };
+
                 if (!string.IsNullOrWhiteSpace(node.AutomationId))
                     AutomationProperties.SetAutomationId(mi, node.AutomationId);
 
                 ApplyMenuStyleFromReference(mi, refMi);
-
-                if (node.IsLeaf && node.OnClick != null)
-                {
-                    mi.Click += (s, e) => node.OnClick();
-                }
-
                 parent.Items.Add(mi);
             }
             else
             {
                 mi = existing;
-
-                // Keep style consistent even if it already existed
+                mi.Header = node.Header;
                 ApplyMenuStyleFromReference(mi, refMi);
-
-                // Ensure leaf click wired (without duplication)
-                if (node.IsLeaf && node.OnClick != null)
-                {
-                    mi.Click -= LeafClickShim;
-                    mi.Click += LeafClickShim;
-
-                    void LeafClickShim(object s, RoutedEventArgs e)
-                    {
-                        node.OnClick();
-                    }
-                }
             }
 
-            // Children
+            if (node.IsLeaf)
+            {
+                mi.Tag = node.OnClick;
+
+                mi.Click -= OnSuiteLeafMenuClick;
+                mi.Click += OnSuiteLeafMenuClick;
+            }
+
             if (!node.IsLeaf)
             {
                 foreach (var child in node.Children)
                     EnsureNode(mi, child, refMi);
             }
+        }
+        
+        private static void RemoveExistingSuiteNodes(MenuItem toolsRoot)
+        {
+            if (toolsRoot == null)
+                return;
+
+            for (var i = toolsRoot.Items.Count - 1; i >= 0; i--)
+            {
+                var obj = toolsRoot.Items[i];
+
+                if (obj is MenuItem mi)
+                {
+                    var id = AutomationProperties.GetAutomationId(mi);
+                    if (!string.IsNullOrWhiteSpace(id) &&
+                        id.StartsWith("SafeTradeSuite_", StringComparison.Ordinal))
+                    {
+                        toolsRoot.Items.RemoveAt(i);
+                    }
+                }
+                else if (obj is Separator sep)
+                {
+                    var id = AutomationProperties.GetAutomationId(sep);
+                    if (string.Equals(id, SuiteSeparatorAutomationId, StringComparison.Ordinal))
+                        toolsRoot.Items.RemoveAt(i);
+                }
+            }
+        }
+        
+        private static void OnSuiteLeafMenuClick(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is MenuItem mi))
+                return;
+
+            if (mi.Tag is Action action)
+                action();
         }
 
         private static MenuItem FindFirstNativeMenuItem(MenuItem toolsRoot)

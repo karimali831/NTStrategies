@@ -5,43 +5,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
     internal static partial class SafeTradeSuiteRuntime
     {
-        private static readonly object CopierGate = new object();
         private static SafeTradeCopierTool _copier;
 
         public static SafeTradeCopierTool GetOrCreateCopier()
         {
-            lock (CopierGate)
-            {
-                if (_copier == null)
-                {
-                    _copier = new SafeTradeCopierTool();
-                    PrintLog("Created SafeTradeCopierTool singleton.");
-                }
+            if (_copier == null)
+                _copier = new SafeTradeCopierTool();
 
-                return _copier;
-            }
+            return _copier;
         }
 
         public static void DisposeCopierIfExists()
         {
-            lock (CopierGate)
-            {
-                if (_copier == null)
-                    return;
+            if (_copier == null)
+                return;
 
-                try
-                {
-                    _copier.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    PrintLog("DisposeCopierIfExists failed: " + ex);
-                }
-                finally
-                {
-                    _copier = null;
-                    PrintLog("Disposed SafeTradeCopierTool singleton.");
-                }
+            try
+            {
+                _copier.Dispose();
+            }
+            catch (Exception ex)
+            {
+                PrintLog("DisposeCopierIfExists error: " + ex);
+            }
+            finally
+            {
+                _copier = null;
             }
         }
         

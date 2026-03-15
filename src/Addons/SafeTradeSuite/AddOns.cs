@@ -8,7 +8,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
     public class AddOns : AddOnBase
     {
-        private Window _controlCenterWindow;
         private MenuManager _menuManager;
         private readonly string _instanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
 
@@ -20,48 +19,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
             {
                 Name = "SafeTradeSuite";
                 Description = "SafeTrade Suite - tools for safer execution and account operations.";
+                return;
             }
-            else if (State == State.Terminated)
-            {
-                _menuManager?.Dispose();
-                _menuManager = null;
-                _controlCenterWindow = null;
 
-                SafeTradeSuiteRuntime.DisposeCopierIfExists();
+            if (State == State.Terminated)
+            {
+                try
+                {
+                    _menuManager?.Dispose();
+                    _menuManager = null;
+
+                    SafeTradeSuiteRuntime.DisposeCopierIfExists();
+                }
+                catch (Exception ex)
+                {
+                    SafeTradeSuiteRuntime.PrintLog("AddOns terminate error: " + ex);
+                }
             }
         }
-        
+
         protected override void OnWindowCreated(Window w)
         {
-            SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] OnWindowCreated");
+            if (w == null)
+                return;
 
             try
             {
-                if (w == null)
-                    return;
-
                 var typeName = w.GetType().FullName ?? w.GetType().Name;
-                var title = w.Title ?? "";
-
-                SafeTradeSuiteRuntime.PrintLog("Window type: " + typeName);
-                SafeTradeSuiteRuntime.PrintLog("Window title: " + (string.IsNullOrWhiteSpace(title) ? "<null-title>" : title));
-                
                 if (typeName.IndexOf("ControlCenter", StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    SafeTradeSuiteRuntime.PrintLog("Skipping non-ControlCenter window.");
                     return;
-                }
 
-                _controlCenterWindow = w;
-                _controlCenterWindow.Dispatcher.InvokeAsync(async () =>
+                w.Dispatcher.InvokeAsync(async () =>
                 {
-                    for (var i = 0; i < 50; i++)
+                    for (var i = 0; i < 30; i++)
                     {
-                        if (TryInitMenu(_controlCenterWindow))
-                            break;
+                        if (TryInitMenu(w))
+                            return;
 
                         await Task.Delay(100);
                     }
+
+                    SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] Failed to initialize menu.");
                 }, DispatcherPriority.Loaded);
             }
             catch (Exception ex)
@@ -69,21 +67,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                 SafeTradeSuiteRuntime.PrintLog("OnWindowCreated error: " + ex);
             }
         }
-        
 
         private bool TryInitMenu(Window cc)
         {
             if (cc == null)
                 return false;
 
-            if (_menuManager == null)
-                _menuManager = new MenuManager(cc);
+            _menuManager?.Dispose();
+            _menuManager = new MenuManager(cc);
 
             var toolsRoot = _menuManager.FindToolsRootMenuItem();
             if (toolsRoot == null)
                 return false;
 
-            var nodes = SafeTradeSuiteMenuNodes.Build(() => SafeTradeSuiteRuntime.GetOrCreateCopier().Show());
+            var nodes = SafeTradeSuiteMenuNodes.Build(() =>
+            {
+                SafeTradeSuiteRuntime.DisposeCopierIfExists();
+                SafeTradeSuiteRuntime.GetOrCreateCopier().Show();
+            });
 
             _menuManager.HookToolsMenu(toolsRoot, nodes);
             return true;

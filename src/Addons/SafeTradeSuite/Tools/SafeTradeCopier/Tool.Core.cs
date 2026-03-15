@@ -10,39 +10,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private readonly string _toolId = Guid.NewGuid().ToString("N").Substring(0, 8);
-        private static readonly object WindowGate = new object();
-        private bool _allowWindowClose;
+        private readonly object _windowGate = new object();
         private bool _isClosing;
-        
-        private static Window _window;
+
+        private Window _window;
         private Dispatcher _uiDispatcher;
         private SafeCopierEngine _engine;
         private ComboBox _masterBox;
         private ComboBox _instrumentSelector;
         private StackPanel _followersPanel;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
-
+        
         public void Show()
         {
             SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] Show()");
-            SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] WindowExists={_window != null}");
 
-            lock (WindowGate)
+            lock (_windowGate)
             {
-                // If window exists but is no longer usable, drop it and rebuild
                 if (_window != null)
                 {
-                    if (!_window.IsLoaded || _window.Dispatcher.HasShutdownStarted ||
+                    if (!_window.IsLoaded ||
+                        _window.Dispatcher.HasShutdownStarted ||
                         _window.Dispatcher.HasShutdownFinished)
                     {
-                        CloseInternal(closeWindow: true);
+                        TearDownEngine();
+                        TearDownUiState();
                     }
-                }
-
-                if (_window != null)
-                {
-                    SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] Reusing existing window.");
-
+                    
                     if (!_window.IsVisible)
                         _window.Show();
 
@@ -73,67 +67,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     };
 
                     _uiDispatcher = _window.Dispatcher;
+
+                    _window.Closing += OnWindowClosing;
+                    _window.Closed += OnWindowClosed;
+
+                    HookConnectionStatusUpdates();
+                    _window.Show();
+
                     _uiDispatcher.InvokeAsync(() =>
                     {
                         EnsureInitialInstrumentSession();
-                        // EnsureStartupInstrumentSelection();
                         RefreshInstrumentSelectorItems();
                         RefreshInstrumentTabs();
                         LoadActiveSessionToUi();
                         RenderFlattenAllButtonState();
                     }, DispatcherPriority.Loaded);
-                    
-                    _window.Closing += OnWindowClosing;
-                    _window.Closed += OnWindowClosed;
-
-                    _window.Show();
-                    HookConnectionStatusUpdates();
                 }
                 catch (Exception ex)
                 {
                     LogUnhandled("SafeTradeCopierTool.Show()", ex);
-                    CloseInternal(closeWindow: true);
+                    Dispose();
                     throw;
                 }
             }
         }
-
-        public void Dispose()
-        {
-            // True teardown (used by Close button / tool registry dispose)
-            lock (WindowGate)
-            {
-                CloseInternal(closeWindow: true);
-            }
-        }
-
         
-        private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void TearDownEngine()
         {
-            _isClosing = true;
-
-            if (_allowWindowClose)
-                return;
-
-            // Treat the window X as a real close now
-            _allowWindowClose = true;
-            UnsubscribeUiAccountEvents(Account.All);
-        }
-
-        private void OnWindowClosed(object sender, EventArgs e)
-        {
-            lock (WindowGate)
-            {
-                CloseInternal(closeWindow: false);
-            }
-        }
-        
-
-        private void CloseInternal(bool closeWindow)
-        {
-            SafeTradeSuiteRuntime.PrintLog($"Copier[{_toolId}] CloseInternal(closeWindow={closeWindow})");
-            
-            _isClosing = true;
             UnhookConnectionStatusUpdates();
 
             if (_engine != null)
@@ -142,32 +102,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _engine.Dispose();
                 _engine = null;
             }
+        }
 
-            // Close window (optionally)
-            if (closeWindow && _window != null)
-            {
-                var w = _window;
-
-                w.Closing -= OnWindowClosing;
-                w.Closed -= OnWindowClosed;
-
-                _allowWindowClose = true;
-                w.Close();
-            }
-
+        private void TearDownUiState()
+        {
             _window = null;
             _uiDispatcher = null;
-            _allowWindowClose = false;
 
-            // Clear UI refs / state
             _masterBox = null;
+            _instrumentSelector = null;
             _followersPanel = null;
 
             _btnBuyMkt = null;
             _btnSellMkt = null;
             _btnFlattenAll = null;
-
             _btnCopyOn = null;
+
             _statusLabel = null;
             _statusBox = null;
 
@@ -176,14 +126,61 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterPnlText = null;
             _totalPnlText = null;
 
-            _followerRows.Clear();
-            _lastAccountsSnapshot.Clear();
-            
             _instrumentTabs = null;
             _btnAddInstrumentTab = null;
+
             _activeInstrumentSession = null;
             _suppressSessionUiEvents = false;
+
+            _followerRows.Clear();
+            _lastAccountsSnapshot.Clear();
             _instrumentSessions.Clear();
+        }
+
+        public void Dispose()
+        {
+            lock (_windowGate)
+            {
+                _isClosing = true;
+
+                UnsubscribeUiAccountEvents(Account.All);
+                TearDownEngine();
+
+                if (_window != null)
+                {
+                    var w = _window;
+                    _window = null;
+
+                    w.Closing -= OnWindowClosing;
+                    w.Closed -= OnWindowClosed;
+
+                    if (w.Dispatcher.CheckAccess())
+                        w.Close();
+                    else
+                        w.Dispatcher.Invoke(() => w.Close());
+                }
+
+                TearDownUiState();
+            }
+        }
+        
+        private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            lock (_windowGate)
+            {
+                _isClosing = true;
+            }
+
+            UnsubscribeUiAccountEvents(Account.All);
+        }
+
+        private void OnWindowClosed(object sender, EventArgs e)
+        {
+            lock (_windowGate)
+            {
+                TearDownEngine();
+                TearDownUiState();
+            }
         }
     }
 }
