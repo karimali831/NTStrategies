@@ -201,7 +201,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var qtyBox = CreateFormTextBox(masterQty.ToString(), width: 40);
                 qtyBox.ToolTip = "Qty override (blank = inherit master)";
 
-                var atmBox = CreateFormComboBox(width: 125, margin: new Thickness(0, 0, 12, 0));
+                var atmBox = CreateFormComboBox(width: 125);
                 atmBox.ToolTip =
                     "(inherit master) = use master ATM, Follow Master Exit = no follower bracket, exit when master exits";
 
@@ -222,7 +222,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Minimum = 0,
                     Maximum = 100,
                     Value = 0,
-                    Width = 150,
+                    Width = 100,
                     Margin = new Thickness(0, 2, 0, 2),
                     Visibility = Visibility.Collapsed
                 };
@@ -374,12 +374,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // Status
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // On
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });  // Override ATM
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // PnL
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // BE
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });   // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // Override ATM
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });  // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // BE
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // Flatten
         }
         
         private static Grid BuildFollowerHeaderRow()

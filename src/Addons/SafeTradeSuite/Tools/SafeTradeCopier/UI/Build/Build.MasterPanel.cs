@@ -176,7 +176,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
-                Width = 150,
+                Width = 100,
                 Margin = new Thickness(0, 0, 12, 0),
                 Visibility = Visibility.Collapsed,
                 HorizontalAlignment = HorizontalAlignment.Left
