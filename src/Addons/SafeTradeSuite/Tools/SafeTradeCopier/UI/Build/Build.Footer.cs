@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void RenderFooter(Grid root)
         {
             var bottom = new Grid { Margin = new Thickness(0, 0, 0, 0) };
-            bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
+            bottom.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) }); // instrument tabs
             _footerStatusLabelRow = new RowDefinition { Height = GridLength.Auto };
             _footerStatusBoxRow = new RowDefinition { Height = GridLength.Auto };
             bottom.RowDefinitions.Add(_footerStatusLabelRow); // status label

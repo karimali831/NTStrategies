@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -10,24 +11,58 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             var tabsHost = new Border
             {
-                BorderBrush = SectionBorderBrush(), 
-                BorderThickness = new Thickness(1), 
-                Background = TabBackgroundBrush(), 
-                CornerRadius = new CornerRadius(6), 
-                Padding = new Thickness(6, 4, 6, 4), 
-                Margin = new Thickness(0, 0, 0, 0)
-            }; 
-            
+                BorderBrush = SectionBorderBrush(),
+                BorderThickness = new Thickness(1),
+                Background = TabBackgroundBrush(),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 1, 6, 1),
+                Height = 40,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var tabControlStyle = new Style(typeof(TabControl));
+            tabControlStyle.Setters.Add(new Setter(Control.TemplateProperty, BuildFlatInstrumentTabControlTemplate()));
+
             _instrumentTabs = new TabControl
             {
-                Background = Brushes.Transparent, 
-                BorderThickness = new Thickness(0), 
-                Padding = new Thickness(0), 
-                Margin = new Thickness(0)
-            }; 
-            
-            tabsHost.Child = _instrumentTabs; 
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                VerticalContentAlignment = VerticalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Style = tabControlStyle
+            };
+
+            tabsHost.Child = _instrumentTabs;
             return tabsHost;
+        }
+        
+        private static ControlTemplate BuildFlatInstrumentTabControlTemplate()
+        {
+            var template = new ControlTemplate(typeof(TabControl));
+
+            var root = new FrameworkElementFactory(typeof(Grid));
+            root.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            border.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            border.SetValue(Border.PaddingProperty, new Thickness(0));
+            border.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Stretch);
+
+            var tabPanel = new FrameworkElementFactory(typeof(TabPanel));
+            tabPanel.SetValue(Panel.IsItemsHostProperty, true);
+            tabPanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0));
+            tabPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            tabPanel.SetValue(FrameworkElement.HeightProperty, 38.0);
+
+            border.AppendChild(tabPanel);
+            root.AppendChild(border);
+
+            template.VisualTree = root;
+            return template;
         }
         
         private TabItem BuildInstrumentTabItem(InstrumentSession session)
@@ -69,49 +104,59 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var textBlock = new TextBlock
             {
                 Text = headerText,
-                VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Foreground = isActive ? WindowForegroundBrush() : MutedForegroundBrush(),
-                FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal
+                FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal,
+                VerticalAlignment = VerticalAlignment.Center
             };
 
-            var headerPanel = new DockPanel
+            var headerPanel = new Grid
             {
-                LastChildFill = false,
                 MinWidth = 92,
-                Margin = new Thickness(0),
+                Height = 38,
+                VerticalAlignment = VerticalAlignment.Center,
                 Tag = session
             };
 
-            headerPanel.PreviewMouseLeftButtonDown += OnInstrumentTabHeaderMouseLeftButtonDown;
-            headerPanel.MouseMove += OnInstrumentTabHeaderMouseMove;
+            headerPanel.ColumnDefinitions.Add(new ColumnDefinition());
+            headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            DockPanel.SetDock(closeButton, Dock.Right);
-            DockPanel.SetDock(textBlock, Dock.Left);
+            Grid.SetColumn(textBlock, 0);
+            Grid.SetColumn(closeButton, 1);
 
-            headerPanel.Children.Add(closeButton);
             headerPanel.Children.Add(textBlock);
+            headerPanel.Children.Add(closeButton);
 
             var headerBorder = new Border
             {
                 Background = isActive ? TabSelectedBackgroundBrush() : TabBackgroundBrush(),
                 CornerRadius = new CornerRadius(0),
-                Padding = new Thickness(10, 6, 10, 6),
+                Padding = new Thickness(12, 0, 12, 0),
+                Margin = new Thickness(0),
                 Child = headerPanel,
-                SnapsToDevicePixels = true
+                SnapsToDevicePixels = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                Height = 38,
+                Tag = session
             };
+
+            headerBorder.PreviewMouseLeftButtonDown += OnInstrumentTabHeaderMouseLeftButtonDown;
+            headerBorder.MouseMove += OnInstrumentTabHeaderMouseMove;
 
             return new TabItem
             {
                 Header = headerBorder,
                 Tag = session,
                 MinWidth = 92,
-                Background = TabBackgroundBrush(false),
-                BorderBrush = TabBorderBrush(false),
+                Height = 38,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
                 Foreground = WindowForegroundBrush(),
                 Padding = new Thickness(0),
-                Margin = new Thickness(0)
+                Margin = new Thickness(0),
+                VerticalContentAlignment = VerticalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
             };
         }
     }

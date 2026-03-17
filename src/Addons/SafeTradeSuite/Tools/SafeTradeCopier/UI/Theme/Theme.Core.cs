@@ -5,11 +5,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static CornerRadius ControlCornerRadius()
-        {
-            return new CornerRadius(5);
-        }
-
         private static Thickness ControlBorderThickness()
         {
             return new Thickness(1);
@@ -84,13 +79,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(82, 82, 82))
                 : new SolidColorBrush(Color.FromRgb(170, 170, 170));
-        }
-
-        private static Brush InputDisabledBorderBrush()
-        {
-            return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
-                : new SolidColorBrush(Color.FromRgb(210, 210, 210));
         }
 
         private static Brush DisabledBackgroundBrush()

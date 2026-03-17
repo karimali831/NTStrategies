@@ -35,20 +35,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Visibility = Visibility.Hidden
             };
 
-            _btnCopyOn = new Button
-            {
-                Height = 28,
-                MinWidth = 120,
-                Padding = new Thickness(10, 0, 10, 0),
-                Margin = new Thickness(10, 0, 0, 0),
-                FontWeight = FontWeights.SemiBold,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Content = eng.CopyEnabled ? "Armed" : "Disarmed",
-                Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon,
-                BorderBrush = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon
-            };
+            _btnCopyOn = CreateFormButton(eng.CopyEnabled ? "Armed" : "Disarmed", style: FormButtonStyle.Solid);
+
+            // _btnCopyOn = new Button
+            // {
+            //     Height = 28,
+            //     MinWidth = 120,
+            //     Padding = new Thickness(10, 0, 10, 0),
+            //     Margin = new Thickness(10, 0, 0, 0),
+            //     FontWeight = FontWeights.SemiBold,
+            //     Foreground = Brushes.White,
+            //     HorizontalAlignment = HorizontalAlignment.Right,
+            //     VerticalAlignment = VerticalAlignment.Center,
+            //     Content = eng.CopyEnabled ? "Armed" : "Disarmed",
+            //     Background = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon,
+            //     BorderBrush = eng.CopyEnabled ? Brushes.DarkGreen : Brushes.Maroon
+            // };
 
             Grid.SetColumn(followersTitleText, 0);
             Grid.SetColumn(_btnCopyOn, 1);
