@@ -24,14 +24,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 0, 0, 0)
             };
 
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) }); // Account
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });  // Conn
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });  // Open Pos
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });  // Net Qty
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Realized
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Unrealized
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) }); // Lock
-            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) }); // Mode
+            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  }); // Account
+            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });  // Conn
+            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });  // Open Pos
+            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Realized
+            _positionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Lock
 
             BuildPositionsHeaderRow(_positionsGrid);
             InvalidatePositionsPanel();
@@ -43,21 +40,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             root.Children.Add(positionsFieldset);
         }
 
-        private void BuildPositionsHeaderRow(Grid g)
+        private static void BuildPositionsHeaderRow(Grid g)
         {
             g.RowDefinitions.Clear();
             g.Children.Clear();
 
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            
+            var headerBg = new Border
+            {
+                Background = IsDarkTheme()
+                    ? new SolidColorBrush(Color.FromRgb(32, 32, 32))
+                    : new SolidColorBrush(Color.FromRgb(245, 245, 245))
+            };
+
+            Grid.SetRow(headerBg, 0);
+            Grid.SetColumn(headerBg, 0);
+            Grid.SetColumnSpan(headerBg, g.ColumnDefinitions.Count);
+            Panel.SetZIndex(headerBg, -1);
+            g.Children.Add(headerBg);
 
             AddPositionsHeaderText(g, "Account", 0);
             AddPositionsHeaderText(g, "Conn", 1);
             AddPositionsHeaderText(g, "Open", 2);
-            AddPositionsHeaderText(g, "Net", 3);
-            AddPositionsHeaderText(g, "Realized", 4);
-            AddPositionsHeaderText(g, "Unrealized", 5);
-            AddPositionsHeaderText(g, "Lock", 6);
-            AddPositionsHeaderText(g, "Mode", 7);
+            AddPositionsHeaderText(g, "Realized", 3);
+            AddPositionsHeaderText(g, "Lock", 4);
         }
 
         private static void AddPositionsHeaderText(Grid g, string text, int col)
@@ -67,7 +74,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = text,
                 Margin = new Thickness(6, 4, 6, 4),
                 FontWeight = FontWeights.SemiBold,
-                Foreground = SystemColors.WindowTextBrush,
+                Foreground = WindowForegroundBrush(),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -76,6 +83,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.Children.Add(tb);
         }
 
+        private static Brush PositionsRowBackgroundBrush(int rowIndex)
+        {
+            if (IsDarkTheme())
+                return rowIndex % 2 == 0
+                    ? new SolidColorBrush(Color.FromRgb(28, 28, 28))
+                    : new SolidColorBrush(Color.FromRgb(34, 34, 34));
+
+            return rowIndex % 2 == 0
+                ? new SolidColorBrush(Color.FromRgb(250, 250, 250))
+                : new SolidColorBrush(Color.FromRgb(242, 242, 242));
+        }
+        
+        private static void AddPositionsRowBackground(Grid g, int row, Brush background)
+        {
+            if (g == null)
+                return;
+
+            var rect = new Border
+            {
+                Background = background,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0)
+            };
+
+            Grid.SetRow(rect, row);
+            Grid.SetColumn(rect, 0);
+            Grid.SetColumnSpan(rect, g.ColumnDefinitions.Count);
+            Panel.SetZIndex(rect, -1);
+            g.Children.Add(rect);
+        }
+        
         private void RefreshPositionsPanel()
         {
             if (_positionsGrid == null)
@@ -88,11 +126,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             BuildPositionsHeaderRow(_positionsGrid);
 
             var rowIndex = 1;
-
             foreach (var acc in accounts)
             {
                 if (acc == null)
                     continue;
+                
+                AddPositionsRowBackground(_positionsGrid, rowIndex, PositionsRowBackgroundBrush(rowIndex));
 
                 _positionsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
@@ -109,8 +148,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 var openCount = GetOpenPositionCount(acc);
-                var netQty = instr == null ? 0 : GetNetPosition(acc, instr);
-
+   
                 var connText = GetAccountConnectionLabel(acc);
                 if (string.IsNullOrWhiteSpace(connText))
                     connText = acc.ConnectionStatus == ConnectionStatus.Connected ? "Connected" : acc.ConnectionStatus.ToString();
@@ -119,18 +157,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_engine != null && !_engine.CanEnterForRisk(acc, out var riskReason))
                     lockText = string.IsNullOrWhiteSpace(riskReason) ? "Locked" : riskReason;
 
-                var modeText = GetAccountModeText(acc, master);
-
-                AddPositionsCell(_positionsGrid, acc.Name, rowIndex, 0, Brushes.Black);
+      
+                AddPositionsCell(_positionsGrid, acc.Name, rowIndex, 0, WindowForegroundBrush());
                 AddPositionsCell(_positionsGrid, connText, rowIndex, 1,
-                    acc.ConnectionStatus == ConnectionStatus.Connected ? Brushes.DarkGreen : Brushes.Firebrick);
-                AddPositionsCell(_positionsGrid, openCount.ToString(), rowIndex, 2, Brushes.Black);
-                AddPositionsCell(_positionsGrid, netQty.ToString(), rowIndex, 3, Brushes.Black);
-                AddPositionsCell(_positionsGrid, FmtUsd(realized), rowIndex, 4, GetPnlValueBrush(realized));
-                AddPositionsCell(_positionsGrid, FmtUsd(unrealized), rowIndex, 5, GetPnlValueBrush(unrealized));
-                AddPositionsCell(_positionsGrid, lockText, rowIndex, 6,
-                    string.Equals(lockText, "OK", StringComparison.OrdinalIgnoreCase) ? Brushes.DarkGreen : Brushes.Firebrick);
-                AddPositionsCell(_positionsGrid, modeText, rowIndex, 7, Brushes.DimGray);
+                    acc.ConnectionStatus == ConnectionStatus.Connected ? SuccessActionBrush() : DangerActionBrush());
+                AddPositionsCell(_positionsGrid, openCount.ToString(), rowIndex, 2, WindowForegroundBrush());
+                AddPositionsCell(_positionsGrid, FmtUsd(realized), rowIndex, 3, GetPnlValueBrush(realized));
+                AddPositionsCell(_positionsGrid, lockText, rowIndex, 4,
+                    string.Equals(lockText, "OK", StringComparison.OrdinalIgnoreCase) ? SuccessActionBrush() : DangerActionBrush());
 
                 rowIndex++;
             }
@@ -154,7 +188,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private static int GetOpenPositionCount(Account acc)
         {
-            if (acc == null)
+            if (acc?.Positions == null)
                 return 0;
 
             var count = 0;
@@ -170,35 +204,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             return count;
-        }
-
-        private string GetAccountModeText(Account acc, Account master)
-        {
-            if (acc == null)
-                return "";
-
-            if (master != null && ReferenceEquals(acc, master))
-                return "Master";
-
-            if (_followerRows == null || _followerRows.Count == 0)
-                return "";
-
-            var row = _followerRows.FirstOrDefault(x => x?.Account != null && x.Account.Name == acc.Name);
-            if (row == null || row.EnabledCheck?.IsChecked != true)
-                return "Not selected";
-
-            var bracket = NormalizeAtm(row.AtmOverrideBox?.SelectedItem as string);
-
-            if (string.Equals(bracket, "(follow master exit)", StringComparison.OrdinalIgnoreCase))
-                return "Follow master exit";
-
-            if (string.Equals(bracket, "None", StringComparison.OrdinalIgnoreCase))
-                return "Entry only";
-
-            if (string.Equals(bracket, "(inherit master)", StringComparison.OrdinalIgnoreCase))
-                return "Inherit master";
-
-            return "Own bracket";
         }
         
         private void InvalidatePositionsPanel()

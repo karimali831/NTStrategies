@@ -5,13 +5,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static bool IsDarkTheme()
-        {
-            var c = SystemColors.WindowColor;
-            var luminance = (0.2126 * c.R) + (0.7152 * c.G) + (0.0722 * c.B);
-            return luminance < 140;
-        }
-
         private static CornerRadius ControlCornerRadius()
         {
             return new CornerRadius(5);
@@ -36,14 +29,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             return 24;
         }
-
-        private static Brush WindowBackgroundBrush()
-        {
-            return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(24, 24, 24))
-                : SystemColors.WindowBrush;
-        }
-
+        
         private static Brush CardBackgroundBrush()
         {
             return IsDarkTheme()
@@ -75,22 +61,36 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static Brush InputBackgroundBrush()
         {
             return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(36, 36, 36))
+                ? new SolidColorBrush(Color.FromRgb(40, 40, 40))
                 : Brushes.White;
         }
 
         private static Brush InputForegroundBrush()
         {
             return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(238, 238, 238))
-                : SystemColors.ControlTextBrush;
+                ? new SolidColorBrush(Color.FromRgb(235, 235, 235))
+                : Brushes.Black;
         }
-
+        
+        private static Brush InputDisabledBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(52, 52, 52))
+                : new SolidColorBrush(Color.FromRgb(240, 240, 240));
+        }
+        
         private static Brush InputBorderBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(82, 82, 82))
                 : new SolidColorBrush(Color.FromRgb(170, 170, 170));
+        }
+
+        private static Brush InputDisabledBorderBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
+                : new SolidColorBrush(Color.FromRgb(210, 210, 210));
         }
 
         private static Brush DisabledBackgroundBrush()
@@ -103,8 +103,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static Brush DisabledForegroundBrush()
         {
             return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(175, 175, 175))
-                : Brushes.White;
+                ? new SolidColorBrush(Color.FromRgb(210, 210, 210))
+                : new SolidColorBrush(Color.FromRgb(90, 90, 90));
         }
 
         private static Brush OutlineNeutralBorderBrush()

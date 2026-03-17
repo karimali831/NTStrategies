@@ -23,7 +23,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = "Total Unrealized $0.00",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.DimGray,
+                Foreground = MutedForegroundBrush(),
                 Margin = new Thickness(0, 2, 0, 12),
                 VerticalAlignment = VerticalAlignment.Center
             };

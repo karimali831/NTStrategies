@@ -44,6 +44,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 return $"SIMULATION MODE • COPIER {(disarmed ? "DISARMED" : "ARMED")}";
             }
+            
+            if (HasOnlyCheckedSimFollowers())
+                return $"Sim followers only selected • COPIER {(disarmed ? "DISARMED" : "ARMED")}";
 
             if (disarmed)
                 return "COPIER DISARMED";

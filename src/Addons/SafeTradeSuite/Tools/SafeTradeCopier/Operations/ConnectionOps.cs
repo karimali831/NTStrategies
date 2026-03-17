@@ -64,7 +64,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private CopierStatusState GetStatusState()
         {
             var masterConnected = IsMasterConnected();
-            var followersEnabled = HasAnyCheckedFollowers();
+            var liveFollowersEnabled = HasAnyCheckedLiveFollowers();
             var followersHealthy = AllCheckedFollowersHealthy();
 
             var armed = _engine?.Armed == true;
@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!masterConnected || globalLock)
                 return CopierStatusState.Red;
 
-            if (!_simOnlyMode && copyEnabled && armed && followersEnabled && followersHealthy)
+            if (!_simOnlyMode && copyEnabled && armed && liveFollowersEnabled && followersHealthy)
                 return CopierStatusState.Green;
 
             return CopierStatusState.Yellow;

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            if (!_breakEvenEnabled)
+            if (BreakEvenDisabled)
             {
                 eng.Log("Break-even disabled in Settings.");
                 return;
@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            if (!_breakEvenEnabled)
+            if (BreakEvenDisabled)
             {
                 eng.Log("Break-even disabled in Settings.");
                 return;

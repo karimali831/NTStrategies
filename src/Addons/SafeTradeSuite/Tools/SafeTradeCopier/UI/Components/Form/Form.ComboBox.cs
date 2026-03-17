@@ -16,6 +16,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             ApplyInputChrome(cb);
+            ApplyComboBoxTheme(cb);
+            
+            cb.Loaded += (s, e) =>
+            {
+                var tb = FindVisualChild<TextBox>(cb);
+                if (tb != null)
+                {
+                    tb.Background = InputBackgroundBrush();
+                    tb.Foreground = InputForegroundBrush();
+                    tb.BorderThickness = new Thickness(0);
+                }
+            };
+            
             return cb;
         }
     }

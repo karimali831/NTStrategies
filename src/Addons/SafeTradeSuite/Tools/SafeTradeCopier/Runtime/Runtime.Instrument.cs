@@ -9,8 +9,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
     {
         private static readonly object Gate = new object();
 
-        private static readonly HashSet<string> SavedInstruments =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<string> SavedInstruments =
+            new List<string>();
 
         private static readonly string SavedInstrumentsFilePath =
             Path.Combine(
@@ -32,8 +32,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 
             lock (Gate)
             {
-                if (SavedInstruments.Add(n))
-                    SaveSavedInstrumentsToDisk();
+                var existingIndex = SavedInstruments.FindIndex(x =>
+                    string.Equals(x, n, StringComparison.OrdinalIgnoreCase));
+
+                if (existingIndex >= 0)
+                    SavedInstruments.RemoveAt(existingIndex);
+
+                SavedInstruments.Add(n);
+                SaveSavedInstrumentsToDisk();
+            }
+        }
+        
+        public static void SaveInstrumentOrder(IEnumerable<string> instrumentNames)
+        {
+            if (instrumentNames == null)
+                return;
+
+            EnsureSavedInstrumentsLoaded();
+
+            lock (Gate)
+            {
+                SavedInstruments.Clear();
+
+                foreach (var name in instrumentNames)
+                {
+                    var n = NormalizeInstrumentName(name);
+                    if (string.IsNullOrWhiteSpace(n))
+                        continue;
+
+                    if (SavedInstruments.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    SavedInstruments.Add(n);
+                }
+
+                SaveSavedInstrumentsToDisk();
             }
         }
 
@@ -61,9 +94,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                 return SavedInstruments
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Select(NormalizeInstrumentName)
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(x => x)
                     .ToList();
             }
         }
@@ -90,8 +120,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                     foreach (var line in File.ReadAllLines(SavedInstrumentsFilePath))
                     {
                         var n = NormalizeInstrumentName(line);
-                        if (!string.IsNullOrWhiteSpace(n))
-                            SavedInstruments.Add(n);
+                        if (string.IsNullOrWhiteSpace(n))
+                            continue;
+
+                        if (SavedInstruments.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase)))
+                            continue;
+
+                        SavedInstruments.Add(n);
                     }
                 }
                 catch (Exception ex)
@@ -116,8 +151,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
                         SavedInstruments
                             .Where(x => !string.IsNullOrWhiteSpace(x))
                             .Select(NormalizeInstrumentName)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .OrderBy(x => x)
                             .ToArray());
                 }
                 catch (Exception ex)

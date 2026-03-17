@@ -1,7 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -45,6 +44,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentSelector = CreateFormComboBox(width: 90, editable: true);
             _instrumentSelector.IsTextSearchEnabled = false;
             _instrumentSelector.StaysOpenOnEdit = true;
+            
+            _instrumentSelector.Foreground = InputForegroundBrush();
+            _instrumentSelector.Background = InputBackgroundBrush();
             
             _btnAddInstrumentTab = CreateFormIconAction(
                 Geometry.Parse("M 0 5 L 10 5 M 5 0 L 5 10"),
@@ -156,7 +158,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Text = "Master Unrealized $0.00",
                 Margin = new Thickness(0, 6, 0, 2),
-                Foreground = Brushes.DimGray,
+                Foreground = MutedForegroundBrush(),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12
             };
@@ -190,7 +192,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = Brushes.DimGray,
+                Foreground = MutedForegroundBrush(),
                 Margin = new Thickness(0, 0, 0, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Visibility = Visibility.Collapsed
@@ -286,9 +288,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_suppressSessionUiEvents)
                     return;
 
+                // update follower quantity after master qty changes
+                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                
+                foreach (var r in _followerRows)
+                {
+                    if (string.IsNullOrWhiteSpace(r.QtyOverrideBox.Text))
+                        r.QtyOverrideBox.Text = masterQty.ToString();
+                }
+
+                var latestAccounts = GetSelectableAccounts();
+
+                SaveUiToActiveSession();
+                RebuildFollowersAndRewire(eng, latestAccounts);
+                
+                //
                 SaveUiToActiveSession();
                 ApplyConfigFromUi();
-
+                
                 if (eng.CopyEnabled)
                     eng.SetCopyEnabled(true);
             }

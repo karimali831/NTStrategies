@@ -91,27 +91,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private List<string> GetAvailableInstruments()
         {
-            var names = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            var ordered = new List<string>();
+
+            void AddIfValid(string value)
+            {
+                var n = NormalizeInstrumentName(value);
+                if (!IsValidInstrumentName(n))
+                    return;
+
+                if (ordered.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                ordered.Add(n);
+            }
 
             foreach (var n in SafeTradeSuiteRuntime.GetSavedInstrumentsSnapshot())
-            {
-                var value = NormalizeInstrumentName(n);
-                if (IsValidInstrumentName(value))
-                    names.Add(value);
-            }
+                AddIfValid(n);
 
             foreach (var s in _instrumentSessions)
-            {
-                var value = NormalizeInstrumentName(s?.InstrumentName);
-                if (IsValidInstrumentName(value))
-                    names.Add(value);
-            }
+                AddIfValid(s?.InstrumentName);
 
-            var current = GetSelectedInstrumentName();
-            if (IsValidInstrumentName(current))
-                names.Add(current);
+            AddIfValid(GetSelectedInstrumentName());
 
-            return names.OrderBy(x => x).ToList();
+            return ordered;
         }
         
         private void NormalizeInstrumentSessions()
@@ -230,88 +232,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 _suppressSessionUiEvents = false;
             }
-        }
-
-        private void AddInstrumentSession(string instrumentName)
-        {
-            SaveUiToActiveSession();
-
-            var normalized = NormalizeInstrumentName(instrumentName);
-            if (!IsValidInstrumentName(normalized))
-            {
-                ShowFriendlyError("Invalid instrument", "Please enter a valid NinjaTrader instrument, for example: NQ 03-26");
-                return;
-            }
-
-            RememberInstrument(normalized);
-
-            var existing = _instrumentSessions.FirstOrDefault(x =>
-                string.Equals(NormalizeInstrumentName(x?.InstrumentName), normalized, System.StringComparison.OrdinalIgnoreCase));
-
-            if (existing != null)
-            {
-                _activeInstrumentSession = existing;
-                RefreshInstrumentSelectorItems();
-                RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
-                return;
-            }
-
-            var session = new InstrumentSession
-            {
-                InstrumentName = normalized,
-                MasterAccount = _masterBox?.SelectedItem as Account,
-                MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1),
-                MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None"
-            };
-
-            _instrumentSessions.Add(session);
-            _activeInstrumentSession = session;
-
-            RefreshInstrumentSelectorItems();
-            RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
-        }
-
-        private void RemoveActiveInstrumentSession()
-        {
-            if (_activeInstrumentSession == null)
-                return;
-
-            if (_instrumentSessions.Count <= 1)
-            {
-                var instrumentToForget = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
-
-                _activeInstrumentSession.InstrumentName = "";
-                ForgetInstrument(instrumentToForget);
-
-                RefreshInstrumentSelectorItems();
-                RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
-                return;
-            }
-
-            var sessionToRemove = _activeInstrumentSession;
-            var instrumentToMaybeForget = NormalizeInstrumentName(sessionToRemove.InstrumentName);
-
-            var idx = _instrumentSessions.IndexOf(sessionToRemove);
-            if (idx < 0)
-                return;
-
-            _instrumentSessions.Remove(sessionToRemove);
-
-            if (!IsInstrumentUsedByAnySession(instrumentToMaybeForget, sessionToRemove))
-                ForgetInstrument(instrumentToMaybeForget);
-
-            var nextIdx = idx > 0 ? idx - 1 : 0;
-            if (nextIdx >= _instrumentSessions.Count)
-                nextIdx = _instrumentSessions.Count - 1;
-
-            _activeInstrumentSession = _instrumentSessions[nextIdx];
-
-            RefreshInstrumentSelectorItems();
-            RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
         }
 
         private void ShowFriendlyError(string title, string message)

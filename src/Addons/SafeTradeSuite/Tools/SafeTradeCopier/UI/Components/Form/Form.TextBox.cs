@@ -1,11 +1,16 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static TextBox CreateFormTextBox(string text = "", double width = 120, Thickness? margin = null)
+        private static TextBox CreateFormTextBox(
+            string text = "",
+            double width = 120, 
+            Brush foreground = null,
+            Thickness? margin = null)
         {
             var tb = new TextBox
             {

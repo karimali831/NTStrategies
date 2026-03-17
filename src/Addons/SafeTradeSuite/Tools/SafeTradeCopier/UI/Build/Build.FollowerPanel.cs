@@ -30,7 +30,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = "Followers",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = SystemColors.WindowTextBrush,
+                Foreground = WindowForegroundBrush(),
                 VerticalAlignment = VerticalAlignment.Center,
                 Visibility = Visibility.Hidden
             };
@@ -71,7 +71,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 CanContentScroll = true,
                 Height = 240,
                 Content = _followersPanel,
-                Background = SystemColors.ControlLightBrush
+                Background = SectionBackgroundBrush()
             };
 
             followersStack.Children.Add(followersScroll);

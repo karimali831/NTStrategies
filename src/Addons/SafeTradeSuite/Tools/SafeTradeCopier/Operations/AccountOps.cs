@@ -106,6 +106,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 r.EnabledCheck?.IsChecked == true);
         }
         
+        private bool HasAnyCheckedLiveFollowers()
+        {
+            return _followerRows.Any(r =>
+                r.EnabledCheck?.IsChecked == true && !IsSimAccount(r.Account));
+        }
+        
+        private bool HasOnlyCheckedSimFollowers()
+        {
+            return _followerRows.Any(r =>
+                r.EnabledCheck?.IsChecked == true && IsSimAccount(r.Account)) && !HasAnyCheckedLiveFollowers();
+        }
+        
         private bool AllCheckedFollowersHealthy()
         {
             return _followerRows

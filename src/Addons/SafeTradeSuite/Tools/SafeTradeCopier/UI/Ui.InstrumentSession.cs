@@ -15,7 +15,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Border _btnAddInstrumentTab;
         private Point _instrumentTabDragStart;
         private InstrumentSession _draggingInstrumentSession;
-        
         private bool _isInstrumentTabDragging;
         private Popup _instrumentTabInsertPopup;
         private Border _instrumentTabInsertMarker;
@@ -62,20 +61,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentTabInsertMarker = new Border
             {
-                Width = 4,
-                Height = 30,
-                CornerRadius = new CornerRadius(2),
-                Background = PrimaryActionBrush(),
-                BorderBrush = PrimaryActionBrush(),
-                BorderThickness = new Thickness(1),
+                Width = 2,
+                Height = 22,
+                CornerRadius = new CornerRadius(1),
+                Background = new SolidColorBrush(Color.FromRgb(54, 137, 230)),
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
                 IsHitTestVisible = false,
-                Opacity = 1.0
+                Opacity = 0.95,
+                SnapsToDevicePixels = true
             };
 
             _instrumentTabInsertPopup = new Popup
             {
                 AllowsTransparency = true,
-                Placement = PlacementMode.Absolute,
+                Placement = PlacementMode.Relative,
+                PlacementTarget = _instrumentTabs,
                 StaysOpen = true,
                 IsHitTestVisible = false,
                 Child = _instrumentTabInsertMarker
@@ -200,18 +201,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var targetTab = GetInstrumentTabItemFromDropSource(e.OriginalSource as DependencyObject);
-
-            if (targetTab == null)
-            {
-                ShowInstrumentTabInsertIndicatorAtEnd();
-                e.Effects = DragDropEffects.Move;
-                e.Handled = true;
-                return;
-            }
-
-            var targetSession = targetTab.Tag as InstrumentSession;
-            if (targetSession == null)
+            var insertIndex = GetInsertIndexFromDrag(e, draggedSession);
+            if (insertIndex == null)
             {
                 HideInstrumentTabInsertIndicator();
                 e.Effects = DragDropEffects.None;
@@ -219,9 +210,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var insertAfter = ShouldInsertAfterTarget(targetTab, e, draggedSession);
-            ShowInstrumentTabInsertIndicator(targetTab, insertAfter);
-
+            if (WouldBeNoOpDrop(draggedSession, insertIndex.Value))
+            {
+                HideInstrumentTabInsertIndicator();
+            }
+            
             e.Effects = DragDropEffects.Move;
             e.Handled = true;
         }
@@ -237,67 +230,81 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (draggedSession == null)
                 return;
 
-            var targetTab = GetInstrumentTabItemFromDropSource(e.OriginalSource as DependencyObject);
-
-            if (targetTab == null)
-            {
-                MoveInstrumentSessionToEnd(draggedSession);
-                e.Handled = true;
-                return;
-            }
-
-            var targetSession = targetTab.Tag as InstrumentSession;
-            if (targetSession == null)
+            var insertIndex = GetInsertIndexFromDrag(e, draggedSession);
+            if (insertIndex == null)
             {
                 e.Handled = true;
                 return;
             }
 
-            var insertAfter = ShouldInsertAfterTarget(targetTab, e, draggedSession);
-            ReorderInstrumentSession(draggedSession, targetSession, insertAfter);
+            if (WouldBeNoOpDrop(draggedSession, insertIndex.Value))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            MoveInstrumentSessionToInsertIndex(draggedSession, insertIndex.Value);
             e.Handled = true;
         }
-
-        private void OnInstrumentTabsDragLeave(object sender, DragEventArgs e)
+        
+        private int? GetInsertIndexFromDrag(DragEventArgs e, InstrumentSession draggedSession)
         {
-            HideInstrumentTabInsertIndicator();
+            if (_instrumentTabs == null || draggedSession == null)
+                return null;
+
+            var tabs = _instrumentTabs.Items
+                .OfType<TabItem>()
+                .Where(t => t?.Tag is InstrumentSession)
+                .ToList();
+
+            if (tabs.Count == 0)
+                return 0;
+
+            var mouseX = e.GetPosition(_instrumentTabs).X;
+            const double deadBand = 3.0;
+
+            for (var i = 0; i < tabs.Count; i++)
+            {
+                var tab = tabs[i];
+                var left = tab.TranslatePoint(new Point(0, 0), _instrumentTabs).X;
+                var mid = left + (tab.ActualWidth / 2.0);
+
+                if (mouseX < mid - deadBand)
+                    return i;
+
+                if (mouseX <= mid + deadBand)
+                    return null;
+            }
+
+            // dragging beyond all tabs = insert at end
+            return tabs.Count;
         }
 
-        private void ShowInstrumentTabInsertIndicator(TabItem targetTab, bool insertAfter)
+        private bool WouldBeNoOpDrop(InstrumentSession draggedSession, int insertIndex)
         {
-            if (_instrumentTabs == null || targetTab == null || _instrumentTabInsertPopup == null)
-                return;
+            if (draggedSession == null)
+                return true;
 
-            var targetTopLeft = targetTab.TranslatePoint(new Point(0, 0), _instrumentTabs);
-            var x = insertAfter
-                ? targetTopLeft.X + targetTab.ActualWidth
-                : targetTopLeft.X;
+            var fromIndex = _instrumentSessions.IndexOf(draggedSession);
+            if (fromIndex < 0)
+                return true;
 
-            var topLeftOnScreen = _instrumentTabs.PointToScreen(new Point(0, 0));
+            var normalizedInsertIndex = insertIndex;
 
-            _instrumentTabInsertPopup.HorizontalOffset = topLeftOnScreen.X + x - 1.5;
-            _instrumentTabInsertPopup.VerticalOffset = topLeftOnScreen.Y + 2;
-            _instrumentTabInsertPopup.IsOpen = true;
+            if (normalizedInsertIndex < 0)
+                normalizedInsertIndex = 0;
+
+            if (normalizedInsertIndex > _instrumentSessions.Count)
+                normalizedInsertIndex = _instrumentSessions.Count;
+
+            // convert insert index to final index after removal
+            if (fromIndex < normalizedInsertIndex)
+                normalizedInsertIndex--;
+
+            return normalizedInsertIndex == fromIndex;
         }
 
-        private void ShowInstrumentTabInsertIndicatorAtEnd()
-        {
-            if (_instrumentTabs == null || _instrumentTabs.Items.Count == 0 || _instrumentTabInsertPopup == null)
-                return;
-
-            if (!(_instrumentTabs.Items[_instrumentTabs.Items.Count - 1] is TabItem lastTab))
-                return;
-
-            ShowInstrumentTabInsertIndicator(lastTab, insertAfter: true);
-        }
-
-        private void HideInstrumentTabInsertIndicator()
-        {
-            if (_instrumentTabInsertPopup != null)
-                _instrumentTabInsertPopup.IsOpen = false;
-        }
-
-        private void MoveInstrumentSessionToEnd(InstrumentSession draggedSession)
+        private void MoveInstrumentSessionToInsertIndex(InstrumentSession draggedSession, int insertIndex)
         {
             if (draggedSession == null)
                 return;
@@ -306,79 +313,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (fromIndex < 0)
                 return;
 
-            if (fromIndex == _instrumentSessions.Count - 1)
-                return;
+            if (insertIndex < 0)
+                insertIndex = 0;
 
-            _instrumentSessions.RemoveAt(fromIndex);
-            _instrumentSessions.Add(draggedSession);
-            _activeInstrumentSession = draggedSession;
-
-            RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
-        }
-
-        private bool ShouldInsertAfterTarget(TabItem targetTab, DragEventArgs e, InstrumentSession draggedSession)
-        {
-            if (targetTab == null || draggedSession == null || _instrumentTabs == null)
-                return false;
-
-            var targetSession = targetTab.Tag as InstrumentSession;
-            if (targetSession == null)
-                return false;
-
-            var fromIndex = _instrumentSessions.IndexOf(draggedSession);
-            var targetIndex = _instrumentSessions.IndexOf(targetSession);
-
-            if (fromIndex < 0 || targetIndex < 0)
-                return false;
-
-            var posInTabs = e.GetPosition(_instrumentTabs);
-            var targetLeft = targetTab.TranslatePoint(new Point(0, 0), _instrumentTabs).X;
-            var targetMid = targetLeft + (targetTab.ActualWidth / 2.0);
-
-            if (fromIndex < targetIndex)
-                return posInTabs.X >= targetLeft + 6;
-
-            if (fromIndex > targetIndex)
-                return posInTabs.X >= targetMid;
-
-            return false;
-        }
-
-        private static TabItem GetInstrumentTabItemFromDropSource(DependencyObject source)
-        {
-            var current = source;
-
-            while (current != null)
-            {
-                if (current is TabItem tab && tab.Tag is InstrumentSession)
-                    return tab;
-
-                current = VisualTreeHelper.GetParent(current);
-            }
-
-            return null;
-        }
-        
-        private void ReorderInstrumentSession(InstrumentSession draggedSession, InstrumentSession targetSession, bool insertAfter)
-        {
-            if (draggedSession == null || targetSession == null)
-                return;
-
-            var fromIndex = _instrumentSessions.IndexOf(draggedSession);
-            var targetIndex = _instrumentSessions.IndexOf(targetSession);
-
-            if (fromIndex < 0 || targetIndex < 0 || fromIndex == targetIndex)
-                return;
+            if (insertIndex > _instrumentSessions.Count)
+                insertIndex = _instrumentSessions.Count;
 
             SaveUiToActiveSession();
 
             _instrumentSessions.RemoveAt(fromIndex);
 
-            if (fromIndex < targetIndex)
-                targetIndex--;
-
-            var insertIndex = insertAfter ? targetIndex + 1 : targetIndex;
+            if (fromIndex < insertIndex)
+                insertIndex--;
 
             if (insertIndex < 0)
                 insertIndex = 0;
@@ -389,8 +335,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentSessions.Insert(insertIndex, draggedSession);
             _activeInstrumentSession = draggedSession;
 
+            SafeTradeSuiteRuntime.SaveInstrumentOrder(
+                _instrumentSessions.Select(x => x?.InstrumentName));
+            
             RefreshInstrumentTabs();
             LoadActiveSessionToUi();
+        }
+
+        private void OnInstrumentTabsDragLeave(object sender, DragEventArgs e)
+        {
+            HideInstrumentTabInsertIndicator();
+        }
+
+        private void HideInstrumentTabInsertIndicator()
+        {
+            if (_instrumentTabInsertPopup != null)
+                _instrumentTabInsertPopup.IsOpen = false;
         }
 
         private void OnInstrumentTabCloseClick(object sender, RoutedEventArgs e)
@@ -475,6 +435,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (refreshSelector)
                 RefreshInstrumentSelectorItems();
 
+            SafeTradeSuiteRuntime.SaveInstrumentOrder(
+                _instrumentSessions.Select(x => x?.InstrumentName));
+            
             RefreshInstrumentTabs();
             LoadActiveSessionToUi();
         }
@@ -511,7 +474,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 _activeInstrumentSession = null;
             }
-
+            
+            SafeTradeSuiteRuntime.SaveInstrumentOrder(
+                _instrumentSessions.Select(x => x?.InstrumentName));
+            
             RefreshInstrumentSelectorItems();
             RefreshInstrumentTabs();
             LoadActiveSessionToUi();
@@ -558,7 +524,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (int.TryParse(qtyText, out var qv) && qv > 0)
                         _activeInstrumentSession.FollowerQtyOverrides[accName] = qv;
 
-                    var atm = (r.AtmOverrideBox?.SelectedItem as string) ?? "(inherit master)";
+                    var atm = r.AtmOverrideBox?.SelectedItem as string ?? "Inherit Master";
                     _activeInstrumentSession.FollowerAtmOverrides[accName] = atm;
                 }
             }
@@ -622,7 +588,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         var atm =
                             _activeInstrumentSession.FollowerAtmOverrides.TryGetValue(accName, out var av)
                                 ? av
-                                : "(inherit master)";
+                                : "Inherit Master";
 
                         r.AtmOverrideBox.SelectedItem = atm;
                         RenderFollowerRowState(r);

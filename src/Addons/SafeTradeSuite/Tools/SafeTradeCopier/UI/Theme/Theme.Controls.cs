@@ -11,11 +11,62 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             c.Height = InputHeight();
-            c.Background = InputBackgroundBrush();
-            c.Foreground = InputForegroundBrush();
+
+            c.Background = c.IsEnabled
+                ? InputBackgroundBrush()
+                : InputDisabledBackgroundBrush();
+
+            c.Foreground = c.IsEnabled
+                ? InputForegroundBrush()
+                : InputDisabledForegroundBrush();
+
             c.BorderBrush = InputBorderBrush();
             c.BorderThickness = ControlBorderThickness();
             c.Padding = new Thickness(8, 0, 8, 0);
+        }
+        
+        private static void ApplyComboBoxTheme(ComboBox cb)
+        {
+            if (cb == null)
+                return;
+
+            cb.Background = cb.IsEnabled
+                ? InputBackgroundBrush()
+                : InputDisabledBackgroundBrush();
+
+            cb.Foreground = cb.IsEnabled
+                ? InputForegroundBrush()
+                : InputDisabledForegroundBrush();
+
+            cb.BorderBrush = InputBorderBrush();
+
+            var itemStyle = new Style(typeof(ComboBoxItem));
+
+            itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, InputBackgroundBrush()));
+            itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, InputForegroundBrush()));
+            itemStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+            itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 3, 6, 3)));
+
+            var highlightTrigger = new Trigger
+            {
+                Property = ComboBoxItem.IsHighlightedProperty,
+                Value = true
+            };
+            highlightTrigger.Setters.Add(new Setter(Control.BackgroundProperty, HoverBackgroundBrush()));
+            highlightTrigger.Setters.Add(new Setter(Control.ForegroundProperty, WindowForegroundBrush()));
+
+            var selectedTrigger = new Trigger
+            {
+                Property = ComboBoxItem.IsSelectedProperty,
+                Value = true
+            };
+            selectedTrigger.Setters.Add(new Setter(Control.BackgroundProperty, SelectedBackgroundBrush()));
+            selectedTrigger.Setters.Add(new Setter(Control.ForegroundProperty, WindowForegroundBrush()));
+
+            itemStyle.Triggers.Add(highlightTrigger);
+            itemStyle.Triggers.Add(selectedTrigger);
+
+            cb.ItemContainerStyle = itemStyle;
         }
 
         private static void ApplyCardChrome(Border border)

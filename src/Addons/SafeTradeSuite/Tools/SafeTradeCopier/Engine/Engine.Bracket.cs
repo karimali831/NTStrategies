@@ -109,11 +109,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     a = a.Trim();
 
-                    if (string.Equals(a, "(inherit master)", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(a, "Inherit Master", StringComparison.OrdinalIgnoreCase))
                         return _configuredMasterAtm ?? "None";
 
-                    if (string.Equals(a, "(follow master exit)", StringComparison.OrdinalIgnoreCase))
-                        return "(follow master exit)";
+                    if (string.Equals(a, "Follow Master Exit", StringComparison.OrdinalIgnoreCase))
+                        return "Follow Master Exit";
 
                     return a;
                 }

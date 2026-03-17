@@ -38,5 +38,95 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 ? new SolidColorBrush(Color.FromRgb(28, 28, 28))
                 : new SolidColorBrush(Color.FromRgb(252, 252, 252));
         }
+        
+        private static Brush DarkButtonBackgroundBrush()
+        {
+            return new SolidColorBrush(Color.FromRgb(30, 30, 30));
+        }
+
+        private static Brush DisabledBorderBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(88, 88, 88))
+                : new SolidColorBrush(Color.FromRgb(190, 190, 190));
+        }
+        
+        private static Brush HoverBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(58, 58, 58))
+                : new SolidColorBrush(Color.FromRgb(235, 242, 250));
+        }
+
+        private static Brush SelectedBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(70, 70, 70))
+                : new SolidColorBrush(Color.FromRgb(220, 232, 245));
+        }
+        
+        private static Brush InputDisabledForegroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(185, 185, 185))
+                : new SolidColorBrush(Color.FromRgb(120, 120, 120));
+        }
+        
+        private static Brush FieldsetLegendBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(24, 24, 24))
+                : WindowBackgroundBrush();
+        }
+
+        private static Brush FieldsetLegendBorderBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(72, 72, 72))
+                : Brushes.Transparent;
+        }
+        
+        // Window-level
+        private static Brush WindowBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(24, 24, 24))
+                : new SolidColorBrush(Color.FromRgb(245, 245, 245));
+        }
+
+        private static Brush WindowForegroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(235, 235, 235))
+                : new SolidColorBrush(Color.FromRgb(28, 28, 28));
+        }
+
+        private static Brush PanelBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(30, 30, 30))
+                : Brushes.White;
+        }
+
+        private static Brush SectionBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(34, 34, 34))
+                : new SolidColorBrush(Color.FromRgb(250, 250, 250));
+        }
+
+        private static Brush SectionBorderBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(70, 70, 70))
+                : new SolidColorBrush(Color.FromRgb(190, 190, 190));
+        }
+
+        private static Brush MutedForegroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(160, 160, 160))
+                : new SolidColorBrush(Color.FromRgb(105, 105, 105));
+        }
     }
 }

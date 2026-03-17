@@ -13,7 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = message,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 16),
-                Foreground = SystemColors.WindowTextBrush
+                Foreground = WindowForegroundBrush()
             };
 
             var okButton = new Button
@@ -60,7 +60,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = owner,
                 Content = panel,
-                Background = SystemColors.WindowBrush
+                Background = WindowBackgroundBrush()
             };
 
             var confirmed = false;

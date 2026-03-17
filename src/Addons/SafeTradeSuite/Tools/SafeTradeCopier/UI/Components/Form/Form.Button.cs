@@ -53,15 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             btn.IsEnabled = enabled;
-            btn.Opacity = enabled ? 1.0 : 0.65;
-
-            if (!enabled)
-            {
-                btn.Background = DisabledBackgroundBrush();
-                btn.BorderBrush = DisabledBackgroundBrush();
-                btn.Foreground = DisabledForegroundBrush();
-                return;
-            }
+            btn.Opacity = 1.0;
 
             Brush accent;
             switch (tone)
@@ -83,7 +75,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     break;
             }
 
-            if (style == FormButtonStyle.Outline)
+            var effectiveStyle = style;
+
+            if (IsDarkTheme() && style == FormButtonStyle.Solid)
+                effectiveStyle = FormButtonStyle.Outline;
+
+            if (!enabled)
+            {
+                btn.Foreground = DisabledForegroundBrush();
+                btn.BorderBrush = IsDarkTheme() ? DisabledBorderBrush() : DisabledBackgroundBrush();
+                btn.Background = IsDarkTheme()
+                    ? Brushes.Transparent
+                    : InputDisabledBackgroundBrush();
+                return;
+            }
+
+            if (effectiveStyle == FormButtonStyle.Outline)
             {
                 btn.Background = Brushes.Transparent;
                 btn.BorderBrush = accent;

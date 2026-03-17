@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     foreach (var row in _followerRows)
                     {
                         if (row?.FreeTradeBtn != null)
-                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✔");
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "BE");
                     }
 
                     return;
@@ -132,21 +132,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         continue;
 
                     var enabledFollower = row.EnabledCheck?.IsChecked == true;
-                    if (!enabledFollower || !_breakEvenEnabled)
+                    if (!enabledFollower || BreakEvenDisabled)
                     {
-                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✔");
+                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "BE");
                         continue;
                     }
 
                     var canUndo = _engine != null && _engine.CanUndoFreeTrade(row.Account, instr, out _);
                     var canApply = _engine != null && _engine.CanApplyFreeTrade(row.Account, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo, "✔");
+                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo, "BE");
                     anyCanApplyOrUndo |= canUndo || canApply;
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && _breakEvenEnabled, false, "BE All");
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && !BreakEvenDisabled, false, "BE All");
             }, DispatcherPriority.Background);
         }
         
@@ -169,7 +169,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             btn.IsEnabled = enabled;
             btn.Content = undoMode ? "Undo BE" : btnText;
             btn.Background = enabled
-                ? undoMode ? Brushes.DarkOrange : Brushes.BlueViolet
+                ? undoMode ? Brushes.DarkOrange : Brushes.RoyalBlue
                 : Brushes.Gray;
             btn.Foreground = Brushes.White;
             btn.Opacity = enabled ? 1.0 : 0.60;

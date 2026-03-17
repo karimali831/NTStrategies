@@ -6,13 +6,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private bool _breakEvenEnabled = true;
         private double _freeTradeMinProfitPoints = 4;
         private double _freeTradePlusPoints = 1;
 
         private TextBox _freeTradeMinProfitPointsBox;
         private TextBox _freeTradePlusPointsBox;
-        private CheckBox _breakEvenEnabledCheck;
+        private ComboBox _breakEvenModeSelector;
+        private BreakEvenMode _breakEvenMode = BreakEvenMode.Manual;
+        private bool BreakEvenDisabled => _breakEvenMode == BreakEvenMode.None;
+        
         
         private UIElement RenderBreakEvenFieldset()
         {
@@ -21,26 +23,42 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 4, 0, 0)
             };
 
-            _breakEvenEnabledCheck = new CheckBox
+            var modeRow = new Grid
             {
-                Content = "Enable break-even",
-                IsChecked = _breakEvenEnabled,
                 Margin = new Thickness(0, 0, 0, 10)
             };
 
-            _breakEvenEnabledCheck.Checked += (s, e) =>
+            modeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            modeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+
+            var modeLbl = new TextBlock
             {
-                _breakEvenEnabled = true;
+                Text = "Break-even mode:",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0,0,8,0),
+                Foreground = WindowForegroundBrush()
+            };
+
+            _breakEvenModeSelector = CreateFormComboBox(width: 120);
+
+            _breakEvenModeSelector.Items.Add("None");
+            _breakEvenModeSelector.Items.Add("Auto");
+            _breakEvenModeSelector.Items.Add("Manual");
+
+            _breakEvenModeSelector.SelectedIndex = (int)_breakEvenMode;
+
+            _breakEvenModeSelector.SelectionChanged += (s, e) =>
+            {
+                _breakEvenMode = (BreakEvenMode)_breakEvenModeSelector.SelectedIndex;
                 RenderBreakEvenEnablementUi();
                 ApplyConfigFromUi();
             };
 
-            _breakEvenEnabledCheck.Unchecked += (s, e) =>
-            {
-                _breakEvenEnabled = false;
-                RenderBreakEvenEnablementUi();
-                ApplyConfigFromUi();
-            };
+            Grid.SetColumn(modeLbl, 0);
+            Grid.SetColumn(_breakEvenModeSelector, 1);
+
+            modeRow.Children.Add(modeLbl);
+            modeRow.Children.Add(_breakEvenModeSelector);
 
             var minProfitRow = new Grid
             {
@@ -54,7 +72,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Text = "Min favour points:",
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(0, 0, 8, 0),
+                IsEnabled = !BreakEvenDisabled
             };
 
             _freeTradeMinProfitPointsBox = new TextBox
@@ -62,7 +81,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Height = 24,
                 Width = 80,
                 Text = _freeTradeMinProfitPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsEnabled = !BreakEvenDisabled
             };
 
             var minProfitHint = new TextBlock
@@ -70,7 +90,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = "Required before Break-even Allowed",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
-                Foreground = Brushes.DimGray
+                Foreground = MutedForegroundBrush()
             };
 
             Grid.SetColumn(minProfitLbl, 0);
@@ -109,7 +129,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = "0 = exact break-even",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
-                Foreground = Brushes.DimGray
+                Foreground = MutedForegroundBrush()
             };
 
             Grid.SetColumn(plusPointsLbl, 0);
@@ -164,7 +184,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 ApplyConfigFromUi();
             };
 
-            bePanel.Children.Add(_breakEvenEnabledCheck);
+            bePanel.Children.Add(modeRow);
             bePanel.Children.Add(minProfitRow);
             bePanel.Children.Add(plusPointsRow);
 

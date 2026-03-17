@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 .Where(r => r?.Account != null)
                 .ToDictionary(
                     r => r.Account.Name,
-                    r => r.QtyOverrideBox?.Text ?? "",
+                    r => r.QtyOverrideBox?.Text,
                     StringComparer.Ordinal);
 
             var bracketSelections = _followerRows
@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (r?.Account == null)
                     continue;
-
+                
                 if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
                     r.QtyOverrideBox.Text = qtyText;
 
@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    if (!_breakEvenEnabled)
+                    if (BreakEvenDisabled)
                     {
                         eng.Log("Break-even disabled in Settings.");
                         return;
@@ -151,6 +151,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var master = _masterBox?.SelectedItem as Account;
             var masterName = master?.Name ?? "";
 
+            var rowIndex = 0;
             foreach (var acc in accounts)
             {
                 if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
@@ -159,7 +160,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var rowGrid = new Grid
                 {
                     Margin = new Thickness(2, 2, 2, 2),
-                    Background = TableRowAltBrush()
+                    Background = GetFollowerRowBackgroundBrush(rowIndex)
                 };
                 
                 FollowerHeaderColumnDefinitions(rowGrid);
@@ -192,32 +193,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Text = acc.Name,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(6, 0, 6, 0),
-                    Foreground = SystemColors.ControlTextBrush
+                    Foreground = WindowForegroundBrush()
                 };
 
-                var qtyBox = new TextBox
-                {
-                    Height = 24,
-                    Margin = new Thickness(6, 0, 6, 0),
-                    ToolTip = "Qty override (blank = inherit master)"
-                };
+                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
 
-                var atmBox = new ComboBox
-                {
-                    Height = 24,
-                    Margin = new Thickness(6, 0, 6, 0),
-                    MinWidth = 125,
-                    ToolTip = "(inherit master) = use master ATM, (follow master exit) = no follower bracket, exit when master exits"
-                };
+                var qtyBox = CreateFormTextBox(masterQty.ToString(), width: 40);
+                qtyBox.ToolTip = "Qty override (blank = inherit master)";
+
+                var atmBox = CreateFormComboBox(width: 125, margin: new Thickness(0, 0, 12, 0));
+                atmBox.ToolTip =
+                    "(inherit master) = use master ATM, Follow Master Exit = no follower bracket, exit when master exits";
 
                 var pnl = new TextBlock
                 {
                     Text = "Unrealized $0.00",
                     VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = Brushes.DimGray,
+                    Foreground = MutedForegroundBrush(),
                     FontWeight = FontWeights.SemiBold,
                     FontSize = 12,
-                    Margin = new Thickness(10, 0, 10, 0),
+                    // Margin = new Thickness(10, 0, 10, 0),
                     TextTrimming = TextTrimming.CharacterEllipsis
                 };
                 
@@ -239,34 +234,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 12,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = Brushes.DimGray,
+                    Foreground = MutedForegroundBrush(),
                     Margin = new Thickness(6, 0, 6, 0),
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     Visibility = Visibility.Collapsed
                 };
 
-                // Flatten
-                var flatten = new Button
-                {
-                    Content = "❌",
-                    Height = 24,
-                    Width = 20,
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
+                var flatten = CreateFormButton(
+                    text: "Flatten",
+                    tone: FormButtonTone.Danger,
+                    style: FormButtonStyle.Outline,
+                    width: 90,
+                    height: 30);
                 RenderFlattenButtonState(flatten, enabled: false);
                 
-                // Break-even
-                var freeTrade = new Button
-                {
-                    Content = "✓",
-                    Height = 24,
-                    Width = 20,
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
+                var freeTrade = CreateFormButton(
+                    text: "BE",
+                    tone: FormButtonTone.Primary,
+                    style: FormButtonStyle.Outline,
+                    width: 70,
+                    height: 30);
                 RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔");
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
@@ -364,19 +351,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _followerRows.Add(row);
                 _followersPanel.Children.Add(rowGrid);
+                
+                rowIndex++;
             }
         }
 
+        private static Brush GetFollowerRowBackgroundBrush(int rowIndex)
+        {
+            if (IsDarkTheme())
+            {
+                return rowIndex % 2 == 0
+                    ? new SolidColorBrush(Color.FromRgb(24, 24, 24))
+                    : new SolidColorBrush(Color.FromRgb(29, 29, 29));
+            }
+
+            return rowIndex % 2 == 0
+                ? new SolidColorBrush(Color.FromRgb(248, 248, 248))
+                : new SolidColorBrush(Color.FromRgb(242, 242, 242));
+        }
+        
         private static void FollowerHeaderColumnDefinitions(Grid g)
         {
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // Status
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // On
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Account
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Override Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Override ATM
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });  // Override ATM
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // PnL
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75) });   // BE
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(75) });   // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // BE
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });   // Flatten
         }
         
         private static Grid BuildFollowerHeaderRow()
@@ -384,7 +387,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var g = new Grid
             {
                 Margin = new Thickness(0, 0, 0, 4),
-                Background = TableHeaderBrush()
+                Background = IsDarkTheme()
+                    ? new SolidColorBrush(Color.FromRgb(30, 30, 30))
+                    : TableHeaderBrush()
             };
 
             FollowerHeaderColumnDefinitions(g);
@@ -392,11 +397,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "Status", 0);
             AddHeaderText(g, "On", 1);
             AddHeaderText(g, "Account", 2);
-            AddHeaderText(g, "Override Qty", 3);
+            AddHeaderText(g, "Qty", 3);
             AddHeaderText(g, "Bracket", 4);
             AddHeaderText(g, "PnL", 5);
-            AddHeaderText(g, "BE", 6);
-            AddHeaderText(g, "Flatten", 7);
+            AddHeaderText(g, "Position", 6);
+            AddHeaderText(g, "", 7);
 
             return g;
         }
@@ -408,7 +413,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = text,
                 Margin = new Thickness(6, 4, 6, 4),
                 FontWeight = FontWeights.SemiBold,
-                Foreground = SystemColors.WindowTextBrush,
+                Foreground = WindowForegroundBrush(),
                 VerticalAlignment = VerticalAlignment.Center
             };
 

@@ -199,7 +199,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     return string.Equals(
                         (a ?? "").Trim(),
-                        "(follow master exit)",
+                        "Follow Master Exit",
                         StringComparison.OrdinalIgnoreCase);
                 }
 

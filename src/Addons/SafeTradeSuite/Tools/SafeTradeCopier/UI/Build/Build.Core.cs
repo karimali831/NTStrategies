@@ -13,6 +13,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private bool _userManuallyDisarmed;
         private bool _simOnlyMode = true;
         
+        private UIElement SafeBuildUi(SafeCopierEngine engine)
+        {
+            try
+            {
+                return BuildUi(engine);
+            }
+            catch (Exception ex)
+            {
+                SafeTradeSuiteRuntime.PrintLog("BuildUi FAILED:");
+                SafeTradeSuiteRuntime.PrintLog(ex.ToString());
+                throw;
+            }
+        }
         
         private UIElement BuildUi(SafeCopierEngine eng)
         {
@@ -26,7 +39,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var root = new Grid
                 {
                     Margin = new Thickness(12),
-                    Background = SystemColors.WindowBrush
+                    Background = WindowBackgroundBrush()
                 };
 
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // menu
@@ -41,7 +54,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // ---------------- Header ----------------
                 RenderHeader(root);
                 
-                // ---------------- Top panels: Master + Positions ----------------
+                // ---------------- Top panels: Master + Status ----------------
                 var topPanelsGrid = new Grid
                 {
                     Margin = new Thickness(0, 0, 0, 0)
@@ -66,7 +79,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 root.Children.Add(topPanelsGrid);
 
                 RenderMasterPanel(eng, topPanelsGrid);
-                RenderPositionsPanel(topPanelsGrid);
+                RenderCopierStatusPanel(root);
+                // RenderPositionsPanel(topPanelsGrid);
                 
                 // ---------------- Followers ----------------
                 RenderFollowerPanel(eng, root);

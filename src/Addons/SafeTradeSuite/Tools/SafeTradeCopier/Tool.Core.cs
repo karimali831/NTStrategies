@@ -55,15 +55,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _window = new Window
                     {
                         Title = "Safe Trade Copier (V2.1)",
-                        Width = 920,
+                        Width = 850,
                         Height = 750,
-                        MinWidth = 920,
+                        MinWidth = 850,
                         MinHeight = 750,
                         ResizeMode = ResizeMode.CanResize,
                         SizeToContent = SizeToContent.Manual,
-                        Background = SystemColors.WindowBrush,
-                        Foreground = SystemColors.WindowTextBrush,
-                        Content = BuildUi(_engine),
+                        Background = WindowBackgroundBrush(),
+                        Foreground = WindowForegroundBrush(),
+                        Content = SafeBuildUi(_engine),
                     };
 
                     _uiDispatcher = _window.Dispatcher;
@@ -85,6 +85,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 catch (Exception ex)
                 {
+                    SafeTradeSuiteRuntime.PrintLog("SafeTradeCopierTool.Show() FAILED:");
+                    SafeTradeSuiteRuntime.PrintLog(ex.ToString());
+
                     LogUnhandled("SafeTradeCopierTool.Show()", ex);
                     Dispose();
                     throw;

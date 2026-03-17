@@ -17,8 +17,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var legendBorder = new Border
             {
-                Background = SystemColors.WindowBrush,
-                Padding = new Thickness(10, 0, 10, 0),
+                Background = FieldsetLegendBackgroundBrush(),
+                BorderBrush = FieldsetLegendBorderBrush(),
+                BorderThickness = new Thickness(IsDarkTheme() ? 1 : 0),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 1, 10, 1),
                 Margin = new Thickness(14, 0, 0, -10),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
@@ -31,7 +34,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Text = legend,
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = SystemColors.WindowTextBrush
+                Foreground = WindowForegroundBrush()
             };
 
             legendBorder.Child = legendText;
@@ -39,10 +42,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var border = new Border
             {
                 BorderThickness = new Thickness(1),
-                BorderBrush = SystemColors.ActiveBorderBrush,
+                BorderBrush = SectionBorderBrush(),
                 CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(10, 18, 10, 14),
-                Background = SystemColors.WindowBrush,
+                Background = SectionBackgroundBrush(),
                 Child = content
             };
 

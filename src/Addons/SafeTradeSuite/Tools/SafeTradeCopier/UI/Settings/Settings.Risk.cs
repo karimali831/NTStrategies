@@ -81,7 +81,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             riskPanel.Children.Add(new TextBlock
             {
                 Text = "0 = disabled",
-                Foreground = Brushes.DimGray,
+                Foreground = MutedForegroundBrush(),
                 Margin = new Thickness(0, 0, 0, 10)
             });
 
@@ -108,7 +108,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Text = text,
                     Margin = new Thickness(6, 4, 6, 6),
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = SystemColors.WindowTextBrush,
+                    Foreground = WindowForegroundBrush(),
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 Grid.SetRow(tb, 0);

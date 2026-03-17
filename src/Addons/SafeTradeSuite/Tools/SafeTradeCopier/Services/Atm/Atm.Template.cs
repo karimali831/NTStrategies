@@ -7,8 +7,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private const string InheritMasterBracketOption = "(inherit master)";
-        private const string FollowMasterExitBracketOption = "(follow master exit)";
+        private const string InheritMasterBracketOption = "Inherit Master";
+        private const string FollowMasterExitBracketOption = "Follow Master Exit";
 
         private static string NormalizeAtm(string s)
         {

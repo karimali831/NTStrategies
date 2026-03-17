@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RenderFooter(Grid root)
         {
-            var bottom = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+            var bottom = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
             _footerStatusLabelRow = new RowDefinition { Height = GridLength.Auto };
             _footerStatusBoxRow = new RowDefinition { Height = GridLength.Auto };
@@ -20,12 +20,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 
-            _instrumentTabs = new TabControl
-            {
-                Height = 34,
-                Margin = new Thickness(0, 0, 6, 6),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
+            var instrumentTabsWrapper = BuildInstrumentTabsWrapper();
 
             _statusBox = new TextBox
             {
@@ -34,19 +29,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Height = 110,
                 MinHeight = 110,
-                Background = SystemColors.ControlLightBrush,
-                Foreground = SystemColors.ControlTextBrush
+                Background = SectionBackgroundBrush(),
+                Foreground = WindowForegroundBrush()
             };
 
             _statusLabel = new TextBlock
             {
-                Text = "Status:",
-                Foreground = SystemColors.WindowTextBrush,
-                Margin = new Thickness(0, 0, 0, 4)
+                Text = "Status",
+                Foreground = WindowForegroundBrush(),
+                Margin = new Thickness(0, 0, 0, 4),
             };
-                
-            Grid.SetRow(_instrumentTabs, 0);
-            Grid.SetColumn(_instrumentTabs, 0);
+
+            Grid.SetRow(instrumentTabsWrapper, 0);
+            Grid.SetColumn(instrumentTabsWrapper, 0);
 
             Grid.SetRow(_statusLabel, 1);
             Grid.SetColumn(_statusLabel, 0);
@@ -54,8 +49,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Grid.SetRow(_statusBox, 2);
             Grid.SetColumn(_statusBox, 0);
 
-
-            bottom.Children.Add(_instrumentTabs);
+            bottom.Children.Add(instrumentTabsWrapper);
             bottom.Children.Add(_statusLabel);
             bottom.Children.Add(_statusBox);
 

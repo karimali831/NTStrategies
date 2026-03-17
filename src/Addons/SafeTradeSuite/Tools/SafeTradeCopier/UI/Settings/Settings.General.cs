@@ -7,6 +7,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private bool _showStatusBox;
         private TextBlock _statusLabel;
+        private ComboBox _themeSelector;
         
         private UIElement RenderGeneralFieldset()
         {
@@ -15,6 +16,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 4, 0, 0)
             };
 
+            // Sim  mode
             var simMode = new CheckBox
             {
                 Content = "Simulation Mode",
@@ -34,6 +36,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 OnSimModeChanged();
             };
 
+            // Status log
             var showStatusBox = new CheckBox
             {
                 Content = "Show status log",
@@ -52,9 +55,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _showStatusBox = false;
                 ApplyStatusBoxVisibility();
             };
+            
+            // Theme
+            var themeRow = new Grid
+            {
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+
+            themeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            themeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var themeLbl = new TextBlock
+            {
+                Text = "Theme:",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0,0,8,0),
+                Foreground = WindowForegroundBrush()
+            };
+
+            _themeSelector = CreateFormComboBox(width: 125);
+
+            _themeSelector.Items.Add("System");
+            _themeSelector.Items.Add("Light");
+            _themeSelector.Items.Add("Dark");
+
+            _themeSelector.SelectedIndex = (int)_themeMode;
+
+            _themeSelector.SelectionChanged += (s, e) =>
+            {
+                _themeMode = (ThemeMode)_themeSelector.SelectedIndex;
+            };
+
+            Grid.SetColumn(themeLbl, 0);
+            Grid.SetColumn(_themeSelector, 1);
+
+            themeRow.Children.Add(themeLbl);
+            themeRow.Children.Add(_themeSelector);
 
             generalPanel.Children.Add(simMode);
             generalPanel.Children.Add(showStatusBox);
+            generalPanel.Children.Add(themeRow);
 
             return BuildFieldset("General", generalPanel);
         }
