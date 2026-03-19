@@ -6,6 +6,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private Border _btnAddInstrumentTab;
+        private Border _btnRemoveInstrumentTab;
         private TextBox _masterQtyBox;
         private ComboBox _masterAtmBox;
         private TextBlock _masterPnlText;
@@ -33,7 +35,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Account
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Instrument label
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Instrument
-            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) }); // Add button
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) }); // Add instrument
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) }); // Remove instrument
             
             var accountLbl = CreateFormLabel("Account", width: 50);
 
@@ -74,17 +77,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RenderFlattenAllButtonState();
                 });
             
+            _btnRemoveInstrumentTab = CreateFormIconAction(
+                Geometry.Parse("M 0 0 L 10 10 M 10 0 L 0 10"),
+                tone: FormButtonTone.Danger,
+                width: 34,
+                height: InputHeight(),
+                toolTip: "Remove instrument tab",
+                onClick: () =>
+                {
+                    
+                });
+            
             Grid.SetColumn(accountLbl, 0);
             Grid.SetColumn(_masterBox, 1);
             Grid.SetColumn(instrumentLbl, 2);
             Grid.SetColumn(_instrumentSelector, 3);
             Grid.SetColumn(_btnAddInstrumentTab, 4);
+            Grid.SetColumn(_btnRemoveInstrumentTab, 5);
 
             masterTopRow.Children.Add(accountLbl);
             masterTopRow.Children.Add(_masterBox);
             masterTopRow.Children.Add(instrumentLbl);
             masterTopRow.Children.Add(_instrumentSelector);
             masterTopRow.Children.Add(_btnAddInstrumentTab);
+            masterTopRow.Children.Add(_btnRemoveInstrumentTab);
 
             var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -93,25 +109,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _btnBuyMkt = CreateFormButton(
-                text: "Buy",
+                text: "Buy Mkt",
+                width: 120,
                 tone: FormButtonTone.Success,
                 style: FormButtonStyle.Solid);
 
             _btnSellMkt = CreateFormButton(
-                text: "Sell",
+                text: "Sell Mkt",
+                width: 120,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Solid,
                 margin: new Thickness(6, 0, 0, 0));
 
             _btnFreeTradeAll = CreateFormButton(
-                text: "BE All",
+                text: "Break-even All",
+                width: 120,
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
                 margin: new Thickness(6, 0, 0, 0));
-            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "BE All");
+            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Break-even All");
 
             _btnFlattenAll = CreateFormButton(
                 text: "Flatten All",
+                width: 120,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Outline,
                 margin: new Thickness(6, 0, 0, 0));
@@ -209,7 +229,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _btnMasterFreeTrade = CreateFormButton(
-                text: "BE",
+                text: "Break-even",
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
                 width: 100,

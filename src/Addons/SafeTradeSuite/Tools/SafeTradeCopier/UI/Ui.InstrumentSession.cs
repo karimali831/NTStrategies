@@ -12,7 +12,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private TabControl _instrumentTabs;
-        private Border _btnAddInstrumentTab;
         private Point _instrumentTabDragStart;
         private InstrumentSession _draggingInstrumentSession;
         private bool _isInstrumentTabDragging;

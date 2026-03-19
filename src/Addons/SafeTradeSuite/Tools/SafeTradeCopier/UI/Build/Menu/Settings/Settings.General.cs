@@ -6,7 +6,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private bool _showStatusBox;
-        private TextBlock _statusLabel;
         private ComboBox _themeSelector;
         
         private UIElement RenderGeneralFieldset()
@@ -48,12 +47,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 _showStatusBox = true;
                 ApplyStatusBoxVisibility();
+                RefreshMainMenuTabs();
             };
 
             showStatusBox.Unchecked += (s, e) =>
             {
                 _showStatusBox = false;
                 ApplyStatusBoxVisibility();
+                RefreshMainMenuTabs();
             };
             
             // Theme
@@ -101,23 +102,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void OnSimModeChanged()
         {
-            EnforceSimOnlyModeUi(GetSelectableAccounts());
+            var accounts = GetSelectableAccounts();
+
+            EnforceSimOnlyModeUi(accounts);
+
+            RebuildFollowersAndRewire(_engine, accounts);
+
             ApplyConfigFromUi();
             RenderFollowerRowsState();
             RenderFlattenAllButtonState();
-            RefreshStatusBar();
+            RefreshCopierStatusPanel();
+            RefreshFollowerBulkActionButtons();
             RefreshRiskFieldset();
         }
         
         private void ApplyStatusBoxVisibility()
         {
-            var visibility = _showStatusBox ? Visibility.Visible : Visibility.Collapsed;
-
-            if (_statusLabel != null)
-                _statusLabel.Visibility = visibility;
-
             if (_statusBox != null)
-                _statusBox.Visibility = visibility;
+                _statusBox.Visibility = _showStatusBox ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

@@ -7,6 +7,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private void RenderInstrumentTabs(Grid root)
+        {
+            var bottom = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            bottom.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var instrumentTabsWrapper = BuildInstrumentTabsWrapper();
+
+            Grid.SetRow(instrumentTabsWrapper, 3);
+            Grid.SetColumn(instrumentTabsWrapper, 0);
+
+            bottom.Children.Add(instrumentTabsWrapper);
+
+            Grid.SetRow(bottom, 3);
+            root.Children.Add(bottom);
+
+         
+            ApplyStatusBoxVisibility();
+        }
+        
         private Border BuildInstrumentTabsWrapper()
         {
             var tabsHost = new Border

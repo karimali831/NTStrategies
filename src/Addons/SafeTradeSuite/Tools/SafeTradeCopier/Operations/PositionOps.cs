@@ -93,7 +93,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FlattenAllSelected(SafeCopierEngine eng)
         {
-            if (eng == null) return;
+            if (eng == null)
+                return;
 
             if (!(_masterBox?.SelectedItem is Account master))
             {
@@ -108,7 +109,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            eng.Log($"Flatten All clicked. Instr={instr.FullName}");
+            eng.Log($"Flatten selected instrument clicked -> instr={instr.FullName}");
 
             if (_masterPnlBar != null)
                 _masterPnlBar.Tag = "ORDER_FILLED";
@@ -117,8 +118,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             foreach (var r in _followerRows)
             {
-                if (r?.Account == null) continue;
-                if (r.IncludeCheck?.IsChecked != true) continue;
+                if (r?.Account == null)
+                    continue;
+
+                if (r.EnabledCheck?.IsChecked != true)
+                    continue;
 
                 if (r.PnlBar != null)
                     r.PnlBar.Tag = "ORDER_FILLED";
@@ -126,7 +130,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 eng.EnsureFlatInstrument(r.Account, instr);
             }
 
-            eng.Log("Flatten All submitted (instrument-only).");
+            eng.Log("Flatten selected instrument submitted.");
         }
         
         private bool CanFlatten(Account account, string instrFull)

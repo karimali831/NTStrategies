@@ -127,18 +127,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return Brushes.White;
         }
 
+        private static Brush DotWarningBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(255, 170, 0))
+                : new SolidColorBrush(Color.FromRgb(230, 140, 0));
+        }
+        
+        private static Brush DotDisconnectedBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(190, 70, 70))
+                : new SolidColorBrush(Color.FromRgb(170, 70, 70));
+        }
+        
         private static Brush DotConnectedOnBrush()
         {
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(38, 200, 78))
                 : new SolidColorBrush(Color.FromRgb(24, 160, 64));
-        }
-
-        private Brush DotWarningBrush()
-        {
-            return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(255, 170, 0))
-                : new SolidColorBrush(Color.FromRgb(230, 140, 0));
         }
 
         private static Brush DotOffBrush()

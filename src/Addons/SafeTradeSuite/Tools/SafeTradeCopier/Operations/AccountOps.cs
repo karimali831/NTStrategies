@@ -100,29 +100,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
         }
         
-        private bool HasAnyCheckedFollowers()
+        private bool HasAnyCheckedSimFollowersHealthy()
         {
-            return _followerRows.Any(r =>
-                r.EnabledCheck?.IsChecked == true);
+            var query = _followerRows
+                .Where(r => r.EnabledCheck?.IsChecked == true && IsSimAccount(r.Account))
+                .ToList();
+
+            return query.Any() &&
+                   query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
-        private bool HasAnyCheckedLiveFollowers()
+        private bool HasAnyCheckedLiveFollowersHealthy()
         {
-            return _followerRows.Any(r =>
-                r.EnabledCheck?.IsChecked == true && !IsSimAccount(r.Account));
+            var query = _followerRows
+                .Where(r => r.EnabledCheck?.IsChecked == true && !IsSimAccount(r.Account))
+                .ToList();
+
+            return query.Any() &&
+                   query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
-        private bool HasOnlyCheckedSimFollowers()
+        private bool HasAnyCheckedFollowersHealthy()
         {
-            return _followerRows.Any(r =>
-                r.EnabledCheck?.IsChecked == true && IsSimAccount(r.Account)) && !HasAnyCheckedLiveFollowers();
-        }
-        
-        private bool AllCheckedFollowersHealthy()
-        {
-            return _followerRows
+            var query = _followerRows
                 .Where(r => r.EnabledCheck?.IsChecked == true)
-                .All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
+                .ToList();
+
+            return query.Any() &&
+                   query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -10,6 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private TextBox _masterMaxDailyProfitBox;
         private TextBox _masterMaxDailyLossBox;
+        private ContentControl _riskFieldsetHost;
 
         private readonly Dictionary<string, CheckBox> _followerUseMasterRiskChecks =
             new Dictionary<string, CheckBox>(StringComparer.Ordinal);
@@ -305,6 +305,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             return BuildFieldset("Risk", riskPanel);
+        }
+        
+        private void RefreshRiskFieldset()
+        {
+            if (_riskFieldsetHost == null)
+                return;
+
+            _riskFieldsetHost.Content = RenderRiskFieldset();
         }
     }
 }

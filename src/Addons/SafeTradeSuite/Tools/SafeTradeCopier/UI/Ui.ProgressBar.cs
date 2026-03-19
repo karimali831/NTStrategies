@@ -478,25 +478,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     FontWeight = FontWeights.SemiBold
                 });
             }
-
-            // tb.Inlines.Add(new System.Windows.Documents.Run("R ")
-            // {
-            //     Foreground = MutedForegroundBrush(),
-            //     FontWeight = FontWeights.SemiBold
-            // });
-            //
-            // tb.Inlines.Add(new System.Windows.Documents.Run(FmtUsd(realized))
-            // {
-            //     Foreground = GetPnlValueBrush(realized),
-            //     FontWeight = FontWeights.SemiBold
-            // });
-
-            // tb.Inlines.Add(new System.Windows.Documents.Run("   •   ")
-            // {
-            //     Foreground = MutedForegroundBrush(),
-            //     FontWeight = FontWeights.SemiBold
-            // });
-
+            
             tb.Inlines.Add(new System.Windows.Documents.Run("Unrealized ")
             {
                 Foreground = MutedForegroundBrush(),

@@ -42,19 +42,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Background = WindowBackgroundBrush()
                 };
 
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // menu
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status bar
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // totals pnl
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // top menu tabs
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // top panels
-                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // followers
-                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // footer/status
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // main content
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
 
-
-                // ---------------- Header ----------------
-                RenderHeader(root);
+                // ---------------- Top menu ----------------
+                var mainMenuTabs = BuildMainMenuTabs();
+                Grid.SetRow(mainMenuTabs, 0);
+                root.Children.Add(mainMenuTabs);
                 
-                // ---------------- Top panels: Master + Status ----------------
+                // ---------------- Master + Copier Status ----------------
                 var topPanelsGrid = new Grid
                 {
                     Margin = new Thickness(0, 0, 0, 0)
@@ -62,7 +60,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
                 {
-                    Width = new GridLength(1, GridUnitType.Star)
+                    Width = new GridLength(13, GridUnitType.Star)
                 });
 
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
@@ -72,21 +70,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
                 {
-                    Width = new GridLength(1, GridUnitType.Star)
+                    Width = new GridLength(7, GridUnitType.Star)
                 });
 
-                Grid.SetRow(topPanelsGrid, 4);
+                Grid.SetRow(topPanelsGrid, 1);
                 root.Children.Add(topPanelsGrid);
 
                 RenderMasterPanel(eng, topPanelsGrid);
-                RenderCopierStatusPanel(root);
-                // RenderPositionsPanel(topPanelsGrid);
-                
-                // ---------------- Followers ----------------
-                RenderFollowerPanel(eng, root);
+                RenderCopierStatusPanel(topPanelsGrid);
+      
+                // -- Tab Menu Panels --
+                _statusBox = RenderStatusBox();
+                _mainContentHost = new ContentControl
+                {
+                    Margin = new Thickness(0)
+                };
 
-                // ---------------- Copier buttons + Status ----------------
-                RenderFooter(root);
+                Grid.SetRow(_mainContentHost, 2);
+                root.Children.Add(_mainContentHost);
+
+                // ---------------- Instrument Tabs ----------------
+                RenderInstrumentTabs(root);
 
                 // ---------------- Hook engine events ----------------
                 eng.OnStatus += msg =>
@@ -114,7 +118,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     display.InvokeAsync(() =>
                     {
-                        RefreshStatusBar();
+                        RefreshCopierStatusPanel();
                         RenderButtons(eng.CopyEnabled);
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
@@ -131,7 +135,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     display.InvokeAsync(() =>
                     {
-                        RefreshStatusBar();
+                        RefreshCopierStatusPanel();
                         RenderButtons(copyOn);
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
@@ -183,7 +187,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshInstrumentSelectorItems();
                 RefreshInstrumentTabs();
                 LoadActiveSessionToUi();
-                RefreshStatusBar();
+                RefreshCopierStatusPanel();
+                
+                _topPanelsGrid = topPanelsGrid;
+                RefreshMainMenuTabs();
+                RefreshMainMenuContent();
                 
                 return new ScrollViewer
                 {

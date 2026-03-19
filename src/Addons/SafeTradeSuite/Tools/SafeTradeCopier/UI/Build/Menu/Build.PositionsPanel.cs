@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -36,7 +35,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             stack.Children.Add(_positionsGrid);
 
             var positionsFieldset = BuildFieldset("Positions", stack);
-            Grid.SetColumn(positionsFieldset, 2);
             root.Children.Add(positionsFieldset);
         }
 

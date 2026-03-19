@@ -60,26 +60,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Connection.ConnectionStatusUpdate -= OnGlobalConnectionStatusUpdate;
             _connectionStatusHooked = false;
         }
-        
-        private CopierStatusState GetStatusState()
-        {
-            var masterConnected = IsMasterConnected();
-            var liveFollowersEnabled = HasAnyCheckedLiveFollowers();
-            var followersHealthy = AllCheckedFollowersHealthy();
-
-            var armed = _engine?.Armed == true;
-            var copyEnabled = _engine?.CopyEnabled == true;
-
-            var globalLock = false; // future
-
-            if (!masterConnected || globalLock)
-                return CopierStatusState.Red;
-
-            if (!_simOnlyMode && copyEnabled && armed && liveFollowersEnabled && followersHealthy)
-                return CopierStatusState.Green;
-
-            return CopierStatusState.Yellow;
-        }
 
         private void OnGlobalConnectionStatusUpdate(object sender, ConnectionStatusEventArgs e)
         {
@@ -90,11 +70,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshAccountsUi();
                 HandleFollowerConnectionSafety();
                 TryAutoRearmAfterReconnect();
-                RefreshStatusBar();
+                RefreshCopierStatusPanel();
 
                 _engine?.Log(
                     "Connection update: " +
-                    $"Conn={(e.Connection?.Options?.Name ?? "Unknown")} " +
+                    $"Conn={e.Connection?.Options?.Name ?? "Unknown"} " +
                     $"Order={e.Status} Price={e.PriceStatus}"
                 );
             }, DispatcherPriority.Background);
@@ -106,8 +86,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine.CopyEnabled) return;
             if (_userManuallyDisarmed) return;
             if (!_autoRearmPending) return;
-            if (!HasAnyCheckedFollowers()) return;
-            if (!AllCheckedFollowersHealthy()) return;
+            if (!HasAnyCheckedFollowersHealthy()) return;
 
             RequestCopyEnabled("Copy auto-rearmed after connection recovered.");
             _autoRearmPending = false;
@@ -122,7 +101,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _engine.SetCopyEnabled(true);
 
             if (!string.IsNullOrWhiteSpace(reason))
-                RefreshStatusBar();
+                RefreshCopierStatusPanel();
         }
         
         private void RequestCopyDisabled(bool manual, bool allowAutoRearm, string reason)
@@ -138,7 +117,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!string.IsNullOrWhiteSpace(reason))
                 _engine.Log(reason);
 
-            RefreshStatusBar();
+            RefreshCopierStatusPanel();
         }
         
         private void HandleFollowerConnectionSafety()

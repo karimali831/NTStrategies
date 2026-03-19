@@ -152,9 +152,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var masterName = master?.Name ?? "";
 
             var rowIndex = 0;
-            foreach (var acc in accounts)
+            foreach (var acc in accounts.Where(a => !_simOnlyMode || IsSimAccount(a)))
             {
+                if (acc == null)
+                    continue;
+
                 if (!string.IsNullOrWhiteSpace(masterName) && acc.Name == masterName)
+                    continue;
+
+                if (_simOnlyMode && !IsSimAccount(acc))
                     continue;
                 
                 var rowGrid = new Grid
@@ -241,19 +247,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
 
                 var flatten = CreateFormButton(
-                    text: "Flatten",
+                    text: "❌",
                     tone: FormButtonTone.Danger,
-                    style: FormButtonStyle.Outline,
-                    width: 90,
-                    height: 30);
+                    style: FormButtonStyle.Outline);
                 RenderFlattenButtonState(flatten, enabled: false);
                 
                 var freeTrade = CreateFormButton(
-                    text: "BE",
+                    text: "✓",
                     tone: FormButtonTone.Primary,
-                    style: FormButtonStyle.Outline,
-                    width: 70,
-                    height: 30);
+                    style: FormButtonStyle.Outline);
                 RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔");
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
@@ -314,19 +316,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 enabled.Checked += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
-                    RefreshStatusBar();
+                    RefreshCopierStatusPanel();
                     RenderFollowerRowState(row);
                     SaveUiToActiveSession();
                     ApplyConfigFromUi();
+                    RefreshFollowerBulkActionButtons();
                 };
 
                 enabled.Unchecked += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
-                    RefreshStatusBar();
+                    RefreshCopierStatusPanel();
                     RenderFollowerRowState(row);
                     SaveUiToActiveSession();
                     ApplyConfigFromUi();
+                    RefreshFollowerBulkActionButtons();
                 };
                 
                 qtyBox.TextChanged += (s, e) =>
@@ -354,6 +358,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 
                 rowIndex++;
             }
+            
+            RefreshFollowerBulkActionButtons();
         }
 
         private static Brush GetFollowerRowBackgroundBrush(int rowIndex)
@@ -372,14 +378,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void FollowerHeaderColumnDefinitions(Grid g)
         {
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // Status
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });   // On
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });  // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // Status
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // On
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });  // Override ATM
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });  // PnL
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // BE
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) }); // Override ATM
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) }); // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // BE
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Flatten
         }
         
         private static Grid BuildFollowerHeaderRow()
@@ -393,28 +399,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             FollowerHeaderColumnDefinitions(g);
-            
-            AddHeaderText(g, "Status", 0);
-            AddHeaderText(g, "On", 1);
-            AddHeaderText(g, "Account", 2);
-            AddHeaderText(g, "Qty", 3);
-            AddHeaderText(g, "Bracket", 4);
-            AddHeaderText(g, "PnL", 5);
-            AddHeaderText(g, "Position", 6);
-            AddHeaderText(g, "", 7);
+
+            AddHeaderText(g, "Status", 0, centered: true);
+            AddHeaderText(g, "On", 1, centered: true);
+            AddHeaderText(g, "Account", 2, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Qty", 3, centered: true);
+            AddHeaderText(g, "Bracket", 4, margin: new Thickness(14, 4, 6, 4));
+            AddHeaderText(g, "PnL", 5, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Break-even", 6, centered: true);
+            AddHeaderText(g, "Flatten", 7, centered: true);
 
             return g;
         }
 
-        private static void AddHeaderText(Grid g, string text, int col)
+        private static void AddHeaderText(
+            Grid g,
+            string text,
+            int col,
+            bool centered = false,
+            Thickness? margin = null)
         {
             var tb = new TextBlock
             {
                 Text = text,
-                Margin = new Thickness(6, 4, 6, 4),
+                Margin = margin ?? new Thickness(6, 4, 6, 4),
                 FontWeight = FontWeights.SemiBold,
                 Foreground = WindowForegroundBrush(),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = centered ? HorizontalAlignment.Center : HorizontalAlignment.Left,
+                TextAlignment = centered ? TextAlignment.Center : TextAlignment.Left
             };
 
             Grid.SetColumn(tb, col);

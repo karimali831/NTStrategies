@@ -9,7 +9,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private readonly Dictionary<string, (double r, double u)> _uiPnl = new Dictionary<string, (double r, double u)>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _uiNet = new Dictionary<string, int>(StringComparer.Ordinal);
-        
+        private double TotalRealizedPnl { get; set; }
+        private double TotalUnrealizedPnl { get; set; }
+
         private void RenderPnlUi()
         {
             if (_isClosing)
@@ -72,6 +74,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (row.PnlText != null)
                         SetPnlText(row.PnlText, "", r, u, shortened: true);
+
+                    RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
+                    
+                    TotalRealizedPnl = totalR;
+                    TotalUnrealizedPnl = totalU;
+
+                    if (_totalPnlText != null)
+                        SetPnlText(_totalPnlText, "Total", totalR, totalU, shortened: false);
 
                     RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
                 }

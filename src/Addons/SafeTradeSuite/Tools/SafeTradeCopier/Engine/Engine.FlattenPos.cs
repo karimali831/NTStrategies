@@ -12,95 +12,167 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             public void EnsureFlatInstrument(Account acc, Instrument instr)
             {
-                if (acc == null || instr == null) return;
+                if (acc == null || instr == null)
+                    return;
 
-                // fire-and-forget: cancel + flatten now, then re-check once (or twice) shortly after
                 Task.Run(async () =>
                 {
-                    try
+                    for (var pass = 1; pass <= 4; pass++)
                     {
-                        FlattenInstrument(acc, instr);
+                        try
+                        {
+                            FlattenInstrument(acc, instr, pass);
 
-                        // Re-check after NT has processed cancels/fills
-                        await Task.Delay(300).ConfigureAwait(false);
-                        FlattenInstrument(acc, instr);
+                            await Task.Delay(400).ConfigureAwait(false);
 
-                        // Optional: one more pass for stubborn ATM state transitions
-                        await Task.Delay(300).ConfigureAwait(false);
-                        FlattenInstrument(acc, instr);
+                            var netAfter = GetNetPosition(acc, instr);
+                            var workingAfter = GetWorkingOrdersForInstrument(acc, instr).Count;
+
+                            Log(
+                                $"Flatten verify -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                                $"netAfter={netAfter}, workingAfter={workingAfter}");
+
+                            if (netAfter == 0 && workingAfter == 0)
+                            {
+                                ClearActiveBracket(acc, instr);
+                                Log($"Flatten complete -> acc={acc.Name}, instr={instr.FullName}, pass={pass}");
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log(
+                                $"Flatten pass failed -> acc={acc?.Name}, instr={instr?.FullName}, pass={pass}, " +
+                                $"msg={ex.Message}");
+                        }
                     }
-                    catch
-                    {
-                        // keep tool silent/safe; no exceptions to user from background
-                    }
+
+                    Log($"Flatten incomplete after retries -> acc={acc.Name}, instr={instr.FullName}");
                 });
             }
 
-            private void FlattenInstrument(Account acc, Instrument instr)
+            private List<Order> GetWorkingOrdersForInstrument(Account acc, Instrument instr)
             {
-                if (acc == null || instr == null) return;
+                var result = new List<Order>();
 
-                // 1) Cancel any working orders on this instrument (ATM targets/stops live here)
-                var orders = new List<Order>();
-                try
-                {
-                    orders.AddRange(acc.Orders);
-                }
-                catch
-                {
-                    // if Orders enumeration fails, we still try to flatten net position below
-                }
+                if (acc == null || instr == null)
+                    return result;
 
                 try
                 {
-                    foreach (var o in orders)
+                    foreach (var o in acc.Orders)
                     {
-                        if (o?.Instrument == null) continue;
-                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal)) continue;
+                        if (o?.Instrument == null)
+                            continue;
+
+                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                            continue;
 
                         if (o.OrderState == OrderState.Working ||
                             o.OrderState == OrderState.Accepted ||
-                            o.OrderState == OrderState.Submitted)
+                            o.OrderState == OrderState.Submitted ||
+                            o.OrderState == OrderState.PartFilled)
                         {
-                            acc.Cancel(new[] { o });
+                            result.Add(o);
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // non-fatal
+                    Log($"GetWorkingOrdersForInstrument failed -> acc={acc?.Name}, instr={instr?.FullName}, msg={ex.Message}");
                 }
 
-                // 2) Now flatten the net position
+                return result;
+            }
+            
+            private void FlattenInstrument(Account acc, Instrument instr, int pass)
+            {
+                if (acc == null || instr == null)
+                    return;
+
+                List<Order> orders;
+                try
+                {
+                    orders = acc.Orders?.ToList() ?? new List<Order>();
+                }
+                catch (Exception ex)
+                {
+                    Log($"Flatten orders snapshot failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
+                    orders = new List<Order>();
+                }
+
+                var instrumentOrders = orders
+                    .Where(o => o?.Instrument != null &&
+                                string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    .ToList();
+
+                foreach (var o in instrumentOrders)
+                {
+                    Log(
+                        $"Flatten inspect order -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                        $"name={o.Name}, signal={o.Name}, state={o.OrderState}, qty={o.Quantity}");
+                }
+
+                try
+                {
+                    var cancellable = instrumentOrders
+                        .Where(o =>
+                            o.OrderState == OrderState.Working ||
+                            o.OrderState == OrderState.Accepted ||
+                            o.OrderState == OrderState.Submitted ||
+                            o.OrderState == OrderState.PartFilled)
+                        .ToArray();
+
+                    if (cancellable.Length > 0)
+                    {
+                        acc.Cancel(cancellable);
+                        Log($"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, count={cancellable.Length}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Flatten cancel failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
+                }
+
                 var net = GetNetPosition(acc, instr);
                 if (net == 0)
                 {
-                    ClearActiveBracket(acc, instr);
-                    Log($"Flatten -> {acc.Name}: net=0 (nothing to do) instr={instr.FullName}");
+                    Log($"Flatten -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, net=0");
                     return;
                 }
 
                 var action = net > 0 ? OrderAction.Sell : OrderAction.BuyToCover;
                 var qty = Math.Abs(net);
 
-                Log($"Flatten -> {acc.Name}: net={net}, action={action}, qty={qty}, instr={instr.FullName}");
+                try
+                {
+                    var ord = acc.CreateOrder(
+                        instr,
+                        action,
+                        OrderType.Market,
+                        OrderEntry.Manual,
+                        TimeInForce.Day,
+                        qty,
+                        0,
+                        0,
+                        string.Empty,
+                        "STC:FLATTEN",
+                        DateTime.MaxValue,
+                        null
+                    );
 
-                var ord = acc.CreateOrder(
-                    instr,
-                    action,
-                    OrderType.Market,
-                    OrderEntry.Manual,
-                    TimeInForce.Day,
-                    qty,
-                    0,
-                    0,
-                    string.Empty,
-                    "STC:FLATTEN",
-                    DateTime.MaxValue,
-                    null
-                );
+                    acc.Submit(new[] { ord });
 
-                acc.Submit(new[] { ord });
+                    Log(
+                        $"Flatten market submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                        $"net={net}, action={action}, qty={qty}");
+                }
+                catch (Exception ex)
+                {
+                    Log(
+                        $"Flatten market submit failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                        $"net={net}, msg={ex.Message}");
+                }
             }
             
             private void TryFlattenFollowersOnMasterFlat()
