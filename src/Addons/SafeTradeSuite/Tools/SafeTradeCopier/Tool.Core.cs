@@ -34,6 +34,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _window.Dispatcher.HasShutdownFinished)
                     {
                         TearDownEngine();
+                        TearDownUiState();
                     }
                     
                     if (!_window.IsVisible)
@@ -103,7 +104,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _engine = null;
             }
         }
-        
+
+        private void TearDownUiState()
+        {
+            _window = null;
+            _uiDispatcher = null;
+
+            _masterBox = null;
+            _instrumentSelector = null;
+            _followersPanel = null;
+
+            _btnBuyMkt = null;
+            _btnSellMkt = null;
+            _btnFlattenAll = null;
+            _btnCopyOn = null;
+
+            _statusBox = null;
+            _masterQtyBox = null;
+            _masterAtmBox = null;
+            _masterPnlText = null;
+            _totalPnlText = null;
+
+            _instrumentTabs = null;
+            _btnAddInstrumentTab = null;
+
+            _activeInstrumentSession = null;
+            _suppressSessionUiEvents = false;
+
+            _followerRows.Clear();
+            _lastAccountsSnapshot.Clear();
+            _instrumentSessions.Clear();
+        }
+
         public void Dispose()
         {
             lock (_windowGate)
@@ -126,6 +158,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     else
                         w.Dispatcher.Invoke(() => w.Close());
                 }
+
+                TearDownUiState();
             }
         }
         
@@ -144,6 +178,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             lock (_windowGate)
             {
                 TearDownEngine();
+                TearDownUiState();
             }
         }
     }
