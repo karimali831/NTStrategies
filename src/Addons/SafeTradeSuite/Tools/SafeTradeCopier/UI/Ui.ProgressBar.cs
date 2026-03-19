@@ -64,14 +64,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            var hasBracket = _engine.TryGetActiveBracketSpec(account, instr, out var spec);
+            _engine.TryGetActiveBracketSpec(account, instr, out var spec);
 
-            var uTmp = 0.0;
-            var qTmp = 0;
-            var hasOpenPosition = false;
-
-            if (hasBracket)
-                hasOpenPosition = TryGetInstrumentUnrealized(account, instr, out uTmp, out qTmp);
+            var hasOpenPosition = TryGetInstrumentUnrealized(account, instr, out var uTmp, out var qTmp);
 
             if (hasOpenPosition && spec != null)
             {
@@ -103,15 +98,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             bar.BeginAnimation(RangeBase.ValueProperty, null);
             bar.Visibility = Visibility.Collapsed;
             bar.Value = 0;
-
-            var existingTag = bar.Tag as string;
-            if (string.IsNullOrWhiteSpace(existingTag) ||
-                (!existingTag.StartsWith("OUTCOME_DONE:", StringComparison.Ordinal) &&
-                 !existingTag.StartsWith("OUTCOME_PENDING:", StringComparison.Ordinal)))
-            {
-                bar.Tag = null;
-                ClearBarOutcome(statusText, bar);
-            }
+            bar.Tag = null;
+            ClearBarOutcome(statusText, bar);
         }
 
         private static readonly Brush GreenGrad = new LinearGradientBrush

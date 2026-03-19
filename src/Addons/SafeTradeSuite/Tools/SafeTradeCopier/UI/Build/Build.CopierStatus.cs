@@ -30,20 +30,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             statusStack.Children.Add(BuildStatusLine(out _copierReadyDot, out _copierReadyText));
             statusStack.Children.Add(BuildStatusLine(out _copierReadySecondaryDot, out _copierReadySecondaryText));
-
-            statusStack.Children.Add(new Border
-            {
-                Height = 1,
-                Margin = new Thickness(0, 10, 0, 10),
-                Background = SectionBorderBrush()
-            });
-
             statusStack.Children.Add(BuildTextLine(out _totalPnlText));
 
             var statusFieldset = BuildFieldset("Status", statusStack);
-            Grid.SetColumn(statusFieldset, 2);
-            root.Children.Add(statusFieldset);
 
+            Grid.SetColumn(statusFieldset, 2);
+            Grid.SetRow(statusFieldset, 1);
+
+            root.Children.Add(statusFieldset);
+            
             RefreshCopierStatusPanel();
         }
 
@@ -85,7 +80,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return row;
         }
 
-        private UIElement BuildTextLine(out TextBlock text)
+        private static UIElement BuildTextLine(out TextBlock text)
         {
             text = new TextBlock
             {
@@ -118,11 +113,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _copierReadySecondaryDot.Background = reason.SecondaryDotColour ?? DotOffBrush();
                 _copierReadySecondaryText.Text = reason.SecondaryReason ?? string.Empty;
             }
-            
-            _totalPnlText = new TextBlock
-            {
-                Text = "Total Unrealized $0.00"
-            };
         }
         
         private ReadyStatus GetReadyReason()

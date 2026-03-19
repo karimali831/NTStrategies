@@ -20,7 +20,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Visibility = Visibility.Collapsed
             };
             
-            ApplyStatusBoxVisibility();
             return _statusBox;
         }
     }

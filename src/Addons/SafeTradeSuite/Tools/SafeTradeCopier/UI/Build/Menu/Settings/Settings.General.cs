@@ -46,15 +46,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             showStatusBox.Checked += (s, e) =>
             {
                 _showStatusBox = true;
-                ApplyStatusBoxVisibility();
-                RefreshMainMenuTabs();
+                RebuildMainMenuTabs();
             };
 
             showStatusBox.Unchecked += (s, e) =>
             {
                 _showStatusBox = false;
-                ApplyStatusBoxVisibility();
-                RefreshMainMenuTabs();
+                RebuildMainMenuTabs();
             };
             
             // Theme
@@ -68,7 +66,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var themeLbl = new TextBlock
             {
-                Text = "Theme:",
+                Text = "Theme",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0,0,8,0),
                 Foreground = WindowForegroundBrush()
@@ -105,21 +103,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var accounts = GetSelectableAccounts();
 
             EnforceSimOnlyModeUi(accounts);
-
             RebuildFollowersAndRewire(_engine, accounts);
-
             ApplyConfigFromUi();
             RenderFollowerRowsState();
             RenderFlattenAllButtonState();
             RefreshCopierStatusPanel();
             RefreshFollowerBulkActionButtons();
             RefreshRiskFieldset();
-        }
-        
-        private void ApplyStatusBoxVisibility()
-        {
-            if (_statusBox != null)
-                _statusBox.Visibility = _showStatusBox ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

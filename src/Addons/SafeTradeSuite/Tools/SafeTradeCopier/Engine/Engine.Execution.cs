@@ -11,6 +11,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             private void OnMasterExecution(object sender, ExecutionEventArgs e)
             {
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[MASTER EXEC] acc={e?.Execution?.Account?.Name} name={e?.Execution?.Order?.Name} instr={e?.Execution?.Order?.Instrument?.FullName} state={e?.Execution?.Order?.OrderState} fillPrice={e?.Execution?.Price} qty={e?.Execution?.Quantity}");
+                
                 if (e?.Execution == null) return;
                 if (_master == null || e.Execution.Account != _master) return;
                 if (_instrument == null) return;
@@ -28,6 +31,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 HandleBracketExitOutcome(_master, e.Execution);
                 // Always try to submit bracket for STC entry fills
+                
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
+                
                 TrySubmitBracketOnFill(_master, e.Execution);
                 TryFlattenFollowersOnMasterFlat();
 
@@ -116,6 +123,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HandleBracketExitOutcome(acc, e.Execution);
 
                 // Brackets only submit if there's a pending entry name for this fill.
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[FOLLOWER EXEC -> TRY BRACKET] name={e.Execution?.Order?.Name}");
+                
                 TrySubmitBracketOnFill(acc, e.Execution);
             }
         }

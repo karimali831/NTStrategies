@@ -6,21 +6,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static bool ShowConfirmDialog(Window owner, string title, string message, string okText = "Confirm", string cancelText = "Cancel")
+        private static bool ShowConfirmDialog(
+            Window owner,
+            string title,
+            string message,
+            string okText = "Confirm",
+            string cancelText = "Cancel")
         {
             var text = new TextBlock
             {
                 Text = message,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 16),
-                Foreground = WindowForegroundBrush()
+                Margin = new Thickness(0, 0, 0, 18),
+                Foreground = WindowForegroundBrush(),
+                LineHeight = 22
             };
 
             var okButton = new Button
             {
                 Content = okText,
-                Width = 100,
-                Height = 30,
+                Width = 120,
+                Height = 34,
                 Margin = new Thickness(0, 0, 8, 0),
                 Background = Brushes.Firebrick,
                 Foreground = Brushes.White,
@@ -31,8 +37,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var cancelButton = new Button
             {
                 Content = cancelText,
-                Width = 100,
-                Height = 30,
+                Width = 120,
+                Height = 34,
                 IsCancel = true
             };
 
@@ -46,7 +52,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var panel = new StackPanel
             {
-                Margin = new Thickness(16)
+                Margin = new Thickness(18)
             };
             panel.Children.Add(text);
             panel.Children.Add(buttons);
@@ -54,13 +60,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var dialog = new Window
             {
                 Title = title,
-                Width = 420,
-                Height = 180,
+                Width = 460,
+                Height = 220,
+                MinHeight = 220,
                 ResizeMode = ResizeMode.NoResize,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = owner,
                 Content = panel,
-                Background = WindowBackgroundBrush()
+                Background = WindowBackgroundBrush(),
+                Foreground = WindowForegroundBrush()
             };
 
             var confirmed = false;

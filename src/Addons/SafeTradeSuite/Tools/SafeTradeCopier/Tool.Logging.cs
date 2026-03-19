@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Text;
 using NinjaTrader.Core;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -9,54 +8,38 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static string CrashLogPath =>
             Path.Combine(Globals.UserDataDir, "log", "SafeTradeCopier.crash.log");
+        
+        
 
-        private void LogUnhandled(string context, Exception ex)
+        private static void LogUnhandled(string scope, Exception ex)
         {
             try
             {
-                var sb = new StringBuilder();
-                sb.AppendLine("==================================================");
-                sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
-                sb.AppendLine($"Context: {context}");
-                sb.AppendLine();
-
                 if (ex == null)
                 {
-                    sb.AppendLine("Exception: <null>");
+                    SafeTradeSuiteRuntime.PrintLog($"[UNHANDLED] scope={scope} ex=<null>");
+                    return;
                 }
-                else
+
+                SafeTradeSuiteRuntime.PrintLog($"[UNHANDLED] scope={scope}");
+                SafeTradeSuiteRuntime.PrintLog(ex.ToString());
+
+                var inner = ex.InnerException;
+                var depth = 1;
+
+                while (inner != null)
                 {
-                    sb.AppendLine(ex.ToString());
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[UNHANDLED INNER {depth}] {inner.GetType().FullName}: {inner.Message}");
+                    SafeTradeSuiteRuntime.PrintLog(inner.ToString());
 
-                    var inner = ex.InnerException;
-                    var depth = 1;
-
-                    while (inner != null)
-                    {
-                        sb.AppendLine();
-                        sb.AppendLine($"---- Inner Exception Level {depth} ----");
-                        sb.AppendLine(inner.ToString());
-                        inner = inner.InnerException;
-                        depth++;
-                    }
+                    inner = inner.InnerException;
+                    depth++;
                 }
-
-                File.AppendAllText(CrashLogPath, sb.ToString());
             }
             catch
             {
-                // never throw from logger
-            }
-
-            try
-            {
-                _engine?.Log($"[CRASH] {context}");
-                if (ex != null)
-                    _engine?.Log(ex.ToString());
-            }
-            catch
-            {
-                // ignore logging errors
+                // never let logging crash the UI
             }
         }
     }

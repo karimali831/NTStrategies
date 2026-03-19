@@ -43,18 +43,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             );
 
             _lastAppliedConfig = config;
+            SavePersistentUiState();
         }
         
         private CopierUiConfig BuildConfigFromUi()
         {
             var master = _masterBox?.SelectedItem as Account;
-            var instr = (_instrumentSelector?.SelectedItem as string ?? "").Trim();
-
+            var instr = NormalizeInstrumentName(
+                (_instrumentSelector?.SelectedItem as string) ??
+                _instrumentSelector?.Text ??
+                "");
             var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
-
-            var masterAtm = _masterAtmBox?.SelectedItem as string ?? "None";
+            var masterAtm = (_masterAtmBox?.SelectedItem as string) ?? _masterAtmBox?.Text ?? "None";
+            
             if (string.IsNullOrWhiteSpace(masterAtm))
                 masterAtm = "None";
+
+            masterAtm = NormalizeAtm(masterAtm);
 
             if (_simOnlyMode && master != null && !IsSimAccount(master))
             {

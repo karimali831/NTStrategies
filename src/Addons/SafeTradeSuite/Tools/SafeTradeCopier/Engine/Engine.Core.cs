@@ -289,9 +289,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!string.IsNullOrWhiteSpace(reason))
                     Log($"DISARMED: {reason}");
             }
-            
-            
-            public void Log(string msg) => OnStatus?.Invoke(msg);
+
+
+            public void Log(string msg)
+            {
+                SafeTradeSuiteRuntime.PrintLog(msg);
+                // OnStatus?.Invoke(msg);
+            }
 
             public void Dispose()
             {

@@ -9,15 +9,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private enum MainMenuTab
-        {
-            Followers,
-            Positions,
-            Trades,
-            Settings,
-            Diag
-        }
-
         private sealed class MainMenuTabItem
         {
             public MainMenuTab Key { get; set; }
@@ -31,7 +22,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Border _mainMenuTabsWrapper;
         private StackPanel _mainMenuTabsPanel;
         private readonly List<MainMenuTabItem> _mainMenuTabItems = new List<MainMenuTabItem>();
-        private MainMenuTab _activeMainMenuTab = MainMenuTab.Followers;
+        private MainMenuTab _activeMainMenuTab = MainMenuTab.Copier;
+        private Window _diagWindow;
+        private TextBox _diagWindowTextBox;
 
         private Border BuildMainMenuTabs()
         {
@@ -49,20 +42,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Child = _mainMenuTabsPanel
             };
 
+            RebuildMainMenuTabs();
+            return _mainMenuTabsWrapper;
+        }
+
+        private void BuildMenuTabs()
+        {
             _mainMenuTabItems.Clear();
             _mainMenuTabsPanel.Children.Clear();
-
-            AddMainMenuTab(MainMenuTab.Followers, "Followers", CreateUsersIcon());
+            
+            AddMainMenuTab(MainMenuTab.Copier, "Copier", CreateCopierIcon());
             AddMainMenuTab(MainMenuTab.Positions, "Positions", CreateGridIcon());
             AddMainMenuTab(MainMenuTab.Trades, "Trades", CreateListIcon());
             AddMainMenuTab(MainMenuTab.Settings, "Settings", CreateCogIcon());
 
             if (_showStatusBox)
                 AddMainMenuTab(MainMenuTab.Diag, "Diag", CreateListIcon());
-
+            
             RefreshMainMenuTabs();
-
-            return _mainMenuTabsWrapper;
         }
 
         private void AddMainMenuTab(MainMenuTab key, string title, Geometry iconGeometry)
@@ -130,6 +127,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Icon = icon
             });
         }
+        
+        private void RebuildMainMenuTabs()
+        {
+            if (_mainMenuTabsPanel == null)
+                return;
+
+            // if user hid Diag while it was active, move back to Copier
+            if (!_showStatusBox && _activeMainMenuTab == MainMenuTab.Diag)
+                _activeMainMenuTab = MainMenuTab.Copier;
+            
+            BuildMenuTabs();
+        }
 
         private void RefreshMainMenuTabs()
         {
@@ -166,7 +175,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             switch (_activeMainMenuTab)
             {
-                case MainMenuTab.Followers:
+                case MainMenuTab.Copier:
                     _topPanelsGrid.Visibility = Visibility.Visible;
                     _mainContentHost.Content = BuildFollowersContent();
                     break;
@@ -190,37 +199,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private UIElement BuildFollowersContent()
         {
-            return BuildFollowersView();
-        }
-        
-
-        private UIElement BuildPositionsContent()
-        {
-            return BuildPositionsView();
-        }
-        
-        private UIElement BuildFollowersView()
-        {
-            var host = new Grid();
-
-            // IMPORTANT: clear existing rows (avoid reuse issues)
-            _followersPanel = null;
-            _btnCopyOn = null;
-
-            RenderFollowerPanel(_engine, host);
-            RefreshFollowerBulkActionButtons();
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[BUILD FOLLOWERS CONTENT] activeInstr={_activeInstrumentSession?.InstrumentName} rowsBefore={_followerRows.Count}");
             
+            var host = new Grid();
+            RenderFollowerPanel(_engine, host);
+
+            var accounts = GetSelectableAccounts();
+            BuildFollowerRows(accounts);
+
+            foreach (var r in _followerRows)
+                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+
+            EnforceSimOnlyModeUi(accounts);
+            LoadActiveSessionToUi();
+            RenderFollowerRowsState();
+            WireFollowerFlattenButtons(_engine);
+            WireFollowerFreeTradeButtons(_engine);
+            RefreshFollowerBulkActionButtons();
+
             return host;
         }
-        
-        private UIElement BuildPositionsView()
+
+        private UIElement BuildPositionsContent()
         {
             var host = new Grid();
 
             _positionsGrid = null;
-
             RenderPositionsPanel(host);
-
+            
             return host;
         }
 
@@ -270,20 +277,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void OpenDiagWindow()
         {
-            if (_statusBox == null)
+            if (!_showStatusBox)
                 return;
 
-            var diagWindow = new Window
+            if (_diagWindow != null)
             {
-                Title = "Safe Trade Copier Diagnostics",
-                Width = 700,
-                Height = 420,
-                Owner = _window,
-                Background = WindowBackgroundBrush(),
-                Foreground = WindowForegroundBrush()
-            };
+                _diagWindow.Activate();
+                return;
+            }
 
-            var diagText = new TextBox
+            _diagWindowTextBox = new TextBox
             {
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
@@ -291,13 +294,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Background = SectionBackgroundBrush(),
                 Foreground = WindowForegroundBrush(),
-                Text = _statusBox.Text
+                Text = _statusBox?.Text ?? ""
             };
 
-            diagWindow.Content = diagText;
-            diagWindow.Show();
+            _diagWindow = new Window
+            {
+                Title = "Safe Trade Copier Diagnostics",
+                Width = 700,
+                Height = 420,
+                Owner = _window,
+                Background = WindowBackgroundBrush(),
+                Foreground = WindowForegroundBrush(),
+                Content = _diagWindowTextBox
+            };
+
+            _diagWindow.Closed += (s, e) =>
+            {
+                _diagWindow = null;
+                _diagWindowTextBox = null;
+            };
+
+            _diagWindow.Show();
         }
 
+        private static Geometry CreateCopierIcon()
+        {
+            return Geometry.Parse("M3,3 H13 V13 H3 Z M6,6 H16 V16 H6 Z");
+        }
+        
         private static Geometry CreateUsersIcon()
         {
             return Geometry.Parse("F1 M 4,8 A 2,2 0 1 1 4,4 A 2,2 0 1 1 4,8 M 8.5,7.5 A 1.5,1.5 0 1 1 8.5,4.5 A 1.5,1.5 0 1 1 8.5,7.5 M 1,11 C 1,9.5 3,9 4,9 C 5,9 7,9.5 7,11 M 6.5,11 C 6.7,10 7.8,9.3 9,9.3 C 10,9.3 11,9.8 11,11");

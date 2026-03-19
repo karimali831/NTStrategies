@@ -50,7 +50,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             _btnToggleAllFollowers = CreateFormButton(
-                text: "Select All Followers",
+                text: "Select All",
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
                 width: 150,
@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 tone: FormButtonTone.Warning,
                 style: FormButtonStyle.Outline,
                 width: 120,
-                height: SmallButtonHeight(),
+                height:SmallButtonHeight(),
                 margin: new Thickness(6, 0, 0, 0));
 
             _btnToggleAllFollowers.Click += (s, e) => ToggleFollowersSelection(x => true);
@@ -159,8 +159,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (_btnToggleAllFollowers != null)
                 _btnToggleAllFollowers.Content = AreAllMatchingFollowersChecked(x => true)
-                    ? "Deselect All Followers"
-                    : "Select All Followers";
+                    ? "Deselect All"
+                    : "Select All";
 
             if (_btnToggleSimFollowers != null)
                 _btnToggleSimFollowers.Content = AreAllMatchingFollowersChecked(r => IsSimAccount(r.Account))

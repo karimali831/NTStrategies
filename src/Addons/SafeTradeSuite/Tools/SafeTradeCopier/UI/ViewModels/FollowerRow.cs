@@ -8,8 +8,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private sealed class FollowerRow
         {
             public Account Account;
-
-            public Border StatusDot;
             public CheckBox EnabledCheck;
             public TextBlock AccountText;
 

@@ -28,7 +28,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             double? width = null,
             double? height = null,
             Thickness? margin = null,
-            bool bold = true)
+            bool bold = true,
+            double? fontSize = null
+            )
         {
             var btn = new Button
             {
@@ -40,7 +42,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(2, 0, 2, 0),
                 HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                FontSize = fontSize ?? 13
             };
 
             ApplyButtonTheme(btn, tone, style, enabled: true);

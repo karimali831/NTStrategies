@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
@@ -11,7 +12,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
         {
             if (_copier == null)
                 _copier = new SafeTradeCopierTool();
-
+            
+            
             return _copier;
         }
 
@@ -38,7 +40,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
         {
             Code.Output.Process(
                 $"[SafeTradeSuite DEBUG] {DateTime.Now:HH:mm:ss.fff} {msg}",
-                PrintTo.OutputTab1);
+                PrintTo.OutputTab2);
         }
     }
 }

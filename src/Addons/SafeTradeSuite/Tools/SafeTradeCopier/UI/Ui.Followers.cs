@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using NinjaTrader.Cbi;
@@ -16,6 +15,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RebuildFollowersAndRewire(SafeCopierEngine eng, List<Account> accounts)
         {
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
+
             var selected = new HashSet<string>(
                 _followerRows
                     .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
@@ -53,9 +55,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
 
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.AtmOverrideBox?.SelectedItem}");
+
                 if (r?.Account == null)
                     continue;
-                
+
                 if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
                     r.QtyOverrideBox.Text = qtyText;
 
@@ -64,6 +69,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     r.AtmOverrideBox.Items.Contains(bracket))
                 {
                     r.AtmOverrideBox.SelectedItem = bracket;
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.AtmOverrideBox.SelectedItem}");
                 }
             }
 
@@ -95,9 +102,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
                     
+                    var hadOpenPosition = HasOpenInstrumentPosition(r.Account, instr);
+
+                    if (!hadOpenPosition)
+                    {
+                        if (r.PnlBar != null)
+                            r.PnlBar.Tag = null;
+
+                        ClearBarOutcome(r.PnlBarStatusText, r.PnlBar);
+                        eng.Log($"Flatten skipped -> {r.Account.Name} ({instr.FullName}) no open position.");
+                        return;
+                    }
+
                     if (r.PnlBar != null)
                         r.PnlBar.Tag = "ORDER_FILLED";
-                    
+
                     eng.EnsureFlatInstrument(r.Account, instr);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
                 };
@@ -146,13 +165,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void BuildFollowerRows(List<Account> accounts)
         {
             _followerRows.Clear();
-            _followersPanel.Children.Clear();
+
+            if (_followersPanel != null)
+                _followersPanel.Children.Clear();
 
             var master = _masterBox?.SelectedItem as Account;
             var masterName = master?.Name ?? "";
 
             var rowIndex = 0;
-            foreach (var acc in accounts.Where(a => !_simOnlyMode || IsSimAccount(a)))
+            foreach (var acc in accounts)
             {
                 if (acc == null)
                     continue;
@@ -170,18 +191,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 
                 FollowerHeaderColumnDefinitions(rowGrid);
-                
-                var statusDot = new Border
-                {
-                    Width = 12,
-                    Height = 12,
-                    CornerRadius = new CornerRadius(6),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = DotBorderBrush(),
-                    Background = DotOffBrush(),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
               
                 var enabled = new CheckBox
                 {
@@ -229,7 +238,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Maximum = 100,
                     Value = 0,
                     Width = 100,
-                    Margin = new Thickness(0, 2, 0, 2),
+                    Margin = new Thickness(0, 2, 20, 2),
                     Visibility = Visibility.Collapsed
                 };
                 EnsureRoundedProgressBar(pnlBar, alignRight: false);
@@ -274,21 +283,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0)
                 };
-
-                Grid.SetColumn(statusDot, 0);
-                Grid.SetColumn(enabled, 1);
-                Grid.SetColumn(accountText, 2);
-                Grid.SetColumn(qtyBox, 3);
-                Grid.SetColumn(atmBox, 4);
-                Grid.SetColumn(pnlStack, 5);
-                Grid.SetColumn(freeTrade, 6);
-                Grid.SetColumn(flatten, 7);
+                
+                Grid.SetColumn(enabled, 0);
+                Grid.SetColumn(accountText, 1);
+                Grid.SetColumn(qtyBox, 2);
+                Grid.SetColumn(atmBox, 3);
+                Grid.SetColumn(pnlStack, 4);
+                Grid.SetColumn(freeTrade, 5);
+                Grid.SetColumn(flatten, 6);
 
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
                 pnlStack.Children.Add(pnlBarStatusText);
 
-                rowGrid.Children.Add(statusDot);
                 rowGrid.Children.Add(enabled);
                 rowGrid.Children.Add(accountText);
                 rowGrid.Children.Add(qtyBox);
@@ -300,7 +307,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var row = new FollowerRow
                 {
                     Account = acc,
-                    StatusDot = statusDot,
                     EnabledCheck = enabled,
                     AccountText = accountText,
                     QtyOverrideBox = qtyBox,
@@ -326,6 +332,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 enabled.Unchecked += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
+
+                    var instr = GetInstrument();
+                    if (HasOpenInstrumentPosition(row.Account, instr))
+                    {
+                        _suppressSessionUiEvents = true;
+                        try
+                        {
+                            row.EnabledCheck.IsChecked = true;
+                        }
+                        finally
+                        {
+                            _suppressSessionUiEvents = false;
+                        }
+
+                        RenderFollowerRowState(row);
+                        RefreshCopierStatusPanel();
+                        RefreshFollowerBulkActionButtons();
+                        SavePersistentUiState();
+                        return;
+                    }
+
                     RefreshCopierStatusPanel();
                     RenderFollowerRowState(row);
                     SaveUiToActiveSession();
@@ -354,8 +381,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 flatten.VerticalAlignment = VerticalAlignment.Center;
 
                 _followerRows.Add(row);
-                _followersPanel.Children.Add(rowGrid);
-                
+                _followersPanel?.Children.Add(rowGrid);
+
                 rowIndex++;
             }
             
@@ -378,12 +405,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static void FollowerHeaderColumnDefinitions(Grid g)
         {
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // Status
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // On
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) }); // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) }); // Override ATM
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) }); // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // PnL
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // BE
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Flatten
         }
@@ -400,14 +426,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             FollowerHeaderColumnDefinitions(g);
 
-            AddHeaderText(g, "Status", 0, centered: true);
-            AddHeaderText(g, "On", 1, centered: true);
-            AddHeaderText(g, "Account", 2, margin: new Thickness(6, 4, 6, 4));
-            AddHeaderText(g, "Qty", 3, centered: true);
-            AddHeaderText(g, "Bracket", 4, margin: new Thickness(14, 4, 6, 4));
-            AddHeaderText(g, "PnL", 5, margin: new Thickness(6, 4, 6, 4));
-            AddHeaderText(g, "Break-even", 6, centered: true);
-            AddHeaderText(g, "Flatten", 7, centered: true);
+            AddHeaderText(g, "On", 0, centered: true);
+            AddHeaderText(g, "Account", 1, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Qty", 2, centered: true);
+            AddHeaderText(g, "Bracket", 3, margin: new Thickness(14, 4, 6, 4));
+            AddHeaderText(g, "PnL", 4, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Break-even", 5, centered: true);
+            AddHeaderText(g, "Flatten", 6, centered: true);
 
             return g;
         }
@@ -444,7 +469,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             cb.Style = _circularCheckBoxStyle;
         }
         
-         private static Style BuildCircularCheckBoxStyle()
+        private static Style BuildCircularCheckBoxStyle()
         {
             var style = new Style(typeof(CheckBox));
 
@@ -456,6 +481,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, DotOffBrush()));
+            style.Setters.Add(new Setter(FrameworkElement.TagProperty, FollowerCheckVisualState.Off));
 
             var template = new ControlTemplate(typeof(CheckBox));
 
@@ -480,16 +507,58 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             border.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             border.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
 
+            var check = new FrameworkElementFactory(typeof(TextBlock))
+            {
+                Name = "CheckGlyph"
+            };
+            check.SetValue(TextBlock.TextProperty, "✓");
+            check.SetValue(TextBlock.FontSizeProperty, 11.0);
+            check.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            check.SetValue(TextBlock.ForegroundProperty, Brushes.White);
+            check.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+            check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            check.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+
             root.AppendChild(border);
+            root.AppendChild(check);
+
             template.VisualTree = root;
 
-            var checkedTrigger = new Trigger
+            var offTrigger = new Trigger
             {
-                Property = ToggleButton.IsCheckedProperty,
-                Value = true
+                Property = FrameworkElement.TagProperty,
+                Value = FollowerCheckVisualState.Off
             };
-            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotConnectedOnBrush(), "Dot"));
-            checkedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotConnectedOnBrush(), "Dot"));
+            offTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Brushes.Transparent, "Dot"));
+            offTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotBorderBrush(), "Dot"));
+            offTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "CheckGlyph"));
+
+            var armedTrigger = new Trigger
+            {
+                Property = FrameworkElement.TagProperty,
+                Value = FollowerCheckVisualState.Armed
+            };
+            armedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotConnectedOnBrush(), "Dot"));
+            armedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotConnectedOnBrush(), "Dot"));
+            armedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "CheckGlyph"));
+
+            var warningTrigger = new Trigger
+            {
+                Property = FrameworkElement.TagProperty,
+                Value = FollowerCheckVisualState.Warning
+            };
+            warningTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotWarningBrush(), "Dot"));
+            warningTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotWarningBrush(), "Dot"));
+            warningTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "CheckGlyph"));
+
+            var disconnectedTrigger = new Trigger
+            {
+                Property = FrameworkElement.TagProperty,
+                Value = FollowerCheckVisualState.Disconnected
+            };
+            disconnectedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotDisconnectedBrush(), "Dot"));
+            disconnectedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotDisconnectedBrush(), "Dot"));
+            disconnectedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "CheckGlyph"));
 
             var disabledTrigger = new Trigger
             {
@@ -498,7 +567,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
             disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.45, "Root"));
 
-            template.Triggers.Add(checkedTrigger);
+            template.Triggers.Add(offTrigger);
+            template.Triggers.Add(armedTrigger);
+            template.Triggers.Add(warningTrigger);
+            template.Triggers.Add(disconnectedTrigger);
             template.Triggers.Add(disabledTrigger);
 
             style.Setters.Add(new Setter(Control.TemplateProperty, template));
@@ -507,7 +579,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RenderFollowerRowState(FollowerRow row)
         {
-            if (row?.Account == null) return;
+            if (row?.Account == null)
+                return;
 
             var connState = GetUiConnectionState(row.Account);
             var connected = connState == UiConnectionState.Connected;
@@ -516,59 +589,55 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var isChecked = row.EnabledCheck?.IsChecked == true;
             var isArmed = _engine?.CopyEnabled == true;
+            
+            var instr = GetInstrument();
+            var hasOpenPosition = HasOpenInstrumentPosition(row.Account, instr);
 
-            if (row.StatusDot != null)
-            {
-                row.StatusDot.Visibility = Visibility.Visible;
-                row.StatusDot.BorderBrush = DotBorderBrush();
-
-                if (disconnected)
-                {
-                    row.StatusDot.Background = DotDisconnectedBrush();
-                    row.StatusDot.ToolTip = "Disconnected";
-                }
-                else if (warning)
-                {
-                    row.StatusDot.Background = DotWarningBrush();
-                    row.StatusDot.ToolTip = "Connecting or reconnecting";
-                }
-                else if (connected && isChecked && isArmed)
-                {
-                    row.StatusDot.Background = DotConnectedOnBrush();
-                    row.StatusDot.ToolTip = "Connected";
-                }
-                else if (connected && isChecked && !isArmed)
-                {
-                    row.StatusDot.Background = DotWarningBrush();
-                    row.StatusDot.ToolTip = "Disarmed";
-                }
-                else
-                {
-                    row.StatusDot.Background = DotOffBrush();
-                    row.StatusDot.ToolTip = "Connected";
-                }
-            }
-
-            var allowCheck = connected;
+            if (hasOpenPosition && row.EnabledCheck != null && row.EnabledCheck.IsChecked != true)
+                row.EnabledCheck.IsChecked = true;
 
             if (row.EnabledCheck != null)
             {
-                row.EnabledCheck.IsEnabled = allowCheck;
-                row.EnabledCheck.Opacity = allowCheck ? 1.0 : 0.55;
+                var allowCheckToggle = connected && !hasOpenPosition;
 
-                if (!allowCheck)
-                    row.EnabledCheck.ToolTip = warning
-                        ? "Connecting or reconnecting"
-                        : "Disconnected";
+                row.EnabledCheck.IsEnabled = allowCheckToggle;
+                row.EnabledCheck.Opacity = connected ? 1.0 : 0.55;
+
+                if (disconnected)
+                {
+                    row.EnabledCheck.ToolTip = "Disconnected";
+                    row.EnabledCheck.Foreground = DotDisconnectedBrush();
+                }
+                else if (warning)
+                {
+                    row.EnabledCheck.ToolTip = "Connecting or reconnecting";
+                    row.EnabledCheck.Foreground = DotWarningBrush();
+                }
+                else if (hasOpenPosition)
+                {
+                    row.EnabledCheck.ToolTip = isArmed
+                        ? "Enabled because an open position exists"
+                        : "Enabled because an open position exists";
+                    row.EnabledCheck.Foreground = isArmed ? DotConnectedOnBrush() : DotWarningBrush();
+                }
                 else if (isChecked && !isArmed)
+                {
                     row.EnabledCheck.ToolTip = "Selected but disarmed";
-                else if (isChecked && isArmed)
+                    row.EnabledCheck.Foreground = DotWarningBrush();
+                }
+                else if (isChecked)
+                {
                     row.EnabledCheck.ToolTip = "Selected and armed";
+                    row.EnabledCheck.Foreground = DotConnectedOnBrush();
+                }
                 else
+                {
                     row.EnabledCheck.ToolTip = "Click to enable follower";
+                    row.EnabledCheck.Foreground = DotOffBrush();
+                }
             }
 
-            var allowEdits = allowCheck && isChecked;
+            var allowEdits = connected && (isChecked || hasOpenPosition);
 
             if (row.QtyOverrideBox != null)
                 row.QtyOverrideBox.IsEnabled = allowEdits;
@@ -576,6 +645,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (row.AtmOverrideBox != null)
                 row.AtmOverrideBox.IsEnabled = allowEdits;
         }
+        
         
         private void RenderFollowerRowsState()
         {

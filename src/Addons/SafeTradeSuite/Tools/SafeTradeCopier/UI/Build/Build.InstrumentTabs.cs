@@ -22,9 +22,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             Grid.SetRow(bottom, 3);
             root.Children.Add(bottom);
-
-         
-            ApplyStatusBoxVisibility();
         }
         
         private Border BuildInstrumentTabsWrapper()

@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var masterProfitLbl = new TextBlock
             {
-                Text = "Master max daily profit:",
+                Text = "Master max daily profit",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var masterLossLbl = new TextBlock
             {
-                Text = "Master max daily loss:",
+                Text = "Master max daily loss",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 8, 0)
             };

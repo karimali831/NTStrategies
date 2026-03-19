@@ -15,7 +15,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private Window _window;
         private Dispatcher _uiDispatcher;
-        private SafeCopierEngine _engine;
+        private static SafeCopierEngine _engine;
         private ComboBox _masterBox;
         private ComboBox _instrumentSelector;
         private StackPanel _followersPanel;
@@ -44,6 +44,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _window.WindowState = WindowState.Normal;
 
                     _window.Activate();
+                    if (Application.Current != null)
+                    {
+                        Application.Current.DispatcherUnhandledException += (s, e) =>
+                        {
+                            LogUnhandled("Application.DispatcherUnhandledException", e.Exception);
+                        };
+                    }
+
+                    if (_window?.Dispatcher != null)
+                    {
+                        _window.Dispatcher.UnhandledException += (s, e) =>
+                        {
+                            LogUnhandled("Window.Dispatcher.UnhandledException", e.Exception);
+                        };
+                    }
+
+                    AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                    {
+                        LogUnhandled("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject as Exception);
+                    };
                     return;
                 }
 
@@ -56,7 +76,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         Title = "Safe Trade Copier (V2.1)",
                         Width = 850,
-                        Height = 730,
+                        Height = 720,
                         ResizeMode = ResizeMode.CanResize,
                         SizeToContent = SizeToContent.Manual,
                         Background = WindowBackgroundBrush(),
@@ -65,6 +85,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     };
 
                     _uiDispatcher = _window.Dispatcher;
+
+                    _window.Dispatcher.UnhandledException += (s, e) =>
+                    {
+                        LogUnhandled("Dispatcher.UnhandledException", e.Exception);
+                    };
+
+                    AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                    {
+                        LogUnhandled("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject as Exception);
+                    };
 
                     _window.Closing += OnWindowClosing;
                     _window.Closed += OnWindowClosed;

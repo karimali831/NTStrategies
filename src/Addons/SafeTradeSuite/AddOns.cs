@@ -58,6 +58,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 
                         await Task.Delay(100);
                     }
+                    
 
                     SafeTradeSuiteRuntime.PrintLog($"AddOns[{_instanceId}] Failed to initialize menu.");
                 }, DispatcherPriority.Loaded);
@@ -87,6 +88,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
             });
 
             _menuManager.HookToolsMenu(toolsRoot, nodes);
+            
             return true;
         }
     }

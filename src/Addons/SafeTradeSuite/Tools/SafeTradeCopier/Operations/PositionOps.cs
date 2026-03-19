@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -93,44 +94,148 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FlattenAllSelected(SafeCopierEngine eng)
         {
-            if (eng == null)
-                return;
-
-            if (!(_masterBox?.SelectedItem is Account master))
+            try
             {
-                eng.Log("Select a master account first.");
-                return;
+                if (eng == null)
+                    return;
+
+                if (!(_masterBox?.SelectedItem is Account master))
+                {
+                    eng.Log("Select a master account first.");
+                    return;
+                }
+
+                var instr = GetInstrument();
+                if (instr == null)
+                {
+                    eng.Log("Invalid instrument.");
+                    return;
+                }
+
+                eng.Log($"Flatten All clicked. Instr={instr.FullName}");
+
+                var anySubmitted = false;
+
+                var masterHadOpenPosition = HasOpenInstrumentPosition(master, instr);
+                if (masterHadOpenPosition)
+                {
+                    if (_masterPnlBar != null)
+                        _masterPnlBar.Tag = "ORDER_FILLED";
+
+                    eng.EnsureFlatInstrument(master, instr);
+                    anySubmitted = true;
+                }
+                else
+                {
+                    ClearBarOutcome(_masterPnlBarStatusText, _masterPnlBar);
+                }
+
+                foreach (var r in _followerRows)
+                {
+                    if (r?.Account == null)
+                        continue;
+
+                    var followerHadOpenPosition = HasOpenInstrumentPosition(r.Account, instr);
+                    if (!followerHadOpenPosition)
+                    {
+                        ClearBarOutcome(r.PnlBarStatusText, r.PnlBar);
+                        continue;
+                    }
+
+                    if (r.PnlBar != null)
+                        r.PnlBar.Tag = "ORDER_FILLED";
+
+                    eng.EnsureFlatInstrument(r.Account, instr);
+                    anySubmitted = true;
+                }
+
+                eng.Log(anySubmitted
+                    ? "Flatten All submitted (instrument-only)."
+                    : "Flatten All skipped. No open positions found for selected accounts on this instrument.");
+            }
+            catch (Exception ex)
+            {
+                LogUnhandled("FlattenAllSelected", ex);
+                throw;
+            }
+        }
+        
+        private static bool HasOpenInstrumentPosition(Account acc, Instrument instr)
+        {
+            if (acc == null || instr == null)
+                return false;
+
+            foreach (var pos in acc.Positions)
+            {
+                if (pos?.Instrument == null)
+                    continue;
+
+                if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    continue;
+
+                var qty = Math.Abs((int)pos.Quantity);
+                if (qty > 0)
+                    return true;
             }
 
+            return false;
+        }
+
+        private bool HasAnyOpenPositionOnActiveInstrument()
+        {
             var instr = GetInstrument();
             if (instr == null)
-            {
-                eng.Log("Invalid instrument.");
+                return false;
+
+            if (_masterBox?.SelectedItem is Account master && HasOpenInstrumentPosition(master, instr))
+                return true;
+
+            return _followerRows.Any(r =>
+                r?.Account != null &&
+                HasOpenInstrumentPosition(r.Account, instr));
+        }
+
+        private void EnsureEnabledFollowersAndAutoRearmForOpenPositions()
+        {
+            ForceEnableFollowersWithOpenPositions();
+
+            ApplyConfigFromUi();
+            RenderFollowerRowsState();
+            RefreshFollowerBulkActionButtons();
+            RefreshCopierStatusPanel();
+            RenderFlattenAllButtonState();
+            SavePersistentUiState();
+
+            if (!HasAnyOpenPositionOnActiveInstrument())
                 return;
-            }
 
-            eng.Log($"Flatten selected instrument clicked -> instr={instr.FullName}");
+            if (_engine == null)
+                return;
 
-            if (_masterPnlBar != null)
-                _masterPnlBar.Tag = "ORDER_FILLED";
+            if (_engine.CopyEnabled && _engine.Armed)
+                return;
 
-            eng.EnsureFlatInstrument(master, instr);
+            _userManuallyDisarmed = false;
+            _autoRearmPending = false;
+            RequestCopyEnabled("Auto re-armed because open positions exist on the active instrument.");
 
-            foreach (var r in _followerRows)
+            SavePersistentUiState();
+        }
+        
+        private void ForceEnableFollowersWithOpenPositions()
+        {
+            var instr = GetInstrument();
+            if (instr == null)
+                return;
+
+            foreach (var row in _followerRows)
             {
-                if (r?.Account == null)
+                if (row?.Account == null || row.EnabledCheck == null)
                     continue;
 
-                if (r.EnabledCheck?.IsChecked != true)
-                    continue;
-
-                if (r.PnlBar != null)
-                    r.PnlBar.Tag = "ORDER_FILLED";
-
-                eng.EnsureFlatInstrument(r.Account, instr);
+                if (HasOpenInstrumentPosition(row.Account, instr))
+                    row.EnabledCheck.IsChecked = true;
             }
-
-            eng.Log("Flatten selected instrument submitted.");
         }
         
         private bool CanFlatten(Account account, string instrFull)

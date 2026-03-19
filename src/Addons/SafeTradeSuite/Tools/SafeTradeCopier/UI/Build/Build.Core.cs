@@ -34,7 +34,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             try
             {
                 var accounts = GetSelectableAccounts();
+                
                 SubscribeUiAccountEvents(accounts);
+                LoadPersistentUiState();
                 
                 var root = new Grid
                 {
@@ -52,33 +54,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetRow(mainMenuTabs, 0);
                 root.Children.Add(mainMenuTabs);
                 
-                // ---------------- Master + Copier Status ----------------
+                // ---------------- Master + Instrument/Status ----------------
                 var topPanelsGrid = new Grid
                 {
-                    Margin = new Thickness(0, 0, 0, 0)
+                    Margin = new Thickness(0)
                 };
 
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
                 {
                     Width = new GridLength(13, GridUnitType.Star)
                 });
-
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
                 {
                     Width = new GridLength(12)
                 });
-
                 topPanelsGrid.ColumnDefinitions.Add(new ColumnDefinition
                 {
                     Width = new GridLength(7, GridUnitType.Star)
                 });
 
+                topPanelsGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                topPanelsGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
                 Grid.SetRow(topPanelsGrid, 1);
                 root.Children.Add(topPanelsGrid);
 
                 RenderMasterPanel(eng, topPanelsGrid);
+                RenderInstrument(topPanelsGrid);
                 RenderCopierStatusPanel(topPanelsGrid);
-      
+                
                 // -- Tab Menu Panels --
                 _statusBox = RenderStatusBox();
                 _mainContentHost = new ContentControl
@@ -103,8 +107,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     display.InvokeAsync(() =>
                     {
-                        _statusBox.AppendText($"{DateTime.Now:HH:mm:ss}  {msg}\n");
-                        _statusBox.ScrollToEnd();
+                        var line = $"{DateTime.Now:HH:mm:ss}  {msg}\n";
+
+                        _statusBox?.AppendText(line);
+                        _statusBox?.ScrollToEnd();
+
+                        _diagWindowTextBox?.AppendText(line);
+                        _diagWindowTextBox?.ScrollToEnd();
                     });
                 };
 

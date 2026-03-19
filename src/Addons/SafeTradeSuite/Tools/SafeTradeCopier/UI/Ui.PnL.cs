@@ -74,8 +74,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (row.PnlText != null)
                         SetPnlText(row.PnlText, "", r, u, shortened: true);
-
-                    RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
                     
                     TotalRealizedPnl = totalR;
                     TotalUnrealizedPnl = totalU;

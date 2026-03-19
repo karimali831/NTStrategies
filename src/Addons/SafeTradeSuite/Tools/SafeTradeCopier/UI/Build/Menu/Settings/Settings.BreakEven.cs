@@ -33,7 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var modeLbl = new TextBlock
             {
-                Text = "Break-even mode:",
+                Text = "Mode",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0,0,8,0),
                 Foreground = WindowForegroundBrush()
@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var minProfitLbl = new TextBlock
             {
-                Text = "Min favour points:",
+                Text = "Min favour points",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 IsEnabled = !BreakEvenDisabled
@@ -111,7 +111,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var plusPointsLbl = new TextBlock
             {
-                Text = "Stop beyond entry points:",
+                Text = "Stop beyond entry points",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };

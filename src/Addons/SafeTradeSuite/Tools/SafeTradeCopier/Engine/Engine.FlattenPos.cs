@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
@@ -10,6 +11,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            public partial class SafeTradeCopierTool
+            {
+                private static string FlattenException(Exception ex)
+                {
+                    if (ex == null)
+                        return "";
+
+                    var sb = new StringBuilder();
+                    var depth = 0;
+                    var cur = ex;
+
+                    while (cur != null)
+                    {
+                        if (depth > 0)
+                            sb.AppendLine().AppendLine("---- INNER EXCEPTION ----");
+
+                        sb.AppendLine(cur.GetType().FullName);
+                        sb.AppendLine(cur.Message);
+                        sb.AppendLine(cur.StackTrace);
+
+                        cur = cur.InnerException;
+                        depth++;
+                    }
+
+                    return sb.ToString();
+                }
+            }
+            
             public void EnsureFlatInstrument(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
