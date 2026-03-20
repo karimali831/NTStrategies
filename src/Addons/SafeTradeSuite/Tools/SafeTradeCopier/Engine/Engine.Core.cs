@@ -30,7 +30,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private readonly ConcurrentQueue<long> _copiedTicks = new ConcurrentQueue<long>();
 
             // Safety defaults (not exposed to UI)
-            private const int MaxAbsQtyPerFollower = 2;
+            private const int MaxAbsQtyPerFollower = 99;
             private const int MaxCopiesPer2Sec = 20;
             private const int StaggerMsPerFollower = 125;
 

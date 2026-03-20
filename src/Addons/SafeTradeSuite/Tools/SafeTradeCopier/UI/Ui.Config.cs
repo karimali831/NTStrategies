@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 (_instrumentSelector?.SelectedItem as string) ??
                 _instrumentSelector?.Text ??
                 "");
-            var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+            var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
             var masterAtm = (_masterAtmBox?.SelectedItem as string) ?? _masterAtmBox?.Text ?? "None";
             
             if (string.IsNullOrWhiteSpace(masterAtm))

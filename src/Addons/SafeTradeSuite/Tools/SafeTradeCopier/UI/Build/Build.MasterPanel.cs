@@ -219,7 +219,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 // update follower quantity after master qty changes
-                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
                 
                 foreach (var r in _followerRows)
                 {

@@ -67,7 +67,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                 }
 
-                var qty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                var qty = ParseQtyOrDefault(_masterQtyBox?.Text);
+                
+                if (qty < 1)
+                {
+                    eng.Log("Invalid order quantity. Must be >= 1.");
+                    return;
+                }
+                
                 var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
                 var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
                 var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");

@@ -126,9 +126,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     var qty = ResolveFollowerQty(f, masterExecQty);
                     if (qty <= 0 || qty > MaxAbsQtyPerFollower)
+
+                        if (qty < 1)
+                        {
+                            // Safety: cap follower qty by max-per-follower
+                            qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
+                            Log($"Copy skipped -> {f.Name}: invalid follower qty ({qty}). Must be >= 1.");
+                            continue;
+                        }
+
+                    if (qty > MaxAbsQtyPerFollower)
                     {
-                        // Safety: cap follower qty by max-per-follower
-                        qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
+                        Log($"Copy skipped -> {f.Name}: follower qty ({qty}) exceeds max allowed ({MaxAbsQtyPerFollower}).");
+                        continue;
                     }
 
                     var bracketMode = ResolveFollowerAtm(f);

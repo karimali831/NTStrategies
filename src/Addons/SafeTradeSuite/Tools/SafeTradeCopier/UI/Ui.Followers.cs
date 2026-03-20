@@ -210,7 +210,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Foreground = WindowForegroundBrush()
                 };
 
-                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
 
                 var qtyBox = CreateFormTextBox(masterQty.ToString(), width: 40);
                 qtyBox.ToolTip = "Qty override (blank = inherit master)";

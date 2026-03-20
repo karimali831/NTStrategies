@@ -422,7 +422,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 InstrumentName = normalized,
                 MasterAccount = _masterBox?.SelectedItem as Account,
-                MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1),
+                MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text),
                 MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None"
             };
 
@@ -503,7 +503,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
-                _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text, 1);
+                _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
                 _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
 
                 _activeInstrumentSession.FollowersEnabled.Clear();
