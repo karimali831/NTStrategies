@@ -9,7 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         internal sealed class ReadyStatus
         {
             public string PrimaryReason { get; set; }
-            public Brush PrimaryReasonColour { get; set; }
+            public Brush PrimaryReasonColor { get; set; }
             public string SecondaryReason { get; set; }
             public Brush PrimaryDotColour { get; set; }
             public Brush SecondaryDotColour { get; set; }
@@ -103,9 +103,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _copierReadyDot.Background = reason.PrimaryDotColour ?? DotOffBrush();
             _copierReadyText.Text = reason.PrimaryReason ?? string.Empty;
-            
-            if (reason.PrimaryReasonColour != null)
-                _copierReadyText.Foreground = reason.PrimaryReasonColour;
+
+            if (!_simOnlyMode)
+            {
+                if (ArmedWithLiveFollowers())
+                {
+                    _copierReadyText.Text = "Live Ready";
+                    _copierReadyText.Foreground = DotConnectedOnBrush();
+                }
+                else
+                {
+                    _copierReadyText.Text = "Ready";
+                    _copierReadyText.Foreground = PrimaryTextBrush();
+                }
+            }
 
             if (_copierReadySecondaryDot != null && _copierReadySecondaryText != null)
             {
@@ -117,6 +128,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _copierReadySecondaryDot.Background = reason.SecondaryDotColour ?? DotOffBrush();
                 _copierReadySecondaryText.Text = reason.SecondaryReason ?? string.Empty;
             }
+        }
+
+        public bool Armed()
+        {
+            return _engine != null && _engine.CopyEnabled && _engine.Armed;
+        }
+        
+        public bool ArmedWithLiveFollowers()
+        {
+            return Armed() && HasAnyCheckedLiveFollowersHealthy();
         }
         
         private ReadyStatus GetReadyReason()
@@ -148,10 +169,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             readyStatus.PrimaryDotColour = connectedColor;
-            var armed = _engine != null && _engine.CopyEnabled && _engine.Armed;
-
-            var armedTxt = armed ? CountCheckedFollowers() == 1 ? 
-                "Follower armed" : "Followers armed" : "Followers disarmed";
+            var armedTxt = $"Follower{(CountCheckedFollowers() == 1 ? "" : "s")} {(Armed() ? "armed" : "disarmed")}";
             
             if (_simOnlyMode)
             {
@@ -165,12 +183,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 readyStatus.SecondaryReason = armedTxt;
-                readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
+                readyStatus.SecondaryDotColour = Armed() ? connectedColor : warningColor;
                 return readyStatus;
             }
             
-            readyStatus.PrimaryReason = "Ready";
-
+            readyStatus.PrimaryReason = "Master Ready";
+            
             if (!HasAnyCheckedLiveFollowersHealthy())
             {
                 readyStatus.SecondaryReason = "No live followers selected";
@@ -178,13 +196,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return readyStatus;
             }
 
-            readyStatus.PrimaryReason = "Live Ready";
-            
-            if (armed)
-                readyStatus.PrimaryReasonColour = connectedColor;
-            
             readyStatus.SecondaryReason = armedTxt;
-            readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
+            readyStatus.SecondaryDotColour = Armed() ? connectedColor : warningColor;
+            
             return readyStatus;
         }
     }

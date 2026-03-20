@@ -14,7 +14,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnToggleSimFollowers;
         private Button _btnToggleLiveFollowers;
         private StackPanel _followersBulkActionsPanel;
-        private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
+        private static readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
         
         private void RenderFollowerPanel(SafeCopierEngine eng, Grid root)
         {
