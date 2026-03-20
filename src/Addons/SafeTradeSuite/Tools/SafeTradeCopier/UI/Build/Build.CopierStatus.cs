@@ -169,7 +169,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             readyStatus.PrimaryDotColour = connectedColor;
-            var armedTxt = $"Follower{(CountCheckedFollowers() == 1 ? "" : "s")} {(Armed() ? "armed" : "disarmed")}";
+            var armedTxt = $"Follower{(CountCheckedFollowers() == 1 ? "" : "s")} {(Armed() ? "Armed" : "Disarmed")}";
             
             if (_simOnlyMode)
             {

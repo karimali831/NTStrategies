@@ -184,10 +184,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // ---------------- UI -> Engine wiring ----------------
                 RenderButtons(copyOn: eng.CopyEnabled);
                 RenderFlattenAllButtonState();
-                EnsureInitialInstrumentSession();
-                RefreshInstrumentSelectorItems();
-                RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
                 RefreshCopierStatusPanel();
                 
                 _topPanelsGrid = topPanelsGrid;

@@ -13,7 +13,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
             if (_copier == null)
                 _copier = new SafeTradeCopierTool();
             
-            
             return _copier;
         }
 

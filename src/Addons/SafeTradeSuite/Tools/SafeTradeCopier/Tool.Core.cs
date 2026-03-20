@@ -108,8 +108,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RefreshInstrumentSelectorItems();
                         RefreshInstrumentTabs();
                         LoadActiveSessionToUi();
-                        RenderFlattenAllButtonState();
-                    }, DispatcherPriority.Loaded);
+
+                        Rehydrate();
+
+                    }, DispatcherPriority.ApplicationIdle);
                 }
                 catch (Exception ex)
                 {
@@ -121,6 +123,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     throw;
                 }
             }
+        }
+
+        private void Rehydrate()
+        {
+            _engine?.RehydrateActiveBracketsFromLiveOrders();
+            EnsureEnabledFollowersAndAutoRearmForOpenPositions();
+            RenderFollowerRowsState();
+            RefreshCopierStatusPanel();
+            RenderFlattenAllButtonState();
+            RenderBreakEvenEnablementUi();
+            RenderPnlUi();
         }
         
         private void TearDownEngine()

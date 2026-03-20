@@ -188,6 +188,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
                 _activeInstrumentSession = _instrumentSessions[0];
+
+            _engine?.RehydrateActiveBracketsFromLiveOrders();
         }
         
         private void RefreshInstrumentSelectorItems()
