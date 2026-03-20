@@ -135,6 +135,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Any(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
         }
         
+        private int CountCheckedFollowers()
+        {
+            return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
+        }
+        
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)
         {
             if (a == null || b == null) return false;

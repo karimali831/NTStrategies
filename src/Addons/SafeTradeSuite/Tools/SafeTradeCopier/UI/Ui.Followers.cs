@@ -196,8 +196,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Content = null,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Tag = acc
+                    VerticalAlignment = VerticalAlignment.Center
                 };
 
                 ApplyCircularCheckBoxStyle(enabled);
@@ -502,10 +501,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             border.SetValue(FrameworkElement.HeightProperty, 14.0);
             border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
             border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-            border.SetValue(Border.BorderBrushProperty, DotBorderBrush());
             border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
             border.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             border.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.ForegroundProperty));
 
             var check = new FrameworkElementFactory(typeof(TextBlock))
             {
@@ -587,14 +587,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var warning = connState == UiConnectionState.Warning;
             var disconnected = connState == UiConnectionState.Disconnected;
 
-            var isChecked = row.EnabledCheck?.IsChecked == true;
-            var isArmed = _engine?.CopyEnabled == true;
-            
             var instr = GetInstrument();
             var hasOpenPosition = HasOpenInstrumentPosition(row.Account, instr);
 
             if (hasOpenPosition && row.EnabledCheck != null && row.EnabledCheck.IsChecked != true)
                 row.EnabledCheck.IsChecked = true;
+
+            var isChecked = row.EnabledCheck?.IsChecked == true;
+            var isArmed = _engine?.CopyEnabled == true;
 
             if (row.EnabledCheck != null)
             {
@@ -606,34 +606,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (disconnected)
                 {
                     row.EnabledCheck.ToolTip = "Disconnected";
-                    row.EnabledCheck.Foreground = DotDisconnectedBrush();
+                    row.EnabledCheck.Tag = FollowerCheckVisualState.Disconnected;
                 }
                 else if (warning)
                 {
                     row.EnabledCheck.ToolTip = "Connecting or reconnecting";
-                    row.EnabledCheck.Foreground = DotWarningBrush();
+                    row.EnabledCheck.Tag = FollowerCheckVisualState.Warning;
                 }
                 else if (hasOpenPosition)
                 {
                     row.EnabledCheck.ToolTip = isArmed
                         ? "Enabled because an open position exists"
-                        : "Enabled because an open position exists";
-                    row.EnabledCheck.Foreground = isArmed ? DotConnectedOnBrush() : DotWarningBrush();
+                        : "Enabled because an open position exists while copier is disarmed";
+
+                    row.EnabledCheck.Tag = isArmed
+                        ? FollowerCheckVisualState.Armed
+                        : FollowerCheckVisualState.Warning;
                 }
                 else if (isChecked && !isArmed)
                 {
                     row.EnabledCheck.ToolTip = "Selected but disarmed";
-                    row.EnabledCheck.Foreground = DotWarningBrush();
+                    row.EnabledCheck.Tag = FollowerCheckVisualState.Warning;
                 }
                 else if (isChecked)
                 {
                     row.EnabledCheck.ToolTip = "Selected and armed";
-                    row.EnabledCheck.Foreground = DotConnectedOnBrush();
+                    row.EnabledCheck.Tag = FollowerCheckVisualState.Armed;
                 }
                 else
                 {
                     row.EnabledCheck.ToolTip = "Click to enable follower";
-                    row.EnabledCheck.Foreground = DotOffBrush();
+                    row.EnabledCheck.Tag = FollowerCheckVisualState.Off;
                 }
             }
 
@@ -645,7 +648,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (row.AtmOverrideBox != null)
                 row.AtmOverrideBox.IsEnabled = allowEdits;
         }
-        
         
         private void RenderFollowerRowsState()
         {

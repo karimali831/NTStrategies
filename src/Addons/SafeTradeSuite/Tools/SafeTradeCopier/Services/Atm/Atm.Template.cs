@@ -33,15 +33,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 StringComparison.OrdinalIgnoreCase);
         }
 
-         private static void LoadAtmTemplatesInto(ComboBox combo, bool includeInherit)
+        private static void LoadAtmTemplatesInto(ComboBox combo, bool includeInherit)
         {
             if (combo == null)
                 return;
-
-            var existingSelection =
-                NormalizeAtm(combo.SelectedItem as string) != "None"
-                    ? NormalizeAtm(combo.SelectedItem as string)
-                    : NormalizeAtm(combo.Text);
 
             var items = new List<string>();
 
@@ -88,24 +83,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             combo.ItemsSource = finalItems;
 
-            if (!string.IsNullOrWhiteSpace(existingSelection) &&
-                finalItems.Any(x => string.Equals(x, existingSelection, StringComparison.OrdinalIgnoreCase)))
-            {
-                combo.SelectedItem = finalItems.First(x =>
-                    string.Equals(x, existingSelection, StringComparison.OrdinalIgnoreCase));
-            }
-            else if (includeInherit && finalItems.Contains(InheritMasterBracketOption))
-            {
+            if (includeInherit && finalItems.Contains(InheritMasterBracketOption))
                 combo.SelectedItem = InheritMasterBracketOption;
-            }
             else if (finalItems.Contains("None"))
-            {
                 combo.SelectedItem = "None";
-            }
             else
-            {
                 combo.SelectedItem = finalItems.FirstOrDefault();
-            }
         }
     }
 }

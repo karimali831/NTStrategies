@@ -9,6 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         internal sealed class ReadyStatus
         {
             public string PrimaryReason { get; set; }
+            public Brush PrimaryReasonColour { get; set; }
             public string SecondaryReason { get; set; }
             public Brush PrimaryDotColour { get; set; }
             public Brush SecondaryDotColour { get; set; }
@@ -102,6 +103,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _copierReadyDot.Background = reason.PrimaryDotColour ?? DotOffBrush();
             _copierReadyText.Text = reason.PrimaryReason ?? string.Empty;
+            
+            if (reason.PrimaryReasonColour != null)
+                _copierReadyText.Foreground = reason.PrimaryReasonColour;
 
             if (_copierReadySecondaryDot != null && _copierReadySecondaryText != null)
             {
@@ -145,6 +149,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             readyStatus.PrimaryDotColour = connectedColor;
             var armed = _engine != null && _engine.CopyEnabled && _engine.Armed;
+
+            var armedTxt = armed ? CountCheckedFollowers() == 1 ? 
+                "Follower armed" : "Followers armed" : "Followers disarmed";
             
             if (_simOnlyMode)
             {
@@ -157,7 +164,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return readyStatus;
                 }
 
-                readyStatus.SecondaryReason = armed ? "Copier armed" : "Copier disarmed";
+                readyStatus.SecondaryReason = armedTxt;
                 readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
                 return readyStatus;
             }
@@ -170,8 +177,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }
+
+            readyStatus.PrimaryReason = "Live Ready";
             
-            readyStatus.SecondaryReason = armed ? "Copier armed" : "Copier disarmed";
+            if (armed)
+                readyStatus.PrimaryReasonColour = connectedColor;
+            
+            readyStatus.SecondaryReason = armedTxt;
             readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
             return readyStatus;
         }
