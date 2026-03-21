@@ -125,15 +125,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
 
                     var qty = ResolveFollowerQty(f, masterExecQty);
-                    if (qty <= 0 || qty > MaxAbsQtyPerFollower)
-
-                        if (qty < 1)
-                        {
-                            // Safety: cap follower qty by max-per-follower
-                            qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
-                            Log($"Copy skipped -> {f.Name}: invalid follower qty ({qty}). Must be >= 1.");
-                            continue;
-                        }
+                    if (qty < 1)
+                    {
+                        // Safety: cap follower qty by max-per-follower
+                        qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
+                        Log($"Copy skipped -> {f.Name}: invalid follower qty ({qty}). Must be >= 1.");
+                        continue;
+                    }
 
                     if (qty > MaxAbsQtyPerFollower)
                     {
@@ -467,17 +465,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            
             private int ResolveFollowerQty(Account follower, int masterExecQty)
             {
-                if (follower == null) return masterExecQty;
+                if (follower == null)
+                    return masterExecQty;
 
                 if (_configuredFollowerQtyOverrides != null &&
-                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q) &&
-                    q > 0)
+                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q))
+                {
                     return q;
+                }
 
-                // inherit master execution qty (most consistent for strategy/manual)
                 return masterExecQty;
             }
         }

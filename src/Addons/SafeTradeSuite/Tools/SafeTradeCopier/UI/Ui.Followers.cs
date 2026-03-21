@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using NinjaTrader.Cbi;
 
@@ -11,8 +10,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static Style _circularCheckBoxStyle;
-        
         private void RebuildFollowersAndRewire(SafeCopierEngine eng, List<Account> accounts)
         {
             SafeTradeSuiteRuntime.PrintLog(
@@ -62,7 +59,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     continue;
 
                 if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
-                    r.QtyOverrideBox.Text = qtyText;
+                    r.QtyOverrideBox.Text =  int.Parse(qtyText) > 99 ? "99" : qtyText;
 
                 if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
                     r.AtmOverrideBox != null &&
@@ -191,15 +188,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 
                 FollowerHeaderColumnDefinitions(rowGrid);
-              
-                var enabled = new CheckBox
-                {
-                    Content = null,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
 
-                ApplyCircularCheckBoxStyle(enabled);
+                var enabled = CreateCircularCheckBox();
                 enabled.ToolTip = "Enable follower";
                 
                 var accountText = new TextBlock
@@ -257,13 +247,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var flatten = CreateFormButton(
                     text: "❌",
                     tone: FormButtonTone.Danger,
-                    style: FormButtonStyle.Outline);
+                    style: FormButtonStyle.Outline,
+                    height: SmallButtonHeight());
                 RenderFlattenButtonState(flatten, enabled: false);
                 
                 var freeTrade = CreateFormButton(
-                    text: "✓",
+                    text: "✅",
                     tone: FormButtonTone.Primary,
-                    style: FormButtonStyle.Outline);
+                    style: FormButtonStyle.Outline,
+                    height: SmallButtonHeight());
                 RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔");
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
@@ -407,7 +399,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // On
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) }); // Override ATM
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) }); // Bracket
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // PnL
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // BE
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Flatten
@@ -456,125 +448,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             Grid.SetColumn(tb, col);
             g.Children.Add(tb);
-        }
-        
-        private static void ApplyCircularCheckBoxStyle(CheckBox cb)
-        {
-            if (cb == null) return;
-
-            if (_circularCheckBoxStyle == null)
-                _circularCheckBoxStyle = BuildCircularCheckBoxStyle();
-
-            cb.Style = _circularCheckBoxStyle;
-        }
-        
-        private static Style BuildCircularCheckBoxStyle()
-        {
-            var style = new Style(typeof(CheckBox));
-
-            style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
-            style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 18.0));
-            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 18.0));
-            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
-            style.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0)));
-            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
-            style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-            style.Setters.Add(new Setter(Control.ForegroundProperty, DotOffBrush()));
-            style.Setters.Add(new Setter(FrameworkElement.TagProperty, FollowerCheckVisualState.Off));
-
-            var template = new ControlTemplate(typeof(CheckBox));
-
-            var root = new FrameworkElementFactory(typeof(Grid))
-            {
-                Name = "Root"
-            };
-            root.SetValue(FrameworkElement.WidthProperty, 18.0);
-            root.SetValue(FrameworkElement.HeightProperty, 18.0);
-            root.SetValue(Panel.BackgroundProperty, Brushes.Transparent);
-
-            var border = new FrameworkElementFactory(typeof(Border))
-            {
-                Name = "Dot"
-            };
-            border.SetValue(FrameworkElement.WidthProperty, 14.0);
-            border.SetValue(FrameworkElement.HeightProperty, 14.0);
-            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
-            border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-            border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-            border.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            border.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-            border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
-            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.ForegroundProperty));
-
-            var check = new FrameworkElementFactory(typeof(TextBlock))
-            {
-                Name = "CheckGlyph"
-            };
-            check.SetValue(TextBlock.TextProperty, "✓");
-            check.SetValue(TextBlock.FontSizeProperty, 11.0);
-            check.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
-            check.SetValue(TextBlock.ForegroundProperty, Brushes.White);
-            check.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
-            check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            check.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-
-            root.AppendChild(border);
-            root.AppendChild(check);
-
-            template.VisualTree = root;
-
-            var offTrigger = new Trigger
-            {
-                Property = FrameworkElement.TagProperty,
-                Value = FollowerCheckVisualState.Off
-            };
-            offTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Brushes.Transparent, "Dot"));
-            offTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotBorderBrush(), "Dot"));
-            offTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "CheckGlyph"));
-
-            var armedTrigger = new Trigger
-            {
-                Property = FrameworkElement.TagProperty,
-                Value = FollowerCheckVisualState.Armed
-            };
-            armedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotConnectedOnBrush(), "Dot"));
-            armedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotConnectedOnBrush(), "Dot"));
-            armedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "CheckGlyph"));
-
-            var warningTrigger = new Trigger
-            {
-                Property = FrameworkElement.TagProperty,
-                Value = FollowerCheckVisualState.Warning
-            };
-            warningTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotWarningBrush(), "Dot"));
-            warningTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotWarningBrush(), "Dot"));
-            warningTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "CheckGlyph"));
-
-            var disconnectedTrigger = new Trigger
-            {
-                Property = FrameworkElement.TagProperty,
-                Value = FollowerCheckVisualState.Disconnected
-            };
-            disconnectedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, DotDisconnectedBrush(), "Dot"));
-            disconnectedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, DotDisconnectedBrush(), "Dot"));
-            disconnectedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "CheckGlyph"));
-
-            var disabledTrigger = new Trigger
-            {
-                Property = UIElement.IsEnabledProperty,
-                Value = false
-            };
-            disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.45, "Root"));
-
-            template.Triggers.Add(offTrigger);
-            template.Triggers.Add(armedTrigger);
-            template.Triggers.Add(warningTrigger);
-            template.Triggers.Add(disconnectedTrigger);
-            template.Triggers.Add(disabledTrigger);
-
-            style.Setters.Add(new Setter(Control.TemplateProperty, template));
-            return style;
         }
         
         private void RenderFollowerRowState(FollowerRow row)

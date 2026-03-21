@@ -15,13 +15,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 4, 0, 0)
             };
 
-            // Sim  mode
-            var simMode = new CheckBox
-            {
-                Content = "Simulation Mode",
-                IsChecked = _simOnlyMode,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
+            // Sim mode
+            var simMode = CreateCheckBox(
+                text: "Simulation Mode",
+                isChecked: _simOnlyMode,
+                margin: new Thickness(0, 0, 0, 8));
 
             simMode.Checked += (s, e) =>
             {
@@ -36,12 +34,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             // Status log
-            var showStatusBox = new CheckBox
-            {
-                Content = "Show status log",
-                IsChecked = _showStatusBox,
-                Margin = new Thickness(0, 0, 0, 0)
-            };
+            var showStatusBox = CreateCheckBox(
+                text: "Show status log",
+                isChecked: _showStatusBox);
 
             showStatusBox.Checked += (s, e) =>
             {
@@ -82,7 +77,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _themeSelector.SelectionChanged += (s, e) =>
             {
-                _themeMode = (ThemeMode)_themeSelector.SelectedIndex;
+                if (_themeSelector.SelectedIndex < 0)
+                    return;
+
+                var newTheme = (ThemeMode)_themeSelector.SelectedIndex;
+                if (_themeMode == newTheme)
+                    return;
+
+                _themeMode = newTheme;
+                SavePersistentUiState();
+                ReopenWindowForThemeChange();
             };
 
             Grid.SetColumn(themeLbl, 0);

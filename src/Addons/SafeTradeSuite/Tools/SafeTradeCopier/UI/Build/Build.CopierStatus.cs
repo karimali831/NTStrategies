@@ -103,20 +103,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _copierReadyDot.Background = reason.PrimaryDotColour ?? DotOffBrush();
             _copierReadyText.Text = reason.PrimaryReason ?? string.Empty;
-
-            if (!_simOnlyMode)
-            {
-                if (ArmedWithLiveFollowers())
-                {
-                    _copierReadyText.Text = "Live Ready";
-                    _copierReadyText.Foreground = DotConnectedOnBrush();
-                }
-                else
-                {
-                    _copierReadyText.Text = "Ready";
-                    _copierReadyText.Foreground = PrimaryTextBrush();
-                }
-            }
+            _copierReadyText.Foreground = reason.PrimaryReasonColor ?? PrimaryTextBrush();
 
             if (_copierReadySecondaryDot != null && _copierReadySecondaryText != null)
             {
@@ -135,9 +122,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _engine != null && _engine.CopyEnabled && _engine.Armed;
         }
         
-        public bool ArmedWithLiveFollowers()
+        public bool ArmedWithLiveFollowersHealthy()
         {
             return Armed() && HasAnyCheckedLiveFollowersHealthy();
+        }
+        
+        public bool ArmedWithSimFollowersHealthy()
+        {
+            return Armed() && HasAnyCheckedSimFollowersHealthy();
         }
         
         private ReadyStatus GetReadyReason()
@@ -169,12 +161,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             readyStatus.PrimaryDotColour = connectedColor;
-            var armedTxt = $"Follower{(CountCheckedFollowers() == 1 ? "" : "s")} {(Armed() ? "Armed" : "Disarmed")}";
+            var armedTxt = $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} {(Armed() ? "Armed" : "Disarmed")}";
             
             if (_simOnlyMode)
             {
-                readyStatus.PrimaryReason = "Simulation Ready";
-
+                var simCopierReady = ArmedWithSimFollowersHealthy();
+                readyStatus.PrimaryReason = $"Sim {(simCopierReady ? "Copier" : "Master")} Ready";
+                
                 if (!HasAnyCheckedSimFollowersHealthy())
                 {
                     readyStatus.SecondaryReason = "No followers selected";
@@ -187,8 +180,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return readyStatus;
             }
             
-            readyStatus.PrimaryReason = "Master Ready";
-            
+            readyStatus.PrimaryReason = $"{(IsSimAccount(GetMasterAccount()) ? "Sim" : "Live")} Master Ready";
+            if (ArmedWithLiveFollowersHealthy())
+            {
+                readyStatus.PrimaryReason = "Live Copier Ready";
+                readyStatus.PrimaryReasonColor = DotConnectedOnBrush();
+            }
+
             if (!HasAnyCheckedLiveFollowersHealthy())
             {
                 readyStatus.SecondaryReason = "No live followers selected";

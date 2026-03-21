@@ -14,8 +14,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static Brush TabSelectedBackgroundBrush()
         {
             return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(32, 32, 32))
-                : Brushes.White;
+                ? new SolidColorBrush(Color.FromRgb(42, 42, 42))
+                : new SolidColorBrush(Color.FromRgb(255, 255, 255));
         }
 
         private static Brush TabBorderBrush()

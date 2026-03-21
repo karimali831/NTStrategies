@@ -100,7 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
         }
         
-        private bool HasAnyCheckedSimFollowersHealthy()
+        private static bool HasAnyCheckedSimFollowersHealthy()
         {
             var query = _followerRows
                 .Where(r => r.EnabledCheck?.IsChecked == true && IsSimAccount(r.Account))
@@ -110,7 +110,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                    query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
-        private bool HasAnyCheckedLiveFollowersHealthy()
+        private static bool HasAnyCheckedLiveFollowersHealthy()
         {
             var query = _followerRows
                 .Where(r => r.EnabledCheck?.IsChecked == true && !IsSimAccount(r.Account))
@@ -120,7 +120,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                    query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
-        private bool HasAnyCheckedFollowersHealthy()
+        private static bool HasAnyCheckedFollowersHealthy()
         {
             var query = _followerRows
                 .Where(r => r.EnabledCheck?.IsChecked == true)
@@ -135,9 +135,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Any(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
         }
         
-        private static int CountCheckedFollowers()
+        private static int CountCheckedFollowersHealthy()
         {
-            return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
+            return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true && 
+                GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)

@@ -46,29 +46,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
 
             _btnToggleAllFollowers = CreateFormButton(
                 text: "Select All",
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
-                width: 150,
                 height: SmallButtonHeight());
 
             _btnToggleSimFollowers = CreateFormButton(
                 text: "Select All Sim",
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
-                width: 120,
                 height: SmallButtonHeight());
 
             _btnToggleLiveFollowers = CreateFormButton(
                 text: "Select All Live",
                 tone: FormButtonTone.Warning,
                 style: FormButtonStyle.Outline,
-                width: 120,
-                height:SmallButtonHeight(),
+                height: SmallButtonHeight(),
                 margin: new Thickness(6, 0, 0, 0));
 
             _btnToggleAllFollowers.Click += (s, e) => ToggleFollowersSelection(x => true);
@@ -81,6 +79,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnCopyOn = CreateFormButton(
                 eng.CopyEnabled ? "Armed" : "Disarmed",
+                height: SmallButtonHeight(),
+                tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Solid);
 
             Grid.SetColumn(followersTitleText, 0);
@@ -98,17 +98,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Orientation = Orientation.Vertical
             };
-
-            var followersScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                CanContentScroll = true,
-                Height = 240,
-                Content = _followersPanel,
-                Background = SectionBackgroundBrush()
-            };
-
+            
+            var followersScroll = CreateScrollbar(_followersPanel, canContentScroll: true, height: 240);
             followersStack.Children.Add(followersScroll);
 
             var followersFieldset = BuildFieldset("Followers", followersStack);
@@ -131,12 +122,36 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RequestCopyEnabled("Manual enable requested.");
             };
         }
+        
+        private UIElement BuildFollowersContent()
+        {
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[BUILD FOLLOWERS CONTENT] activeInstr={_activeInstrumentSession?.InstrumentName} rowsBefore={_followerRows.Count}");
+            
+            var host = new Grid();
+            RenderFollowerPanel(_engine, host);
+
+            var accounts = GetSelectableAccounts();
+            BuildFollowerRows(accounts);
+
+            foreach (var r in _followerRows)
+                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+
+            EnforceSimOnlyModeUi(accounts);
+            LoadActiveSessionToUi();
+            RenderFollowerRowsState();
+            WireFollowerFlattenButtons(_engine);
+            WireFollowerFreeTradeButtons(_engine);
+            RefreshFollowerBulkActionButtons();
+
+            return host;
+        }
 
         private void RenderButtons(bool copyOn)
         {
             if (_btnCopyOn == null)
                 return;
-
+            
             _btnCopyOn.IsEnabled = true;
             _btnCopyOn.Content = copyOn ? "Armed" : "Disarmed";
             _btnCopyOn.Background = copyOn ? Brushes.DarkGreen : Brushes.Maroon;
@@ -173,7 +188,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     : "Select All Live";
         }
 
-        private bool AreAllMatchingFollowersChecked(Func<FollowerRow, bool> predicate)
+        private static bool AreAllMatchingFollowersChecked(Func<FollowerRow, bool> predicate)
         {
             var rows = _followerRows
                 .Where(r => r?.Account != null)
@@ -198,7 +213,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (rows.Count == 0)
                 return;
 
-            var shouldCheck = !rows.All(r => r.EnabledCheck.IsChecked == true);
+            var shouldCheck = rows.Any(r => r.EnabledCheck.IsChecked != true);
 
             _suppressSessionUiEvents = true;
             try

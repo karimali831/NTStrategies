@@ -52,21 +52,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Property = ComboBoxItem.IsHighlightedProperty,
                 Value = true
             };
-            highlightTrigger.Setters.Add(new Setter(Control.BackgroundProperty, HoverBackgroundBrush()));
+            highlightTrigger.Setters.Add(new Setter(Control.BackgroundProperty, ComboItemHoverBackgroundBrush()));
             highlightTrigger.Setters.Add(new Setter(Control.ForegroundProperty, WindowForegroundBrush()));
 
             var selectedTrigger = new Trigger
             {
-                Property = ComboBoxItem.IsSelectedProperty,
+                Property = ListBoxItem.IsSelectedProperty,
                 Value = true
             };
-            selectedTrigger.Setters.Add(new Setter(Control.BackgroundProperty, SelectedBackgroundBrush()));
+            selectedTrigger.Setters.Add(new Setter(Control.BackgroundProperty, ComboItemSelectedBackgroundBrush()));
             selectedTrigger.Setters.Add(new Setter(Control.ForegroundProperty, WindowForegroundBrush()));
 
             itemStyle.Triggers.Add(highlightTrigger);
             itemStyle.Triggers.Add(selectedTrigger);
 
             cb.ItemContainerStyle = itemStyle;
+
+            var style = new Style(typeof(ComboBox), cb.Style);
+            style.Setters.Add(new Setter(Control.TemplateProperty, BuildComboBoxTemplate()));
+            cb.Style = style;
         }
 
         private static void ApplyCardChrome(Border border)

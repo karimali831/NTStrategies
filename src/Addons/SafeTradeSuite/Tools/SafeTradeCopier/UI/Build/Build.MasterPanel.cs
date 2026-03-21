@@ -1,8 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -20,6 +17,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private TextBlock _masterPnlBarStatusText;
         private Button _btnFreeTradeAll;
         private Button _btnMasterFreeTrade;
+        private Button _btnFlattenMaster;
         
         private void RenderMasterPanel(SafeCopierEngine eng, Grid root)
         {
@@ -34,17 +32,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Account label
-            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Account
-            
-            var accountLbl = CreateFormLabel("Account", width: 50);
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Account combo
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Qty label
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Qty box
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bracket label
+            masterTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bracket combo
 
-            _masterBox = CreateFormComboBox(width: 150, margin: new Thickness(0, 0, 12, 0));
-            
+            var accountLbl = CreateFormLabel("Account", width: 55);
+
+            _masterBox = CreateFormComboBox(width: 140, margin: new Thickness(0, 0, 12, 0));
+
+            var qtyLbl = CreateFormLabel("Qty", width: 28);
+            _masterQtyBox = CreateFormTextBox("1", 40, margin: new Thickness(0, 0, 12, 0));
+
+            var atmLbl = CreateFormLabel("Bracket", width: 50);
+            _masterAtmBox = CreateFormComboBox(width: 160);
+
             Grid.SetColumn(accountLbl, 0);
             Grid.SetColumn(_masterBox, 1);
+            Grid.SetColumn(qtyLbl, 2);
+            Grid.SetColumn(_masterQtyBox, 3);
+            Grid.SetColumn(atmLbl, 4);
+            Grid.SetColumn(_masterAtmBox, 5);
 
             masterTopRow.Children.Add(accountLbl);
             masterTopRow.Children.Add(_masterBox);
+            masterTopRow.Children.Add(qtyLbl);
+            masterTopRow.Children.Add(_masterQtyBox);
+            masterTopRow.Children.Add(atmLbl);
+            masterTopRow.Children.Add(_masterAtmBox);
 
             var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -80,7 +96,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 style: FormButtonStyle.Outline,
                 margin: new Thickness(6, 0, 0, 0));
             ApplyButtonTheme(_btnFlattenAll, FormButtonTone.Danger, FormButtonStyle.Outline, enabled: false);
-            
+
             _btnFreeTradeAll.Click += (s, e) => FreeTradeAllSelected(eng);
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
             _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
@@ -95,28 +111,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.Children.Add(_btnSellMkt);
             orderRow.Children.Add(_btnFreeTradeAll);
             orderRow.Children.Add(_btnFlattenAll);
-
-            var qaRow = new Grid { Margin = new Thickness(0, 0, 0, 6) };
-            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });
-            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            qaRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });
-            
-            var qtyLbl = CreateFormLabel("Order Qty", width: 60);
-            var atmLbl = CreateFormLabel("Bracket", width: 50);
-
-            _masterQtyBox = CreateFormTextBox("1", 40,  margin: new Thickness(0, 0, 20, 0));
-            _masterAtmBox = CreateFormComboBox(width: 180);
-
-            Grid.SetColumn(qtyLbl, 0);
-            Grid.SetColumn(_masterQtyBox, 1);
-            Grid.SetColumn(atmLbl, 2);
-            Grid.SetColumn(_masterAtmBox, 3);
-
-            qaRow.Children.Add(qtyLbl);
-            qaRow.Children.Add(_masterQtyBox);
-            qaRow.Children.Add(atmLbl);
-            qaRow.Children.Add(_masterAtmBox);
 
             _masterPnlText = new TextBlock
             {
@@ -164,12 +158,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             masterStack.Children.Add(masterTopRow);
             masterStack.Children.Add(orderRow);
-            masterStack.Children.Add(qaRow);
+
             var masterPnlTopRow = new Grid
             {
                 Margin = new Thickness(0, 6, 0, 0)
             };
             masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _btnMasterFreeTrade = CreateFormButton(
@@ -179,13 +174,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 width: 100,
                 height: SmallButtonHeight(),
                 margin: new Thickness(8, 0, 0, 0));
-
             _btnMasterFreeTrade.Click += (s, e) => FreeTradeMasterSelected(eng);
             
+            _btnFlattenMaster = CreateFormButton(
+                text: "Flatten",
+                width: 100,
+                tone: FormButtonTone.Danger,
+                style: FormButtonStyle.Outline,
+                height: SmallButtonHeight(),
+                margin: new Thickness(8, 0, 0, 0));
+            ApplyButtonTheme(_btnFlattenMaster, FormButtonTone.Danger, FormButtonStyle.Outline, enabled: false);
+
+            _btnFlattenMaster.Click += (s, e) => FreeTradeMasterSelected(eng);
+
             Grid.SetColumn(_masterPnlText, 0);
             Grid.SetColumn(_btnMasterFreeTrade, 1);
+            Grid.SetColumn(_btnFlattenMaster, 2);
             masterPnlTopRow.Children.Add(_masterPnlText);
             masterPnlTopRow.Children.Add(_btnMasterFreeTrade);
+            masterPnlTopRow.Children.Add(_btnFlattenMaster);
 
             masterStack.Children.Add(masterPnlTopRow);
             masterStack.Children.Add(masterPnlRow);
@@ -196,7 +203,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Grid.SetRow(masterFieldset, 0);
             Grid.SetRowSpan(masterFieldset, 2);
             root.Children.Add(masterFieldset);
-            
+
             _masterBox.SelectionChanged += (s, e) =>
             {
                 if (_suppressSessionUiEvents)
@@ -218,9 +225,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_suppressSessionUiEvents)
                     return;
 
-                // update follower quantity after master qty changes
                 var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
-                
+
                 foreach (var r in _followerRows)
                 {
                     if (string.IsNullOrWhiteSpace(r.QtyOverrideBox.Text))
@@ -231,11 +237,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 SaveUiToActiveSession();
                 RebuildFollowersAndRewire(eng, latestAccounts);
-                
-                //
+
                 SaveUiToActiveSession();
                 ApplyConfigFromUi();
-                
+
                 if (eng.CopyEnabled)
                     eng.SetCopyEnabled(true);
             }
@@ -248,6 +253,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SaveUiToActiveSession();
                 ApplyAndMaybeRewire();
             };
+
             _masterAtmBox.SelectionChanged += (s, e) =>
             {
                 if (_suppressSessionUiEvents)

@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     foreach (var row in _followerRows)
                     {
                         if (row?.FreeTradeBtn != null)
-                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✓");
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, "✅");
                     }
 
                     return;

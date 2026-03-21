@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -37,8 +36,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _mainMenuTabsWrapper = new Border
             {
                 Background = Brushes.Transparent,
+                BorderBrush = SectionBorderBrush(),
+                BorderThickness = new Thickness(0, 0, 0, 1),
                 Padding = new Thickness(0),
-                Margin = new Thickness(0, 0, 0, 8),
+                Margin = new Thickness(0, 0, 0, 16),
                 Child = _mainMenuTabsPanel
             };
 
@@ -94,12 +95,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var border = new Border
             {
-                Background = TabBackgroundBrush(),
-                BorderBrush = SectionBorderBrush(),
-                BorderThickness = new Thickness(1, 1, 1, 0),
-                CornerRadius = new CornerRadius(6, 6, 0, 0),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(3, 3, 0, 0),
                 Padding = new Thickness(12, 8, 12, 8),
-                Margin = new Thickness(0, 0, 6, 0),
+                Margin = new Thickness(0, 0, 12, -1),
                 Child = content,
                 Cursor = System.Windows.Input.Cursors.Hand
             };
@@ -148,11 +149,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 item.Border.Background = active
                     ? TabSelectedBackgroundBrush()
-                    : TabBackgroundBrush();
+                    : Brushes.Transparent;
 
                 item.Border.BorderBrush = active
                     ? TabSelectedBorderBrush()
-                    : SectionBorderBrush();
+                    : Brushes.Transparent;
+
+                item.Border.BorderThickness = active
+                    ? new Thickness(1, 1, 1, 0)
+                    : new Thickness(0);
+
+                item.Border.CornerRadius = new CornerRadius(3, 3, 0, 0);
+                item.Border.Margin = new Thickness(0, 0, 12, -1);
 
                 item.Text.Foreground = active
                     ? WindowForegroundBrush()
@@ -173,108 +181,39 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_mainContentHost == null || _topPanelsGrid == null)
                 return;
 
+            var showCopierChrome = _activeMainMenuTab == MainMenuTab.Copier;
+
+            _topPanelsGrid.Visibility = showCopierChrome
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (_instrumentTabsHost != null)
+            {
+                _instrumentTabsHost.Visibility = showCopierChrome
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
             switch (_activeMainMenuTab)
             {
                 case MainMenuTab.Copier:
-                    _topPanelsGrid.Visibility = Visibility.Visible;
                     _mainContentHost.Content = BuildFollowersContent();
                     break;
 
                 case MainMenuTab.Positions:
-                    _topPanelsGrid.Visibility = Visibility.Visible;
                     _mainContentHost.Content = BuildPositionsContent();
                     break;
 
                 case MainMenuTab.Trades:
-                    _topPanelsGrid.Visibility = Visibility.Collapsed;
                     _mainContentHost.Content = BuildTradesPlaceholder();
                     break;
 
                 case MainMenuTab.Settings:
-                    _topPanelsGrid.Visibility = Visibility.Collapsed;
                     _mainContentHost.Content = BuildSettingsContent();
                     break;
             }
         }
-
-        private UIElement BuildFollowersContent()
-        {
-            SafeTradeSuiteRuntime.PrintLog(
-                $"[BUILD FOLLOWERS CONTENT] activeInstr={_activeInstrumentSession?.InstrumentName} rowsBefore={_followerRows.Count}");
-            
-            var host = new Grid();
-            RenderFollowerPanel(_engine, host);
-
-            var accounts = GetSelectableAccounts();
-            BuildFollowerRows(accounts);
-
-            foreach (var r in _followerRows)
-                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
-
-            EnforceSimOnlyModeUi(accounts);
-            LoadActiveSessionToUi();
-            RenderFollowerRowsState();
-            WireFollowerFlattenButtons(_engine);
-            WireFollowerFreeTradeButtons(_engine);
-            RefreshFollowerBulkActionButtons();
-
-            return host;
-        }
-
-        private UIElement BuildPositionsContent()
-        {
-            var host = new Grid();
-
-            _positionsGrid = null;
-            RenderPositionsPanel(host);
-            
-            return host;
-        }
-
-        private UIElement BuildTradesPlaceholder()
-        {
-            return new Border
-            {
-                Background = SectionBackgroundBrush(),
-                BorderBrush = SectionBorderBrush(),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(12),
-                Child = new TextBlock
-                {
-                    Text = "Trades panel coming soon.",
-                    Foreground = WindowForegroundBrush()
-                }
-            };
-        }
-
-        private UIElement BuildSettingsContent()
-        {
-            var root = new StackPanel
-            {
-                Margin = new Thickness(0)
-            };
-
-            var generalFieldset = RenderGeneralFieldset();
-            var beFieldset = RenderBreakEvenFieldset();
-
-            _riskFieldsetHost = new ContentControl
-            {
-                Content = RenderRiskFieldset()
-            };
-
-            root.Children.Add(generalFieldset);
-            root.Children.Add(beFieldset);
-            root.Children.Add(_riskFieldsetHost);
-
-            return new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = root
-            };
-        }
-
+        
         private void OpenDiagWindow()
         {
             if (!_showStatusBox)

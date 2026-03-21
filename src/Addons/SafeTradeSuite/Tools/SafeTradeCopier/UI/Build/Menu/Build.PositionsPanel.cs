@@ -37,6 +37,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var positionsFieldset = BuildFieldset("Positions", stack);
             root.Children.Add(positionsFieldset);
         }
+        
+        private UIElement BuildPositionsContent()
+        {
+            var host = new Grid();
+
+            _positionsGrid = null;
+            RenderPositionsPanel(host);
+            
+            return host;
+        }
 
         private static void BuildPositionsHeaderRow(Grid g)
         {

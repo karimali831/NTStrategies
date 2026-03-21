@@ -150,14 +150,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(6, 4, 6, 4),
                     VerticalAlignment = VerticalAlignment.Center
                 };
-
-                var useMasterCheck = new CheckBox
-                {
-                    IsChecked = _followerUseMasterRisk[acc.Name],
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(6, 4, 6, 4)
-                };
+                
+                var useMasterCheck = CreateCheckBox(
+                    isChecked: _followerUseMasterRisk[acc.Name],
+                    horizontalAlignment: HorizontalAlignment.Left,
+                    margin: new Thickness(6, 4, 6, 4));
 
                 var maxProfitBox = new TextBox
                 {

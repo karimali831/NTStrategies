@@ -7,6 +7,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private UIElement _instrumentTabsHost;
+        
         private void RenderInstrumentTabs(Grid root)
         {
             var bottom = new Grid { Margin = new Thickness(0, 0, 0, 0) };
@@ -14,7 +16,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             var instrumentTabsWrapper = BuildInstrumentTabsWrapper();
-
+            _instrumentTabsHost = instrumentTabsWrapper;
+            
             Grid.SetRow(instrumentTabsWrapper, 3);
             Grid.SetColumn(instrumentTabsWrapper, 0);
 
@@ -39,6 +42,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var tabControlStyle = new Style(typeof(TabControl));
             tabControlStyle.Setters.Add(new Setter(Control.TemplateProperty, BuildFlatInstrumentTabControlTemplate()));
+            
+            var tabItemStyle = new Style(typeof(TabItem));
+            tabItemStyle.Setters.Add(new Setter(Control.TemplateProperty, BuildFlatInstrumentTabItemTemplate()));
+            tabItemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            tabItemStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+            tabItemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            tabItemStyle.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0)));
 
             _instrumentTabs = new TabControl
             {
@@ -49,11 +59,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HorizontalContentAlignment = HorizontalAlignment.Left,
                 VerticalContentAlignment = VerticalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Style = tabControlStyle
+                Style = tabControlStyle,
+                ItemContainerStyle = tabItemStyle
             };
 
             tabsHost.Child = _instrumentTabs;
             return tabsHost;
+        }
+        
+        private static ControlTemplate BuildFlatInstrumentTabItemTemplate()
+        {
+            var template = new ControlTemplate(typeof(TabItem));
+
+            var root = new FrameworkElementFactory(typeof(Border));
+            root.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            root.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
+            root.SetValue(Border.BorderThicknessProperty, new Thickness(0));
+            root.SetValue(Border.PaddingProperty, new Thickness(0));
+            root.SetValue(FrameworkElement.MarginProperty, new Thickness(0));
+            root.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+            presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+            presenter.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Stretch);
+
+            root.AppendChild(presenter);
+            template.VisualTree = root;
+
+            return template;
         }
         
         private static ControlTemplate BuildFlatInstrumentTabControlTemplate()

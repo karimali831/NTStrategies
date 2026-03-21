@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-        private bool ShouldConfirmMasterSubmitBecauseDisarmed()
+        private static bool ShouldConfirmMasterSubmitBecauseDisarmed()
         {
             if (_engine == null)
                 return false;

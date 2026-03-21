@@ -90,8 +90,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static Brush WindowBackgroundBrush()
         {
             return IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(24, 24, 24))
+                ? new SolidColorBrush(Color.FromRgb(30, 30, 30))
                 : new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                // : new SolidColorBrush(Color.FromRgb(245, 245, 245));
         }
 
         private static Brush WindowForegroundBrush()
@@ -127,6 +128,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return IsDarkTheme()
                 ? new SolidColorBrush(Color.FromRgb(160, 160, 160))
                 : new SolidColorBrush(Color.FromRgb(105, 105, 105));
+        }
+        
+        // dropdown
+        private static Brush ComboItemHoverBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(58, 58, 58))
+                : new SolidColorBrush(Color.FromRgb(235, 242, 250));
+        }
+
+        private static Brush ComboItemSelectedBackgroundBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(78, 78, 78))
+                : new SolidColorBrush(Color.FromRgb(220, 232, 245));
+        }
+
+        private static Brush ComboPopupBorderBrush()
+        {
+            return IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(78, 78, 78))
+                : new SolidColorBrush(Color.FromRgb(190, 190, 190));
         }
     }
 }

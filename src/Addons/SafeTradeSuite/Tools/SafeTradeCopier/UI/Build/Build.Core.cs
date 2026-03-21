@@ -34,9 +34,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             try
             {
                 var accounts = GetSelectableAccounts();
-                
                 SubscribeUiAccountEvents(accounts);
-                LoadPersistentUiState();
                 
                 var root = new Grid
                 {
@@ -190,12 +188,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshMainMenuTabs();
                 RefreshMainMenuContent();
                 
-                return new ScrollViewer
-                {
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                    Content = root
-                };
+                return root;
             
             }
             catch (Exception ex)

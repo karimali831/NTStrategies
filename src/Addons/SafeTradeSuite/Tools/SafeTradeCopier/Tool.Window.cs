@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
@@ -12,7 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private readonly string _toolId = Guid.NewGuid().ToString("N").Substring(0, 8);
         private readonly object _windowGate = new object();
         private bool _isClosing;
-
+        
         private Window _window;
         private Dispatcher _uiDispatcher;
         private static SafeCopierEngine _engine;
@@ -36,7 +37,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         TearDownEngine();
                         TearDownUiState();
                     }
-                    
+                }
+
+                if (_window != null)
+                {
                     if (!_window.IsVisible)
                         _window.Show();
 
@@ -44,6 +48,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _window.WindowState = WindowState.Normal;
 
                     _window.Activate();
+
                     if (Application.Current != null)
                     {
                         Application.Current.DispatcherUnhandledException += (s, e) =>
@@ -52,7 +57,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         };
                     }
 
-                    if (_window?.Dispatcher != null)
+                    if (_window.Dispatcher != null)
                     {
                         _window.Dispatcher.UnhandledException += (s, e) =>
                         {
@@ -64,54 +69,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         LogUnhandled("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject as Exception);
                     };
+
                     return;
                 }
 
-                _isClosing = false;
-                _engine = new SafeCopierEngine();
-
                 try
                 {
-                    _window = new Window
-                    {
-                        Title = "Safe Trade Copier (V2.1)",
-                        Width = 850,
-                        Height = 720,
-                        ResizeMode = ResizeMode.CanResize,
-                        SizeToContent = SizeToContent.Manual,
-                        Background = WindowBackgroundBrush(),
-                        Foreground = WindowForegroundBrush(),
-                        Content = SafeBuildUi(_engine),
-                    };
-
-                    _uiDispatcher = _window.Dispatcher;
-
-                    _window.Dispatcher.UnhandledException += (s, e) =>
-                    {
-                        LogUnhandled("Dispatcher.UnhandledException", e.Exception);
-                    };
-
-                    AppDomain.CurrentDomain.UnhandledException += (s, e) =>
-                    {
-                        LogUnhandled("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject as Exception);
-                    };
-
-                    _window.Closing += OnWindowClosing;
-                    _window.Closed += OnWindowClosed;
-
-                    HookConnectionStatusUpdates();
-                    _window.Show();
-
-                    _uiDispatcher.InvokeAsync(() =>
-                    {
-                        EnsureInitialInstrumentSession();
-                        RefreshInstrumentSelectorItems();
-                        RefreshInstrumentTabs();
-                        LoadActiveSessionToUi();
-
-                        Rehydrate();
-
-                    }, DispatcherPriority.ApplicationIdle);
+                    CreateAndShowWindow();
                 }
                 catch (Exception ex)
                 {
@@ -122,6 +86,116 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Dispose();
                     throw;
                 }
+            }
+        }
+        
+        private void CreateAndShowWindow(
+            double width = 850,
+            double height = 720,
+            double? left = null,
+            double? top = null,
+            WindowState windowState = WindowState.Normal)
+        {
+            _isClosing = false;
+            _engine = new SafeCopierEngine();
+            LoadPersistentUiState();
+
+            _window = new Window
+            {
+                Title = "Safe Trade Copier (V2.1)",
+                Width = width,
+                Height = height,
+                ResizeMode = ResizeMode.CanResize,
+                SizeToContent = SizeToContent.Manual,
+                Background = WindowBackgroundBrush(),
+                Foreground = WindowForegroundBrush(),
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = false,
+                Content = BuildChromedWindowContent(_engine),
+            };
+
+            if (left.HasValue)
+                _window.Left = left.Value;
+
+            if (top.HasValue)
+                _window.Top = top.Value;
+
+            WindowChrome.SetWindowChrome(_window, new WindowChrome
+            {
+                CaptionHeight = 0,
+                ResizeBorderThickness = new Thickness(6),
+                CornerRadius = new CornerRadius(0),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false,
+                NonClientFrameEdges = NonClientFrameEdges.None
+            });
+
+            _uiDispatcher = _window.Dispatcher;
+
+            _window.Dispatcher.UnhandledException += (s, e) =>
+            {
+                LogUnhandled("Dispatcher.UnhandledException", e.Exception);
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                LogUnhandled("AppDomain.CurrentDomain.UnhandledException", e.ExceptionObject as Exception);
+            };
+
+            _window.Closing += OnWindowClosing;
+            _window.Closed += OnWindowClosed;
+            _window.StateChanged += (s, e) => UpdateWindowCaptionButtons();
+
+            HookConnectionStatusUpdates();
+
+            _window.Show();
+            _window.WindowState = windowState;
+
+            _uiDispatcher.InvokeAsync(() =>
+            {
+                EnsureInitialInstrumentSession();
+                RefreshInstrumentSelectorItems();
+                RefreshInstrumentTabs();
+                LoadActiveSessionToUi();
+                Rehydrate();
+            }, DispatcherPriority.ApplicationIdle);
+        }
+
+        private void CloseCurrentWindowForRebuild()
+        {
+            if (_window == null)
+                return;
+
+            var w = _window;
+            _window = null;
+
+            w.Closing -= OnWindowClosing;
+            w.Closed -= OnWindowClosed;
+
+            if (w.Dispatcher.CheckAccess())
+                w.Close();
+            else
+                w.Dispatcher.Invoke(() => w.Close());
+        }
+
+        private void ReopenWindowForThemeChange()
+        {
+            var width = _window?.Width ?? 850;
+            var height = _window?.Height ?? 700;
+            var left = _window?.Left;
+            var top = _window?.Top;
+            var state = _window?.WindowState ?? WindowState.Normal;
+
+            lock (_windowGate)
+            {
+                _isClosing = true;
+
+                UnsubscribeUiAccountEvents(Account.All);
+                TearDownEngine();
+                CloseCurrentWindowForRebuild();
+                TearDownUiState();
+
+                CreateAndShowWindow(width, height, left, top, state);
             }
         }
 
@@ -147,12 +221,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _engine = null;
             }
         }
-
+        
         private void TearDownUiState()
         {
             _window = null;
             _uiDispatcher = null;
-
+            _btnWindowMinimize = null;
+            _btnWindowMaximize = null;
+            _btnWindowClose = null;
+            _windowTitleBar = null;
+            
             _masterBox = null;
             _instrumentSelector = null;
             _followersPanel = null;
@@ -187,21 +265,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 UnsubscribeUiAccountEvents(Account.All);
                 TearDownEngine();
-
-                if (_window != null)
-                {
-                    var w = _window;
-                    _window = null;
-
-                    w.Closing -= OnWindowClosing;
-                    w.Closed -= OnWindowClosed;
-
-                    if (w.Dispatcher.CheckAccess())
-                        w.Close();
-                    else
-                        w.Dispatcher.Invoke(() => w.Close());
-                }
-
+                CloseCurrentWindowForRebuild();
                 TearDownUiState();
             }
         }

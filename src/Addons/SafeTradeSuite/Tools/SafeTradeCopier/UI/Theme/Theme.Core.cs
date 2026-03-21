@@ -32,6 +32,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 : Brushes.White;
         }
 
+        private static Brush ThemeColor()
+        {
+            return new SolidColorBrush(Color.FromRgb(255, 106, 0));
+        }
+        
         private static Brush CardBorderBrush()
         {
             return IsDarkTheme()

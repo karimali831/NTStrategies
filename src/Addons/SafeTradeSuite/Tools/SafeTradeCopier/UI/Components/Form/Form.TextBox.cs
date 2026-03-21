@@ -8,7 +8,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static TextBox CreateFormTextBox(
             string text = "",
-            double width = 120, 
+            double width = 120,
             Brush foreground = null,
             Thickness? margin = null)
         {
@@ -21,6 +21,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             ApplyInputChrome(tb);
+
+            tb.IsEnabledChanged += (s, e) => ApplyInputChrome(tb);
+
             return tb;
         }
     }

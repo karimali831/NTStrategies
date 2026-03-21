@@ -8,8 +8,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static string CrashLogPath =>
             Path.Combine(Globals.UserDataDir, "log", "SafeTradeCopier.crash.log");
-        
-        
 
         private static void LogUnhandled(string scope, Exception ex)
         {
