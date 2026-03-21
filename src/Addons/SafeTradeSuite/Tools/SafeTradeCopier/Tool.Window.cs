@@ -90,8 +90,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         }
         
         private void CreateAndShowWindow(
-            double width = 850,
-            double height = 720,
             double? left = null,
             double? top = null,
             WindowState windowState = WindowState.Normal)
@@ -103,15 +101,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _window = new Window
             {
                 Title = "Safe Trade Copier (V2.1)",
-                Width = width,
-                Height = height,
+                Width = 850,
+                Height = 700,
                 ResizeMode = ResizeMode.CanResize,
                 SizeToContent = SizeToContent.Manual,
                 Background = WindowBackgroundBrush(),
                 Foreground = WindowForegroundBrush(),
                 WindowStyle = WindowStyle.None,
                 AllowsTransparency = false,
-                Content = BuildChromedWindowContent(_engine),
+                Content = new Grid
+                {
+                    Margin = new Thickness(3), // space for shadow
+                    Children =
+                    {
+                        BuildChromedWindowContent(_engine)
+                    }
+                }
             };
 
             if (left.HasValue)
@@ -123,8 +128,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             WindowChrome.SetWindowChrome(_window, new WindowChrome
             {
                 CaptionHeight = 0,
-                ResizeBorderThickness = new Thickness(6),
-                CornerRadius = new CornerRadius(0),
+                // ResizeBorderThickness = new Thickness(6),
+                CornerRadius = new CornerRadius(8),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false,
                 NonClientFrameEdges = NonClientFrameEdges.None
@@ -180,8 +185,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void ReopenWindowForThemeChange()
         {
-            var width = _window?.Width ?? 850;
-            var height = _window?.Height ?? 700;
             var left = _window?.Left;
             var top = _window?.Top;
             var state = _window?.WindowState ?? WindowState.Normal;
@@ -195,7 +198,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 CloseCurrentWindowForRebuild();
                 TearDownUiState();
 
-                CreateAndShowWindow(width, height, left, top, state);
+                CreateAndShowWindow( left, top, state);
             }
         }
 

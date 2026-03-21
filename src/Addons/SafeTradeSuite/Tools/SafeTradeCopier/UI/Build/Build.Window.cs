@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -16,21 +17,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             var root = new Grid
             {
-                Background = WindowBackgroundBrush(),
+                Background = Brushes.Transparent,
                 SnapsToDevicePixels = true
             };
 
-            var outerBorder = new Border
+            var chromeHost = new Grid
             {
-                Background = WindowBackgroundBrush(),
-                BorderBrush = IsDarkTheme()
-                    ? new SolidColorBrush(Color.FromRgb(42, 42, 42))
-                    : new SolidColorBrush(Color.FromRgb(210, 210, 210)),
-                BorderThickness = new Thickness(1),
-                SnapsToDevicePixels = true
+                Background = WindowBackgroundBrush()
             };
-
-            var chromeHost = new Grid();
             chromeHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
             chromeHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
@@ -47,10 +41,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Grid.SetRow(contentHost, 1);
             chromeHost.Children.Add(contentHost);
 
-            outerBorder.Child = chromeHost;
-            root.Children.Add(outerBorder);
+            root.Children.Add(chromeHost);
 
-            return root;
+            var shadowHost = new Border
+            {
+                Background = WindowBackgroundBrush(),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(1),
+                Effect = new DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    BlurRadius = 32,
+                    ShadowDepth = 0,
+                    Opacity = IsDarkTheme() ? 0.34 : 0.14
+                },
+                Child = new Border
+                {
+                    Background = Brushes.Transparent,
+                    CornerRadius = new CornerRadius(8),
+                    BorderThickness = new Thickness(0),
+                    BorderBrush = SectionBorderBrush(),
+                    Child = root
+                }
+            };
+
+            return shadowHost;
         }
         
         private Border BuildWindowTitleBar()
@@ -60,14 +75,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 : new SolidColorBrush(Color.FromRgb(245, 245, 245));
 
             var borderBrush = IsDarkTheme()
-                ? new SolidColorBrush(Color.FromRgb(42, 42, 42))
-                : new SolidColorBrush(Color.FromRgb(210, 210, 210));
+                ? new SolidColorBrush(Color.FromRgb(34, 34, 34))
+                : new SolidColorBrush(Color.FromRgb(225, 225, 225));
 
             var titleBar = new Border
             {
                 Background = bg,
                 BorderBrush = borderBrush,
                 BorderThickness = new Thickness(0, 0, 0, 1),
+                CornerRadius = new CornerRadius(8, 8, 0, 0),
                 Height = 42
             };
 
@@ -178,7 +194,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var btn = new Button
             {
                 Content = text,
-                Width = 46,
+                Width = 30,
                 Height = 42,
                 FontSize = 14,
                 FontWeight = FontWeights.Normal,
