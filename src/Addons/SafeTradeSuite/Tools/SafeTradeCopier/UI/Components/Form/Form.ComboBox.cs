@@ -9,7 +9,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private static ComboBox CreateFormComboBox(double width = 120, Thickness? margin = null, bool editable = false)
+        private static ComboBox CreateFormComboBox(
+            double width = 120, 
+            Thickness? margin = null, 
+            bool editable = false)
         {
             var cb = new ComboBox
             {

@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
-    internal static partial class SafeTradeSuiteRuntime
+    internal partial class SafeTradeSuiteRuntime
     {
         private static readonly object Gate = new object();
 

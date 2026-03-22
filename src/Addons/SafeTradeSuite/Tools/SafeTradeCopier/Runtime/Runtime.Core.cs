@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Threading.Tasks;
 using NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
-    internal static partial class SafeTradeSuiteRuntime
+    internal partial class SafeTradeSuiteRuntime
     {
         private static SafeTradeCopierTool _copier;
 

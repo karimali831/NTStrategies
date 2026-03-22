@@ -43,13 +43,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 0, 8, 0)
             };
 
-            _masterMaxDailyProfitBox = new TextBox
-            {
-                Height = 24,
-                Width = 80,
-                Text = _masterMaxDailyProfit.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
+            _masterMaxDailyProfitBox = CreateFormTextBox(
+                _masterMaxDailyProfit.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                width: 80
+            );
 
             var masterLossLbl = new TextBlock
             {
@@ -58,14 +55,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(12, 0, 8, 0)
             };
 
-            _masterMaxDailyLossBox = new TextBox
-            {
-                Height = 24,
-                Width = 80,
-                Text = _masterMaxDailyLoss.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-
+            _masterMaxDailyLossBox = CreateFormTextBox(
+                _masterMaxDailyLoss.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                width: 80
+            );
+            
             Grid.SetColumn(masterProfitLbl, 0);
             Grid.SetColumn(_masterMaxDailyProfitBox, 1);
             Grid.SetColumn(masterLossLbl, 2);
@@ -156,23 +150,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     horizontalAlignment: HorizontalAlignment.Left,
                     margin: new Thickness(6, 4, 6, 4));
 
-                var maxProfitBox = new TextBox
-                {
-                    Height = 24,
-                    Width = 90,
-                    Margin = new Thickness(6, 2, 6, 2),
-                    Text = _followerMaxDailyProfit[acc.Name].ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    VerticalContentAlignment = VerticalAlignment.Center
-                };
+                var maxProfitBox = CreateFormTextBox(
+                    _followerMaxDailyProfit[acc.Name].ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    width: 90,
+                    margin: new Thickness(6, 2, 6, 2)
+                );
 
-                var maxLossBox = new TextBox
-                {
-                    Height = 24,
-                    Width = 90,
-                    Margin = new Thickness(6, 2, 6, 2),
-                    Text = _followerMaxDailyLoss[acc.Name].ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    VerticalContentAlignment = VerticalAlignment.Center
-                };
+                var maxLossBox = CreateFormTextBox(
+                    _followerMaxDailyLoss[acc.Name].ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    width: 90,
+                    margin: new Thickness(6, 2, 6, 2)
+                );
 
                 void ApplyFollowerRiskEnabledState()
                 {

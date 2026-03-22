@@ -78,9 +78,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _followersBulkActionsPanel.Children.Add(_btnToggleLiveFollowers);
 
             _btnCopyOn = CreateFormButton(
-                eng.CopyEnabled ? "Armed" : "Disarmed",
+                eng.CopyEnabled ? "Disarm" : "Arm",
                 height: SmallButtonHeight(),
-                tone: FormButtonTone.Danger,
+                tone: FormButtonTone.Success,
                 style: FormButtonStyle.Solid);
 
             Grid.SetColumn(followersTitleText, 0);
@@ -152,10 +152,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_btnCopyOn == null)
                 return;
             
-            _btnCopyOn.IsEnabled = true;
-            _btnCopyOn.Content = copyOn ? "Armed" : "Disarmed";
-            _btnCopyOn.Background = copyOn ? Brushes.DarkGreen : Brushes.Maroon;
-            _btnCopyOn.BorderBrush = copyOn ? Brushes.DarkGreen : Brushes.Maroon;
+            _btnCopyOn.Content = copyOn ? "Disarm" : "Arm";
+
+            var tone = copyOn ? FormButtonTone.Danger : FormButtonTone.Success;
+            ApplyButtonTheme(_btnCopyOn, tone, FormButtonStyle.Solid, enabled: true);
         }
         
         private void RefreshFollowerBulkActionButtons()

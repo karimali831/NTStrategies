@@ -4,7 +4,7 @@ using System.Web.Script.Serialization;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite
 {
-    internal static partial class SafeTradeSuiteRuntime
+    internal partial class SafeTradeSuiteRuntime
     {
         private static readonly string SafeTradeCopierUiStateFilePath =
             Path.Combine(

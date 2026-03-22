@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -76,14 +75,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 IsEnabled = !BreakEvenDisabled
             };
 
-            _freeTradeMinProfitPointsBox = new TextBox
-            {
-                Height = 24,
-                Width = 80,
-                Text = _freeTradeMinProfitPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                IsEnabled = !BreakEvenDisabled
-            };
+            _freeTradeMinProfitPointsBox = CreateFormTextBox(
+                _freeTradeMinProfitPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                width: 80,
+                isEnabled: !BreakEvenDisabled);
 
             var minProfitHint = new TextBlock
             {
@@ -116,13 +111,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Margin = new Thickness(0, 0, 8, 0)
             };
 
-            _freeTradePlusPointsBox = new TextBox
-            {
-                Height = 24,
-                Width = 80,
-                Text = _freeTradePlusPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
+            _freeTradePlusPointsBox = CreateFormTextBox(
+                _freeTradePlusPoints.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                width: 80);
 
             var plusPointsHint = new TextBlock
             {

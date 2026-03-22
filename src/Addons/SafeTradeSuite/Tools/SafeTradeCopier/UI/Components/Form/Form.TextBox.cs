@@ -9,7 +9,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private static TextBox CreateFormTextBox(
             string text = "",
             double width = 120,
+            double? height = null,
             Brush foreground = null,
+            bool? isEnabled = true,
             Thickness? margin = null)
         {
             var tb = new TextBox
@@ -17,7 +19,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Width = width,
                 Margin = margin ?? new Thickness(0),
                 Text = text ?? "",
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                IsEnabled =  isEnabled ?? true,
             };
 
             ApplyInputChrome(tb);

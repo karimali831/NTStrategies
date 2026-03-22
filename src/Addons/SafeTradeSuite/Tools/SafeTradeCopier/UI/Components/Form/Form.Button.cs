@@ -57,6 +57,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             btn.IsEnabled = enabled;
             btn.Opacity = 1.0;
+            btn.Focusable = false;
+            btn.FocusVisualStyle = null;
 
             Brush accent;
             switch (tone)
@@ -77,7 +79,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     accent = OutlineNeutralBorderBrush();
                     break;
             }
-
+            
             var effectiveStyle = style;
 
             if (IsDarkTheme() && style == FormButtonStyle.Solid)
