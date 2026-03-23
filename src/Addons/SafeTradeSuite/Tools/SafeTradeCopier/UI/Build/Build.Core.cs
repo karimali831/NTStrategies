@@ -48,9 +48,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // instrument tabs
 
                 // ---------------- Top menu ----------------
-                var mainMenuTabs = BuildMainMenuTabs();
-                Grid.SetRow(mainMenuTabs, 0);
-                root.Children.Add(mainMenuTabs);
+                var topMenuBar = BuildTopMenuBar(eng);
+                Grid.SetRow(topMenuBar, 0);
+                root.Children.Add(topMenuBar);
                 
                 // ---------------- Master + Instrument/Status ----------------
                 var topPanelsGrid = new Grid
@@ -196,6 +196,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 LogUnhandled("BuildUi()", ex);
                 throw;
             }
+        }
+        
+        private void RenderMasterSubmitButtonsState()
+        {
+            var pending = _engine != null && _engine.IsMasterSubmitInFlight();
+
+            if (_btnBuyMkt != null)
+                _btnBuyMkt.IsEnabled = !pending;
+
+            if (_btnSellMkt != null)
+                _btnSellMkt.IsEnabled = !pending;
         }
     }
 }

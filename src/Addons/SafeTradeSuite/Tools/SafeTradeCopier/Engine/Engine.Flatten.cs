@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
@@ -11,32 +10,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            private static string FlattenException(Exception ex)
-            {
-                if (ex == null)
-                    return "";
-
-                var sb = new StringBuilder();
-                var depth = 0;
-                var cur = ex;
-
-                while (cur != null)
-                {
-                    if (depth > 0)
-                        sb.AppendLine().AppendLine("---- INNER EXCEPTION ----");
-
-                    sb.AppendLine(cur.GetType().FullName);
-                    sb.AppendLine(cur.Message);
-                    sb.AppendLine(cur.StackTrace);
-
-                    cur = cur.InnerException;
-                    depth++;
-                }
-
-                return sb.ToString();
-            }
-
-
             public void EnsureFlatInstrument(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
@@ -77,42 +50,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Log($"Flatten incomplete after retries -> acc={acc.Name}, instr={instr.FullName}");
                 });
             }
-
-            private List<Order> GetWorkingOrdersForInstrument(Account acc, Instrument instr)
-            {
-                var result = new List<Order>();
-
-                if (acc == null || instr == null)
-                    return result;
-
-                try
-                {
-                    foreach (var o in acc.Orders)
-                    {
-                        if (o?.Instrument == null)
-                            continue;
-
-                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
-                            continue;
-
-                        if (o.OrderState == OrderState.Working ||
-                            o.OrderState == OrderState.Accepted ||
-                            o.OrderState == OrderState.Submitted ||
-                            o.OrderState == OrderState.PartFilled)
-                        {
-                            result.Add(o);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log(
-                        $"GetWorkingOrdersForInstrument failed -> acc={acc?.Name}, instr={instr?.FullName}, msg={ex.Message}");
-                }
-
-                return result;
-            }
-
+            
             private void FlattenInstrument(Account acc, Instrument instr, int pass)
             {
                 if (acc == null || instr == null)

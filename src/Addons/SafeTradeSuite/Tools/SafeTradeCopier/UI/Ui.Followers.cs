@@ -253,7 +253,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RenderFlattenButtonState(flatten, enabled: false);
                 
                 var freeTrade = CreateFormButton(
-                    text: "✅",
+                    text: CheckGlyph,
                     tone: FormButtonTone.Primary,
                     style: FormButtonStyle.Outline,
                     height: SmallButtonHeight());
@@ -483,8 +483,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!shieldEnabled)
             {
                 row.GuardText.Text = "🛡";
-                row.GuardText.Foreground = WarningActionBrush(); // <-- changed
-                row.GuardText.ToolTip = "Shield disabled in Settings";
+                row.GuardText.Foreground = WarningActionBrush();
+                row.GuardText.ToolTip = "Shield disabled in Settings (no protection active)";
                 return;
             }
 

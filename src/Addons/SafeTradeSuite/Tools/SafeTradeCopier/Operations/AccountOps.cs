@@ -17,9 +17,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static bool IsSimAccount(Account acc)
         {
-            var n = acc?.Name ?? "";
-            return n.StartsWith("Sim", StringComparison.OrdinalIgnoreCase)
-                   || n.StartsWith("Playback", StringComparison.OrdinalIgnoreCase);
+            if (acc == null)
+                return false;
+
+            var accountName = (acc.Name ?? "").Trim();
+            var connectionName = (acc.Connection?.Options?.Name ?? "").Trim();
+
+            if (connectionName.Equals("Playback", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (connectionName.Equals("Simulation", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (accountName.Equals("Sim101", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (accountName.StartsWith("Sim", StringComparison.OrdinalIgnoreCase) &&
+                (connectionName.Equals("Simulation", StringComparison.OrdinalIgnoreCase) ||
+                 string.IsNullOrWhiteSpace(connectionName)))
+                return true;
+
+            return false;
         }
 
         private Account GetMasterAccount()

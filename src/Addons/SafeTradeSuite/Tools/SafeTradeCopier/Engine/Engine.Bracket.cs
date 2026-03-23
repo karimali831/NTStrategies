@@ -183,15 +183,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            internal bool HasActiveBracket(Account acc, Instrument instr)
-            {
-                if (acc == null || instr == null)
-                    return false;
-
-                lock (_gate)
-                    return _activeBracketByAccInstr.ContainsKey(BracketKey(acc, instr));
-            }
-            
             private void HandleBracketExitOutcome(Account acc, Execution execution)
             {
                 if (acc == null || execution?.Order == null) return;

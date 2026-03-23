@@ -217,8 +217,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _userManuallyDisarmed = false;
             _autoRearmPending = false;
+            
             RequestCopyEnabled("Auto re-armed because open positions exist on the active instrument.");
-
             SavePersistentUiState();
         }
         

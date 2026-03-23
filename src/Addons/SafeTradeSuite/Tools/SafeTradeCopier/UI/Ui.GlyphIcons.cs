@@ -2,6 +2,6 @@
 {
     public partial class SafeTradeCopierTool
     {
-
+        private const string CheckGlyph = "✓";
     }
 }

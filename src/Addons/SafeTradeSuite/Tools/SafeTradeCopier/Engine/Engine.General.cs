@@ -1,4 +1,5 @@
 ﻿using System;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {

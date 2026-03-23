@@ -5,8 +5,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private Border _btnAddInstrumentTab;
-        private Border _btnRemoveInstrumentTab;
         private TextBox _masterQtyBox;
         private ComboBox _masterAtmBox;
         private TextBlock _masterPnlText;

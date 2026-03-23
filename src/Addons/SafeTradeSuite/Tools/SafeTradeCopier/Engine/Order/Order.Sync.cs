@@ -7,45 +7,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            private void OnMasterOrderUpdate(object sender, OrderEventArgs e)
-            {
-                if (e?.Order == null)
-                    return;
-
-                if (_instrument == null)
-                    return;
-
-                if (e.Order.Instrument == null || e.Order.Instrument.FullName != _instrument.FullName)
-                    return;
-
-                var name = (e.Order.Name ?? "").Trim();
-
-                HandlePendingEntryCleanup(e.Order);
-                CompleteMasterManualSubmit(e.Order);
-
-                if (name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
-                    SyncBracketFromOrderUpdate(e.Order);
-
-                TryFlattenFollowersOnMasterFlat();
-            }
-            
-            private void HandlePendingEntryCleanup(Order order)
-            {
-                if (order == null)
-                    return;
-
-                var name = (order.Name ?? "").Trim();
-                if (!name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                if (order.OrderState != OrderState.Rejected &&
-                    order.OrderState != OrderState.Cancelled)
-                    return;
-
-                RemovePendingBracketForEntry(name);
-                Log($"[SYNC] ENTRY CLEARED acc={order.Account?.Name} instr={order.Instrument?.FullName} state={order.OrderState}");
-            }
-            
             private void SyncBracketFromOrderUpdate(Order order)
             {
                 if (order == null)

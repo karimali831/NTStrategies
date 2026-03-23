@@ -68,19 +68,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
                 master.Submit(new[] { entry });
             }
-
-            private void SeenCleanup()
-            {
-                if (_seen.Count <= 5000)
-                    return;
-                
-                var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
-                foreach (var kv in _seen.ToArray())
-                {
-                    if (kv.Value < cutoff)
-                        _seen.TryRemove(kv.Key, out _);
-                }
-            }
             
             private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
             {
@@ -208,22 +195,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            private bool FollowerUsesMasterExit(Account follower)
-            {
-                if (follower == null)
-                    return false;
-
-                if (_configuredFollowerAtmOverrides != null &&
-                    _configuredFollowerAtmOverrides.TryGetValue(follower.Name, out var a))
-                {
-                    return string.Equals(
-                        (a ?? "").Trim(),
-                        "Follow Master Exit",
-                        StringComparison.OrdinalIgnoreCase);
-                }
-
-                return false;
-            }
             
             private void TrySubmitBracketOnFill(Account master, Execution execution)
             {
@@ -431,55 +402,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 Log($"Follower submit -> {acc.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
                 acc.Submit(new[] { entry });
-            }
-            
-            private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)
-            {
-                if (e?.Order == null)
-                    return;
-
-                var name = (e.Order.Name ?? "").Trim();
-                if (!name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                HandlePendingEntryCleanup(e.Order);
-                SyncBracketFromOrderUpdate(e.Order);
-
-                var acc = e.Order.Account;
-                if (acc != null && name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
-                {
-                    FollowerGuard settings;
-                    lock (_gate)
-                        settings = _followerGuard ?? new FollowerGuard();
-
-                    if (e.Order.OrderState == OrderState.Rejected)
-                    {
-                        MarkFollowerEntryResolved(acc);
-                        ApplyGuardAction(
-                            acc,
-                            settings.OnEntryReject,
-                            $"Follower entry rejected: {name}");
-
-                        return;
-                    }
-
-                    if (e.Order.OrderState == OrderState.Cancelled)
-                        MarkFollowerEntryResolved(acc);
-                }
-            }
-            
-            private int ResolveFollowerQty(Account follower, int masterExecQty)
-            {
-                if (follower == null)
-                    return masterExecQty;
-
-                if (_configuredFollowerQtyOverrides != null &&
-                    _configuredFollowerQtyOverrides.TryGetValue(follower.Name, out var q))
-                {
-                    return q;
-                }
-
-                return masterExecQty;
             }
         }
     }

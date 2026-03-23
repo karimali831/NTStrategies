@@ -31,7 +31,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterAccount: config.MasterAccount,
                 followerAccounts: config.Followers,
                 instrName: config.InstrumentName,
-                masterQty: config.MasterQty,
                 masterAtm: config.MasterAtm,
                 followerQtyOverridesByAccountName: config.FollowerQtyOverrides,
                 followerAtmOverridesByAccountName: config.FollowerAtmOverrides,

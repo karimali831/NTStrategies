@@ -60,7 +60,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 new Dictionary<string, double>(StringComparer.Ordinal);
             
             // Watchdog
-            private Task _guardWatchdogTask;
             private int _guardWatchdogRunning;
             private const int GuardWatchdogIntervalMs = 500;
 
@@ -73,7 +72,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Account masterAccount,
                 List<Account> followerAccounts,
                 string instrName,
-                int masterQty,
                 string masterAtm,
                 Dictionary<string, int> followerQtyOverridesByAccountName,
                 Dictionary<string, string> followerAtmOverridesByAccountName,
@@ -314,8 +312,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 var token = _cts.Token;
-
-                _guardWatchdogTask = Task.Run(async () =>
+                Task.Run(async () =>
                 {
                     try
                     {
@@ -342,7 +339,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     finally
                     {
-                        Interlocked.Exchange(ref _guardWatchdogRunning, 0);
+                        StopFollowerGuardWatchdog_NoLock();
                     }
                 }, token);
             }
@@ -350,7 +347,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void StopFollowerGuardWatchdog_NoLock()
             {
                 Interlocked.Exchange(ref _guardWatchdogRunning, 0);
-                _guardWatchdogTask = null;
             }
 
             public void Dispose()

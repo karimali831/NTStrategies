@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System;
+using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -6,12 +8,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private Border _btnAddInstrumentTab;
+
         private void RenderInstrument(Grid root)
         {
             var instrumentStack = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Margin = new Thickness(0)
+                Margin = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
             var topRow = new Grid
@@ -20,9 +25,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
-            topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // combo
-            topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) }); // add
-            topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) }); // remove
+            topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _instrumentSelector = CreateFormComboBox(editable: true);
             _instrumentSelector.IsTextSearchEnabled = false;
@@ -31,8 +35,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentSelector.Background = InputBackgroundBrush();
             _instrumentSelector.HorizontalAlignment = HorizontalAlignment.Stretch;
             _instrumentSelector.Width = double.NaN;
-            _instrumentSelector.Margin = new Thickness(0, 0, 6, 0);
-
+            _instrumentSelector.Margin = new Thickness(0);
+            
             _btnAddInstrumentTab = CreateFormIconAction(
                 Geometry.Parse("M 0 5 L 10 5 M 5 0 L 5 10"),
                 tone: FormButtonTone.Primary,
@@ -41,6 +45,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 toolTip: "Add instrument tab",
                 onClick: () =>
                 {
+                    if (!CanAddSelectedInstrumentTab())
+                        return;
+
                     var typed = GetSelectedInstrumentName();
 
                     if (string.IsNullOrWhiteSpace(typed))
@@ -56,32 +63,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
 
                     ActivateOrCreateInstrumentSession(typed, refreshSelector: true);
+                    UpdateAddInstrumentButtonState();
                     RenderFlattenAllButtonState();
                 });
-
-            _btnRemoveInstrumentTab = CreateFormIconAction(
-                Geometry.Parse("M 0 0 L 10 10 M 10 0 L 0 10"),
-                tone: FormButtonTone.Danger,
-                width: 34,
-                height: InputHeight(),
-                toolTip: "Remove instrument tab",
-                onClick: () =>
-                {
-                    if (_activeInstrumentSession != null)
-                        RemoveInstrumentSession(_activeInstrumentSession);
-                });
+            _btnAddInstrumentTab.BorderThickness = new Thickness(0, 1, 1, 1);
 
             Grid.SetColumn(_instrumentSelector, 0);
             Grid.SetColumn(_btnAddInstrumentTab, 1);
-            Grid.SetColumn(_btnRemoveInstrumentTab, 2);
 
             topRow.Children.Add(_instrumentSelector);
             topRow.Children.Add(_btnAddInstrumentTab);
-            topRow.Children.Add(_btnRemoveInstrumentTab);
-
             instrumentStack.Children.Add(topRow);
 
             var instrumentFieldset = BuildFieldset("Instrument", instrumentStack);
+            if (instrumentFieldset is FrameworkElement fe)
+                fe.HorizontalAlignment = HorizontalAlignment.Stretch;
 
             Grid.SetColumn(instrumentFieldset, 2);
             Grid.SetRow(instrumentFieldset, 0);
@@ -94,6 +90,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 var instrumentName = NormalizeInstrumentName(_instrumentSelector.SelectedItem as string);
+
+                UpdateAddInstrumentButtonState();
+
                 if (string.IsNullOrWhiteSpace(instrumentName))
                     return;
 
@@ -105,6 +104,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_engine != null && _engine.CopyEnabled)
                     _engine.SetCopyEnabled(true);
 
+                UpdateAddInstrumentButtonState();
                 RenderFlattenAllButtonState();
             };
 
@@ -114,6 +114,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 var instrumentName = GetSelectedInstrumentName();
+
+                UpdateAddInstrumentButtonState();
+
                 if (string.IsNullOrWhiteSpace(instrumentName))
                     return;
 
@@ -121,8 +124,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 ActivateOrCreateInstrumentSession(instrumentName, refreshSelector: true);
+                UpdateAddInstrumentButtonState();
                 RenderFlattenAllButtonState();
             };
+
+            _instrumentSelector.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler((s, e) =>
+            {
+                UpdateAddInstrumentButtonState();
+            }));
+
+            UpdateAddInstrumentButtonState();
+        }
+
+        private bool CanAddSelectedInstrumentTab()
+        {
+            var instrumentName = NormalizeInstrumentName(GetSelectedInstrumentName());
+            if (string.IsNullOrWhiteSpace(instrumentName))
+                return false;
+
+            if (!IsValidInstrumentName(instrumentName))
+                return false;
+
+            return !_instrumentSessions.Any(x =>
+                string.Equals(
+                    NormalizeInstrumentName(x?.InstrumentName),
+                    instrumentName,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void UpdateAddInstrumentButtonState()
+        {
+            if (_btnAddInstrumentTab == null)
+                return;
+
+            var enabled = CanAddSelectedInstrumentTab();
+
+            SetFormIconActionEnabled(
+                _btnAddInstrumentTab,
+                enabled,
+                FormButtonTone.Primary,
+                enabledToolTip: "Add instrument tab",
+                disabledToolTip: "Instrument tab already exists");
         }
     }
 }

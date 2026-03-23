@@ -31,10 +31,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var confirmed = ShowConfirmDialog(
                         _window,
                         "Copier disarmed",
-                        "You have follower accounts enabled, but the copier is currently disarmed.\n\n" +
-                        $"Submitting this {sideText} market order will only place the order on the master account.\n\n" +
-                        "Do you want to continue?",
-                        okText: "Submit order",
+                        "You have follower accounts enabled, but the copier is currently disarmed.\n" +
+                        $"Submitting this {sideText} market order will only place the order on the master account.",
+                        okText: "Submit master only",
                         cancelText: "Cancel");
 
                     if (!confirmed)

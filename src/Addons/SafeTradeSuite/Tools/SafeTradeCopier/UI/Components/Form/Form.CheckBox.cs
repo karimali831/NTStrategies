@@ -96,7 +96,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Name = "CheckGlyph"
             };
-            check.SetValue(TextBlock.TextProperty, "✓");
+            check.SetValue(TextBlock.TextProperty, CheckGlyph);
             check.SetValue(TextBlock.FontSizeProperty, 11.0);
             check.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
             check.SetValue(TextBlock.ForegroundProperty, Brushes.White);

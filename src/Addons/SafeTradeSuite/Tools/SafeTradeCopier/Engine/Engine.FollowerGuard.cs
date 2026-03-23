@@ -283,16 +283,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"onDesync={_followerGuard.OnDesync}");
             }
             
-            public bool TryGetFollowerGuardState(Account follower, out FollowerGuardState snapshot)
+            public void TryGetFollowerGuardState(Account follower, out FollowerGuardState snapshot)
             {
                 snapshot = null;
-                if (follower == null)
-                    return false;
+                if (follower == null) return;
 
                 lock (_gate)
                 {
-                    if (!_guardStateByAccount.TryGetValue(follower.Name, out var state) || state == null)
-                        return false;
+                    if (!_guardStateByAccount.TryGetValue(follower.Name, out var state) || state == null) return;
 
                     snapshot = new FollowerGuardState
                     {
@@ -303,8 +301,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         IsGuardDisabled = state.IsGuardDisabled,
                         LastGuardReason = state.LastGuardReason
                     };
-
-                    return true;
                 }
             }
         }
