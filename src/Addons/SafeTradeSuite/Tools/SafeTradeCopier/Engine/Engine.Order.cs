@@ -52,9 +52,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[MASTER BRACKET PENDING ADD] entry={entryName} master={master.Name} instr={instr.FullName} qty={qty} atm={atmTemplateName} stopTicks={stopTicks} targetTicks={targetTicks}");
-                    
                     _pendingBrackets[entryName] = new PendingBracket
                     {
                         EntryName = entryName,
@@ -71,28 +68,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
                 master.Submit(new[] { entry });
             }
+
+            private void SeenCleanup()
+            {
+                if (_seen.Count <= 5000)
+                    return;
+                
+                var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
+                foreach (var kv in _seen.ToArray())
+                {
+                    if (kv.Value < cutoff)
+                        _seen.TryRemove(kv.Key, out _);
+                }
+            }
             
             private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
             {
-                if (_seen.Count > 5000)
-                {
-                    var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
-                    foreach (var kv in _seen.ToArray())
-                    {
-                        if (kv.Value < cutoff)
-                            _seen.TryRemove(kv.Key, out _);
-                    }
-                }
+                SeenCleanup();
 
                 List<Account> followerSnap;
                 Account masterSnap;
                 Instrument instrSnap;
+                FollowerGuard guard;
 
                 lock (_gate)
                 {
                     followerSnap = _followers.ToList();
                     masterSnap = _master;
                     instrSnap = _instrument;
+                    guard = _followerGuard ?? new FollowerGuard();
                 }
 
                 foreach (var f in followerSnap)
@@ -114,28 +118,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    var key = $"{execId}|{f.Name}|{instrSnap.FullName}";
-                    if (!_seen.TryAdd(key, DateTime.UtcNow.Ticks))
+                    var seenKey = $"{execId}|{f.Name}|{instrSnap.FullName}";
+                    if (!_seen.TryAdd(seenKey, DateTime.UtcNow.Ticks))
                         continue;
-                    
+
                     if (!CanEnterForRisk(f, out var riskReason))
                     {
                         Log($"Copy skipped -> {f.Name}: {riskReason}");
                         continue;
                     }
 
-                    var qty = ResolveFollowerQty(f, masterExecQty);
-                    if (qty < 1)
+                    var qtyToCopy = ResolveFollowerQty(f, masterExecQty);
+                    if (qtyToCopy < 1)
                     {
-                        // Safety: cap follower qty by max-per-follower
-                        qty = Math.Min(Math.Max(qty, 1), MaxAbsQtyPerFollower);
-                        Log($"Copy skipped -> {f.Name}: invalid follower qty ({qty}). Must be >= 1.");
+                        Log($"Copy skipped -> {f.Name}: invalid follower qty ({qtyToCopy}). Must be >= 1.");
                         continue;
                     }
 
-                    if (qty > MaxAbsQtyPerFollower)
+                    if (qtyToCopy > _maxAbsQtyPerFollower)
                     {
-                        Log($"Copy skipped -> {f.Name}: follower qty ({qty}) exceeds max allowed ({MaxAbsQtyPerFollower}).");
+                        Log($"Copy skipped -> {f.Name}: follower qty ({qtyToCopy}) exceeds max allowed ({_maxAbsQtyPerFollower}).");
+                        continue;
+                    }
+
+                    if (IsFollowerGuardDisabled(f))
+                    {
+                        Log($"Copy skipped -> {f.Name}: follower disabled by guard.");
                         continue;
                     }
 
@@ -147,53 +155,50 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         !followMasterExit;
 
                     Log(
-                        $"Copy -> {f.Name}: action={action}, qty={qty}, instr={instrSnap.FullName}, " +
+                        $"Copy -> {f.Name}: action={action}, qty={qtyToCopy}, instr={instrSnap.FullName}, " +
                         $"mode={(followMasterExit ? "FOLLOW_MASTER_EXIT" : hasOwnBracket ? $"OWN_BRACKET:{bracketMode}" : "ENTRY_ONLY")}");
 
-                    // follower has its own bracket
-                    if (hasOwnBracket)
+                    try
                     {
-                        SubmitFollowerMarketWithBracket(f, instrSnap, action, qty, bracketMode, execId);
-                    }
-                    // follower entry only, exits when master exits
-                    else if (followMasterExit)
-                    {
-                        var ord = f.CreateOrder(
-                            instrSnap,
-                            action,
-                            OrderType.Market,
-                            OrderEntry.Manual,
-                            TimeInForce.Day,
-                            qty,
-                            0,
-                            0,
-                            string.Empty,
-                            $"STC:ENTRY:{execId}",
-                            DateTime.MaxValue,
-                            null
-                        );
+                        if (hasOwnBracket)
+                        {
+                            var entryName = $"STC:ENTRY:{execId}:{f.Name}";
+                            MarkFollowerEntrySubmitted(f, entryName);
+                            SubmitFollowerMarketWithBracket(f, instrSnap, action, qtyToCopy, bracketMode, entryName);
+                        }
+                        else
+                        {
+                            var entryName = $"STC:ENTRY:{execId}";
+                            MarkFollowerEntrySubmitted(f, entryName);
 
-                        f.Submit(new[] { ord });
-                    }
-                    // entry only, no follower bracket
-                    else
-                    {
-                        var ord = f.CreateOrder(
-                            instrSnap,
-                            action,
-                            OrderType.Market,
-                            OrderEntry.Manual,
-                            TimeInForce.Day,
-                            qty,
-                            0,
-                            0,
-                            string.Empty,
-                            $"STC:ENTRY:{execId}",
-                            DateTime.MaxValue,
-                            null
-                        );
+                            var ord = f.CreateOrder(
+                                instrSnap,
+                                action,
+                                OrderType.Market,
+                                OrderEntry.Manual,
+                                TimeInForce.Day,
+                                qtyToCopy,
+                                0,
+                                0,
+                                string.Empty,
+                                entryName,
+                                DateTime.MaxValue,
+                                null
+                            );
 
-                        f.Submit(new[] { ord });
+                            f.Submit(new[] { ord });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MarkFollowerEntryResolved(f);
+
+                        ApplyGuardAction(
+                            f,
+                            guard.OnEntryReject,
+                            $"Follower entry submit failed: {ex.Message}");
+
+                        continue;
                     }
 
                     RecordCopy();
@@ -386,7 +391,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
             
-            private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string execId)
+            private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string entryName)
             {
                 if (acc == null || instr == null) return;
                 
@@ -396,10 +401,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     stopTicks = 0;
                     targetTicks = 0;
                 }
-
-                // Unique entry name that we can match on ExecutionUpdate
-                var entryName = $"STC:ENTRY:{execId}:{acc.Name}";
-
+                
                 var entry = acc.CreateOrder(
                     instr,
                     action,
@@ -443,25 +445,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HandlePendingEntryCleanup(e.Order);
                 SyncBracketFromOrderUpdate(e.Order);
 
-                if (!Armed)
-                    return;
-
-                if (e.Order.OrderState == OrderState.Rejected)
+                var acc = e.Order.Account;
+                if (acc != null && name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                 {
-                    var msg =
-                        $"Error={e.Error} " +
-                        $"State={e.Order.OrderState} " +
-                        $"Action={e.Order.OrderAction} " +
-                        $"Qty={e.Order.Quantity} " +
-                        $"Name={e.Order.Name}";
-
+                    FollowerGuard settings;
                     lock (_gate)
+                        settings = _followerGuard ?? new FollowerGuard();
+
+                    if (e.Order.OrderState == OrderState.Rejected)
                     {
-                        _copyEnabled = false;
-                        DisarmUnsafe_NoLock($"Circuit breaker: copied order REJECTED on {e.Order.Account?.Name}. Msg={msg}");
-                        RaiseModeChanged_NoLock();
-                        RaiseReady_NoLock(reasonOverride: "Order rejected");
+                        MarkFollowerEntryResolved(acc);
+                        ApplyGuardAction(
+                            acc,
+                            settings.OnEntryReject,
+                            $"Follower entry rejected: {name}");
+
+                        return;
                     }
+
+                    if (e.Order.OrderState == OrderState.Cancelled)
+                        MarkFollowerEntryResolved(acc);
                 }
             }
             

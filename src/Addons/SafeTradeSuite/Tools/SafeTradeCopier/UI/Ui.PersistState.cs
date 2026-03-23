@@ -19,7 +19,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     FreeTradeMinProfitPoints = _freeTradeMinProfitPoints,
                     FreeTradePlusPoints = _freeTradePlusPoints,
                     ActiveInstrumentName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName),
-                    ActiveMainMenuTab = _activeMainMenuTab.ToString()
+                    ActiveMainMenuTab = _activeMainMenuTab.ToString(),
+                    FollowerGuardEnabled = _followerGuardEnabled,
+                    FollowerGuardEntryFillTimeoutSeconds = _followerGuardEntryFillTimeoutSeconds,
+                    FollowerGuardDesyncGraceSeconds = _followerGuardDesyncGraceSeconds,
+                    FollowerGuardOnEntryReject = (int)_followerGuardOnEntryReject,
+                    FollowerGuardOnEntryTimeout = (int)_followerGuardOnEntryTimeout,
+                    FollowerGuardOnDesync = (int)_followerGuardOnDesync
+                    
                 };
 
                 foreach (var session in _instrumentSessions)
@@ -61,7 +68,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _breakEvenMode = (BreakEvenMode)state.BreakEvenMode;
                 _freeTradeMinProfitPoints = state.FreeTradeMinProfitPoints;
                 _freeTradePlusPoints = state.FreeTradePlusPoints;
+                _followerGuardEnabled = state.FollowerGuardEnabled;
+                _followerGuardEntryFillTimeoutSeconds = state.FollowerGuardEntryFillTimeoutSeconds > 0
+                    ? state.FollowerGuardEntryFillTimeoutSeconds
+                    : 5;
+                _followerGuardDesyncGraceSeconds = state.FollowerGuardDesyncGraceSeconds > 0
+                    ? state.FollowerGuardDesyncGraceSeconds
+                    : 3;
 
+                _followerGuardOnEntryReject = Enum.IsDefined(typeof(GuardAction), state.FollowerGuardOnEntryReject)
+                    ? (GuardAction)state.FollowerGuardOnEntryReject
+                    : GuardAction.FlattenAndDisable;
+
+                _followerGuardOnEntryTimeout = Enum.IsDefined(typeof(GuardAction), state.FollowerGuardOnEntryTimeout)
+                    ? (GuardAction)state.FollowerGuardOnEntryTimeout
+                    : GuardAction.FlattenAndDisable;
+
+                _followerGuardOnDesync = Enum.IsDefined(typeof(GuardAction), state.FollowerGuardOnDesync)
+                    ? (GuardAction)state.FollowerGuardOnDesync
+                    : GuardAction.FlattenAndDisable;
                 _instrumentSessions.Clear();
 
                 var accounts = GetSelectableAccounts();

@@ -46,7 +46,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterQtyBox = CreateFormTextBox("1", 40, margin: new Thickness(0, 0, 12, 0));
 
             var atmLbl = CreateFormLabel("Bracket", width: 50);
-            _masterAtmBox = CreateFormComboBox(width: 160);
+            _masterAtmBox = CreateFormComboBox(width: 140);
 
             Grid.SetColumn(accountLbl, 0);
             Grid.SetColumn(_masterBox, 1);
@@ -70,20 +70,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnBuyMkt = CreateFormButton(
                 text: "Buy Market",
-                width: 120,
+                width: 115,
                 tone: FormButtonTone.Success,
                 style: FormButtonStyle.Solid);
 
             _btnSellMkt = CreateFormButton(
                 text: "Sell Market",
-                width: 120,
+                width: 115,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Solid,
                 margin: new Thickness(6, 0, 0, 0));
 
             _btnFreeTradeAll = CreateFormButton(
                 text: "Break-even All",
-                width: 120,
+                width: 115,
                 tone: FormButtonTone.Primary,
                 style: FormButtonStyle.Outline,
                 margin: new Thickness(6, 0, 0, 0));
@@ -91,7 +91,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _btnFlattenAll = CreateFormButton(
                 text: "Flatten All",
-                width: 120,
+                width: 115,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Outline,
                 margin: new Thickness(6, 0, 0, 0));

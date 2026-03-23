@@ -11,34 +11,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            public partial class SafeTradeCopierTool
+            private static string FlattenException(Exception ex)
             {
-                private static string FlattenException(Exception ex)
+                if (ex == null)
+                    return "";
+
+                var sb = new StringBuilder();
+                var depth = 0;
+                var cur = ex;
+
+                while (cur != null)
                 {
-                    if (ex == null)
-                        return "";
+                    if (depth > 0)
+                        sb.AppendLine().AppendLine("---- INNER EXCEPTION ----");
 
-                    var sb = new StringBuilder();
-                    var depth = 0;
-                    var cur = ex;
+                    sb.AppendLine(cur.GetType().FullName);
+                    sb.AppendLine(cur.Message);
+                    sb.AppendLine(cur.StackTrace);
 
-                    while (cur != null)
-                    {
-                        if (depth > 0)
-                            sb.AppendLine().AppendLine("---- INNER EXCEPTION ----");
-
-                        sb.AppendLine(cur.GetType().FullName);
-                        sb.AppendLine(cur.Message);
-                        sb.AppendLine(cur.StackTrace);
-
-                        cur = cur.InnerException;
-                        depth++;
-                    }
-
-                    return sb.ToString();
+                    cur = cur.InnerException;
+                    depth++;
                 }
+
+                return sb.ToString();
             }
-            
+
+
             public void EnsureFlatInstrument(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
@@ -108,12 +106,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 catch (Exception ex)
                 {
-                    Log($"GetWorkingOrdersForInstrument failed -> acc={acc?.Name}, instr={instr?.FullName}, msg={ex.Message}");
+                    Log(
+                        $"GetWorkingOrdersForInstrument failed -> acc={acc?.Name}, instr={instr?.FullName}, msg={ex.Message}");
                 }
 
                 return result;
             }
-            
+
             private void FlattenInstrument(Account acc, Instrument instr, int pass)
             {
                 if (acc == null || instr == null)
@@ -126,7 +125,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 catch (Exception ex)
                 {
-                    Log($"Flatten orders snapshot failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
+                    Log(
+                        $"Flatten orders snapshot failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
                     orders = new List<Order>();
                 }
 
@@ -155,12 +155,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (cancellable.Length > 0)
                     {
                         acc.Cancel(cancellable);
-                        Log($"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, count={cancellable.Length}");
+                        Log(
+                            $"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, count={cancellable.Length}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log($"Flatten cancel failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
+                    Log(
+                        $"Flatten cancel failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
                 }
 
                 var net = GetNetPosition(acc, instr);
@@ -203,7 +205,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         $"net={net}, msg={ex.Message}");
                 }
             }
-            
+
             private void TryFlattenFollowersOnMasterFlat()
             {
                 if (_master == null || _instrument == null)
@@ -214,7 +216,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 FlattenFollowersThatUseMasterExit(_instrument);
             }
-            
+
             private void FlattenFollowersThatUseMasterExit(Instrument instr)
             {
                 if (instr == null)
@@ -225,7 +227,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 lock (_gate)
                 {
                     followersToFlatten = (_configuredFollowers ?? new List<Account>())
-                        .Where(f => f != null && f.ConnectionStatus == ConnectionStatus.Connected && FollowerUsesMasterExit(f))
+                        .Where(f => f != null && f.ConnectionStatus == ConnectionStatus.Connected &&
+                                    FollowerUsesMasterExit(f))
                         .Distinct()
                         .ToList();
                 }

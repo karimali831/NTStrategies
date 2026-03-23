@@ -67,6 +67,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuManager.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Menu\MenuNodes.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.BreakEven.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.FollowerGuard.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Order.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.FlattenPos.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.OrderSync.cs" />
@@ -75,6 +76,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\CopierExitMode.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\CopierStatusState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\FollowerCheckVisualState.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\GuardAction.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\MainMenuTab.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\ThemeMode.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Helper\StringFormatter.cs" />
@@ -82,6 +84,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\ActiveBracketSpec.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\CopierUiConfig.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\DailyRuntime.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\FollowerGuard.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\PendingBracket.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\PersistState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\Settings.cs" />
@@ -119,6 +122,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.PositionsPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.TradesPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.BreakEven.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.FollowerGuard.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.Panel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.General.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.Risk.cs" />

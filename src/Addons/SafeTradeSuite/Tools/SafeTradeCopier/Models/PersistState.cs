@@ -15,6 +15,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public string ActiveInstrumentName { get; set; }
         public string ActiveMainMenuTab { get; set; }
 
+        public bool FollowerGuardEnabled { get; set; } = true;
+        public int FollowerGuardEntryFillTimeoutSeconds { get; set; }
+        public int FollowerGuardDesyncGraceSeconds { get; set; }
+        public int FollowerGuardOnEntryReject { get; set; }
+        public int FollowerGuardOnEntryTimeout { get; set; }
+        public int FollowerGuardOnDesync { get; set; }
+
         public List<InstrumentSessionState> InstrumentSessions { get; set; } =
             new List<InstrumentSessionState>();
     }

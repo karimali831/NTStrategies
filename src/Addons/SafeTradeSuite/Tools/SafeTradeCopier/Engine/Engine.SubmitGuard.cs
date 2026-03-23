@@ -74,7 +74,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            internal void CompleteMasterManualSubmit(Order order)
+            private void CompleteMasterManualSubmit(Order order)
             {
                 if (order == null)
                     return;

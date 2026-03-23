@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
@@ -127,6 +128,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"[FOLLOWER EXEC -> TRY BRACKET] name={e.Execution?.Order?.Name}");
                 
                 TrySubmitBracketOnFill(acc, e.Execution);
+                
+                var orderName = (e.Execution?.Order?.Name ?? "").Trim();
+                if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
+                {
+                    MarkFollowerEntryResolved(acc);
+                    ResetFollowerDesync(acc);
+                }
             }
         }
     }

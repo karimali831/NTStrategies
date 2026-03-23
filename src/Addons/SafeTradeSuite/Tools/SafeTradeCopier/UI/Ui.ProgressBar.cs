@@ -465,13 +465,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Foreground = MutedForegroundBrush(),
                     FontWeight = FontWeights.SemiBold
                 });
+                
+                tb.Inlines.Add(new System.Windows.Documents.Run("Unrealized ")
+                {
+                    Foreground = MutedForegroundBrush(),
+                    FontWeight = FontWeights.SemiBold
+                });
             }
-            
-            tb.Inlines.Add(new System.Windows.Documents.Run("Unrealized ")
-            {
-                Foreground = MutedForegroundBrush(),
-                FontWeight = FontWeights.SemiBold
-            });
 
             tb.Inlines.Add(new System.Windows.Documents.Run(FmtUsd(unrealized))
             {

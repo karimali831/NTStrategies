@@ -24,6 +24,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public CheckBox OverrideCheck => null;
             public TextBox QtyBox => QtyOverrideBox;
             public ComboBox AtmBox => AtmOverrideBox;
+            public TextBlock GuardText { get; set; }
+            public ToolTip GuardToolTip { get; set; }
         }
     }
 }

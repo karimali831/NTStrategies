@@ -59,7 +59,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     continue;
 
                 if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
-                    r.QtyOverrideBox.Text =  int.Parse(qtyText) > 99 ? "99" : qtyText;
+                {
+                    if (int.TryParse(qtyText, out var parsedQty))
+                        r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
+                    else
+                        r.QtyOverrideBox.Text = qtyText;
+                }
 
                 if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
                     r.AtmOverrideBox != null &&
@@ -162,9 +167,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void BuildFollowerRows(List<Account> accounts)
         {
             _followerRows.Clear();
-
-            if (_followersPanel != null)
-                _followersPanel.Children.Clear();
+            _followersPanel?.Children.Clear();
 
             var master = _masterBox?.SelectedItem as Account;
             var masterName = master?.Name ?? "";
@@ -211,13 +214,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var pnl = new TextBlock
                 {
-                    Text = "Unrealized $0.00",
+                    Text = "$0.00",
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = MutedForegroundBrush(),
                     FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    // Margin = new Thickness(10, 0, 10, 0),
-                    TextTrimming = TextTrimming.CharacterEllipsis
+                    FontSize = 12
                 };
                 
                 var pnlBar = new ProgressBar
@@ -275,6 +276,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Margin = new Thickness(0)
                 };
                 
+                // Guard
+                var guardText = new TextBlock
+                {
+                    Text = "",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    FontWeight = FontWeights.Bold,
+                    FontSize = 14,
+                    Foreground = WarningActionBrush(),
+                    ToolTip = null
+                };
+                
                 Grid.SetColumn(enabled, 0);
                 Grid.SetColumn(accountText, 1);
                 Grid.SetColumn(qtyBox, 2);
@@ -282,6 +295,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetColumn(pnlStack, 4);
                 Grid.SetColumn(freeTrade, 5);
                 Grid.SetColumn(flatten, 6);
+                Grid.SetColumn(guardText, 7);
 
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
@@ -294,6 +308,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 rowGrid.Children.Add(pnlStack);
                 rowGrid.Children.Add(freeTrade);
                 rowGrid.Children.Add(flatten);
+                rowGrid.Children.Add(guardText);
 
                 var row = new FollowerRow
                 {
@@ -307,6 +322,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     FlattenBtn = flatten,
                     FreeTradeBtn = freeTrade,
                     PnlBarStatusText = pnlBarStatusText,
+                    GuardText = guardText
                 };
                 
                 // When user changes follower settings, we re-apply config (no re-arm UX)
@@ -399,10 +415,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) });  // On
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) }); // Bracket
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Bracket
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) }); // Unrealized
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // BE
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) }); // Guard
         }
         
         private static Grid BuildFollowerHeaderRow()
@@ -416,14 +433,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             FollowerHeaderColumnDefinitions(g);
-
             AddHeaderText(g, "On", 0, centered: true);
-            AddHeaderText(g, "Account", 1, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Account", 1);
             AddHeaderText(g, "Qty", 2, centered: true);
-            AddHeaderText(g, "Bracket", 3, margin: new Thickness(14, 4, 6, 4));
-            AddHeaderText(g, "PnL", 4, margin: new Thickness(6, 4, 6, 4));
+            AddHeaderText(g, "Bracket", 3);
+            AddHeaderText(g, "Unrealized", 4);
             AddHeaderText(g, "Break-even", 5, centered: true);
             AddHeaderText(g, "Flatten", 6, centered: true);
+            AddHeaderText(g, "Shield", 7, centered: true);
 
             return g;
         }
@@ -448,6 +465,68 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             Grid.SetColumn(tb, col);
             g.Children.Add(tb);
+        }
+        
+        private void RenderFollowerGuardState(FollowerRow row)
+        {
+            if (row?.Account == null || row.GuardText == null || _engine == null)
+                return;
+
+            row.GuardText.Visibility = Visibility.Visible;
+            row.GuardText.FontSize = 14;
+            row.GuardText.FontWeight = FontWeights.Bold;
+
+            _engine.TryGetFollowerGuardState(row.Account, out var state);
+
+            var shieldEnabled = _followerGuardEnabled;
+
+            if (!shieldEnabled)
+            {
+                row.GuardText.Text = "🛡";
+                row.GuardText.Foreground = WarningActionBrush(); // <-- changed
+                row.GuardText.ToolTip = "Shield disabled in Settings";
+                return;
+            }
+
+            if (state == null)
+            {
+                row.GuardText.Text = "🛡";
+                row.GuardText.Foreground = SuccessActionBrush();
+                row.GuardText.ToolTip = "Shield healthy";
+                return;
+            }
+
+            if (state.IsGuardDisabled)
+            {
+                row.GuardText.Text = "🛡";
+                row.GuardText.Foreground = DangerActionBrush();
+                row.GuardText.ToolTip = string.IsNullOrWhiteSpace(state.LastGuardReason)
+                    ? "Follower disabled by shield"
+                    : state.LastGuardReason;
+                return;
+            }
+
+            if (state.EntryWorking)
+            {
+                row.GuardText.Text = "🛡";
+                row.GuardText.Foreground = WarningActionBrush();
+                row.GuardText.ToolTip = state.PendingEntryTimeUtc != null
+                    ? $"Follower entry pending since {state.PendingEntryTimeUtc.Value:HH:mm:ss} UTC"
+                    : "Follower entry pending.";
+                return;
+            }
+
+            if (state.DesyncDetectedAtUtc != null)
+            {
+                row.GuardText.Text = "🛡";
+                row.GuardText.Foreground = WarningActionBrush();
+                row.GuardText.ToolTip = $"Follower desync under observation since {state.DesyncDetectedAtUtc.Value:HH:mm:ss} UTC";
+                return;
+            }
+
+            row.GuardText.Text = "🛡";
+            row.GuardText.Foreground = SuccessActionBrush();
+            row.GuardText.ToolTip = "Shield healthy";
         }
         
         private void RenderFollowerRowState(FollowerRow row)
@@ -520,6 +599,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (row.AtmOverrideBox != null)
                 row.AtmOverrideBox.IsEnabled = allowEdits;
+            
+            RenderFollowerGuardState(row);
         }
         
         private void RenderFollowerRowsState()

@@ -14,6 +14,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var generalFieldset = RenderGeneralFieldset();
             var beFieldset = RenderBreakEvenFieldset();
+            var followerGuardFieldset = RenderFollowerGuardFieldset();
 
             _riskFieldsetHost = new ContentControl
             {
@@ -22,6 +23,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             root.Children.Add(generalFieldset);
             root.Children.Add(beFieldset);
+            root.Children.Add(followerGuardFieldset);
             root.Children.Add(_riskFieldsetHost);
 
             return CreateScrollbar(root);

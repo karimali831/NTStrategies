@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -30,7 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private readonly ConcurrentQueue<long> _copiedTicks = new ConcurrentQueue<long>();
 
             // Safety defaults (not exposed to UI)
-            private const int MaxAbsQtyPerFollower = 99; // Number is hard-coded in Ui.Followers WARNING !!
+            private int _maxAbsQtyPerFollower = 99; // Number is hard-coded in Ui.Followers WARNING !!
             private const int MaxCopiesPer2Sec = 20;
             private const int StaggerMsPerFollower = 125;
 
@@ -57,6 +58,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private Dictionary<string, double> _configuredFollowerMaxDailyLoss =
                 new Dictionary<string, double>(StringComparer.Ordinal);
+            
+            // Watchdog
+            private Task _guardWatchdogTask;
+            private int _guardWatchdogRunning;
+            private const int GuardWatchdogIntervalMs = 500;
 
             public bool CopyEnabled
             {
@@ -196,6 +202,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[REWIRE] reason={reason} copyEnabled={_copyEnabled} armed={Armed} master={_configuredMaster?.Name} followers={_configuredFollowers?.Count ?? 0} instr={_configuredInstrumentName}");
                 
+                _guardStateByAccount.Clear();
+                
                 // Tear down old wiring (if any)
                 if (_master != null)
                 {
@@ -236,11 +244,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 Armed = true;
-
                 foreach (var f in _followers)
                 {
                     f.OrderUpdate += OnFollowerOrderUpdate;
                     f.ExecutionUpdate += OnFollowerExecution;
+                    GetGuardState(f);
                 }
 
                 // reset circuit-breaker bookkeeping
@@ -252,7 +260,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _cts = new CancellationTokenSource();
                 oldCts.Cancel();
                 oldCts.Dispose();
-
+                
+                StartFollowerGuardWatchdog_NoLock();
                 Log($"ARMED (auto). Reason={reason}. Master={_master?.Name}, Followers={_followers.Count}, Instr='{_instrumentName}'");
             }
 
@@ -282,6 +291,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _cts = new CancellationTokenSource();
                 oldCts.Cancel();
                 oldCts.Dispose();
+                
+                StopFollowerGuardWatchdog_NoLock();
 
                 _seen.Clear();
                 while (_copiedTicks.TryDequeue(out _)) { }
@@ -295,6 +306,51 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 SafeTradeSuiteRuntime.PrintLog(msg);
                 // OnStatus?.Invoke(msg);
+            }
+            
+            private void StartFollowerGuardWatchdog_NoLock()
+            {
+                if (Interlocked.Exchange(ref _guardWatchdogRunning, 1) == 1)
+                    return;
+
+                var token = _cts.Token;
+
+                _guardWatchdogTask = Task.Run(async () =>
+                {
+                    try
+                    {
+                        while (!token.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                RunFollowerGuardWatchdog();
+                            }
+                            catch (Exception ex)
+                            {
+                                Log($"[GUARD] watchdog iteration failed -> {ex.Message}");
+                            }
+
+                            await Task.Delay(GuardWatchdogIntervalMs, token).ConfigureAwait(false);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[GUARD] watchdog fatal -> {ex.Message}");
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _guardWatchdogRunning, 0);
+                    }
+                }, token);
+            }
+
+            private void StopFollowerGuardWatchdog_NoLock()
+            {
+                Interlocked.Exchange(ref _guardWatchdogRunning, 0);
+                _guardWatchdogTask = null;
             }
 
             public void Dispose()
