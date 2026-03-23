@@ -2,7 +2,7 @@
 {
     public partial class SafeTradeCopierTool
     {
-        private enum ThemeMode
+        public enum ThemeMode
         {
             System,
             Light,

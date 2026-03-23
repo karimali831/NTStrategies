@@ -2,11 +2,6 @@
 {
     public partial class SafeTradeCopierTool
     {
-        public enum BreakEvenMode
-        {
-            None,
-            Auto,
-            Manual
-        }
+
     }
 }

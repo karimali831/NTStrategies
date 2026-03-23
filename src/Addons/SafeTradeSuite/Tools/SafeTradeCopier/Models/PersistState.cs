@@ -25,15 +25,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             public bool SimOnlyMode { get; set; } = true;
             public bool ShowStatusBox { get; set; } = true;
-            public int ThemeMode { get; set; }
+            public ThemeMode ThemeMode { get; set; }
         }
 
         [Serializable]
         public sealed class BreakEvenSettings
         {
-            public int BreakEvenMode { get; set; }
-            public double FreeTradeMinProfitPoints { get; set; }
-            public double FreeTradePlusPoints { get; set; }
+            public BreakEvenMode Mode { get; set; }
+            public double MinProfitPoints { get; set; }
+            public double PlusPoints { get; set; }
         }
 
         [Serializable]
@@ -42,8 +42,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public double MasterMaxDailyProfit { get; set; }
             public double MasterMaxDailyLoss { get; set; }
 
-            public int AutoFlattenOnOrderReject { get; set; }
-            public int AutoFlattenMissingBracket { get; set; }
+            public AutoFlattenProtectionScope AutoFlattenOnOrderReject { get; set; }
+            public AutoFlattenProtectionScope AutoFlattenMissingBracket { get; set; }
 
             public Dictionary<string, bool> FollowerUseMasterRisk { get; set; } =
                 new Dictionary<string, bool>(StringComparer.Ordinal);
@@ -62,9 +62,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public int EntryFillTimeoutSeconds { get; set; } = 5;
             public int DesyncGraceSeconds { get; set; } = 3;
 
-            public int OnEntryReject { get; set; } = (int)GuardAction.FlattenAndDisable;
-            public int OnEntryTimeout { get; set; } = (int)GuardAction.FlattenAndDisable;
-            public int OnDesync { get; set; } = (int)GuardAction.FlattenAndDisable;
+            public GuardAction OnEntryReject { get; set; } = GuardAction.FlattenAndDisable;
+            public GuardAction OnEntryTimeout { get; set; } = GuardAction.FlattenAndDisable;
+            public GuardAction OnDesync { get; set; } = GuardAction.FlattenAndDisable;
         }
 
         public sealed class InstrumentSessionState

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
@@ -30,7 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _mainMenuTabsPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Bottom
             };
 
             _mainMenuTabsWrapper = new Border
@@ -38,8 +39,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Background = Brushes.Transparent,
                 BorderBrush = SectionBorderBrush(),
                 BorderThickness = new Thickness(0, 0, 0, 1),
-                Padding = new Thickness(0),
+                Padding = new Thickness(0, 0, 0, 0),
                 Margin = new Thickness(0, 0, 0, 16),
+                VerticalAlignment = VerticalAlignment.Bottom,
                 Child = _mainMenuTabsPanel
             };
 
@@ -100,9 +102,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 BorderThickness = new Thickness(0),
                 CornerRadius = new CornerRadius(3, 3, 0, 0),
                 Padding = new Thickness(12, 8, 12, 8),
-                Margin = new Thickness(0, 0, 12, -1),
+                Margin = new Thickness(0, 0, 12, 0),
+                VerticalAlignment = VerticalAlignment.Bottom,
                 Child = content,
-                Cursor = System.Windows.Input.Cursors.Hand
+                Cursor = Cursors.Hand
             };
 
             border.MouseLeftButtonUp += (s, e) =>
@@ -160,7 +163,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     : new Thickness(0);
 
                 item.Border.CornerRadius = new CornerRadius(3, 3, 0, 0);
-                item.Border.Margin = new Thickness(0, 0, 12, -1);
+
+                // Active tab drops 1px lower so it visually erases the wrapper bottom line beneath it
+                item.Border.Margin = active
+                    ? new Thickness(0, 0, 12, -1)
+                    : new Thickness(0, 0, 12, 0);
+
+                Panel.SetZIndex(item.Border, active ? 2 : 1);
 
                 item.Text.Foreground = active
                     ? WindowForegroundBrush()

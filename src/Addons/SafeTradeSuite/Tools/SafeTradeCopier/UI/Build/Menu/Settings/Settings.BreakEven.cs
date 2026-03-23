@@ -39,7 +39,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             _breakEvenModeSelector = CreateFormComboBox(width: 120);
-
             _breakEvenModeSelector.Items.Add("None");
             _breakEvenModeSelector.Items.Add("Auto");
             _breakEvenModeSelector.Items.Add("Manual");

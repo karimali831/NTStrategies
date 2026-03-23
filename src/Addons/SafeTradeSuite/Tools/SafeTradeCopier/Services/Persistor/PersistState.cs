@@ -8,42 +8,57 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private SafeTradeCopierUiState _persistedState = new SafeTradeCopierUiState();
         
+        private void EnsurePersistedStateDefaults()
+        {
+            if (_persistedState == null)
+                _persistedState = new SafeTradeCopierUiState();
+
+            if (_persistedState.Appearance == null)
+                _persistedState.Appearance = new AppearanceSettings();
+
+            if (_persistedState.BreakEven == null)
+                _persistedState.BreakEven = new BreakEvenSettings();
+
+            if (_persistedState.Risk == null)
+                _persistedState.Risk = new RiskSettings();
+
+            if (_persistedState.FollowerShield == null)
+                _persistedState.FollowerShield = new FollowerShieldSettings();
+
+            if (_persistedState.InstrumentSessions == null)
+                _persistedState.InstrumentSessions = new List<InstrumentSessionState>();
+
+            if (_persistedState.Risk.FollowerUseMasterRisk == null)
+                _persistedState.Risk.FollowerUseMasterRisk =
+                    new Dictionary<string, bool>(StringComparer.Ordinal);
+
+            if (_persistedState.Risk.FollowerMaxDailyProfit == null)
+                _persistedState.Risk.FollowerMaxDailyProfit =
+                    new Dictionary<string, double>(StringComparer.Ordinal);
+
+            if (_persistedState.Risk.FollowerMaxDailyLoss == null)
+                _persistedState.Risk.FollowerMaxDailyLoss =
+                    new Dictionary<string, double>(StringComparer.Ordinal);
+        }
+        
         private void SavePersistentUiState()
         {
             try
             {
+                EnsurePersistedStateDefaults();
+
                 _persistedState.Appearance.SimOnlyMode = _simOnlyMode;
                 _persistedState.Appearance.ShowStatusBox = _showStatusBox;
-                _persistedState.Appearance.ThemeMode = (int)_themeMode;
+                _persistedState.Appearance.ThemeMode = _themeMode;
 
-                _persistedState.BreakEven.BreakEvenMode = (int)_breakEvenMode;
-                _persistedState.BreakEven.FreeTradeMinProfitPoints = _freeTradeMinProfitPoints;
-                _persistedState.BreakEven.FreeTradePlusPoints = _freeTradePlusPoints;
+                _persistedState.BreakEven.Mode = _breakEvenMode;
+                _persistedState.BreakEven.MinProfitPoints = _freeTradeMinProfitPoints;
+                _persistedState.BreakEven.PlusPoints = _freeTradePlusPoints;
 
-                _persistedState.FollowerShield.Enabled = _followerGuardEnabled;
-                _persistedState.FollowerShield.EntryFillTimeoutSeconds = _followerGuardEntryFillTimeoutSeconds;
-                _persistedState.FollowerShield.DesyncGraceSeconds = _followerGuardDesyncGraceSeconds;
-                _persistedState.FollowerShield.OnEntryReject = (int)_followerGuardOnEntryReject;
-                _persistedState.FollowerShield.OnEntryTimeout = (int)_followerGuardOnEntryTimeout;
-                _persistedState.FollowerShield.OnDesync = (int)_followerGuardOnDesync;
+                SaveRiskSettingsToState();
+                SaveFollowerGuardSettingsToState();
 
-                _persistedState.Risk.MasterMaxDailyProfit = _masterMaxDailyProfit;
-                _persistedState.Risk.MasterMaxDailyLoss = _masterMaxDailyLoss;
-                _persistedState.Risk.AutoFlattenOnOrderReject = (int)_autoFlattenOnOrderReject;
-                _persistedState.Risk.AutoFlattenMissingBracket = (int)_autoFlattenMissingBracket;
-
-                _persistedState.Risk.FollowerUseMasterRisk =
-                    new Dictionary<string, bool>(_followerUseMasterRisk, StringComparer.Ordinal);
-
-                _persistedState.Risk.FollowerMaxDailyProfit =
-                    new Dictionary<string, double>(_followerMaxDailyProfit, StringComparer.Ordinal);
-
-                _persistedState.Risk.FollowerMaxDailyLoss =
-                    new Dictionary<string, double>(_followerMaxDailyLoss, StringComparer.Ordinal);
-
-                _persistedState.ActiveInstrumentName =
-                    NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
-
+                _persistedState.ActiveInstrumentName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
                 _persistedState.ActiveMainMenuTab = _activeMainMenuTab.ToString();
 
                 _persistedState.InstrumentSessions.Clear();
@@ -76,95 +91,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             try
             {
-                _persistedState =
-                    SafeTradeSuiteRuntime.LoadCopierUiState<SafeTradeCopierUiState>()
-                    ?? new SafeTradeCopierUiState();
+                _persistedState = SafeTradeSuiteRuntime.LoadCopierUiState<SafeTradeCopierUiState>()
+                                  ?? new SafeTradeCopierUiState();
 
-                if (_persistedState.Appearance == null)
-                    _persistedState.Appearance = new AppearanceSettings();
-
-                if (_persistedState.BreakEven == null)
-                    _persistedState.BreakEven = new BreakEvenSettings();
-
-                if (_persistedState.Risk == null)
-                    _persistedState.Risk = new RiskSettings();
-
-                if (_persistedState.FollowerShield == null)
-                    _persistedState.FollowerShield = new FollowerShieldSettings();
-
-                if (_persistedState.InstrumentSessions == null)
-                    _persistedState.InstrumentSessions = new List<InstrumentSessionState>();
-
-                if (_persistedState.Risk.FollowerUseMasterRisk == null)
-                    _persistedState.Risk.FollowerUseMasterRisk =
-                        new Dictionary<string, bool>(StringComparer.Ordinal);
-
-                if (_persistedState.Risk.FollowerMaxDailyProfit == null)
-                    _persistedState.Risk.FollowerMaxDailyProfit =
-                        new Dictionary<string, double>(StringComparer.Ordinal);
-
-                if (_persistedState.Risk.FollowerMaxDailyLoss == null)
-                    _persistedState.Risk.FollowerMaxDailyLoss =
-                        new Dictionary<string, double>(StringComparer.Ordinal);
+                EnsurePersistedStateDefaults();
 
                 _simOnlyMode = _persistedState.Appearance.SimOnlyMode;
                 _showStatusBox = _persistedState.Appearance.ShowStatusBox;
-                _themeMode = (ThemeMode)_persistedState.Appearance.ThemeMode;
+                _themeMode = _persistedState.Appearance.ThemeMode;
 
-                _breakEvenMode = (BreakEvenMode)_persistedState.BreakEven.BreakEvenMode;
-                _freeTradeMinProfitPoints = _persistedState.BreakEven.FreeTradeMinProfitPoints;
-                _freeTradePlusPoints = _persistedState.BreakEven.FreeTradePlusPoints;
+                _breakEvenMode = _persistedState.BreakEven.Mode;
+                _freeTradeMinProfitPoints = _persistedState.BreakEven.MinProfitPoints;
+                _freeTradePlusPoints = _persistedState.BreakEven.PlusPoints;
 
-                _followerGuardEnabled = _persistedState.FollowerShield.Enabled;
-                _followerGuardEntryFillTimeoutSeconds =
-                    _persistedState.FollowerShield.EntryFillTimeoutSeconds > 0
-                        ? _persistedState.FollowerShield.EntryFillTimeoutSeconds
-                        : 5;
-
-                _followerGuardDesyncGraceSeconds =
-                    _persistedState.FollowerShield.DesyncGraceSeconds > 0
-                        ? _persistedState.FollowerShield.DesyncGraceSeconds
-                        : 3;
-
-                _followerGuardOnEntryReject =
-                    Enum.IsDefined(typeof(GuardAction), _persistedState.FollowerShield.OnEntryReject)
-                        ? (GuardAction)_persistedState.FollowerShield.OnEntryReject
-                        : GuardAction.FlattenAndDisable;
-
-                _followerGuardOnEntryTimeout =
-                    Enum.IsDefined(typeof(GuardAction), _persistedState.FollowerShield.OnEntryTimeout)
-                        ? (GuardAction)_persistedState.FollowerShield.OnEntryTimeout
-                        : GuardAction.FlattenAndDisable;
-
-                _followerGuardOnDesync =
-                    Enum.IsDefined(typeof(GuardAction), _persistedState.FollowerShield.OnDesync)
-                        ? (GuardAction)_persistedState.FollowerShield.OnDesync
-                        : GuardAction.FlattenAndDisable;
-
-                _masterMaxDailyProfit = Math.Max(0, _persistedState.Risk.MasterMaxDailyProfit);
-                _masterMaxDailyLoss = Math.Max(0, _persistedState.Risk.MasterMaxDailyLoss);
-
-                _autoFlattenOnOrderReject =
-                    Enum.IsDefined(typeof(AutoFlattenProtectionScope), _persistedState.Risk.AutoFlattenOnOrderReject)
-                        ? (AutoFlattenProtectionScope)_persistedState.Risk.AutoFlattenOnOrderReject
-                        : AutoFlattenProtectionScope.Disabled;
-
-                _autoFlattenMissingBracket =
-                    Enum.IsDefined(typeof(AutoFlattenProtectionScope), _persistedState.Risk.AutoFlattenMissingBracket)
-                        ? (AutoFlattenProtectionScope)_persistedState.Risk.AutoFlattenMissingBracket
-                        : AutoFlattenProtectionScope.Disabled;
-
-                _followerUseMasterRisk.Clear();
-                foreach (var kv in _persistedState.Risk.FollowerUseMasterRisk)
-                    _followerUseMasterRisk[kv.Key] = kv.Value;
-
-                _followerMaxDailyProfit.Clear();
-                foreach (var kv in _persistedState.Risk.FollowerMaxDailyProfit)
-                    _followerMaxDailyProfit[kv.Key] = kv.Value;
-
-                _followerMaxDailyLoss.Clear();
-                foreach (var kv in _persistedState.Risk.FollowerMaxDailyLoss)
-                    _followerMaxDailyLoss[kv.Key] = kv.Value;
+                LoadRiskSettingsFromState();
+                LoadFollowerGuardSettingsFromState();
 
                 _instrumentSessions.Clear();
                 var accounts = GetSelectableAccounts();

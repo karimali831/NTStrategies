@@ -4,7 +4,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private void LoadFollowerGuardSettingsIntoUi()
+        private void LoadFollowerGuardSettingsFromState()
         {
             var settings = _persistedState?.FollowerShield ?? new FollowerShieldSettings();
 
@@ -16,18 +16,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 ? settings.DesyncGraceSeconds
                 : 3;
 
-            _followerGuardOnEntryReject = Enum.IsDefined(typeof(GuardAction), settings.OnEntryReject)
-                ? (GuardAction)settings.OnEntryReject
-                : GuardAction.FlattenAndDisable;
+            _followerGuardOnEntryReject = settings.OnEntryReject;
+            _followerGuardOnEntryTimeout = settings.OnEntryTimeout;
+            _followerGuardOnDesync = settings.OnDesync;
+        }
 
-            _followerGuardOnEntryTimeout = Enum.IsDefined(typeof(GuardAction), settings.OnEntryTimeout)
-                ? (GuardAction)settings.OnEntryTimeout
-                : GuardAction.FlattenAndDisable;
+        private void SaveFollowerGuardSettingsToState()
+        {
+            EnsurePersistedStateDefaults();
 
-            _followerGuardOnDesync = Enum.IsDefined(typeof(GuardAction), settings.OnDesync)
-                ? (GuardAction)settings.OnDesync
-                : GuardAction.FlattenAndDisable;
+            _persistedState.FollowerShield.Enabled = _followerGuardEnabled;
+            _persistedState.FollowerShield.EntryFillTimeoutSeconds = _followerGuardEntryFillTimeoutSeconds;
+            _persistedState.FollowerShield.DesyncGraceSeconds = _followerGuardDesyncGraceSeconds;
+            _persistedState.FollowerShield.OnEntryReject = _followerGuardOnEntryReject;
+            _persistedState.FollowerShield.OnEntryTimeout = _followerGuardOnEntryTimeout;
+            _persistedState.FollowerShield.OnDesync = _followerGuardOnDesync;
+        }
 
+        private void LoadFollowerGuardSettingsIntoUi()
+        {
             if (_fgEnabledCheckBox != null)
                 _fgEnabledCheckBox.IsChecked = _followerGuardEnabled;
 
@@ -46,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_fgOnDesyncComboBox != null)
                 _fgOnDesyncComboBox.SelectedItem = _followerGuardOnDesync;
         }
-        
+
         private void ApplyFollowerGuardSettingsFromUi()
         {
             _followerGuardEnabled = _fgEnabledCheckBox?.IsChecked == true;
@@ -56,17 +63,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _followerGuardOnEntryTimeout = GetSelectedGuardAction(_fgOnEntryTimeoutComboBox, GuardAction.FlattenAndDisable);
             _followerGuardOnDesync = GetSelectedGuardAction(_fgOnDesyncComboBox, GuardAction.FlattenAndDisable);
 
-            _persistedState.FollowerShield.Enabled = _followerGuardEnabled;
-            _persistedState.FollowerShield.EntryFillTimeoutSeconds = _followerGuardEntryFillTimeoutSeconds;
-            _persistedState.FollowerShield.DesyncGraceSeconds = _followerGuardDesyncGraceSeconds;
-            _persistedState.FollowerShield.OnEntryReject = (int)_followerGuardOnEntryReject;
-            _persistedState.FollowerShield.OnEntryTimeout = (int)_followerGuardOnEntryTimeout;
-            _persistedState.FollowerShield.OnDesync = (int)_followerGuardOnDesync;
-
+            SaveFollowerGuardSettingsToState();
             SavePersistentUiState();
             ApplyFollowerGuardSettingsToEngine();
         }
-        
+
         private void ApplyFollowerGuardSettingsToEngine()
         {
             var settings = new FollowerGuard

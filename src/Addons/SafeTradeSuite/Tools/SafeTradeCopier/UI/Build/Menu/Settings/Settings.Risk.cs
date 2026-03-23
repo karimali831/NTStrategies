@@ -100,6 +100,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _autoFlattenOnOrderRejectComboBox.SelectedItem = _autoFlattenOnOrderReject;
             _autoFlattenMissingBracketComboBox.SelectedItem = _autoFlattenMissingBracket;
             
+            _autoFlattenOnOrderRejectComboBox.SelectionChanged += (s, e) =>
+            {
+                _autoFlattenOnOrderReject = GetSelectedProtectionScope(
+                    _autoFlattenOnOrderRejectComboBox,
+                    AutoFlattenProtectionScope.Disabled);
+
+                SaveRiskSettingsToState();
+                SavePersistentUiState();
+                ApplyRiskProtectionSettingsToEngine();
+            };
+
+            _autoFlattenMissingBracketComboBox.SelectionChanged += (s, e) =>
+            {
+                _autoFlattenMissingBracket = GetSelectedProtectionScope(
+                    _autoFlattenMissingBracketComboBox,
+                    AutoFlattenProtectionScope.Disabled);
+
+                SaveRiskSettingsToState();
+                SavePersistentUiState();
+                ApplyRiskProtectionSettingsToEngine();
+            };
+            
             _followerUseMasterRiskChecks.Clear();
             _followerMaxDailyProfitBoxes.Clear();
             _followerMaxDailyLossBoxes.Clear();
@@ -250,28 +272,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _followerMaxDailyProfitBoxes[acc.Name] = maxProfitBox;
                 _followerMaxDailyLossBoxes[acc.Name] = maxLossBox;
                 
-                _autoFlattenOnOrderRejectComboBox.SelectionChanged += (s, e) =>
-                {
-                    _autoFlattenOnOrderReject = GetSelectedProtectionScope(
-                        _autoFlattenOnOrderRejectComboBox,
-                        AutoFlattenProtectionScope.Disabled);
-
-                    SaveRiskSettingsToState();
-                    SavePersistentUiState();
-                    ApplyRiskProtectionSettingsToEngine();
-                };
-
-                _autoFlattenMissingBracketComboBox.SelectionChanged += (s, e) =>
-                {
-                    _autoFlattenMissingBracket = GetSelectedProtectionScope(
-                        _autoFlattenMissingBracketComboBox,
-                        AutoFlattenProtectionScope.Disabled);
-
-                    SaveRiskSettingsToState();
-                    SavePersistentUiState();
-                    ApplyRiskProtectionSettingsToEngine();
-                };
-
                 Grid.SetRow(accountTb, rowIndex);
                 Grid.SetColumn(accountTb, 0);
 

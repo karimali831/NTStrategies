@@ -14,12 +14,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _autoFlattenOnOrderReject =
                 Enum.IsDefined(typeof(AutoFlattenProtectionScope), risk.AutoFlattenOnOrderReject)
-                    ? (AutoFlattenProtectionScope)risk.AutoFlattenOnOrderReject
+                    ? risk.AutoFlattenOnOrderReject
                     : AutoFlattenProtectionScope.Disabled;
 
             _autoFlattenMissingBracket =
                 Enum.IsDefined(typeof(AutoFlattenProtectionScope), risk.AutoFlattenMissingBracket)
-                    ? (AutoFlattenProtectionScope)risk.AutoFlattenMissingBracket
+                    ? risk.AutoFlattenMissingBracket
                     : AutoFlattenProtectionScope.Disabled;
 
             _followerUseMasterRisk.Clear();
@@ -46,10 +46,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void SaveRiskSettingsToState()
         {
+            EnsurePersistedStateDefaults();
+            
             _persistedState.Risk.MasterMaxDailyProfit = _masterMaxDailyProfit;
             _persistedState.Risk.MasterMaxDailyLoss = _masterMaxDailyLoss;
-            _persistedState.Risk.AutoFlattenOnOrderReject = (int)_autoFlattenOnOrderReject;
-            _persistedState.Risk.AutoFlattenMissingBracket = (int)_autoFlattenMissingBracket;
+            _persistedState.Risk.AutoFlattenOnOrderReject = _autoFlattenOnOrderReject;
+            _persistedState.Risk.AutoFlattenMissingBracket = _autoFlattenMissingBracket;
 
             _persistedState.Risk.FollowerUseMasterRisk =
                 new Dictionary<string, bool>(_followerUseMasterRisk, StringComparer.Ordinal);

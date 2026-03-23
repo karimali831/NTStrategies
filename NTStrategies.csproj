@@ -108,7 +108,9 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Runtime\Runtime.Instrument.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Runtime\Runtime.UiState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\InstrumentSessionManager.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persistor\BreakEvenSettingsPersist.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persistor\FollowerGuardSettingsPersist.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persistor\GeneralSettingsPersist.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persistor\PersistState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persistor\RiskSettingsPersist.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Risk\RiskEvaluator.cs" />
