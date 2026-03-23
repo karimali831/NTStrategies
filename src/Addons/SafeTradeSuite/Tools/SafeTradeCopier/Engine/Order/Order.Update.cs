@@ -25,8 +25,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
                     SyncBracketFromOrderUpdate(e.Order);
-
-                TryFlattenFollowersOnMasterFlat();
             }
             
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)

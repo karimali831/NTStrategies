@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,44 +11,65 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            private readonly ConcurrentDictionary<string, byte> _flattenInFlight =
+                new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+            
+            private static string FlattenKey(Account acc, Instrument instr)
+            {
+                return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
+            }
+            
             public void EnsureFlatInstrument(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
                     return;
 
+                var key = FlattenKey(acc, instr);
+                if (!_flattenInFlight.TryAdd(key, 0))
+                {
+                    Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=already-in-flight");
+                    return;
+                }
+
                 Task.Run(async () =>
                 {
-                    for (var pass = 1; pass <= 4; pass++)
+                    try
                     {
-                        try
+                        for (var pass = 1; pass <= 4; pass++)
                         {
-                            FlattenInstrument(acc, instr, pass);
-
-                            await Task.Delay(400).ConfigureAwait(false);
-
-                            var netAfter = GetNetPosition(acc, instr);
-                            var workingAfter = GetWorkingOrdersForInstrument(acc, instr).Count;
-
-                            Log(
-                                $"Flatten verify -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                                $"netAfter={netAfter}, workingAfter={workingAfter}");
-
-                            if (netAfter == 0 && workingAfter == 0)
+                            try
                             {
-                                ClearActiveBracket(acc, instr);
-                                Log($"Flatten complete -> acc={acc.Name}, instr={instr.FullName}, pass={pass}");
-                                return;
+                                FlattenInstrument(acc, instr, pass);
+                                await Task.Delay(400).ConfigureAwait(false);
+
+                                var hasLivePositionAfter = TryGetLivePosition(acc, instr, out var mpAfter, out var qtyAfter);
+                                var workingAfter = GetWorkingOrdersForInstrument(acc, instr).Count;
+
+                                Log(
+                                    $"Flatten verify -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                                    $"hasLivePos={hasLivePositionAfter}, mpAfter={mpAfter}, qtyAfter={qtyAfter}, workingAfter={workingAfter}");
+
+                                if (!hasLivePositionAfter && workingAfter == 0)
+                                {
+                                    ClearActiveBracket(acc, instr);
+                                    Log($"Flatten complete -> acc={acc.Name}, instr={instr.FullName}, pass={pass}");
+                                    return;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log(
+                                    $"Flatten pass failed -> acc={acc?.Name}, instr={instr?.FullName}, pass={pass}, " +
+                                    $"msg={ex.Message}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            Log(
-                                $"Flatten pass failed -> acc={acc?.Name}, instr={instr?.FullName}, pass={pass}, " +
-                                $"msg={ex.Message}");
-                        }
-                    }
 
-                    Log($"Flatten incomplete after retries -> acc={acc.Name}, instr={instr.FullName}");
+                        Log($"Flatten incomplete after retries -> acc={acc.Name}, instr={instr.FullName}");
+                    }
+                    finally
+                    {
+                        _flattenInFlight.TryRemove(key, out _);
+                    }
                 });
             }
             
@@ -103,15 +125,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         $"Flatten cancel failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
                 }
 
-                var net = GetNetPosition(acc, instr);
-                if (net == 0)
+                if (!TryGetLivePosition(acc, instr, out var marketPosition, out var qty))
                 {
-                    Log($"Flatten -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, net=0");
+                    Log($"Flatten -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, no live position");
                     return;
                 }
 
-                var action = net > 0 ? OrderAction.Sell : OrderAction.BuyToCover;
-                var qty = Math.Abs(net);
+                var action = marketPosition == MarketPosition.Long
+                    ? OrderAction.Sell
+                    : OrderAction.BuyToCover;
+
+                Log(
+                    $"Flatten decision -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                    $"marketPosition={marketPosition}, qty={qty}");
 
                 try
                 {
@@ -134,25 +160,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     Log(
                         $"Flatten market submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                        $"net={net}, action={action}, qty={qty}");
+                        $"marketPosition={marketPosition}, action={action}, qty={qty}");
                 }
                 catch (Exception ex)
                 {
                     Log(
                         $"Flatten market submit failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                        $"net={net}, msg={ex.Message}");
+                        $"msg={ex.Message}");
                 }
-            }
-
-            private void TryFlattenFollowersOnMasterFlat()
-            {
-                if (_master == null || _instrument == null)
-                    return;
-
-                if (GetNetPosition(_master, _instrument) != 0)
-                    return;
-
-                FlattenFollowersThatUseMasterExit(_instrument);
             }
 
             private void FlattenFollowersThatUseMasterExit(Instrument instr)
@@ -175,7 +190,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     try
                     {
-                        if (GetNetPosition(f, instr) == 0)
+                        if (!TryGetLivePosition(f, instr, out _, out _))
                             continue;
 
                         EnsureFlatInstrument(f, instr);

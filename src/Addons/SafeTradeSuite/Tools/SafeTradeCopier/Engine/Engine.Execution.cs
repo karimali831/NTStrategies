@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using NinjaTrader.Cbi;
@@ -9,15 +10,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine : IDisposable
         {
+            private readonly ConcurrentDictionary<string, long> _followMasterExitSeen =
+                new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
+            
             private void OnMasterExecution(object sender, ExecutionEventArgs e)
             {
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[MASTER EXEC] acc={e?.Execution?.Account?.Name} name={e?.Execution?.Order?.Name} instr={e?.Execution?.Order?.Instrument?.FullName} state={e?.Execution?.Order?.OrderState} fillPrice={e?.Execution?.Price} qty={e?.Execution?.Quantity}");
-                
+
                 if (e?.Execution == null) return;
                 if (_master == null || e.Execution.Account != _master) return;
                 if (_instrument == null) return;
-
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
@@ -30,26 +33,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     orderName.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase);
 
                 HandleBracketExitOutcome(_master, e.Execution);
-                // Always try to submit bracket for STC entry fills
-                
-                SafeTradeSuiteRuntime.PrintLog(
-                    $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
-                
-                TrySubmitBracketOnFill(_master, e.Execution);
-                TryFlattenFollowersOnMasterFlat();
 
-                // If master exit filled and master is now flat, flatten followers that follow master exit
-                if (isMasterExitExecution && GetNetPosition(_master, _instrument) == 0)
+                if (IsStcEntryExecution(ord))
                 {
-                    FlattenFollowersThatUseMasterExit(_instrument);
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
+
+                    TrySubmitBracketOnFill(_master, e.Execution);
+                }
+
+                if (isMasterExitExecution)
+                {
+                    TryTriggerFollowMasterExitFromMasterExecution(e.Execution);
                     return;
                 }
 
-                // Only COPY on entry executions created by STC
-                if (!IsStcEntryExecution(e.Execution.Order))
+                if (!IsStcEntryExecution(ord))
                     return;
 
-                if (!Armed || !_copyEnabled) return;
+                if (!Armed || !_copyEnabled)
+                    return;
 
                 var execId = e.Execution.ExecutionId ?? "";
                 if (string.IsNullOrWhiteSpace(execId))
@@ -71,14 +74,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterExecQty = Math.Abs(masterExecQty);
                 if (masterExecQty <= 0) return;
 
-                var masterAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
-                var followerAction = masterAction;
+                var followerAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
 
                 CancellationToken token;
                 lock (_gate)
-                {
                     token = _cts.Token;
-                }
 
                 Task.Run(async () =>
                 {
@@ -108,6 +108,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return false;
             }
             
+            private void TryTriggerFollowMasterExitFromMasterExecution(Execution execution)
+            {
+                if (execution == null || _master == null || _instrument == null)
+                    return;
+
+                var execId = execution.ExecutionId ?? "";
+                if (string.IsNullOrWhiteSpace(execId))
+                    execId = $"{execution.Time.Ticks}_{execution.Price}_{execution.Quantity}_{execution.MarketPosition}";
+
+                var key = $"{_master.Name}|{_instrument.FullName}|{execId}|FOLLOW_EXIT";
+                if (!TryMarkFollowMasterExitSeen(key))
+                {
+                    Log($"Follow-master-exit skipped duplicate -> {_master.Name} ({_instrument.FullName}) execId={execId}");
+                    return;
+                }
+
+                FlattenFollowersThatUseMasterExit(_instrument);
+            }
+            
+            private bool TryMarkFollowMasterExitSeen(string key)
+            {
+                return _followMasterExitSeen.TryAdd(key, DateTime.UtcNow.Ticks);
+            }
+            
             private void OnFollowerExecution(object sender, ExecutionEventArgs e)
             {
                 if (e?.Execution == null) return;
@@ -126,11 +150,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[FOLLOWER EXEC -> TRY BRACKET] name={e.Execution?.Order?.Name}");
                 
-                TrySubmitBracketOnFill(acc, e.Execution);
-                
                 var orderName = (e.Execution?.Order?.Name ?? "").Trim();
                 if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                 {
+                    TrySubmitBracketOnFill(acc, e.Execution);
                     MarkFollowerEntryResolved(acc);
                     ResetFollowerDesync(acc);
                 }

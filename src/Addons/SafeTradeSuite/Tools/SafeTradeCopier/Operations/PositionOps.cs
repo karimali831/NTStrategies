@@ -162,23 +162,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static bool HasOpenInstrumentPosition(Account acc, Instrument instr)
         {
-            if (acc == null || instr == null)
-                return false;
-
-            foreach (var pos in acc.Positions)
-            {
-                if (pos?.Instrument == null)
-                    continue;
-
-                if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
-                    continue;
-
-                var qty = Math.Abs((int)pos.Quantity);
-                if (qty > 0)
-                    return true;
-            }
-
-            return false;
+            return TryGetLivePosition(acc, instr, out _, out _);
         }
 
         private bool HasAnyOpenPositionOnActiveInstrument()
@@ -193,6 +177,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Any(r =>
                 r?.Account != null &&
                 HasOpenInstrumentPosition(r.Account, instr));
+        }
+        
+        private static bool TryGetLivePosition(Account acc, Instrument instr, out MarketPosition marketPosition, out int absQty)
+        {
+            marketPosition = MarketPosition.Flat;
+            absQty = 0;
+
+            if (acc == null || instr == null)
+                return false;
+
+            foreach (var pos in acc.Positions)
+            {
+                if (pos?.Instrument == null)
+                    continue;
+
+                if (!string.Equals(pos.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    continue;
+
+                marketPosition = pos.MarketPosition;
+                absQty = Math.Abs((int)Math.Round((double)pos.Quantity, MidpointRounding.AwayFromZero));
+
+                return marketPosition != MarketPosition.Flat && absQty > 0;
+            }
+
+            return false;
         }
 
         private void EnsureEnabledFollowersAndAutoRearmForOpenPositions()
