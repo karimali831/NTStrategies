@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public event Action<bool, bool> OnModeChanged;
             public event Action<bool, string> OnReadyChanged;
 
-            private string _configuredMasterAtm = "None";
+            private string _configuredMasterBracket = "None";
 
             private Dictionary<string, int> _configuredFollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
             private Dictionary<string, string> _configuredFollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -72,7 +72,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Account masterAccount,
                 List<Account> followerAccounts,
                 string instrName,
-                string masterAtm,
+                string masterBracket,
                 Dictionary<string, int> followerQtyOverridesByAccountName,
                 Dictionary<string, string> followerAtmOverridesByAccountName,
                 double masterMaxDailyProfit,
@@ -91,7 +91,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var instr = string.IsNullOrWhiteSpace(name) ? null : Instrument.GetInstrument(name);
                 
                 SafeTradeSuiteRuntime.PrintLog(
-                    $"[APPLY CONFIG] master={masterAccount?.Name} followers={followersClean.Count} instr={name} atm={masterAtm}");
+                    $"[APPLY CONFIG] master={masterAccount?.Name} followers={followersClean.Count} instr={name} atm={masterBracket}");
 
                 Account oldMaster;
                 List<Account> oldFollowers;
@@ -112,7 +112,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _configuredFollowers = followersClean;
                     _configuredInstrumentName = name;
                     _configuredInstrument = instr;
-                    _configuredMasterAtm = string.IsNullOrWhiteSpace(masterAtm) ? "None" : masterAtm.Trim();
+                    _configuredMasterBracket = string.IsNullOrWhiteSpace(masterBracket) ? "None" : masterBracket.Trim();
                     _configuredFollowerQtyOverrides =
                         followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
                     _configuredFollowerAtmOverrides =
@@ -259,7 +259,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 oldCts.Cancel();
                 oldCts.Dispose();
                 
-                StartFollowerGuardWatchdog_NoLock();
+                StartProtectiveWatchdog_NoLock();
                 Log($"ARMED (auto). Reason={reason}. Master={_master?.Name}, Followers={_followers.Count}, Instr='{_instrumentName}'");
             }
 
@@ -306,7 +306,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // OnStatus?.Invoke(msg);
             }
             
-            private void StartFollowerGuardWatchdog_NoLock()
+            private void StartProtectiveWatchdog_NoLock()
             {
                 if (Interlocked.Exchange(ref _guardWatchdogRunning, 1) == 1)
                     return;
@@ -320,7 +320,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         {
                             try
                             {
-                                RunFollowerGuardWatchdog();
+                                RunProtectiveWatchdog();
                             }
                             catch (Exception ex)
                             {

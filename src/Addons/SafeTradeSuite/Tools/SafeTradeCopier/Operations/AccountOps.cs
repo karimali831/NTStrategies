@@ -17,27 +17,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private static bool IsSimAccount(Account acc)
         {
-            if (acc == null)
-                return false;
-
-            var accountName = (acc.Name ?? "").Trim();
-            var connectionName = (acc.Connection?.Options?.Name ?? "").Trim();
-
-            if (connectionName.Equals("Playback", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (connectionName.Equals("Simulation", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (accountName.Equals("Sim101", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (accountName.StartsWith("Sim", StringComparison.OrdinalIgnoreCase) &&
-                (connectionName.Equals("Simulation", StringComparison.OrdinalIgnoreCase) ||
-                 string.IsNullOrWhiteSpace(connectionName)))
-                return true;
-
-            return false;
+            var n = acc?.Name ?? "";
+            return n.StartsWith("Sim", StringComparison.OrdinalIgnoreCase)
+                   || n.StartsWith("Playback", StringComparison.OrdinalIgnoreCase);
         }
 
         private Account GetMasterAccount()
@@ -73,10 +55,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 prevFollowers[name] = new PrevFollowerState
                 {
-                    Included = r.IncludeCheck?.IsChecked == true,
-                    OverrideEnabled = false,
-                    QtyText = r.QtyBox?.Text ?? "",
-                    AtmName = r.AtmBox?.SelectedItem as string
+                    Included = r.EnabledCheck?.IsChecked == true,
+                    QtyText = r.QtyOverrideBox?.Text ?? "",
+                    BracketName = r.BracketOverrideBox?.SelectedItem as string
                 };
             }
 
@@ -103,14 +84,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!prevFollowers.TryGetValue(r.AccountName, out var ps))
                     continue;
 
-                if (r.IncludeCheck != null)
-                    r.IncludeCheck.IsChecked = ps.Included;
+                if (r.EnabledCheck != null)
+                    r.EnabledCheck.IsChecked = ps.Included;
 
-                if (r.QtyBox != null)
-                    r.QtyBox.Text = ps.QtyText ?? "";
+                if (r.QtyOverrideBox != null)
+                    r.QtyOverrideBox.Text = ps.QtyText ?? "";
 
-                if (r.AtmBox != null && ps.AtmName != null)
-                    r.AtmBox.SelectedItem = ps.AtmName;
+                if (r.BracketOverrideBox != null && ps.BracketName != null)
+                    r.BracketOverrideBox.SelectedItem = ps.BracketName;
             }
 
             EnforceSimOnlyModeUi(accounts);
@@ -170,9 +151,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private sealed class PrevFollowerState
         {
             public bool Included;
-            public bool OverrideEnabled;
             public string QtyText;
-            public string AtmName;
+            public string BracketName;
         }
 
         private sealed class AccountSnap

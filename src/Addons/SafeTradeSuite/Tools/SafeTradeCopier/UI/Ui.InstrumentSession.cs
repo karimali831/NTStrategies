@@ -423,7 +423,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 InstrumentName = normalized,
                 MasterAccount = _masterBox?.SelectedItem as Account,
                 MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text),
-                MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None"
+                MasterAtm = (_masterBracketBox?.SelectedItem as string) ?? "None"
             };
 
             _instrumentSessions.Add(session);
@@ -504,7 +504,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 _activeInstrumentSession.MasterAccount = _masterBox?.SelectedItem as Account;
                 _activeInstrumentSession.MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
-                _activeInstrumentSession.MasterAtm = (_masterAtmBox?.SelectedItem as string) ?? "None";
+                _activeInstrumentSession.MasterAtm = (_masterBracketBox?.SelectedItem as string) ?? "None";
 
                 _activeInstrumentSession.FollowersEnabled.Clear();
                 _activeInstrumentSession.FollowerQtyOverrides.Clear();
@@ -523,7 +523,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (int.TryParse(qtyText, out var qv) && qv > 0)
                         _activeInstrumentSession.FollowerQtyOverrides[accName] = qv;
 
-                    var atm = r.AtmOverrideBox?.SelectedItem as string ?? "Inherit Master";
+                    var atm = r.BracketOverrideBox?.SelectedItem as string ?? "Inherit Master";
                     _activeInstrumentSession.FollowerAtmOverrides[accName] = atm;
                 }
             }
@@ -566,7 +566,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _masterQtyBox.Text =
                         (_activeInstrumentSession.MasterQty > 0 ? _activeInstrumentSession.MasterQty : 1).ToString();
 
-                    _masterAtmBox.SelectedItem = _activeInstrumentSession.MasterAtm ?? "None";
+                    _masterBracketBox.SelectedItem = _activeInstrumentSession.MasterAtm ?? "None";
 
                     foreach (var r in _followerRows)
                     {
@@ -589,7 +589,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                                 ? av
                                 : "Inherit Master";
 
-                        r.AtmOverrideBox.SelectedItem = atm;
+                        r.BracketOverrideBox.SelectedItem = atm;
                         RenderFollowerRowState(r);
                     }
                 }

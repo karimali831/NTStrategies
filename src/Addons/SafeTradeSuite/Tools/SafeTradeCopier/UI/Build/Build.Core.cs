@@ -177,7 +177,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _masterBox.SelectedItem = initialMaster;
 
                 // ATMs
-                LoadAtmTemplatesInto(_masterAtmBox, includeInherit: false);
+                LoadAtmTemplatesInto(_masterBracketBox, includeInherit: false);
 
                 // ---------------- UI -> Engine wiring ----------------
                 RenderButtons(copyOn: eng.CopyEnabled);

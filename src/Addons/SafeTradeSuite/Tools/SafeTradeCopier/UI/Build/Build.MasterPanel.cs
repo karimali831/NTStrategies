@@ -6,7 +6,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private TextBox _masterQtyBox;
-        private ComboBox _masterAtmBox;
+        private ComboBox _masterBracketBox;
         private TextBlock _masterPnlText;
         private ProgressBar _masterPnlBar;
         private Button _btnBuyMkt;
@@ -44,21 +44,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterQtyBox = CreateFormTextBox("1", 40, margin: new Thickness(0, 0, 12, 0));
 
             var atmLbl = CreateFormLabel("Bracket", width: 50);
-            _masterAtmBox = CreateFormComboBox(width: 140);
+            _masterBracketBox = CreateFormComboBox(width: 140);
 
             Grid.SetColumn(accountLbl, 0);
             Grid.SetColumn(_masterBox, 1);
             Grid.SetColumn(qtyLbl, 2);
             Grid.SetColumn(_masterQtyBox, 3);
             Grid.SetColumn(atmLbl, 4);
-            Grid.SetColumn(_masterAtmBox, 5);
+            Grid.SetColumn(_masterBracketBox, 5);
 
             masterTopRow.Children.Add(accountLbl);
             masterTopRow.Children.Add(_masterBox);
             masterTopRow.Children.Add(qtyLbl);
             masterTopRow.Children.Add(_masterQtyBox);
             masterTopRow.Children.Add(atmLbl);
-            masterTopRow.Children.Add(_masterAtmBox);
+            masterTopRow.Children.Add(_masterBracketBox);
 
             var orderRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -252,7 +252,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 ApplyAndMaybeRewire();
             };
 
-            _masterAtmBox.SelectionChanged += (s, e) =>
+            _masterBracketBox.SelectionChanged += (s, e) =>
             {
                 if (_suppressSessionUiEvents)
                     return;

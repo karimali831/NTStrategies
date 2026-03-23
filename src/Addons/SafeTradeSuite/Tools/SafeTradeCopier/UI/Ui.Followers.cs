@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 .Where(r => r?.Account != null)
                 .ToDictionary(
                     r => r.Account.Name,
-                    r => NormalizeAtm(r.AtmOverrideBox?.SelectedItem as string),
+                    r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
                     StringComparer.Ordinal);
 
             BuildFollowerRows(accounts);
@@ -50,10 +50,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             foreach (var r in _followerRows)
             {
-                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
 
                 SafeTradeSuiteRuntime.PrintLog(
-                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.AtmOverrideBox?.SelectedItem}");
+                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
 
                 if (r?.Account == null)
                     continue;
@@ -67,12 +67,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
-                    r.AtmOverrideBox != null &&
-                    r.AtmOverrideBox.Items.Contains(bracket))
+                    r.BracketOverrideBox != null &&
+                    r.BracketOverrideBox.Items.Contains(bracket))
                 {
-                    r.AtmOverrideBox.SelectedItem = bracket;
+                    r.BracketOverrideBox.SelectedItem = bracket;
                     SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.AtmOverrideBox.SelectedItem}");
+                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
                 }
             }
 
@@ -314,9 +314,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     Account = acc,
                     EnabledCheck = enabled,
-                    AccountText = accountText,
                     QtyOverrideBox = qtyBox,
-                    AtmOverrideBox = atmBox,
+                    BracketOverrideBox = atmBox,
                     PnlText = pnl,
                     PnlBar = pnlBar,
                     FlattenBtn = flatten,
@@ -597,8 +596,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (row.QtyOverrideBox != null)
                 row.QtyOverrideBox.IsEnabled = allowEdits;
 
-            if (row.AtmOverrideBox != null)
-                row.AtmOverrideBox.IsEnabled = allowEdits;
+            if (row.BracketOverrideBox != null)
+                row.BracketOverrideBox.IsEnabled = allowEdits;
             
             RenderFollowerGuardState(row);
         }

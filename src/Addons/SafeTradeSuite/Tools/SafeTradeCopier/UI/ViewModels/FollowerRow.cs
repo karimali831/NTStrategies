@@ -9,23 +9,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             public Account Account;
             public CheckBox EnabledCheck;
-            public TextBlock AccountText;
-
             public TextBox QtyOverrideBox;
-            public ComboBox AtmOverrideBox;
+            public ComboBox BracketOverrideBox;
             public TextBlock PnlText;
             public Button FlattenBtn;
             public ProgressBar PnlBar;
             public TextBlock PnlBarStatusText;
             public Button FreeTradeBtn { get; set; }
-
             public string AccountName => Account?.Name ?? "";
-            public CheckBox IncludeCheck => EnabledCheck;
-            public CheckBox OverrideCheck => null;
-            public TextBox QtyBox => QtyOverrideBox;
-            public ComboBox AtmBox => AtmOverrideBox;
             public TextBlock GuardText { get; set; }
-            public ToolTip GuardToolTip { get; set; }
         }
     }
 }

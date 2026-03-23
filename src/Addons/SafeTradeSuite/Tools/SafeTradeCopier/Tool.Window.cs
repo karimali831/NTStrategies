@@ -245,7 +245,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _statusBox = null;
             _masterQtyBox = null;
-            _masterAtmBox = null;
+            _masterBracketBox = null;
             _masterPnlText = null;
             _totalPnlText = null;
 

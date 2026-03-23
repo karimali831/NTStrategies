@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         continue;
                     }
 
-                    var bracketMode = ResolveFollowerAtm(f);
+                    var bracketMode = ResolveFollowerBracket(f);
                     var followMasterExit = FollowerUsesMasterExit(f);
                     var hasOwnBracket =
                         !string.IsNullOrWhiteSpace(bracketMode) &&

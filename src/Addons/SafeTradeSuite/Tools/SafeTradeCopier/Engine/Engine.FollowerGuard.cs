@@ -191,7 +191,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (IsFollowerGuardDisabled(follower))
                         continue;
                     
-                    var bracketMode = ResolveFollowerAtm(follower);
+                    var bracketMode = ResolveFollowerBracket(follower);
                     var followMasterExit = FollowerUsesMasterExit(follower);
                     var hasOwnBracket =
                         !string.IsNullOrWhiteSpace(bracketMode) &&
@@ -240,24 +240,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         settings.OnDesync,
                         $"Follower desync detected. expected={expected}, actual={actual}");
                 }
-            }
-            
-            private void RunFollowerGuardWatchdog()
-            {
-                FollowerGuard settings;
-                bool armed;
-
-                lock (_gate)
-                {
-                    settings = _followerGuard ?? new FollowerGuard();
-                    armed = Armed;
-                }
-
-                if (!settings.Enabled || !armed)
-                    return;
-
-                CheckFollowerEntryTimeouts(settings);
-                CheckFollowerDesyncs(settings);
             }
             
             public void UpdateFollowerGuardSettings(FollowerGuard settings)

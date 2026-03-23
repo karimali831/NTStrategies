@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 if (r.QtyOverrideBox != null) r.QtyOverrideBox.IsEnabled = allow;
-                if (r.AtmOverrideBox != null) r.AtmOverrideBox.IsEnabled = allow;
+                if (r.BracketOverrideBox != null) r.BracketOverrideBox.IsEnabled = allow;
                 if (r.FlattenBtn != null) RenderFlattenButtonState(r.FlattenBtn, enabled: false);
             }
 

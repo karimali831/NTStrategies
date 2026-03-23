@@ -147,55 +147,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return row;
         }
 
-        private void LoadFollowerGuardSettingsIntoUi()
-        {
-            if (_fgEnabledCheckBox != null)
-                _fgEnabledCheckBox.IsChecked = _followerGuardEnabled;
-
-            if (_fgEntryTimeoutTextBox != null)
-                _fgEntryTimeoutTextBox.Text = Math.Max(1, _followerGuardEntryFillTimeoutSeconds).ToString();
-
-            if (_fgDesyncGraceTextBox != null)
-                _fgDesyncGraceTextBox.Text = Math.Max(1, _followerGuardDesyncGraceSeconds).ToString();
-
-            if (_fgOnEntryRejectComboBox != null)
-                _fgOnEntryRejectComboBox.SelectedItem = _followerGuardOnEntryReject;
-
-            if (_fgOnEntryTimeoutComboBox != null)
-                _fgOnEntryTimeoutComboBox.SelectedItem = _followerGuardOnEntryTimeout;
-
-            if (_fgOnDesyncComboBox != null)
-                _fgOnDesyncComboBox.SelectedItem = _followerGuardOnDesync;
-        }
-
-        private void ApplyFollowerGuardSettingsFromUi()
-        {
-            _followerGuardEnabled = _fgEnabledCheckBox?.IsChecked == true;
-            _followerGuardEntryFillTimeoutSeconds = ParseIntOrDefault(_fgEntryTimeoutTextBox?.Text, 5, 1, 300);
-            _followerGuardDesyncGraceSeconds = ParseIntOrDefault(_fgDesyncGraceTextBox?.Text, 3, 1, 120);
-            _followerGuardOnEntryReject = GetSelectedGuardAction(_fgOnEntryRejectComboBox, GuardAction.FlattenAndDisable);
-            _followerGuardOnEntryTimeout = GetSelectedGuardAction(_fgOnEntryTimeoutComboBox, GuardAction.FlattenAndDisable);
-            _followerGuardOnDesync = GetSelectedGuardAction(_fgOnDesyncComboBox, GuardAction.FlattenAndDisable);
-
-            SavePersistentUiState();
-            ApplyFollowerGuardSettingsToEngine();
-        }
-
-        private void ApplyFollowerGuardSettingsToEngine()
-        {
-            var settings = new FollowerGuard
-            {
-                Enabled = _followerGuardEnabled,
-                EntryFillTimeoutSeconds = _followerGuardEntryFillTimeoutSeconds,
-                DesyncGraceSeconds = _followerGuardDesyncGraceSeconds,
-                OnEntryReject = _followerGuardOnEntryReject,
-                OnEntryTimeout = _followerGuardOnEntryTimeout,
-                OnDesync = _followerGuardOnDesync
-            };
-
-            _engine?.UpdateFollowerGuardSettings(settings);
-        }
-
         private static int ParseIntOrDefault(string raw, int fallback, int min, int max)
         {
             if (!int.TryParse((raw ?? "").Trim(), out var value))

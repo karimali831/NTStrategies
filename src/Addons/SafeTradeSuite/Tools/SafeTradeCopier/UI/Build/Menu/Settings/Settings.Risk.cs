@@ -20,8 +20,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private readonly Dictionary<string, TextBox> _followerMaxDailyLossBoxes =
             new Dictionary<string, TextBox>(StringComparer.Ordinal);
         
+        private AutoFlattenProtectionScope _autoFlattenOnOrderReject = AutoFlattenProtectionScope.Disabled;
+        private AutoFlattenProtectionScope _autoFlattenMissingBracket = AutoFlattenProtectionScope.Disabled;
+
+        private ComboBox _autoFlattenOnOrderRejectComboBox;
+        private ComboBox _autoFlattenMissingBracketComboBox;
+        
         private UIElement RenderRiskFieldset()
         {
+            LoadRiskSettingsFromState();
+            
             var riskPanel = new StackPanel
             {
                 Margin = new Thickness(0, 4, 0, 0)
@@ -78,7 +86,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Foreground = MutedForegroundBrush(),
                 Margin = new Thickness(0, 0, 0, 10)
             });
+            
+            riskPanel.Children.Add(BuildRiskProtectionActionRow(
+                "Auto flatten on order rejection",
+                "If a protected order is rejected for an account with a selected bracket, flatten according to scope.",
+                out _autoFlattenOnOrderRejectComboBox));
 
+            riskPanel.Children.Add(BuildRiskProtectionActionRow(
+                "Auto flatten missing protective bracket",
+                "If an account has a live position with a selected bracket but no working protective stop, flatten according to scope.",
+                out _autoFlattenMissingBracketComboBox));
+            
+            _autoFlattenOnOrderRejectComboBox.SelectedItem = _autoFlattenOnOrderReject;
+            _autoFlattenMissingBracketComboBox.SelectedItem = _autoFlattenMissingBracket;
+            
             _followerUseMasterRiskChecks.Clear();
             _followerMaxDailyProfitBoxes.Clear();
             _followerMaxDailyLossBoxes.Clear();
@@ -116,7 +137,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddRiskHeader("Max Loss", 3);
 
             var settingsAccounts = GetSelectableAccounts();
-            var currentMaster = _masterBox?.SelectedItem as NinjaTrader.Cbi.Account;
+            var currentMaster = _masterBox?.SelectedItem as Cbi.Account;
             var rowIndex = 1;
 
             foreach (var acc in settingsAccounts)
@@ -228,6 +249,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _followerUseMasterRiskChecks[acc.Name] = useMasterCheck;
                 _followerMaxDailyProfitBoxes[acc.Name] = maxProfitBox;
                 _followerMaxDailyLossBoxes[acc.Name] = maxLossBox;
+                
+                _autoFlattenOnOrderRejectComboBox.SelectionChanged += (s, e) =>
+                {
+                    _autoFlattenOnOrderReject = GetSelectedProtectionScope(
+                        _autoFlattenOnOrderRejectComboBox,
+                        AutoFlattenProtectionScope.Disabled);
+
+                    SaveRiskSettingsToState();
+                    SavePersistentUiState();
+                    ApplyRiskProtectionSettingsToEngine();
+                };
+
+                _autoFlattenMissingBracketComboBox.SelectionChanged += (s, e) =>
+                {
+                    _autoFlattenMissingBracket = GetSelectedProtectionScope(
+                        _autoFlattenMissingBracketComboBox,
+                        AutoFlattenProtectionScope.Disabled);
+
+                    SaveRiskSettingsToState();
+                    SavePersistentUiState();
+                    ApplyRiskProtectionSettingsToEngine();
+                };
 
                 Grid.SetRow(accountTb, rowIndex);
                 Grid.SetColumn(accountTb, 0);
@@ -290,6 +333,56 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             };
 
             return BuildFieldset("Risk", riskPanel);
+        }
+        
+        private void ApplyRiskProtectionSettingsToEngine()
+        {
+            _engine?.UpdateRiskProtectionSettings(
+                _autoFlattenOnOrderReject,
+                _autoFlattenMissingBracket);
+        }
+        
+        private static UIElement BuildRiskProtectionActionRow(
+            string label,
+            string helpText,
+            out ComboBox comboBox)
+        {
+            var row = new StackPanel
+            {
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            row.Children.Add(new TextBlock
+            {
+                Text = label,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            row.Children.Add(new TextBlock
+            {
+                Text = helpText,
+                Opacity = 0.72,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+
+            comboBox = CreateFormComboBox();
+            comboBox.MinWidth = 180;
+            comboBox.MaxWidth = 260;
+            comboBox.ItemsSource = Enum.GetValues(typeof(AutoFlattenProtectionScope));
+
+            row.Children.Add(comboBox);
+            return row;
+        }
+
+        private static AutoFlattenProtectionScope GetSelectedProtectionScope(
+            ComboBox comboBox,
+            AutoFlattenProtectionScope fallback)
+        {
+            if (comboBox?.SelectedItem is AutoFlattenProtectionScope scope)
+                return scope;
+
+            return fallback;
         }
         
         private void RefreshRiskFieldset()

@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterAccount: config.MasterAccount,
                 followerAccounts: config.Followers,
                 instrName: config.InstrumentName,
-                masterAtm: config.MasterAtm,
+                masterBracket: config.MasterAtm,
                 followerQtyOverridesByAccountName: config.FollowerQtyOverrides,
                 followerAtmOverridesByAccountName: config.FollowerAtmOverrides,
                 masterMaxDailyProfit: config.MasterMaxDailyProfit,
@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _instrumentSelector?.Text ??
                 "");
             var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
-            var masterAtm = (_masterAtmBox?.SelectedItem as string) ?? _masterAtmBox?.Text ?? "None";
+            var masterAtm = (_masterBracketBox?.SelectedItem as string) ?? _masterBracketBox?.Text ?? "None";
             
             if (string.IsNullOrWhiteSpace(masterAtm))
                 masterAtm = "None";
@@ -96,7 +96,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (int.TryParse(qText, out var qv) && qv > 0)
                     qtyOverrides[r.Account.Name] = qv;
 
-                var aText = (r.AtmOverrideBox?.SelectedItem as string) ?? "Inherit Master";
+                var aText = (r.BracketOverrideBox?.SelectedItem as string) ?? "Inherit Master";
                 if (string.IsNullOrWhiteSpace(aText))
                     aText = "Inherit Master";
 

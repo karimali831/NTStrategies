@@ -24,7 +24,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 CompleteMasterManualSubmit(e.Order);
 
                 if (name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
+                {
                     SyncBracketFromOrderUpdate(e.Order);
+                    HandleRejectedProtectedOrder(e.Order);
+                }
             }
             
             private void OnFollowerOrderUpdate(object sender, OrderEventArgs e)

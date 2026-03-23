@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 
                 var action = isBuy ? OrderAction.Buy : OrderAction.Sell;
-                var atm = NormalizeAtm(_masterAtmBox?.SelectedItem as string);
+                var atm = NormalizeAtm(_masterBracketBox?.SelectedItem as string);
                 var entryName = "STC:ENTRY:" + Guid.NewGuid().ToString("N");
 
                 if (!eng.TryBeginMasterManualSubmit(master, instr, action, qty, atm, entryName,

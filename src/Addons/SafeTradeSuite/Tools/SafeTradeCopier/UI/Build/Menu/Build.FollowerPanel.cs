@@ -135,7 +135,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             BuildFollowerRows(accounts);
 
             foreach (var r in _followerRows)
-                LoadAtmTemplatesInto(r.AtmOverrideBox, includeInherit: true);
+                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
 
             EnforceSimOnlyModeUi(accounts);
             LoadActiveSessionToUi();

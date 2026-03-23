@@ -7,6 +7,49 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            private AutoFlattenProtectionScope _autoFlattenOnOrderReject = AutoFlattenProtectionScope.Disabled;
+            private AutoFlattenProtectionScope _autoFlattenMissingBracket = AutoFlattenProtectionScope.Disabled;
+            
+            private void TriggerRiskProtectionFlatten(Account acc, Instrument instr, string reason)
+            {
+                if (acc == null || instr == null)
+                    return;
+
+                Log($"[RISK PROTECT] flatten -> acc={acc.Name} instr={instr.FullName} reason={reason}");
+
+                if (_master != null && ReferenceEquals(acc, _master))
+                {
+                    lock (_gate)
+                    {
+                        _copyEnabled = false;
+                        DisarmUnsafe_NoLock($"Master protection triggered: {reason}");
+                        RaiseModeChanged_NoLock();
+                        RaiseReady_NoLock(reasonOverride: reason);
+                    }
+                }
+                else
+                {
+                    DisableFollower(acc, reason);
+                }
+
+                EnsureFlatInstrument(acc, instr);
+            }
+            
+            public void UpdateRiskProtectionSettings(
+                AutoFlattenProtectionScope onOrderReject,
+                AutoFlattenProtectionScope onMissingBracket)
+            {
+                lock (_gate)
+                {
+                    _autoFlattenOnOrderReject = onOrderReject;
+                    _autoFlattenMissingBracket = onMissingBracket;
+                }
+
+                Log(
+                    $"[RISK PROTECT] updated -> " +
+                    $"onReject={onOrderReject}, missingBracket={onMissingBracket}");
+            }
+            
             private double GetEffectiveMaxDailyProfit(Account acc)
             {
                 if (acc == null)

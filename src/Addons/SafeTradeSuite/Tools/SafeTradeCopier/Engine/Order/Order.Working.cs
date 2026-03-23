@@ -9,7 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            internal bool HasWorkingBracketOrders(Account acc, Instrument instr)
+            internal static bool HasWorkingBracketOrders(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
                     return false;

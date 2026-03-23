@@ -63,37 +63,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SafeTradeSuiteRuntime.PrintLog($"[UNSUB PNL] {acc?.Name}");
                 acc.AccountItemUpdate -= OnAccountItemUpdate;
             }
-
-            private void OnAccountItemUpdate(object sender, AccountItemEventArgs e)
-            {
-                if (e?.Account == null) 
-                    return;
-
-                if (e.Currency != Currency.UsDollar) 
-                    return;
-
-                if (e.AccountItem != AccountItem.RealizedProfitLoss &&
-                    e.AccountItem != AccountItem.UnrealizedProfitLoss)
-                    return;
-
-                var name = e.Account.Name ?? "";
-                if (string.IsNullOrWhiteSpace(name)) 
-                    return;
-
-                lock (_pnlByAccount)
-                {
-                    if (!_pnlByAccount.TryGetValue(name, out var snap))
-                    {
-                        snap = new PnlSnap();
-                        _pnlByAccount[name] = snap;
-                    }
-
-                    if (e.AccountItem == AccountItem.RealizedProfitLoss)
-                        snap.Realized = e.Value;
-                    else
-                        snap.Unrealized = e.Value;
-                }
-            }
         }
     }
 }
