@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -64,7 +65,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     ActivateOrCreateInstrumentSession(typed, refreshSelector: true);
                     UpdateAddInstrumentButtonState();
-                    RenderFlattenAllButtonState();
+                    // RenderFlattenMasterButtonState();
+                    // RenderFlattenAllButtonState();
                 });
             _btnAddInstrumentTab.BorderThickness = new Thickness(0, 1, 1, 1);
 
@@ -105,7 +107,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _engine.SetCopyEnabled(true);
 
                 UpdateAddInstrumentButtonState();
-                RenderFlattenAllButtonState();
+                // RenderFlattenMasterButtonState();
+                // RenderFlattenAllButtonState();
             };
 
             _instrumentSelector.LostKeyboardFocus += (s, e) =>
@@ -125,10 +128,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 ActivateOrCreateInstrumentSession(instrumentName, refreshSelector: true);
                 UpdateAddInstrumentButtonState();
-                RenderFlattenAllButtonState();
+                // RenderFlattenMasterButtonState();
+                // RenderFlattenAllButtonState();
             };
 
-            _instrumentSelector.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler((s, e) =>
+            _instrumentSelector.AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler((s, e) =>
             {
                 UpdateAddInstrumentButtonState();
             }));

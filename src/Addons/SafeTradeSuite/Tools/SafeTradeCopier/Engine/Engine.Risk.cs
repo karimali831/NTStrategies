@@ -103,32 +103,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 return 0;
             }
-
-            private bool TryGetRealizedPnl(Account acc, out double realized)
+            
+            internal bool CanEnterForRisk(Account acc, out string shortReason, out string fullReason)
             {
-                realized = 0;
-
-                if (acc == null)
-                    return false;
-
-                try
-                {
-                    realized = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-
-            internal bool CanEnterForRisk(Account acc, out string reason)
-            {
-                reason = "";
+                shortReason = "";
+                fullReason = "";
 
                 if (acc == null)
                 {
-                    reason = "No account";
+                    shortReason = "No account";
                     return false;
                 }
                 
@@ -137,26 +120,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (maxProfit <= 0 && maxLoss <= 0)
                 {
-                    reason = "";
+                    shortReason = "";
                     return true;
                 }
 
                 if (!TryGetRealizedPnl(acc, out var realized))
                 {
-                    reason = "Unable to read realized PnL";
+                    shortReason = "Unable to read realized PnL";
                     return false;
                 }
 
                 if (maxProfit > 0 && realized >= maxProfit)
                 {
-                    reason = $"Daily profit lock hit ({realized:0.00} >= {maxProfit:0.00})";
+                    shortReason = "⚠ Daily profit lock hit";
+                    fullReason = $"{shortReason} {FmtUsd(realized)} >= {FmtUsd(maxProfit)}";
                     return false;
                 }
-
-           
+                
                 if (maxLoss > 0 && realized <= -maxLoss)
                 {
-                    reason = $"Daily loss lock hit ({realized:0.00} <= -{maxLoss:0.00})";
+                    shortReason = "⚠ Daily loss lock hit";
+                    fullReason = $"{shortReason}: {FmtUsd(realized)} <= -{FmtUsd(maxLoss)}";
                     return false;
                 }
 

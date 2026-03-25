@@ -135,7 +135,6 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.DiagBox.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.FollowerPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.MenuTabs.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.PositionsPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Build.TradesPanel.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.BreakEven.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Menu\Settings\Settings.FollowerGuard.cs" />
@@ -167,6 +166,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Flatten.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Helper.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.GlyphIcons.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.OrderQtyBox.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Position.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\FollowerRow.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\InstrumentSession.cs" />

@@ -16,6 +16,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Button _btnFreeTradeAll;
         private Button _btnMasterFreeTrade;
         private Button _btnFlattenMaster;
+        private TextBlock _masterPositionText;
         
         private void RenderMasterPanel(SafeCopierEngine eng, Grid root)
         {
@@ -41,7 +42,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterBox = CreateFormComboBox(width: 140, margin: new Thickness(0, 0, 12, 0));
 
             var qtyLbl = CreateFormLabel("Qty", width: 28);
-            _masterQtyBox = CreateFormTextBox("1", 40, margin: new Thickness(0, 0, 12, 0));
+            _masterQtyBox = CreateOrderQtyBox(1, "Order quantity", margin: new Thickness(0, 0, 12, 0));
 
             var atmLbl = CreateFormLabel("Bracket", width: 50);
             _masterBracketBox = CreateFormComboBox(width: 140);
@@ -66,35 +67,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             orderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+            // Copier controls
             _btnBuyMkt = CreateFormButton(
                 text: "Buy Market",
                 width: 115,
                 tone: FormButtonTone.Success,
-                style: FormButtonStyle.Solid);
+                style: FormButtonStyle.Solid,
+                bold: true);
 
             _btnSellMkt = CreateFormButton(
                 text: "Sell Market",
                 width: 115,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Solid,
-                margin: new Thickness(6, 0, 0, 0));
+                margin: new Thickness(6, 0, 0, 0),
+                bold: true);
 
             _btnFreeTradeAll = CreateFormButton(
                 text: "Break-even All",
                 width: 115,
                 tone: FormButtonTone.Primary,
-                style: FormButtonStyle.Outline,
-                margin: new Thickness(6, 0, 0, 0));
-            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Break-even All");
+                style: FormButtonStyle.Solid,
+                margin: new Thickness(6, 0, 0, 0),
+                bold: true);
+            RenderFreeTradeButtonState(_btnFreeTradeAll, enabled: false, undoMode: false, "Break-even All", all: true);
 
             _btnFlattenAll = CreateFormButton(
                 text: "Flatten All",
                 width: 115,
-                tone: FormButtonTone.Danger,
-                style: FormButtonStyle.Outline,
-                margin: new Thickness(6, 0, 0, 0));
-            ApplyButtonTheme(_btnFlattenAll, FormButtonTone.Danger, FormButtonStyle.Outline, enabled: false);
-
+                tone: FormButtonTone.Flatten,
+                style: FormButtonStyle.Solid,
+                margin: new Thickness(6, 0, 0, 0),
+                bold: true);
+            RenderFlattenAllButtonState();
+            
             _btnFreeTradeAll.Click += (s, e) => FreeTradeAllSelected(eng);
             _btnFlattenAll.Click += (s, e) => FlattenAllSelected(eng);
             _btnBuyMkt.Click += (s, e) => SubmitMasterMarket(eng, isBuy: true);
@@ -109,22 +115,85 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             orderRow.Children.Add(_btnSellMkt);
             orderRow.Children.Add(_btnFreeTradeAll);
             orderRow.Children.Add(_btnFlattenAll);
+            
+            masterStack.Children.Add(masterTopRow);
+            masterStack.Children.Add(orderRow);
+            
+           // Master controls
+            var masterInfoGrid = new Grid
+            {
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+
+            masterInfoGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            masterInfoGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });
+            masterInfoGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto  });
+            masterInfoGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _masterPositionText = new TextBlock
+            {
+                Text = "",
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = MutedForegroundBrush(),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
 
             _masterPnlText = new TextBlock
             {
-                Text = "Master Unrealized $0.00",
-                Margin = new Thickness(0, 6, 0, 2),
+                Text = "",
+                Margin = new Thickness(0, 0, 8, 0),
                 Foreground = MutedForegroundBrush(),
                 FontWeight = FontWeights.SemiBold,
-                FontSize = 12
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
 
-            var masterPnlRow = new Grid
+            _btnMasterFreeTrade = CreateFormButton(
+                text: "Break-even",
+                tone: FormButtonTone.Primary,
+                style: FormButtonStyle.Outline,
+                height: SmallButtonHeight(),
+                margin: new Thickness(0),
+                width: null);
+
+            _btnMasterFreeTrade.HorizontalAlignment = HorizontalAlignment.Right;
+            _btnMasterFreeTrade.Click += (s, e) => FreeTradeMasterSelected(eng);
+
+            _btnFlattenMaster = CreateFormButton(
+                text: "Flatten",
+                tone: FormButtonTone.Flatten,
+                style: FormButtonStyle.Solid,
+                height: SmallButtonHeight(),
+                enabled: false,
+                margin: new Thickness(8, 0, 0, 0),
+                width: null);
+
+            _btnFlattenMaster.HorizontalAlignment = HorizontalAlignment.Right;
+            RenderFlattenMasterButtonState();
+
+            _btnFlattenMaster.Click += (s, e) =>
             {
-                Margin = new Thickness(0, 6, 0, 0)
+                var instr = GetInstrument();
+                var master = GetMasterAccount();
+                if (eng == null || master == null || instr == null)
+                    return;
+
+                eng.EnsureFlatInstrument(master, instr);
             };
-            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
-            masterPnlRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+
+            Grid.SetColumn(_masterPositionText, 0);
+            Grid.SetColumn(_masterPnlText, 1);
+            Grid.SetColumn(_btnMasterFreeTrade, 2);
+            Grid.SetColumn(_btnFlattenMaster, 3);
+
+            masterInfoGrid.Children.Add(_masterPositionText);
+            masterInfoGrid.Children.Add(_masterPnlText);
+            masterInfoGrid.Children.Add(_btnMasterFreeTrade);
+            masterInfoGrid.Children.Add(_btnFlattenMaster);
 
             _masterPnlBar = new ProgressBar
             {
@@ -133,14 +202,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Maximum = 100,
                 Value = 0,
                 Width = 100,
-                Margin = new Thickness(0, 0, 12, 0),
+                Margin = new Thickness(0, 6, 0, 0),
                 Visibility = Visibility.Collapsed,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
             EnsureRoundedProgressBar(_masterPnlBar, alignRight: false);
-
-            Grid.SetColumn(_masterPnlBar, 0);
-            masterPnlRow.Children.Add(_masterPnlBar);
 
             _masterPnlBarStatusText = new TextBlock
             {
@@ -149,51 +215,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = MutedForegroundBrush(),
-                Margin = new Thickness(0, 0, 0, 0),
+                Margin = new Thickness(0, 4, 0, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Visibility = Visibility.Collapsed
             };
 
-            masterStack.Children.Add(masterTopRow);
-            masterStack.Children.Add(orderRow);
-
-            var masterPnlTopRow = new Grid
-            {
-                Margin = new Thickness(0, 6, 0, 0)
-            };
-            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            masterPnlTopRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            _btnMasterFreeTrade = CreateFormButton(
-                text: "Break-even",
-                tone: FormButtonTone.Primary,
-                style: FormButtonStyle.Outline,
-                width: 100,
-                height: SmallButtonHeight(),
-                margin: new Thickness(8, 0, 0, 0));
-            _btnMasterFreeTrade.Click += (s, e) => FreeTradeMasterSelected(eng);
-            
-            _btnFlattenMaster = CreateFormButton(
-                text: "Flatten",
-                width: 100,
-                tone: FormButtonTone.Danger,
-                style: FormButtonStyle.Outline,
-                height: SmallButtonHeight(),
-                margin: new Thickness(8, 0, 0, 0));
-            ApplyButtonTheme(_btnFlattenMaster, FormButtonTone.Danger, FormButtonStyle.Outline, enabled: false);
-
-            _btnFlattenMaster.Click += (s, e) => FreeTradeMasterSelected(eng);
-
-            Grid.SetColumn(_masterPnlText, 0);
-            Grid.SetColumn(_btnMasterFreeTrade, 1);
-            Grid.SetColumn(_btnFlattenMaster, 2);
-            masterPnlTopRow.Children.Add(_masterPnlText);
-            masterPnlTopRow.Children.Add(_btnMasterFreeTrade);
-            masterPnlTopRow.Children.Add(_btnFlattenMaster);
-
-            masterStack.Children.Add(masterPnlTopRow);
-            masterStack.Children.Add(masterPnlRow);
+            masterStack.Children.Add(masterInfoGrid);
+            masterStack.Children.Add(_masterPnlBar);
             masterStack.Children.Add(_masterPnlBarStatusText);
 
             var masterFieldset = BuildFieldset("Master", masterStack);
@@ -213,23 +241,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 LoadActiveSessionToUi();
                 RefreshRiskFieldset();
-                RenderFlattenAllButtonState();
+                // RenderPnlUi();
             };
-
-            _masterBox.DropDownOpened += (s, e) => UpdateMasterComboItemEnablement();
-
+            
             void ApplyAndMaybeRewire()
             {
                 if (_suppressSessionUiEvents)
                     return;
-
-                var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
-
-                foreach (var r in _followerRows)
-                {
-                    if (string.IsNullOrWhiteSpace(r.QtyOverrideBox.Text))
-                        r.QtyOverrideBox.Text = masterQty.ToString();
-                }
 
                 var latestAccounts = GetSelectableAccounts();
 

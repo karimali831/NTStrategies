@@ -17,6 +17,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private bool _isInstrumentTabDragging;
         private Popup _instrumentTabInsertPopup;
         private Border _instrumentTabInsertMarker;
+        
+        private static string UiInstrumentKey(Account acc, Instrument instr)
+        {
+            return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
+        }
 
         private void RefreshInstrumentTabs()
         {
@@ -480,7 +485,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RefreshInstrumentSelectorItems();
             RefreshInstrumentTabs();
             LoadActiveSessionToUi();
-            RenderFlattenAllButtonState();
+            // RenderFlattenMasterButtonState();
+            // RenderFlattenAllButtonState();
         }
 
         private void SaveUiToActiveSession()
@@ -598,8 +604,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _suppressSessionUiEvents = false;
                 }
 
-                ApplyConfigFromUi();
                 RenderFollowerRowsState();
+                ApplyConfigFromUi();
             }
             catch (Exception ex)
             {

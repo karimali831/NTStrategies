@@ -194,7 +194,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var btn = new Button
             {
                 Content = text,
-                Width = 30,
+                Width = 60,
+                MinWidth = 0,
                 Height = 42,
                 FontSize = 14,
                 FontWeight = FontWeights.Normal,

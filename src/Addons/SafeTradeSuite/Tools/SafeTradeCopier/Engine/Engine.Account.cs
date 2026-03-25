@@ -6,6 +6,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            public bool TryGetAccountLockReason(Account acc, out string lockShortReason, out string lockLongReason)
+            {
+                lockShortReason = "";
+                lockLongReason = "";
+                if (_engine == null)
+                    return false;
+
+                if (!_engine.CanEnterForRisk(acc, out var shortReason, out var fullReason))
+                {
+                    lockShortReason = shortReason;
+                    lockLongReason = fullReason;
+                    return true;
+                }
+
+                return false;
+            }
+
+            public bool TryGetRealizedPnl(Account acc, out double realized)
+            {
+                realized = 0;
+
+                if (acc == null)
+                    return false;
+
+                try
+                {
+                    realized = acc.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            
             private bool IsProtectionEnabledForAccount(Account acc, AutoFlattenProtectionScope scope)
             {
                 if (acc == null || scope == AutoFlattenProtectionScope.Disabled)

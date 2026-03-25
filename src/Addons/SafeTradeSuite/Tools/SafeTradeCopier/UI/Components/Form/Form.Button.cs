@@ -12,7 +12,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             Primary,
             Success,
             Danger,
-            Warning
+            Warning,
+            Flatten
         }
 
         private enum FormButtonStyle
@@ -36,7 +37,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var btn = new Button
             {
                 Content = text ?? "",
-                Width = width ?? double.NaN,
+                Width = width ?? 100,
+                MinWidth = 0,
                 Height = height ?? MainButtonHeight(),
                 Margin = margin ?? new Thickness(0),
                 FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
@@ -57,7 +59,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             btn.IsEnabled = enabled;
-            btn.Opacity = 1.0;
+            btn.Opacity = enabled ? 1.0 : 0.65;
             btn.Focusable = false;
             btn.FocusVisualStyle = null;
 
@@ -76,36 +78,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 case FormButtonTone.Warning:
                     accent = WarningActionBrush();
                     break;
+                case FormButtonTone.Flatten:
+                    accent = FlattenActionBrush();
+                    break;
                 default:
                     accent = OutlineNeutralBorderBrush();
                     break;
             }
             
-            var effectiveStyle = style;
+            btn.BorderBrush = accent;
+            var isSolidStyle = style == FormButtonStyle.Solid;
+            var isFlattenBtn = tone == FormButtonTone.Flatten;
 
-            if (IsDarkTheme() && style == FormButtonStyle.Solid)
+            var effectiveStyle = style;
+            if (IsDarkTheme() && isSolidStyle && !isFlattenBtn)
                 effectiveStyle = FormButtonStyle.Outline;
 
             if (!enabled)
             {
+                if (isFlattenBtn)
+                {
+                    btn.Foreground = Brushes.White;
+                    btn.Background = Brushes.Gray;
+                    return;
+                }
+                
                 btn.Foreground = DisabledForegroundBrush();
                 btn.BorderBrush = IsDarkTheme() ? DisabledBorderBrush() : DisabledBackgroundBrush();
-                btn.Background = IsDarkTheme()
-                    ? Brushes.Transparent
-                    : InputDisabledBackgroundBrush();
+                btn.Background = IsDarkTheme() ? Brushes.Transparent : InputDisabledBackgroundBrush();
+                
                 return;
             }
 
             if (effectiveStyle == FormButtonStyle.Outline)
             {
                 btn.Background = Brushes.Transparent;
-                btn.BorderBrush = accent;
                 btn.Foreground = accent;
             }
             else
             {
                 btn.Background = accent;
-                btn.BorderBrush = accent;
                 btn.Foreground = ActionForegroundBrush();
             }
         }

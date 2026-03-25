@@ -55,8 +55,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _mainMenuTabsPanel.Children.Clear();
             
             AddMainMenuTab(MainMenuTab.Copier, "Copier", CreateCopierIcon());
-            AddMainMenuTab(MainMenuTab.Positions, "Positions", CreateGridIcon());
-            AddMainMenuTab(MainMenuTab.Trades, "Trades", CreateListIcon());
+            // AddMainMenuTab(MainMenuTab.Positions, "Positions", CreateGridIcon());
+            // AddMainMenuTab(MainMenuTab.Trades, "Trades", CreateListIcon());
             AddMainMenuTab(MainMenuTab.Settings, "Settings", CreateCogIcon());
 
             if (_showStatusBox)
@@ -209,13 +209,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _mainContentHost.Content = BuildFollowersContent();
                     break;
 
-                case MainMenuTab.Positions:
-                    _mainContentHost.Content = BuildPositionsContent();
-                    break;
-
-                case MainMenuTab.Trades:
-                    _mainContentHost.Content = BuildTradesPlaceholder();
-                    break;
+                // case MainMenuTab.Positions:
+                //     _mainContentHost.Content = BuildPositionsContent();
+                //     break;
+                //
+                // case MainMenuTab.Trades:
+                //     _mainContentHost.Content = BuildTradesPlaceholder();
+                //     break;
 
                 case MainMenuTab.Settings:
                     _mainContentHost.Content = BuildSettingsContent();

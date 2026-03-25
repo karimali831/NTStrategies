@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -11,10 +10,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private Button _btnCopyOn;
         private Button _btnToggleAllFollowers;
-        private Button _btnToggleSimFollowers;
-        private Button _btnToggleLiveFollowers;
+        // private Button _btnToggleSimFollowers;
+        // private Button _btnToggleLiveFollowers;
         private StackPanel _followersBulkActionsPanel;
-        private static readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
+        private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
         
         private void RenderFollowerPanel(SafeCopierEngine eng, Grid root)
         {
@@ -56,26 +55,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 style: FormButtonStyle.Outline,
                 height: SmallButtonHeight());
 
-            _btnToggleSimFollowers = CreateFormButton(
-                text: "Select All Sim",
-                tone: FormButtonTone.Primary,
-                style: FormButtonStyle.Outline,
-                height: SmallButtonHeight());
-
-            _btnToggleLiveFollowers = CreateFormButton(
-                text: "Select All Live",
-                tone: FormButtonTone.Warning,
-                style: FormButtonStyle.Outline,
-                height: SmallButtonHeight(),
-                margin: new Thickness(6, 0, 0, 0));
+            // _btnToggleSimFollowers = CreateFormButton(
+            //     text: "Select All Sim",
+            //     tone: FormButtonTone.Primary,
+            //     style: FormButtonStyle.Outline,
+            //     height: SmallButtonHeight());
+            //
+            // _btnToggleLiveFollowers = CreateFormButton(
+            //     text: "Select All Live",
+            //     tone: FormButtonTone.Warning,
+            //     style: FormButtonStyle.Outline,
+            //     height: SmallButtonHeight(),
+            //     margin: new Thickness(6, 0, 0, 0));
 
             _btnToggleAllFollowers.Click += (s, e) => ToggleFollowersSelection(x => true);
-            _btnToggleSimFollowers.Click += (s, e) => ToggleFollowersSelection(r => IsSimAccount(r.Account));
-            _btnToggleLiveFollowers.Click += (s, e) => ToggleFollowersSelection(r => !IsSimAccount(r.Account));
+            // _btnToggleSimFollowers.Click += (s, e) => ToggleFollowersSelection(r => IsSimAccount(r.Account));
+            // _btnToggleLiveFollowers.Click += (s, e) => ToggleFollowersSelection(r => !IsSimAccount(r.Account));
 
             _followersBulkActionsPanel.Children.Add(_btnToggleAllFollowers);
-            _followersBulkActionsPanel.Children.Add(_btnToggleSimFollowers);
-            _followersBulkActionsPanel.Children.Add(_btnToggleLiveFollowers);
+            // _followersBulkActionsPanel.Children.Add(_btnToggleSimFollowers);
+            // _followersBulkActionsPanel.Children.Add(_btnToggleLiveFollowers);
 
             _btnCopyOn = CreateFormButton(
                 eng.CopyEnabled ? "Disarm" : "Arm",
@@ -127,22 +126,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             SafeTradeSuiteRuntime.PrintLog(
                 $"[BUILD FOLLOWERS CONTENT] activeInstr={_activeInstrumentSession?.InstrumentName} rowsBefore={_followerRows.Count}");
-            
+    
             var host = new Grid();
             RenderFollowerPanel(_engine, host);
 
             var accounts = GetSelectableAccounts();
-            BuildFollowerRows(accounts);
-
-            foreach (var r in _followerRows)
-                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
-
-            EnforceSimOnlyModeUi(accounts);
-            LoadActiveSessionToUi();
+            
+            _suppressSessionUiEvents = true;
+            try
+            {
+                BuildFollowerRows(accounts);
+            
+                foreach (var r in _followerRows)
+                    LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
+            
+                EnforceSimOnlyModeUi(accounts);
+                LoadActiveSessionToUi();
+            }
+            finally
+            {
+                _suppressSessionUiEvents = false;
+            }
+            
             RenderFollowerRowsState();
             WireFollowerFlattenButtons(_engine);
             WireFollowerFreeTradeButtons(_engine);
             RefreshFollowerBulkActionButtons();
+            RefreshCopierStatusPanel();
 
             return host;
         }
@@ -163,32 +173,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_followersBulkActionsPanel == null)
                 return;
 
-            if (_btnToggleAllFollowers != null)
-                _btnToggleAllFollowers.Visibility = _simOnlyMode ? Visibility.Visible : Visibility.Collapsed;
+            // if (_btnToggleAllFollowers != null)
+            // _btnToggleAllFollowers.Visibility = _simOnlyMode ? Visibility.Visible : Visibility.Collapsed;
 
-            if (_btnToggleSimFollowers != null)
-                _btnToggleSimFollowers.Visibility = _simOnlyMode ? Visibility.Collapsed : Visibility.Visible;
+            // if (_btnToggleSimFollowers != null)
+            //     _btnToggleSimFollowers.Visibility = _simOnlyMode ? Visibility.Collapsed : Visibility.Visible;
 
-            if (_btnToggleLiveFollowers != null)
-                _btnToggleLiveFollowers.Visibility = _simOnlyMode ? Visibility.Collapsed : Visibility.Visible;
+            // if (_btnToggleLiveFollowers != null)
+            //     _btnToggleLiveFollowers.Visibility = _simOnlyMode ? Visibility.Collapsed : Visibility.Visible;
 
             if (_btnToggleAllFollowers != null)
                 _btnToggleAllFollowers.Content = AreAllMatchingFollowersChecked(x => true)
                     ? "Deselect All"
                     : "Select All";
 
-            if (_btnToggleSimFollowers != null)
-                _btnToggleSimFollowers.Content = AreAllMatchingFollowersChecked(r => IsSimAccount(r.Account))
-                    ? "Deselect All Sim"
-                    : "Select All Sim";
+            // if (_btnToggleSimFollowers != null)
+            //     _btnToggleSimFollowers.Content = AreAllMatchingFollowersChecked(r => IsSimAccount(r.Account))
+            //         ? "Deselect All Sim"
+            //         : "Select All Sim";
 
-            if (_btnToggleLiveFollowers != null)
-                _btnToggleLiveFollowers.Content = AreAllMatchingFollowersChecked(r => !IsSimAccount(r.Account))
-                    ? "Deselect All Live"
-                    : "Select All Live";
+            // if (_btnToggleLiveFollowers != null)
+            //     _btnToggleLiveFollowers.Content = AreAllMatchingFollowersChecked(r => !IsSimAccount(r.Account))
+            //         ? "Deselect All Live"
+            //         : "Select All Live";
         }
 
-        private static bool AreAllMatchingFollowersChecked(Func<FollowerRow, bool> predicate)
+        private bool AreAllMatchingFollowersChecked(Func<FollowerRow, bool> predicate)
         {
             var rows = _followerRows
                 .Where(r => r?.Account != null)

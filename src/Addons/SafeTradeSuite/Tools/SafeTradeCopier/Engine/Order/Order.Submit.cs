@@ -109,9 +109,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (!_seen.TryAdd(seenKey, DateTime.UtcNow.Ticks))
                         continue;
 
-                    if (!CanEnterForRisk(f, out var riskReason))
+                    if (!CanEnterForRisk(f, out _, out var longReason))
                     {
-                        Log($"Copy skipped -> {f.Name}: {riskReason}");
+                        Log($"Copy skipped -> {f.Name}: {longReason}");
                         continue;
                     }
 

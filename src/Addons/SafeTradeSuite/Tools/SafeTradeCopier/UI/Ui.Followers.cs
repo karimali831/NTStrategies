@@ -15,69 +15,77 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SafeTradeSuiteRuntime.PrintLog(
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
 
-            var selected = new HashSet<string>(
-                _followerRows
-                    .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
-                    .Select(r => r.Account.Name),
-                StringComparer.Ordinal);
-
-            var qtyOverrides = _followerRows
-                .Where(r => r?.Account != null)
-                .ToDictionary(
-                    r => r.Account.Name,
-                    r => r.QtyOverrideBox?.Text,
+            _suppressSessionUiEvents = true;
+            try
+            {
+                var selected = new HashSet<string>(
+                    _followerRows
+                        .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
+                        .Select(r => r.Account.Name),
                     StringComparer.Ordinal);
 
-            var bracketSelections = _followerRows
-                .Where(r => r?.Account != null)
-                .ToDictionary(
-                    r => r.Account.Name,
-                    r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
-                    StringComparer.Ordinal);
+                var qtyOverrides = _followerRows
+                    .Where(r => r?.Account != null)
+                    .ToDictionary(
+                        r => r.Account.Name,
+                        r => r.QtyOverrideBox?.Text,
+                        StringComparer.Ordinal);
 
-            BuildFollowerRows(accounts);
+                var bracketSelections = _followerRows
+                    .Where(r => r?.Account != null)
+                    .ToDictionary(
+                        r => r.Account.Name,
+                        r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
+                        StringComparer.Ordinal);
 
-            foreach (var r in _followerRows)
-            {
-                if (r?.Account == null)
-                    continue;
+                BuildFollowerRows(accounts);
 
-                if (r.EnabledCheck != null)
-                    r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
-            }
-
-            EnforceSimOnlyModeUi(accounts);
-
-            foreach (var r in _followerRows)
-            {
-                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
-
-                SafeTradeSuiteRuntime.PrintLog(
-                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
-
-                if (r?.Account == null)
-                    continue;
-
-                if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
+                foreach (var r in _followerRows)
                 {
-                    if (int.TryParse(qtyText, out var parsedQty))
-                        r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
-                    else
-                        r.QtyOverrideBox.Text = qtyText;
+                    if (r?.Account == null)
+                        continue;
+
+                    if (r.EnabledCheck != null)
+                        r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
                 }
 
-                if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
-                    r.BracketOverrideBox != null &&
-                    r.BracketOverrideBox.Items.Contains(bracket))
+                EnforceSimOnlyModeUi(accounts);
+
+                foreach (var r in _followerRows)
                 {
-                    r.BracketOverrideBox.SelectedItem = bracket;
+                    LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
+
                     SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
-                }
-            }
+                        $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
 
-            WireFollowerFlattenButtons(eng);
-            WireFollowerFreeTradeButtons(eng);
+                    if (r?.Account == null)
+                        continue;
+
+                    if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
+                    {
+                        if (int.TryParse(qtyText, out var parsedQty))
+                            r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
+                        else
+                            r.QtyOverrideBox.Text = qtyText;
+                    }
+
+                    if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
+                        r.BracketOverrideBox != null &&
+                        r.BracketOverrideBox.Items.Contains(bracket))
+                    {
+                        r.BracketOverrideBox.SelectedItem = bracket;
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
+                    }
+                }
+
+                WireFollowerFlattenButtons(eng);
+                WireFollowerFreeTradeButtons(eng);
+            }
+            finally
+            {
+                _suppressSessionUiEvents = false;
+            }
 
             ApplyConfigFromUi();
             RefreshRiskFieldset();
@@ -204,14 +212,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
 
                 var masterQty = ParseQtyOrDefault(_masterQtyBox?.Text);
-
-                var qtyBox = CreateFormTextBox(masterQty.ToString(), width: 40);
-                qtyBox.ToolTip = "Qty override (blank = inherit master)";
+                var qtyBox = CreateOrderQtyBox(
+                    null,
+                    $"Blank = inherit master qty ({masterQty})", transparentBg: true);
 
                 var atmBox = CreateFormComboBox(width: 125);
                 atmBox.ToolTip =
                     "(inherit master) = use master ATM, Follow Master Exit = no follower bracket, exit when master exits";
+                
+                // Position
+                var position = new TextBlock
+                {
+                    Text = "",
+                    Foreground = MutedForegroundBrush(),
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 12
+                };
+                RenderLivePositionText(position, acc);
 
+                // PnL Trade Tracker 
                 var pnl = new TextBlock
                 {
                     Text = "$0.00",
@@ -228,7 +247,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Maximum = 100,
                     Value = 0,
                     Width = 100,
-                    Margin = new Thickness(0, 2, 20, 2),
+                    Margin = new Thickness(0, 2, 8, 2),
                     Visibility = Visibility.Collapsed
                 };
                 EnsureRoundedProgressBar(pnlBar, alignRight: false);
@@ -236,7 +255,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var pnlBarStatusText = new TextBlock
                 {
                     Text = "",
-                    VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 12,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = MutedForegroundBrush(),
@@ -247,17 +265,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var flatten = CreateFormButton(
                     text: "❌",
-                    tone: FormButtonTone.Danger,
-                    style: FormButtonStyle.Outline,
+                    tone: FormButtonTone.Flatten,
+                    style: FormButtonStyle.Solid,
+                    width: 60,
                     height: SmallButtonHeight());
-                RenderFlattenButtonState(flatten, enabled: false);
+                RenderFlattenFollowerButtonState(flatten, enabled: false);
                 
                 var freeTrade = CreateFormButton(
-                    text: CheckGlyph,
+                    text: CheckIcon,
                     tone: FormButtonTone.Primary,
-                    style: FormButtonStyle.Outline,
+                    style: FormButtonStyle.Solid,
+                    width: 60,
                     height: SmallButtonHeight());
-                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔");
+                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔", all: false);
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 
@@ -270,11 +290,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // flatten stays disabled by default; PnL timer/net-position logic enables it when needed
                 flatten.IsEnabled = false;
 
+                var pnlHost = new Grid
+                {
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
                 var pnlStack = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
+                    VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0)
                 };
+
+                pnl.VerticalAlignment = VerticalAlignment.Center;
+                pnl.HorizontalAlignment = HorizontalAlignment.Left;
+
+                pnlBar.VerticalAlignment = VerticalAlignment.Center;
+                pnlBarStatusText.VerticalAlignment = VerticalAlignment.Center;
                 
                 // Guard
                 var guardText = new TextBlock
@@ -292,20 +324,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Grid.SetColumn(accountText, 1);
                 Grid.SetColumn(qtyBox, 2);
                 Grid.SetColumn(atmBox, 3);
-                Grid.SetColumn(pnlStack, 4);
-                Grid.SetColumn(freeTrade, 5);
-                Grid.SetColumn(flatten, 6);
-                Grid.SetColumn(guardText, 7);
+                Grid.SetColumn(position, 4);
+                Grid.SetColumn(pnlHost, 5);
+                Grid.SetColumn(freeTrade, 6);
+                Grid.SetColumn(flatten, 7);
+                Grid.SetColumn(guardText, 8);
 
                 pnlStack.Children.Add(pnl);
                 pnlStack.Children.Add(pnlBar);
                 pnlStack.Children.Add(pnlBarStatusText);
 
+                pnlHost.Children.Add(pnlStack);
+
                 rowGrid.Children.Add(enabled);
                 rowGrid.Children.Add(accountText);
                 rowGrid.Children.Add(qtyBox);
                 rowGrid.Children.Add(atmBox);
-                rowGrid.Children.Add(pnlStack);
+                rowGrid.Children.Add(position);
+                rowGrid.Children.Add(pnlHost);
                 rowGrid.Children.Add(freeTrade);
                 rowGrid.Children.Add(flatten);
                 rowGrid.Children.Add(guardText);
@@ -316,6 +352,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     EnabledCheck = enabled,
                     QtyOverrideBox = qtyBox,
                     BracketOverrideBox = atmBox,
+                    Position = position,
                     PnlText = pnl,
                     PnlBar = pnlBar,
                     FlattenBtn = flatten,
@@ -323,6 +360,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     PnlBarStatusText = pnlBarStatusText,
                     GuardText = guardText
                 };
+                
+                RenderLivePositionText(row.Position, row.Account);
                 
                 // When user changes follower settings, we re-apply config (no re-arm UX)
                 enabled.Checked += (s, e) =>
@@ -369,6 +408,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 qtyBox.TextChanged += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
+
+                    RenderQtyBoxState(qtyBox, ParseQtyOrDefault(_masterQtyBox?.Text));
                     SaveUiToActiveSession();
                     ApplyConfigFromUi();
                 };
@@ -383,6 +424,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RenderFollowerRowState(row);
                 
                 qtyBox.VerticalContentAlignment = VerticalAlignment.Center;
+                position.HorizontalAlignment =  HorizontalAlignment.Center;
+                position.VerticalAlignment =  VerticalAlignment.Center;
                 atmBox.VerticalContentAlignment = VerticalAlignment.Center;
                 flatten.VerticalAlignment = VerticalAlignment.Center;
 
@@ -393,6 +436,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
             
             RefreshFollowerBulkActionButtons();
+        }
+        
+        private void RenderQtyBoxState(TextBox qtyBox, int masterQty)
+        {
+            if (qtyBox == null)
+                return;
+
+            var isBlank = string.IsNullOrWhiteSpace(qtyBox.Text);
+
+            qtyBox.ToolTip = isBlank
+                ? $"Blank = inherit master qty ({masterQty})"
+                : "Follower qty override";
+
+            qtyBox.Background = isBlank
+                ? InputDisabledBackgroundBrush()
+                : InputBackgroundBrush();
         }
 
         private static Brush GetFollowerRowBackgroundBrush(int rowIndex)
@@ -415,9 +474,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });  // Override Qty
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) }); // Bracket
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) }); // Unrealized
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // BE
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Flatten
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) }); // Position
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(116) }); // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) }); // BE
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) }); // Flatten
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50) }); // Guard
         }
         
@@ -436,10 +496,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddHeaderText(g, "Account", 1);
             AddHeaderText(g, "Qty", 2, centered: true);
             AddHeaderText(g, "Bracket", 3);
-            AddHeaderText(g, "Unrealized", 4);
-            AddHeaderText(g, "Break-even", 5, centered: true);
-            AddHeaderText(g, "Flatten", 6, centered: true);
-            AddHeaderText(g, "Shield", 7, centered: true);
+            AddHeaderText(g, "Position", 4, centered: true);
+            AddHeaderText(g, "PnL", 5);
+            AddHeaderText(g, "Break-even", 6, centered: true);
+            AddHeaderText(g, "Flatten", 7, centered: true);
+            AddHeaderText(g, "Shield", 8, centered: true);
 
             return g;
         }
@@ -533,6 +594,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (row?.Account == null)
                 return;
 
+            if (row.Position != null)
+                RenderLivePositionText(row.Position, row.Account);
+
             var connState = GetUiConnectionState(row.Account);
             var connected = connState == UiConnectionState.Connected;
             var warning = connState == UiConnectionState.Warning;
@@ -549,7 +613,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (row.EnabledCheck != null)
             {
-                var allowCheckToggle = connected && !hasOpenPosition;
+                var accountLocked = _engine?.TryGetAccountLockReason(row.Account, out _, out _) ?? false;
+                var allowCheckToggle = connected && !hasOpenPosition && !accountLocked;
 
                 row.EnabledCheck.IsEnabled = allowCheckToggle;
                 row.EnabledCheck.Opacity = connected ? 1.0 : 0.55;
@@ -606,6 +671,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             foreach (var row in _followerRows)
                 RenderFollowerRowState(row);
+            
+            RenderPnlUi();
         }
     }
 }

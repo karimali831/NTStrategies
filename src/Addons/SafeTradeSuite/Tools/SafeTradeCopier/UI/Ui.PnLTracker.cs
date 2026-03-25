@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -225,7 +226,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             bar.BorderThickness = new Thickness(0);
-            bar.Background = new SolidColorBrush(Color.FromRgb(220, 220, 220));
+            bar.Background = IsDarkTheme()
+                ? new SolidColorBrush(Color.FromRgb(38, 38, 38))   // softer
+                : new SolidColorBrush(Color.FromRgb(220, 220, 220));
             bar.SnapsToDevicePixels = true;
         }
         
@@ -329,31 +332,53 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return Brushes.DimGray;
         }
 
-        private static void SetPnlText(TextBlock tb, string prefix, double realized, double unrealized, bool shortened)
+        private void SetPnlText(
+            TextBlock tb, 
+            string prefix, 
+            double realized, 
+            double unrealized, 
+            bool shortened, 
+            Account acc = null)
         {
             if (tb == null)
                 return;
 
             tb.Inlines.Clear();
-
+            
             if (!shortened)
             {
-                tb.Inlines.Add(new System.Windows.Documents.Run(prefix + "  ")
-                {
-                    Foreground = MutedForegroundBrush(),
-                    FontWeight = FontWeights.SemiBold
-                });
-                
-                tb.Inlines.Add(new System.Windows.Documents.Run("Unrealized ")
+                tb.Inlines.Add(new Run(prefix + "  ")
                 {
                     Foreground = MutedForegroundBrush(),
                     FontWeight = FontWeights.SemiBold
                 });
             }
 
-            tb.Inlines.Add(new System.Windows.Documents.Run(FmtUsd(unrealized))
+            if (acc != null && _engine.TryGetAccountLockReason(acc, out var lockShortReason, out var lockLongReason))
             {
-                Foreground = GetPnlValueBrush(unrealized),
+                tb.Inlines.Add(new Run(lockShortReason)
+                {
+                    Foreground = WarningActionBrush(),
+                    FontWeight = FontWeights.SemiBold
+                });
+
+                tb.ToolTip = lockLongReason;
+                return;
+            }
+
+            var instr = GetInstrument();
+            var inOpenPos = HasOpenInstrumentPosition(acc, instr);
+            var value = inOpenPos ? unrealized : realized;
+            
+            tb.Inlines.Add(new Run(inOpenPos ? "Unrealized " : "Realized ")
+            {
+                Foreground = MutedForegroundBrush(),
+                FontWeight = FontWeights.SemiBold
+            });
+
+            tb.Inlines.Add(new Run(FmtUsd(value))
+            {
+                Foreground = GetPnlValueBrush(value),
                 FontWeight = FontWeights.SemiBold
             });
         }

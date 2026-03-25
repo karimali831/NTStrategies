@@ -181,12 +181,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 // ---------------- UI -> Engine wiring ----------------
                 RenderButtons(copyOn: eng.CopyEnabled);
-                RenderFlattenAllButtonState();
                 RefreshCopierStatusPanel();
                 
                 _topPanelsGrid = topPanelsGrid;
                 RefreshMainMenuTabs();
                 RefreshMainMenuContent();
+                RenderMasterSubmitButtonsState();
                 
                 return root;
             
@@ -200,13 +200,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RenderMasterSubmitButtonsState()
         {
-            var pending = _engine != null && _engine.IsMasterSubmitInFlight();
+            if (_engine == null)
+                return;
+            
+            var pending = _engine.IsMasterSubmitInFlight();
+            var masterConnected = IsMasterConnected(out var masterAcc);
+            var masterLocked = _engine.TryGetAccountLockReason(masterAcc, out var lockShortReason, out var lockFullReason);
+            var enabled = !pending && masterConnected && !masterLocked;
 
             if (_btnBuyMkt != null)
-                _btnBuyMkt.IsEnabled = !pending;
+            {
+                _btnBuyMkt.IsEnabled = enabled;
+                _btnBuyMkt.ToolTip = masterConnected
+                    ? masterLocked ? lockShortReason : "Submit a market buy on the master account"
+                    : "Master account is disconnected";
+                
+                ApplyButtonTheme(_btnBuyMkt, FormButtonTone.Success, FormButtonStyle.Solid, enabled);
+            }
 
             if (_btnSellMkt != null)
-                _btnSellMkt.IsEnabled = !pending;
+            {
+                _btnSellMkt.IsEnabled = enabled;
+                _btnSellMkt.ToolTip = masterConnected
+                    ? masterLocked ? lockFullReason :  "Submit a market sell on the master account"
+                    : "Master account is disconnected";
+                
+                ApplyButtonTheme(_btnSellMkt, FormButtonTone.Danger, FormButtonStyle.Solid, enabled);
+            }
         }
     }
 }

@@ -208,7 +208,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             EnsureEnabledFollowersAndAutoRearmForOpenPositions();
             RenderFollowerRowsState();
             RefreshCopierStatusPanel();
-            RenderFlattenAllButtonState();
+            // RenderFlattenMasterButtonState();
+            // RenderFlattenAllButtonState();
+            RenderFlattenEnablementUi();
             RenderBreakEvenEnablementUi();
             RenderPnlUi();
         }

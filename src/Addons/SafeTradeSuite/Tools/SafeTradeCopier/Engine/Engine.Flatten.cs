@@ -24,6 +24,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (acc == null || instr == null)
                     return;
 
+                if (acc.ConnectionStatus != ConnectionStatus.Connected)
+                {
+                    Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=disconnected");
+                    return;
+                }
+
+                if (!TryGetLivePosition(acc, instr, out _, out _))
+                {
+                    Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=no-live-position");
+                    return;
+                }
+
                 var key = FlattenKey(acc, instr);
                 if (!_flattenInFlight.TryAdd(key, 0))
                 {
@@ -190,9 +202,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     try
                     {
-                        if (!TryGetLivePosition(f, instr, out _, out _))
-                            continue;
-
                         EnsureFlatInstrument(f, instr);
                         Log($"Follow-master-exit flatten -> {f.Name} ({instr.FullName})");
                     }

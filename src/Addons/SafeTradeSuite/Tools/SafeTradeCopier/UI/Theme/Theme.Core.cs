@@ -121,6 +121,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             return new SolidColorBrush(Color.FromRgb(180, 20, 20));
         }
+        
+        private static Brush FlattenActionBrush()
+        {
+            return Brushes.Maroon;
+        }
 
         private static Brush WarningActionBrush()
         {

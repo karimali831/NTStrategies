@@ -78,18 +78,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             var accounts = new List<Account>();
-
+     
             if (_masterBox?.SelectedItem is Account masterAcc)
                 accounts.Add(masterAcc);
+            
+            var checkedFollowerAccounts =  GetCheckedFollowers()
+                .Select(x => x.Account)
+                .ToList();
 
-            foreach (var r in _followerRows)
+            if (checkedFollowerAccounts.Any())
             {
-                if (r?.Account == null) continue;
-                if (r.EnabledCheck?.IsChecked != true) continue;
-                accounts.Add(r.Account);
+                accounts.AddRange(checkedFollowerAccounts);
             }
 
-            eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints);
+            var canUndoAll = eng.CanUndoFreeTradeAll(checkedFollowerAccounts, instr);
+
+            if (canUndoAll)
+            {
+                eng.UndoFreeTradeAll(accounts, instr);
+            }
+            else
+            {
+                eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints);
+            }
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)
@@ -150,7 +161,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 eng.Log(anySubmitted
-                    ? "Flatten All submitted (instrument-only)."
+                    ? $"Flatten All submitted for {instr.FullName} only."
                     : "Flatten All skipped. No open positions found for selected accounts on this instrument.");
             }
             catch (Exception ex)
@@ -178,6 +189,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 r?.Account != null &&
                 HasOpenInstrumentPosition(r.Account, instr));
         }
+        
+        private string GetLivePosition(Account acc, bool masterPnl)
+        {
+            var instr = GetInstrument();
+            var posTxt = $"{(masterPnl ? "Position " : "")}Flat";
+            
+            if (acc?.Positions == null || instr == null)
+                return posTxt;
+
+            var longCount = 0;
+            var shortCount = 0;
+
+            foreach (var p in acc.Positions)
+            {
+                if (p?.Instrument == null)
+                    continue;
+
+                if (!string.Equals(p.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    continue;
+
+                var qty = Math.Abs((int)Math.Round((double)p.Quantity, MidpointRounding.AwayFromZero));
+                if (qty <= 0)
+                    continue;
+
+                if (p.MarketPosition == MarketPosition.Long)
+                    longCount += qty;
+                else if (p.MarketPosition == MarketPosition.Short)
+                    shortCount += qty;
+            }
+
+            if (longCount > 0 && shortCount == 0)
+                return $"Long ({longCount}x)";
+
+            if (shortCount > 0 && longCount == 0)
+                return $"Short ({shortCount}x)";
+
+            var total = longCount + shortCount;
+            return total > 0 ? $"{total}x" : posTxt;
+        }
+        
         
         private static bool TryGetLivePosition(Account acc, Instrument instr, out MarketPosition marketPosition, out int absQty)
         {
@@ -212,7 +263,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderFollowerRowsState();
             RefreshFollowerBulkActionButtons();
             RefreshCopierStatusPanel();
-            RenderFlattenAllButtonState();
+            // RenderFlattenMasterButtonState();
+            // RenderFlattenAllButtonState();
             SavePersistentUiState();
 
             if (!HasAnyOpenPositionOnActiveInstrument())
@@ -247,29 +299,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-        private bool CanFlatten(Account account, string instrFull)
+        private static bool CanFlatten(Account account, Instrument instr)
         {
-            if (account is null)
-                return false;
-                
-            int net;
-            var key = $"{account.Name}|{instrFull}";
-
-            lock (_uiNet)
-                _uiNet.TryGetValue(key, out net);
-
-            if (net == 0)
-            {
-                foreach (var p in account.Positions)
-                {
-                    if (p?.Instrument == null) continue;
-                    if (!string.Equals(p.Instrument.FullName, instrFull, StringComparison.Ordinal)) continue;
-                    net = p.Quantity;
-                    break;
-                }
-            }
-
-            return net != 0;
+            return HasOpenInstrumentPosition(account, instr);
         }
         
         private static bool TryGetInstrumentUnrealized(Account acc, Instrument instr, out double unrealized, out int absQty)

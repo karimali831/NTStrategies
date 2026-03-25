@@ -43,9 +43,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                 }
 
-                if (!eng.CanEnterForRisk(master, out var riskReason))
+                if (!eng.CanEnterForRisk(master, out _, out var fullReason))
                 {
-                    eng.Log($"Master blocked by risk -> {master.Name}: {riskReason}");
+                    eng.Log($"Master blocked by risk -> {master.Name}: {fullReason}");
                     return;
                 }
 
@@ -55,8 +55,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var confirmed = ShowConfirmDialog(
                         _window,
                         "Confirm additional entry",
-                        $"There is already an open position on {master.Name} for {instr.FullName} (net {currentNet}).\n\nSubmitting another market order may increase exposure.\n\nDo you want to continue?",
-                        okText: "Submit order",
+                        $"There is already an open position on {master.Name} for {instr.FullName} (net {currentNet})",
+                        okText: "Submit another order",
                         cancelText: "Cancel");
 
                     if (!confirmed)
@@ -124,7 +124,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-        private static bool ShouldConfirmMasterSubmitBecauseDisarmed()
+        private bool ShouldConfirmMasterSubmitBecauseDisarmed()
         {
             if (_engine == null)
                 return false;

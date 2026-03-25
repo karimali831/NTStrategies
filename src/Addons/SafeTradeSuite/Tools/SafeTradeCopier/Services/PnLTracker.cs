@@ -36,15 +36,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
             => throw new NotSupportedException();
     }
-    
+        
     public partial class SafeTradeCopierTool
     {
-        private readonly Dictionary<string, (double r, double u)> _uiPnl = new Dictionary<string, (double r, double u)>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _uiNet = new Dictionary<string, int>(StringComparer.Ordinal);
-        private double TotalRealizedPnl { get; set; }
-        private double TotalUnrealizedPnl { get; set; }
-        
-         private void RenderPnlUi()
+
+        private void RenderPnlUi()
         {
             if (_isClosing)
                 return;
@@ -58,70 +55,55 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_isClosing || _window == null)
                     return;
 
+                var instr = GetInstrument();
+                if (instr == null)
+                    return;
+
                 var totalR = 0.0;
                 var totalU = 0.0;
 
-                // master
                 if (_masterBox?.SelectedItem is Account master)
                 {
-                    var mr = 0.0;
-                    var mu = 0.0;
-                    lock (_uiPnl)
-                    {
-                        if (_uiPnl.TryGetValue(master.Name, out var snap))
-                        {
-                            mr = snap.r;
-                            mu = snap.u;
-                        }
-                    }
-
+                    TryGetInstrumentUnrealized(master, instr, out var mu, out _);
+                    _engine.TryGetRealizedPnl(master, out var mr);
+                    
                     totalR += mr;
                     totalU += mu;
 
                     if (_masterPnlText != null)
-                        SetPnlText(_masterPnlText, "", mr, mu, shortened: false);
+                        SetPnlText(_masterPnlText, "", mr, mu, shortened: false, master);
 
+                    RenderLivePositionText(_masterPositionText, master);
                     RenderProgressBar(_masterPnlBar, _masterPnlBarStatusText, master);
                 }
 
-                // followers
                 foreach (var row in _followerRows)
                 {
                     var acc = row?.Account;
-                    if (acc == null) continue;
-
-                    var r = 0.0;
-                    var u = 0.0;
-                    lock (_uiPnl)
-                    {
-                        if (_uiPnl.TryGetValue(acc.Name, out var snap))
-                        {
-                            r = snap.r;
-                            u = snap.u;
-                        }
-                    }
+                    if (acc == null)
+                        continue;
+                    
+                    TryGetInstrumentUnrealized(acc, instr, out var u, out _);
+                    _engine.TryGetRealizedPnl(acc, out var r);
 
                     totalR += r;
                     totalU += u;
 
                     if (row.PnlText != null)
-                        SetPnlText(row.PnlText, "", r, u, shortened: true);
+                        SetPnlText(row.PnlText, "", r, u, shortened: true, acc);
 
+                    RenderLivePositionText(row.Position, acc);
                     RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
                 }
-                
-                TotalRealizedPnl = totalR;
-                TotalUnrealizedPnl = totalU;
 
                 if (_totalPnlText != null)
                     SetPnlText(_totalPnlText, "Total", totalR, totalU, shortened: false);
 
                 RenderFlattenEnablementUi();
                 RenderBreakEvenEnablementUi();
-                InvalidatePositionsPanel();
-            }, DispatcherPriority.Background);
+            }, DispatcherPriority.Render);
         }
-        
+    
         private static void FinalizeBarOutcomeFromTag(ProgressBar bar)
         {
             if (bar == null) return;

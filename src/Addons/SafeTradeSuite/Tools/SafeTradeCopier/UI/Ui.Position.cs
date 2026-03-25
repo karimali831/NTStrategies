@@ -1,4 +1,6 @@
-﻿using NinjaTrader.Cbi;
+﻿using System.Windows;
+using System.Windows.Controls;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -8,7 +10,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             if (!(sender is Account acc)) return;
             if (e?.Position == null) return;
-            
+
             SafeTradeSuiteRuntime.PrintLog(
                 $"[UI POS EVT] acc={acc?.Name} instr={e.Position?.Instrument?.FullName} qty={e.Position?.Quantity} mp={e.Position?.MarketPosition}");
 
@@ -19,7 +21,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             lock (_uiNet)
                 _uiNet[key] = qty;
 
-            InvalidatePositionsPanel();
+            RenderPnlUi();
+            RenderFlattenEnablementUi();
+            RenderBreakEvenEnablementUi();
+            // InvalidatePositionsPanel();
+        }
+        
+        private void RenderLivePositionText(TextBlock tb, Account acc)
+        {
+            if (tb == null)
+                return;
+
+            var isMasterAccount = acc == GetMasterAccount();
+            var text = GetLivePosition(acc, isMasterAccount);
+
+            tb.Text = text ?? "";
+            tb.FontWeight = FontWeights.SemiBold;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                tb.Foreground = MutedForegroundBrush();
+                tb.ToolTip = null;
+                return;
+            }
+
+            if (text.StartsWith("Long", System.StringComparison.OrdinalIgnoreCase))
+            {
+                // tb.Foreground = SuccessActionBrush();
+                tb.ToolTip = "Live long position";
+                return;
+            }
+
+            if (text.StartsWith("Short", System.StringComparison.OrdinalIgnoreCase))
+            {
+                // tb.Foreground = DangerActionBrush();
+                tb.ToolTip = "Live short position";
+                return;
+            }
+
+            tb.Foreground = WarningActionBrush();
+            tb.ToolTip = "Live counter positions";
         }
     }
 }

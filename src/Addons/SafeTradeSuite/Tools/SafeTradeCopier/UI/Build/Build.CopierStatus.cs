@@ -153,7 +153,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return readyStatus;
             }
 
-            if (!IsMasterConnected())
+            if (!IsMasterConnected(out _))
             {
                 readyStatus.PrimaryReason = "Master Disconnected";
                 readyStatus.PrimaryDotColour = disconnectedColor;

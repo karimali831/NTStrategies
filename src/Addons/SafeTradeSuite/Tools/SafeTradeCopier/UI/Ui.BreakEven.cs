@@ -1,5 +1,4 @@
 ﻿using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
@@ -17,29 +16,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (instr == null)
                 {
                     if (_btnMasterFreeTrade != null)
-                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false,"Break-even");
+                        RenderFreeTradeButtonState(_btnMasterFreeTrade, false, false,"Break-even", all: false);
 
                     if (_btnFreeTradeAll != null)
-                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Break-even All");
+                        RenderFreeTradeButtonState(_btnFreeTradeAll, false, false, "Break-even All", all: true);
 
                     foreach (var row in _followerRows)
                     {
                         if (row?.FreeTradeBtn != null)
-                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, CheckGlyph);
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, CheckIcon, all: false);
                     }
 
                     return;
                 }
 
                 var anyCanApplyOrUndo = false;
+                var canUndoAll = false;
 
                 if (_btnMasterFreeTrade != null && _masterBox?.SelectedItem is Account master)
                 {
                     var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
                     var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster,"Break-even");
+                    RenderFreeTradeButtonState(_btnMasterFreeTrade, canUndoMaster || canApplyMaster, canUndoMaster,"Break-even", all: false);
                     anyCanApplyOrUndo |= canUndoMaster || canApplyMaster;
+                    canUndoAll |= canUndoMaster;
                 }
 
                 foreach (var row in _followerRows)
@@ -50,34 +51,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var enabledFollower = row.EnabledCheck?.IsChecked == true;
                     if (!enabledFollower || BreakEvenDisabled)
                     {
-                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, CheckGlyph);
+                        RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, CheckIcon, all: false);
                         continue;
                     }
 
                     var canUndo = _engine != null && _engine.CanUndoFreeTrade(row.Account, instr, out _);
                     var canApply = _engine != null && _engine.CanApplyFreeTrade(row.Account, instr, _freeTradeMinProfitPoints, out _);
 
-                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo, CheckGlyph);
+                    RenderFreeTradeButtonState(row.FreeTradeBtn, canUndo || canApply, canUndo, CheckIcon, all: false);
                     anyCanApplyOrUndo |= canUndo || canApply;
+                    canUndoAll |= canUndo;
                 }
 
                 if (_btnFreeTradeAll != null)
-                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && !BreakEvenDisabled, false, "Break-even All");
+                    RenderFreeTradeButtonState(_btnFreeTradeAll, anyCanApplyOrUndo && !BreakEvenDisabled, canUndoAll, "Break-even All", all: true);
             }, DispatcherPriority.Background);
         }
         
-        private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode, string btnText)
+        private static void RenderFreeTradeButtonState(Button btn, bool enabled, bool undoMode, string btnText, bool all)
         {
             if (btn == null)
                 return;
 
-            btn.IsEnabled = enabled;
-            btn.Content = undoMode ? "Undo BE" : btnText;
-            btn.Background = enabled
-                ? undoMode ? Brushes.DarkOrange : Brushes.RoyalBlue
-                : Brushes.Gray;
-            btn.Foreground = Brushes.White;
-            btn.Opacity = enabled ? 1.0 : 0.60;
+            var tone = enabled
+                ? undoMode ? FormButtonTone.Warning : FormButtonTone.Primary
+                : FormButtonTone.Neutral;
+            
+            btn.Content = undoMode ? $"Undo BE{(all ? " All" : "")}" : btnText;
+            ApplyButtonTheme(btn, tone, FormButtonStyle.Solid, enabled);
         }
     }
 }

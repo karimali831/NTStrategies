@@ -115,6 +115,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return true;
             }
 
+            
+            internal bool CanUndoFreeTradeAll(IEnumerable<Account> accounts, Instrument instr)
+            {
+                if (accounts == null || instr == null)
+                    return false;
+
+                return accounts
+                    .Where(a => a != null)
+                    .Distinct()
+                    .Any(acc => CanUndoFreeTrade(acc, instr, out _));
+            }
+            
+            internal void UndoFreeTradeAll(IEnumerable<Account> accounts, Instrument instr)
+            {
+                if (accounts == null || instr == null) return;
+
+                var applied = accounts.Where(a => a != null).Distinct()
+                    .Count(acc => UndoFreeTrade(acc, instr));
+
+                Log($"[BE] UNDO ALL instr={instr.FullName} applied={applied}");
+            }
+
             internal bool CanUndoFreeTrade(Account acc, Instrument instr, out string reason)
             {
                 reason = "";
@@ -279,18 +301,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (accounts == null || instr == null) return;
 
-                var applied = 0;
-
-                foreach (var acc in accounts.Where(a => a != null).Distinct())
-                {
-                    if (ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints))
-                        applied++;
-                }
+                var applied = accounts.Where(a => a != null).Distinct()
+                    .Count(acc => ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints));
 
                 Log($"[BE] APPLY ALL instr={instr.FullName} applied={applied}");
             }
 
-            private static Order FindWorkingManagedStop(Account acc, Instrument instr, ActiveBracketSpec spec)
+            private Order FindWorkingManagedStop(Account acc, Instrument instr, ActiveBracketSpec spec)
             {
                 if (acc == null || instr == null || spec == null)
                     return null;

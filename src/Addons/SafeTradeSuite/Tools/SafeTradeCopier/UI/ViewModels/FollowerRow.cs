@@ -11,6 +11,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public CheckBox EnabledCheck;
             public TextBox QtyOverrideBox;
             public ComboBox BracketOverrideBox;
+            public TextBlock Position;
             public TextBlock PnlText;
             public Button FlattenBtn;
             public ProgressBar PnlBar;

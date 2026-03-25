@@ -1,5 +1,8 @@
-﻿using System.Windows;
+﻿using System;
+using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -106,14 +109,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             var accounts = GetSelectableAccounts();
 
-            EnforceSimOnlyModeUi(accounts);
+            RebindMasterAccounts(accounts);
             RebuildFollowersAndRewire(_engine, accounts);
-            ApplyConfigFromUi();
-            RenderFollowerRowsState();
-            RenderFlattenAllButtonState();
-            RefreshCopierStatusPanel();
-            RefreshFollowerBulkActionButtons();
-            RefreshRiskFieldset();
+            RefreshUiAfterAccountScopeChanged();
         }
     }
 }
