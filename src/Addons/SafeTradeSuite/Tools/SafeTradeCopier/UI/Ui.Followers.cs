@@ -14,9 +14,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             SafeTradeSuiteRuntime.PrintLog(
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
-
-            _suppressSessionUiEvents = true;
-      
+            
             var selected = new HashSet<string>(
                 _followerRows
                     .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
@@ -82,8 +80,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (_activeInstrumentSession?.IsArmedRequested == true)
                 eng.SetCopyEnabled(true);
-            
-            _suppressSessionUiEvents = false;;
         }
         
         private void WireFollowerFlattenButtons(SafeCopierEngine eng)
@@ -383,16 +379,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var instr = GetInstrument();
                     if (HasOpenInstrumentPosition(row.Account, instr))
                     {
-                        _suppressSessionUiEvents = true;
-                        try
-                        {
-                            SetFollowerChecked(row, true, "BuildFollowerRows.enabled.Unchecked.revertOpenPosition");
-                        }
-                        finally
-                        {
-                            _suppressSessionUiEvents = false;
-                        }
-
+                        SetFollowerChecked(row, true, "BuildFollowerRows.enabled.Unchecked.revertOpenPosition");
                         RenderFollowerRowState(row);
                         RefreshCopierStatusPanel();
                         RefreshFollowerBulkActionButtons();

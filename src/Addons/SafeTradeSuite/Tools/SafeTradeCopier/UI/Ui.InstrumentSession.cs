@@ -11,6 +11,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private bool _isLoadingSessionUi;
         private TabControl _instrumentTabs;
         private Point _instrumentTabDragStart;
         private InstrumentSession _draggingInstrumentSession;
@@ -170,7 +171,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 _isInstrumentTabDragging = true;
-                SaveUiToActiveSession("OnInstrumentTabHeaderMouseMove");
             }
 
             var dragSession = _draggingInstrumentSession;
@@ -557,24 +557,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SafeTradeSuiteRuntime.PrintLog(
                 $"[LOAD SESSION TARGET] instr={_activeInstrumentSession?.InstrumentName} " +
                 $"sessionHash={_activeInstrumentSession?.GetHashCode() ?? 0}");
-            
+
+            _isLoadingSessionUi = true;
+
             try
             {
                 if (_activeInstrumentSession == null)
                     return;
-                
+
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[LOAD SESSION START] instr={_activeInstrumentSession?.InstrumentName} " +
                     $"sessionCheckedBefore={DiagSessionCheckedCount()} sessionMapBefore={DiagSessionFollowersMap()}");
 
-                _suppressSessionUiEvents = true;
-                try
+                using (BeginSessionUiSuppression())
                 {
                     RefreshInstrumentSelectorItems();
 
                     var instrumentName = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
 
-                    if (!string.IsNullOrWhiteSpace(instrumentName) && !_instrumentSelector.Items.Contains(instrumentName))
+                    if (!string.IsNullOrWhiteSpace(instrumentName) &&
+                        !_instrumentSelector.Items.Contains(instrumentName))
                         _instrumentSelector.Items.Add(instrumentName);
 
                     _instrumentSelector.Text = instrumentName;
@@ -582,7 +584,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     var targetMaster = _activeInstrumentSession.MasterAccount;
                     if (targetMaster == null)
-                        targetMaster = _masterBox.SelectedItem as Account ?? GetSelectableAccounts().FirstOrDefault(IsSimAccount) ?? GetSelectableAccounts().FirstOrDefault();
+                        targetMaster = _masterBox.SelectedItem as Account
+                                       ?? GetSelectableAccounts().FirstOrDefault(IsSimAccount)
+                                       ?? GetSelectableAccounts().FirstOrDefault();
 
                     _masterBox.SelectedItem = targetMaster;
 
@@ -607,6 +611,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                         SetFollowerChecked(r, included, "LoadActiveSessionToUi.restoreFollower");
 
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[RESTORE FOLLOWER] instr={_activeInstrumentSession?.InstrumentName} " +
+                            $"acc={accName} saved={included} uiAfter={(r.EnabledCheck?.IsChecked == true ? 1 : 0)}");
+
                         r.QtyOverrideBox.Text =
                             _activeInstrumentSession.FollowerQtyOverrides.TryGetValue(accName, out var qv)
                                 ? qv.ToString()
@@ -620,28 +628,43 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         r.BracketOverrideBox.SelectedItem = atm;
                         RenderFollowerRowState(r);
                     }
-                    
+
                     SafeTradeSuiteRuntime.PrintLog(
                         $"[LOAD SESSION END] instr={_activeInstrumentSession?.InstrumentName} " +
                         $"uiCheckedAfter={DiagCheckedFollowerCount()} uiMapAfter={DiagCheckedFollowers()}");
                 }
-                finally
-                {
-                    _suppressSessionUiEvents = false;
-                }
 
                 RenderFollowerRowsState();
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[POST RENDER ROWS] instr={_activeInstrumentSession?.InstrumentName} " +
+                    $"uiChecked={DiagCheckedFollowerCount()} uiMap={DiagCheckedFollowers()}");
+
                 ApplyConfigFromUi();
 
-                _engine?.SetCopyEnabled(_activeInstrumentSession.IsArmedRequested);
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[POST APPLY CONFIG] instr={_activeInstrumentSession?.InstrumentName} " +
+                    $"uiChecked={DiagCheckedFollowerCount()} uiMap={DiagCheckedFollowers()}");
 
-                RefreshInstrumentTabs();
+                var requested = _activeInstrumentSession.IsArmedRequested;
+                _engine?.SetCopyEnabled(requested);
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[POST SET REQUESTED] instr={_activeInstrumentSession?.InstrumentName} " +
+                    $"requested={_activeInstrumentSession.IsArmedRequested} " +
+                    $"engineRequested={_engine?.IsRequested} armed={_engine?.Armed}");
+
+                RenderButtons();
                 RefreshCopierStatusPanel();
             }
             catch (Exception ex)
             {
                 LogUnhandled("SafeTradeCopierTool.LoadActiveSessionToUi()", ex);
                 throw;
+            }
+            finally
+            {
+                _isLoadingSessionUi = false;
             }
         }
     }

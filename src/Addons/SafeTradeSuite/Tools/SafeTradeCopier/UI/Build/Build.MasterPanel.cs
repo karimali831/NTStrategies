@@ -232,7 +232,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectionChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents)
+                if (_suppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 var latestAccounts = GetSelectableAccounts();
@@ -241,12 +241,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 LoadActiveSessionToUi();
                 RefreshRiskFieldset();
-                // RenderPnlUi();
             };
             
             void ApplyAndMaybeRewire()
             {
-                if (_suppressSessionUiEvents)
+                if (_suppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 var latestAccounts = GetSelectableAccounts();
@@ -261,7 +260,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterQtyBox.TextChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents)
+                if (_suppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 SaveUiToActiveSession("RenderMasterPanel._masterQtyBox.TextChanged ");
@@ -270,7 +269,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBracketBox.SelectionChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents)
+                if (_suppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 SaveUiToActiveSession("RenderMasterPanel._masterBracketBox.SelectionChanged");

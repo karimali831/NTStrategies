@@ -50,23 +50,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_masterBox == null) return;
             if (_followersPanel == null) return;
             if (_engine == null) return;
-
+            
             var masterAcc = GetMasterAccount();
             var prevMasterName = masterAcc?.Name ?? "";
-
-            var prevFollowers = new Dictionary<string, PrevFollowerState>(StringComparer.Ordinal);
-            foreach (var r in _followerRows)
-            {
-                var name = r?.AccountName;
-                if (string.IsNullOrWhiteSpace(name)) continue;
-
-                prevFollowers[name] = new PrevFollowerState
-                {
-                    Included = r.EnabledCheck?.IsChecked == true,
-                    QtyText = r.QtyOverrideBox?.Text ?? "",
-                    BracketName = r.BracketOverrideBox?.SelectedItem as string
-                };
-            }
 
             var accounts = GetSelectableAccounts();
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
@@ -85,25 +71,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
             }
 
-            foreach (var r in _followerRows)
-            {
-                if (r == null) continue;
-                if (!prevFollowers.TryGetValue(r.AccountName, out var ps))
-                    continue;
-
-                if (r.EnabledCheck != null)
-                    r.EnabledCheck.IsChecked = ps.Included;
-
-                if (r.QtyOverrideBox != null)
-                    r.QtyOverrideBox.Text = ps.QtyText ?? "";
-
-                if (r.BracketOverrideBox != null && ps.BracketName != null)
-                    r.BracketOverrideBox.SelectedItem = ps.BracketName;
-            }
-
             EnforceSimOnlyModeUi(accounts);
+            LoadActiveSessionToUi();
             RenderFollowerRowsState();
-            ApplyConfigFromUi();
             RenderMasterSubmitButtonsState();
         }
         

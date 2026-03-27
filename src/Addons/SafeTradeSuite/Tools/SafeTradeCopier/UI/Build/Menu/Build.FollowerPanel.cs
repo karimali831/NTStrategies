@@ -109,21 +109,13 @@
  
              var accounts = GetSelectableAccounts();
              
-             _suppressSessionUiEvents = true;
-             try
-             {
-                 BuildFollowerRows(accounts);
+             BuildFollowerRows(accounts);
              
-                 foreach (var r in _followerRows)
-                     LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
+             foreach (var r in _followerRows)
+                 LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
              
-                 EnforceSimOnlyModeUi(accounts);
-                 LoadActiveSessionToUi();
-             }
-             finally
-             {
-                 _suppressSessionUiEvents = false;
-             }
+             EnforceSimOnlyModeUi(accounts);
+             LoadActiveSessionToUi();
              
              RenderFollowerRowsState();
              WireFollowerFlattenButtons(_engine);
@@ -138,12 +130,12 @@
          {
              if (_btnCopyOn == null)
                  return;
- 
-             var isRequested = _activeInstrumentSession?.IsArmedRequested == true;
- 
-             _btnCopyOn.Content = isRequested ? "Disarm" : "Arm";
- 
-             var tone = isRequested ? FormButtonTone.Warning : FormButtonTone.Success;
+
+             var requested = _activeInstrumentSession?.IsArmedRequested == true;
+
+             _btnCopyOn.Content = requested ? "Disarm" : "Arm";
+
+             var tone = requested ? FormButtonTone.Warning : FormButtonTone.Success;
              ApplyButtonTheme(_btnCopyOn, tone, FormButtonStyle.Solid, enabled: true);
          }
          
@@ -185,15 +177,10 @@
  
              var shouldCheck = rows.Any(r => r.EnabledCheck.IsChecked != true);
  
-             _suppressSessionUiEvents = true;
-             try
+             using (BeginSessionUiSuppression())
              {
                  foreach (var row in rows)
                      row.EnabledCheck.IsChecked = shouldCheck;
-             }
-             finally
-             {
-                 _suppressSessionUiEvents = false;
              }
  
              foreach (var row in rows)

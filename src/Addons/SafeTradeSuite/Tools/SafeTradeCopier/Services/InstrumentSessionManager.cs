@@ -6,11 +6,40 @@ using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
+    
     public partial class SafeTradeCopierTool
     {
         private readonly List<InstrumentSession> _instrumentSessions = new List<InstrumentSession>();
         private InstrumentSession _activeInstrumentSession;
-        private bool _suppressSessionUiEvents;
+        private int _suppressSessionUiEventsDepth;
+        private bool _suppressSessionUiEvents => _suppressSessionUiEventsDepth > 0;
+        
+        private IDisposable BeginSessionUiSuppression()
+        {
+            _suppressSessionUiEventsDepth++;
+            return new SessionUiSuppressionScope(this);
+        }
+
+        private sealed class SessionUiSuppressionScope : IDisposable
+        {
+            private SafeTradeCopierTool _owner;
+
+            public SessionUiSuppressionScope(SafeTradeCopierTool owner)
+            {
+                _owner = owner;
+            }
+
+            public void Dispose()
+            {
+                if (_owner == null)
+                    return;
+
+                if (_owner._suppressSessionUiEventsDepth > 0)
+                    _owner._suppressSessionUiEventsDepth--;
+
+                _owner = null;
+            }
+        }
 
         private string GetSelectedInstrumentName()
         {
@@ -202,8 +231,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var items = GetAvailableInstruments();
 
-            _suppressSessionUiEvents = true;
-            try
+            using (BeginSessionUiSuppression())
             {
                 _instrumentSelector.ItemsSource = null;
                 _instrumentSelector.Items.Clear();
@@ -229,10 +257,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _instrumentSelector.SelectedItem = null;
                     _instrumentSelector.Text = "";
                 }
-            }
-            finally
-            {
-                _suppressSessionUiEvents = false;
             }
         }
         
