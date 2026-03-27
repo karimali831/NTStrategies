@@ -51,6 +51,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!IsStcEntryExecution(ord))
                     return;
 
+                Log($"[MASTER COPY TRIGGER] acc={_master?.Name} instr={_instrument?.FullName} execId={e.Execution.ExecutionId} orderName={orderName} armed={Armed} requested={_isRequested}");
+
                 if (!Armed || !_isRequested)
                     return;
 
@@ -153,6 +155,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var orderName = (e.Execution?.Order?.Name ?? "").Trim();
                 if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                 {
+                    Log($"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
                     TrySubmitBracketOnFill(acc, e.Execution);
                     MarkFollowerEntryResolved(acc);
                     ResetFollowerDesync(acc);

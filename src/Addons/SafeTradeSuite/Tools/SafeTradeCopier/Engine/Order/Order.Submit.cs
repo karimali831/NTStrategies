@@ -12,11 +12,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public partial class SafeCopierEngine
         {
             public void SubmitMasterMarketWithBracket(
-                Account master, 
-                Instrument instr, 
-                OrderAction action, 
-                int qty, 
-                string atmTemplateName, 
+                Account master,
+                Instrument instr,
+                OrderAction action,
+                int qty,
+                string atmTemplateName,
                 string entryName)
             {
                 if (master == null || instr == null)
@@ -56,11 +56,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         EntryName = entryName,
                         Qty = qty,
-                        IsBuy = (action == OrderAction.Buy),
+                        IsBuy = action == OrderAction.Buy,
                         StopTicks = Math.Max(0, stopTicks),
                         TargetTicks = Math.Max(0, targetTicks)
                     };
-                    
+
                     SafeTradeSuiteRuntime.PrintLog(
                         $"[MASTER BRACKET PENDING ADD] entry={entryName} master={master.Name} instr={instr.FullName} qty={qty} atm={atmTemplateName} stopTicks={stopTicks} targetTicks={targetTicks}");
                 }
@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
                 master.Submit(new[] { entry });
             }
-            
+
             private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
             {
                 SeenCleanup();
@@ -88,10 +88,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 foreach (var f in followerSnap)
                 {
-                    if (token.IsCancellationRequested) return;
-                    if (f == null) continue;
-                    if (masterSnap != null && ReferenceEquals(f, masterSnap)) continue;
-                    if (instrSnap == null) return;
+                    if (token.IsCancellationRequested)
+                        return;
+
+                    if (f == null)
+                        continue;
+
+                    if (masterSnap != null && ReferenceEquals(f, masterSnap))
+                        continue;
+
+                    if (instrSnap == null)
+                        return;
 
                     if (f.ConnectionStatus != ConnectionStatus.Connected)
                     {
@@ -134,6 +141,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         continue;
                     }
 
+                    if (HasAnyOpenFollowerTradeState(f, instrSnap, out var openStateReason))
+                    {
+                        Log($"[FOLLOWER COPY GATE] skip acc={f.Name} instr={instrSnap.FullName} reason={openStateReason}");
+                        continue;
+                    }
+
+                    Log($"[FOLLOWER COPY GATE] allow acc={f.Name} instr={instrSnap.FullName} qty={qtyToCopy}");
+
                     var bracketMode = ResolveFollowerBracket(f);
                     var followMasterExit = FollowerUsesMasterExit(f);
                     var hasOwnBracket =
@@ -147,15 +162,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     try
                     {
+                        var entryName = $"STC:ENTRY:{execId}:{f.Name}";
                         if (hasOwnBracket)
                         {
-                            var entryName = $"STC:ENTRY:{execId}:{f.Name}";
                             MarkFollowerEntrySubmitted(f, entryName);
                             SubmitFollowerMarketWithBracket(f, instrSnap, action, qtyToCopy, bracketMode, entryName);
                         }
                         else
                         {
-                            var entryName = $"STC:ENTRY:{execId}";
                             MarkFollowerEntrySubmitted(f, entryName);
 
                             var ord = f.CreateOrder(
@@ -194,22 +208,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
                 }
             }
-            
-            
+
             private void TrySubmitBracketOnFill(Account master, Execution execution)
             {
                 try
                 {
                     SafeTradeSuiteRuntime.PrintLog(
                         $"[TRY SUBMIT BRACKET ON FILL] acc={master?.Name} orderName={execution?.Order?.Name} instr={execution?.Order?.Instrument?.FullName} price={execution?.Price}");
-                    
-                    if (master == null || execution == null) return;
+
+                    if (master == null || execution == null)
+                        return;
 
                     var ord = execution.Order;
-                    if (ord == null) return;
+                    if (ord == null)
+                        return;
 
                     var name = ord.Name ?? "";
-                    if (string.IsNullOrWhiteSpace(name)) return;
+                    if (string.IsNullOrWhiteSpace(name))
+                        return;
 
                     PendingBracket pb;
                     lock (_gate)
@@ -220,15 +236,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             return;
                         }
 
-                        // only submit once (first fill)
-                        _pendingBrackets.Remove(name);
-                        
                         SafeTradeSuiteRuntime.PrintLog(
                             $"[BRACKET PENDING FOUND] entry={name} qty={pb.Qty} isBuy={pb.IsBuy} stopTicks={pb.StopTicks} targetTicks={pb.TargetTicks}");
                     }
 
                     if (pb.StopTicks <= 0 && pb.TargetTicks <= 0)
+                    {
+                        RemovePendingBracketForEntry(name);
                         return;
+                    }
 
                     var fillPrice = execution.Price;
                     if (fillPrice <= 0)
@@ -253,12 +269,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
                     var exitAction = pb.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
-                    
+
                     var orders = new List<Order>(2);
+
+                    var currentStopPrice = 0.0;
+                    var targetPrice = 0.0;
+                    string stopOrderName = null;
+                    string targetOrderName = null;
 
                     if (pb.TargetTicks > 0)
                     {
-                        var tgtPrice = pb.IsBuy
+                        targetPrice = pb.IsBuy
                             ? fillPrice + pb.TargetTicks * tickSize
                             : fillPrice - pb.TargetTicks * tickSize;
 
@@ -269,7 +290,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             OrderEntry.Manual,
                             TimeInForce.Day,
                             pb.Qty,
-                            tgtPrice,
+                            targetPrice,
                             0,
                             oco,
                             "STC:TP",
@@ -277,12 +298,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             null
                         );
 
+                        targetOrderName = "STC:TP";
                         orders.Add(tgt);
                     }
 
                     if (pb.StopTicks > 0)
                     {
-                        var stpPrice = pb.IsBuy
+                        currentStopPrice = pb.IsBuy
                             ? fillPrice - pb.StopTicks * tickSize
                             : fillPrice + pb.StopTicks * tickSize;
 
@@ -294,65 +316,56 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             TimeInForce.Day,
                             pb.Qty,
                             0,
-                            stpPrice,
+                            currentStopPrice,
                             oco,
                             "STC:SL",
                             DateTime.MaxValue,
                             null
                         );
 
+                        stopOrderName = "STC:SL";
                         orders.Add(stp);
                     }
 
-                    if (orders.Count > 0)
+                    if (orders.Count == 0)
                     {
-                        var currentStopPrice = 0.0;
-                        var targetPrice = 0.0;
-                        string stopOrderName = null;
-                        string targetOrderName = null;
+                        RemovePendingBracketForEntry(name);
+                        return;
+                    }
 
-                        if (pb.TargetTicks > 0)
-                        {
-                            targetPrice = pb.IsBuy
-                                ? fillPrice + pb.TargetTicks * tickSize
-                                : fillPrice - pb.TargetTicks * tickSize;
+                    lock (_gate)
+                    {
+                        _activeBracketByAccInstr[BracketKey(master, instr)] =
+                            new ActiveBracketSpec
+                            {
+                                StopTicks = pb.StopTicks,
+                                TargetTicks = pb.TargetTicks,
+                                IsBuy = pb.IsBuy,
+                                Qty = pb.Qty,
+                                EntryPrice = fillPrice,
+                                OriginalStopPrice = currentStopPrice,
+                                CurrentStopPrice = currentStopPrice,
+                                TargetPrice = targetPrice,
+                                IsFreeTradeApplied = false,
+                                StopOrderName = stopOrderName,
+                                TargetOrderName = targetOrderName,
+                                StopOco = oco
+                            };
+                    }
 
-                            targetOrderName = "STC:TP";
-                        }
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[BRACKET SUBMIT] acc={master.Name} instr={instr.FullName} fill={fillPrice:0.00} oco={oco} stopPrice={currentStopPrice:0.00} targetPrice={targetPrice:0.00} qty={pb.Qty}");
 
-                        if (pb.StopTicks > 0)
-                        {
-                            currentStopPrice = pb.IsBuy
-                                ? fillPrice - pb.StopTicks * tickSize
-                                : fillPrice + pb.StopTicks * tickSize;
-
-                            stopOrderName = "STC:SL";
-                        }
-
-                        lock (_gate)
-                        {
-                            _activeBracketByAccInstr[BracketKey(master, instr)] =
-                                new ActiveBracketSpec
-                                {
-                                    StopTicks = pb.StopTicks,
-                                    TargetTicks = pb.TargetTicks,
-                                    IsBuy = pb.IsBuy,
-                                    Qty = pb.Qty,
-                                    EntryPrice = fillPrice,
-                                    OriginalStopPrice = currentStopPrice,
-                                    CurrentStopPrice = currentStopPrice,
-                                    TargetPrice = targetPrice,
-                                    IsFreeTradeApplied = false,
-                                    StopOrderName = stopOrderName,
-                                    TargetOrderName = targetOrderName,
-                                    StopOco = oco
-                                };
-                        }
-                        SafeTradeSuiteRuntime.PrintLog(
-                            $"[BRACKET SUBMIT] acc={master.Name} instr={instr.FullName} fill={fillPrice:0.00} oco={oco} stopPrice={currentStopPrice:0.00} targetPrice={targetPrice:0.00} qty={pb.Qty}");
-                        
+                    try
+                    {
                         master.Submit(orders.ToArray());
+                        RemovePendingBracketForEntry(name);
                         Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
+                    }
+                    catch
+                    {
+                        ClearActiveBracket(master, instr);
+                        throw;
                     }
                 }
                 catch (Exception ex)
@@ -361,18 +374,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     throw;
                 }
             }
-            
+
             private void SubmitFollowerMarketWithBracket(Account acc, Instrument instr, OrderAction action, int qty, string atmTemplateName, string entryName)
             {
-                if (acc == null || instr == null) return;
-                
+                if (acc == null || instr == null)
+                    return;
+
                 if (!TryReadAtmTemplateBasic(atmTemplateName, out var stopTicks, out var targetTicks))
                 {
                     Log($"Follower ATM template parse failed: '{atmTemplateName}'. Submitting entry only.");
                     stopTicks = 0;
                     targetTicks = 0;
                 }
-                
+
                 var entry = acc.CreateOrder(
                     instr,
                     action,
@@ -394,7 +408,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         EntryName = entryName,
                         Qty = qty,
-                        IsBuy = (action == OrderAction.Buy),
+                        IsBuy = action == OrderAction.Buy,
                         StopTicks = Math.Max(0, stopTicks),
                         TargetTicks = Math.Max(0, targetTicks)
                     };

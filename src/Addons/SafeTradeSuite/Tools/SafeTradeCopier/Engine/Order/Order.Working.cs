@@ -45,6 +45,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return false;
             }
             
+            private bool HasWorkingEntryOrders(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return false;
+
+                foreach (var o in acc.Orders)
+                {
+                    if (o?.Instrument == null)
+                        continue;
+
+                    if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                        continue;
+
+                    var isWorking =
+                        o.OrderState == OrderState.Working ||
+                        o.OrderState == OrderState.Accepted ||
+                        o.OrderState == OrderState.Submitted ||
+                        o.OrderState == OrderState.PartFilled ||
+                        o.OrderState == OrderState.Initialized;
+
+                    if (!isWorking)
+                        continue;
+
+                    var name = (o.Name ?? "").Trim();
+                    if (name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return false;
+            }
+            
             private List<Order> GetWorkingOrdersForInstrument(Account acc, Instrument instr)
             {
                 var result = new List<Order>();

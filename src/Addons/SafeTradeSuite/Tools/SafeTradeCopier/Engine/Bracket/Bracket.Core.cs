@@ -75,15 +75,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void HandleBracketExitOutcome(Account acc, Execution execution)
             {
-                if (acc == null || execution?.Order == null) return;
+                if (acc == null || execution?.Order == null)
+                    return;
 
                 var ord = execution.Order;
                 var instr = ord.Instrument;
-                if (instr == null) return;
+                if (instr == null)
+                    return;
 
                 var name = (ord.Name ?? "").Trim();
 
-                // Only care about our own exit orders
                 var isKnownExit =
                     name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
                     name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
@@ -92,9 +93,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!isKnownExit)
                     return;
 
-                // If account is now flat on this instrument, bracket is complete
-                if (GetNetPosition(acc, instr) == 0)
+                var isFlat = GetNetPosition(acc, instr) == 0;
+                var hasWorkingBracket = HasWorkingBracketOrders(acc, instr);
+
+                if (isFlat && !hasWorkingBracket)
+                {
                     ClearActiveBracket(acc, instr);
+                    Log($"[BRACKET CLEAR] acc={acc.Name} instr={instr.FullName} reason=flat_and_no_working_brackets");
+                }
+                else
+                {
+                    Log($"[BRACKET KEEP] acc={acc.Name} instr={instr.FullName} isFlat={isFlat} hasWorkingBracket={hasWorkingBracket}");
+                }
             }
             
             private void RemovePendingBracketForEntry(string entryName)
