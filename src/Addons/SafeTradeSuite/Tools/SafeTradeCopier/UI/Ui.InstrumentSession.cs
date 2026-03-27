@@ -373,6 +373,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void SwitchToSession(InstrumentSession session)
         {
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[SWITCH SESSION] from={_activeInstrumentSession?.InstrumentName} to={session?.InstrumentName}");
+
             if (session == null)
                 return;
 
@@ -382,9 +385,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SaveUiToActiveSession("SwitchToSession");
             _activeInstrumentSession = session;
 
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[SWITCH SESSION MASTER] sessionMaster={_activeInstrumentSession?.MasterAccount?.Name ?? "null"}");
+
             RefreshInstrumentSelectorItems();
             RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
+
+            var latestAccounts = GetSelectableAccounts();
+            RebuildFollowersAndRewire(_engine, latestAccounts);
         }
 
         private void ActivateOrCreateInstrumentSession(string instrumentName, bool refreshSelector = true)
@@ -426,9 +434,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var session = new InstrumentSession
             {
                 InstrumentName = normalized,
-                MasterAccount = _masterBox?.SelectedItem as Account,
+                MasterAccount = GetMasterAccount(),
                 MasterQty = ParseQtyOrDefault(_masterQtyBox?.Text),
-                MasterAtm = (_masterBracketBox?.SelectedItem as string) ?? "None"
+                MasterAtm = _masterBracketBox?.SelectedItem as string ?? "None"
             };
 
             _instrumentSessions.Add(session);
@@ -598,11 +606,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _instrumentSelector.Text = instrumentName;
                     _instrumentSelector.SelectedItem = instrumentName;
 
-                    var targetMaster = _activeInstrumentSession.MasterAccount;
-                    if (targetMaster == null)
-                        targetMaster = _masterBox.SelectedItem as Account
-                                       ?? GetSelectableAccounts().FirstOrDefault(IsSimAccount)
-                                       ?? GetSelectableAccounts().FirstOrDefault();
+                    var targetMaster = _activeInstrumentSession.MasterAccount
+                       ?? GetSelectableAccounts().FirstOrDefault(IsSimAccount)
+                       ?? GetSelectableAccounts().FirstOrDefault();
 
                     _masterBox.SelectedItem = targetMaster;
 
@@ -669,9 +675,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         $"uiChecked={DiagCheckedFollowerCount()} uiMap={DiagCheckedFollowers()}");
                 }
 
-                var requested = _activeInstrumentSession.IsArmedRequested;
-                if (_engine != null && _engine.IsRequested != requested)
-                    _engine.SetCopyEnabled(requested);
+                SyncEngineRequestedStateForActiveSession();
 
                 if (VerboseSessionLogging)
                 {
@@ -695,6 +699,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 _isLoadingSessionUi = false;
             }
+        }
+        
+        private void SyncEngineRequestedStateForActiveSession()
+        {
+            if (_engine == null || _activeInstrumentSession == null)
+                return;
+
+            var requested = _activeInstrumentSession.IsArmedRequested;
+
+            if (!requested)
+            {
+                if (_engine.IsRequested)
+                    _engine.SetCopyEnabled(false);
+
+                return;
+            }
+
+            if (CanRequestArmedForActiveSession(out _))
+            {
+                if (!_engine.IsRequested || !_engine.Armed)
+                    _engine.SetCopyEnabled(true);
+
+                return;
+            }
+
+            if (_engine.IsRequested)
+                _engine.SetCopyEnabled(false);
         }
     }
 }

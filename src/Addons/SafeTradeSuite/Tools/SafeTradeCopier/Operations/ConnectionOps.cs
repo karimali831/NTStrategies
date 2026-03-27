@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
@@ -83,12 +84,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void TryAutoRearmAfterReconnect()
         {
-            if (_engine == null) return;
-            if (_engine.IsRequested) return;
-            if (!HasAnyCheckedFollowersHealthy()) return;
+            if (_engine == null)
+                return;
 
-            if (ActiveSessionRequested())
-                RequestArmed("Copy auto-rearmed after connection recovered.");
+            if (_engine.IsRequested)
+                return;
+
+            if (!ActiveSessionRequested())
+                return;
+
+            if (!ActiveSessionHasHealthyEnabledFollowers())
+                return;
+
+            RequestArmed("Copy auto-rearmed after connection recovered.");
         }
         
         private void RequestArmed(string reason = null)
@@ -98,7 +106,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (!CanRequestArmedForActiveSession(out var blockReason))
             {
-                _activeInstrumentSession.IsArmedRequested = false;
+                _activeInstrumentSession.IsArmedRequested = true;
                 RenderButtons();
                 RefreshCopierStatusPanel();
 
@@ -140,24 +148,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void HandleFollowerConnectionSafety()
         {
-            if (_engine == null) return;
+            if (_engine == null || _activeInstrumentSession?.FollowersEnabled == null)
+                return;
 
-            var anySelectedBad = _followerRows.Any(r =>
+            var anySelectedBad = _activeInstrumentSession.FollowersEnabled.Any(kvp =>
             {
-                if (r?.Account == null) return false;
-                if (r.EnabledCheck?.IsChecked != true) return false;
+                if (!kvp.Value)
+                    return false;
 
-                var state = GetUiConnectionState(r.Account);
-                return state != UiConnectionState.Connected;
+                var account = Account.All.FirstOrDefault(a =>
+                    a != null &&
+                    string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
+
+                return account == null || GetUiConnectionState(account) != UiConnectionState.Connected;
             });
 
             if (!anySelectedBad)
                 return;
 
             if (_engine.IsRequested)
-            {
                 RequestDisarmed("Copy disarmed: one or more selected followers lost connection.");
-            }
 
             RenderFollowerRowsState();
             ApplyConfigFromUi();

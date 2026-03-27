@@ -64,7 +64,7 @@
                  height: SmallButtonHeight(),
                  tone: isRequested ? FormButtonTone.Warning : FormButtonTone.Success,
                  style: FormButtonStyle.Solid,
-                 enabled: HasAnyCheckedFollowersHealthy());
+                 enabled: AreAllCheckedFollowersHealthy());
  
              Grid.SetColumn(followersTitleText, 0);
              Grid.SetColumn(_followersBulkActionsPanel, 1);

@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
@@ -232,12 +233,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectionChanged += (s, e) =>
             {
-                if (SuppressSessionUiEvents || _isLoadingSessionUi)
+                if (SuppressSessionUiEvents || _isLoadingSessionUi || _activeInstrumentSession == null)
+                {
+                    if (VerboseSessionLogging)
+                    {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[MASTER CHANGED IGNORED] suppress={SuppressSessionUiEvents} loading={_isLoadingSessionUi} " +
+                            $"sessionNull={_activeInstrumentSession == null} ui={(_masterBox.SelectedItem as Account)?.Name ?? "null"}");
+                    }
                     return;
+                }
 
-                var latestAccounts = GetSelectableAccounts();
+                if (VerboseSessionLogging)
+                {
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[MASTER CHANGED ACCEPTED] ui={(_masterBox.SelectedItem as Account)?.Name ?? "null"} " +
+                        $"sessionBefore={_activeInstrumentSession?.MasterAccount?.Name ?? "null"}");
+                }
 
                 SaveUiToActiveSession("RenderMasterPanel._masterBox.SelectionChanged");
+
+                var latestAccounts = GetSelectableAccounts();
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 RefreshRiskFieldset();
             };

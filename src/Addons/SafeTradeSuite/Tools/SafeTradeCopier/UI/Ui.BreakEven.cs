@@ -33,7 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var anyCanApplyOrUndo = false;
                 var canUndoAll = false;
 
-                if (_btnMasterFreeTrade != null && _masterBox?.SelectedItem is Account master)
+                if (_btnMasterFreeTrade != null && GetMasterAccount() is Account master)
                 {
                     var canUndoMaster = _engine != null && _engine.CanUndoFreeTrade(master, instr, out _);
                     var canApplyMaster = _engine != null && _engine.CanApplyFreeTrade(master, instr, _freeTradeMinProfitPoints, out _);

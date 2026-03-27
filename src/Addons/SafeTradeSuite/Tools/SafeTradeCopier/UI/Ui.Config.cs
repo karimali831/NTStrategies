@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private CopierUiConfig BuildConfigFromUi()
         {
-            var master = _masterBox?.SelectedItem as Account;
+            var master = GetMasterAccount();
             var instr = NormalizeInstrumentName(
                 (_instrumentSelector?.SelectedItem as string) ??
                 _instrumentSelector?.Text ??

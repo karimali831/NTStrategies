@@ -62,7 +62,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var totalR = 0.0;
                 var totalU = 0.0;
 
-                if (_masterBox?.SelectedItem is Account master)
+                if (GetMasterAccount() is Account master)
                 {
                     TryGetInstrumentUnrealized(master, instr, out var mu, out _);
                     _engine.TryGetRealizedPnl(master, out var mr);

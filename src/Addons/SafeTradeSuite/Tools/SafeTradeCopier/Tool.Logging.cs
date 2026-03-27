@@ -7,7 +7,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private const bool VerboseSessionLogging = false;
+        private const bool VerboseSessionLogging = true;
         private static string CrashLogPath =>
             Path.Combine(Globals.UserDataDir, "log", "SafeTradeCopier.crash.log");
 

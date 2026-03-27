@@ -13,17 +13,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SafeTradeSuiteRuntime.PrintLog(
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
 
-            SaveUiToActiveSession("RebuildFollowersAndRewire.preRebuild");
-
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
             LoadActiveSessionToUi();
-
-            ApplyConfigFromUi();
             RefreshRiskFieldset();
-
-            if (ActiveSessionRequested())
-                eng.SetCopyEnabled(true);
         }
         
         private void WireFollowerFlattenButtons(SafeCopierEngine eng)
@@ -109,7 +102,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _followerRows.Clear();
             _followersPanel?.Children.Clear();
 
-            var master = _masterBox?.SelectedItem as Account;
+            var master = GetMasterAccount();
             var masterName = master?.Name ?? "";
 
             var rowIndex = 0;
@@ -209,7 +202,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     style: FormButtonStyle.Solid,
                     width: 60,
                     height: SmallButtonHeight());
-                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, "✔", all: false);
+                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, CheckIcon, all: false);
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 
@@ -367,12 +360,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             SaveUiToActiveSession(source);
             ApplyConfigFromUi();
-
-            if (_activeInstrumentSession.IsArmedRequested)
-                _engine?.SetCopyEnabled(true);
-            else
-                _engine?.SetCopyEnabled(false);
-
+            SyncEngineRequestedStateForActiveSession();
+            
             RefreshCopierStatusPanel();
             RenderButtons();
             RefreshFollowerBulkActionButtons();

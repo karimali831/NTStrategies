@@ -8,7 +8,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     public partial class SafeTradeCopierTool
     {
         private UIElement _instrumentTabsHost;
-        
+        private const int TabWidth = 92;
+
         private void RenderInstrumentTabs(Grid root)
         {
             var bottom = new Grid { Margin = new Thickness(0, 0, 0, 0) };
@@ -179,7 +180,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var headerPanel = new Grid
             {
-                MinWidth = 92,
+                MinWidth = TabWidth,
                 Height = 38,
                 VerticalAlignment = VerticalAlignment.Center,
                 Tag = session
@@ -217,7 +218,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 Header = headerBorder,
                 Tag = session,
-                MinWidth = 92,
+                MinWidth = TabWidth,
                 Height = 38,
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),

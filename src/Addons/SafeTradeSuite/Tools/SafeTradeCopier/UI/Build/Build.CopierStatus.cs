@@ -152,24 +152,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var armed = Armed();
             var requested = ActiveSessionRequested();
-            var ready = armed && HasAnyCheckedFollowersHealthy();
+            var ready = armed && AreAllCheckedFollowersHealthy();
 
             readyStatus.PrimaryDotColour = connectedColor;
             readyStatus.PrimaryReason = $"{(_simOnlyMode ? "Sim" : "Live")} {(ready ? "copier" : "master")} ready";
 
-            if (!HasAnyCheckedFollowersHealthy())
+            if (!HasAnyCheckedFollowers())
+            {
+                readyStatus.SecondaryReason = requested
+                    ? "Arm requested - select followers"
+                    : "No followers selected";
+                readyStatus.SecondaryDotColour = warningColor;
+                return readyStatus;
+            }
+
+            if (!AreAllCheckedFollowersHealthy())
             {
                 readyStatus.SecondaryReason = requested
                     ? "Arm requested - check followers"
-                    : "No followers selected";
-
+                    : "Selected followers unhealthy";
                 readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }
             
             if (requested && !armed)
             {
-                readyStatus.SecondaryReason = "Re-arming...";
+                readyStatus.SecondaryReason = "Arm requested - waiting";
                 readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }

@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void FreeTradeMasterSelected(SafeCopierEngine eng)
         {
-            if (!(_masterBox?.SelectedItem is Account masterAcc))
+            if (!(GetMasterAccount() is Account masterAcc))
                 return;
 
             var instr = GetInstrument();
@@ -79,7 +79,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var accounts = new List<Account>();
 
-            if (_masterBox?.SelectedItem is Account masterAcc)
+            if (GetMasterAccount() is Account masterAcc)
                 accounts.Add(masterAcc);
 
             accounts.AddRange(
@@ -106,7 +106,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (eng == null)
                     return;
 
-                if (!(_masterBox?.SelectedItem is Account master))
+                if (!(GetMasterAccount() is Account master))
                 {
                     eng.Log("Select a master account first.");
                     return;
@@ -178,7 +178,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (instr == null)
                 return false;
 
-            if (_masterBox?.SelectedItem is Account master && HasOpenInstrumentPosition(master, instr))
+            if (GetMasterAccount() is Account master && HasOpenInstrumentPosition(master, instr))
                 return true;
 
             return _followerRows.Any(r =>

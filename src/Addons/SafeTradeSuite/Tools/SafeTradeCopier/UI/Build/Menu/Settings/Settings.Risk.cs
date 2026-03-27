@@ -159,7 +159,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddRiskHeader("Max Loss", 3);
 
             var settingsAccounts = GetSelectableAccounts();
-            var currentMaster = _masterBox?.SelectedItem as Cbi.Account;
+            var currentMaster = GetMasterAccount();
             var rowIndex = 1;
 
             foreach (var acc in settingsAccounts)

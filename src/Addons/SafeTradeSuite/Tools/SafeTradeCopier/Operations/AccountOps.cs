@@ -31,7 +31,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private Account GetMasterAccount()
         {
-            return _masterBox?.SelectedItem as Account;
+            return _activeInstrumentSession?.MasterAccount 
+                ?? _masterBox?.SelectedItem as Account;
         }
         
         private bool IsMasterConnected(out Account acc)
@@ -46,47 +47,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RefreshAccountsUi()
         {
-            if (_window == null) return;
-            if (_masterBox == null) return;
-            if (_followersPanel == null) return;
-            if (_engine == null) return;
+            if (_window == null || _masterBox == null || _followersPanel == null || _engine == null)
+                return;
 
             var accounts = GetSelectableAccounts();
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
-            var accountsChanged = !SameSnapshot(_lastAccountsSnapshot, snap);
+            var snapshotChanged = !SameSnapshot(_lastAccountsSnapshot, snap);
 
-            if (accountsChanged)
+            if (snapshotChanged)
             {
                 _lastAccountsSnapshot = snap;
 
-                var activeMasterName =
-                    _activeInstrumentSession?.MasterAccount?.Name
-                    ?? GetMasterAccount()?.Name
-                    ?? "";
-
-                using (BeginSessionUiSuppression())
+                if (!_isLoadingSessionUi && !SuppressSessionUiEvents)
                 {
-                    _masterBox.ItemsSource = accounts;
-                    _masterBox.DisplayMemberPath = "Name";
-
-                    var newMaster = !string.IsNullOrWhiteSpace(activeMasterName)
-                        ? accounts.FirstOrDefault(a => string.Equals(a.Name, activeMasterName, StringComparison.Ordinal))
-                        : null;
-
-                    _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
+                    RebindMasterAccounts(accounts);
+                    RebuildFollowersAndRewire(_engine, accounts);
+                    RefreshRiskFieldset();
                 }
 
-                RebuildFollowersAndRewire(_engine, accounts);
-                RefreshCopierStatusPanel();
-                RenderMasterSubmitButtonsState();
                 return;
             }
 
-            EnforceSimOnlyModeUi(accounts);
             RenderFollowerRowsState();
-            RefreshFollowerBulkActionButtons();
             RefreshCopierStatusPanel();
             RenderMasterSubmitButtonsState();
+            RenderPnlUi();
         }
         
         private string DiagCheckedFollowers()
@@ -103,7 +88,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
         }
         
-        private bool HasAnyCheckedFollowersHealthy()
+        private bool AreAllCheckedFollowersHealthy()
         {
             var query = _followerRows
                 .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
