@@ -19,8 +19,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private Border _copierReadySecondaryDot;
         private TextBlock _copierReadyText;
         private TextBlock _copierReadySecondaryText;
-        private TextBlock _totalPnlText;
-        
+
         private void RenderCopierStatusPanel(Grid root)
         {
             var statusStack = new StackPanel
@@ -31,7 +30,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             statusStack.Children.Add(BuildStatusLine(out _copierReadyDot, out _copierReadyText));
             statusStack.Children.Add(BuildStatusLine(out _copierReadySecondaryDot, out _copierReadySecondaryText));
-            statusStack.Children.Add(BuildTextLine(out _totalPnlText));
 
             var statusFieldset = BuildFieldset("Status", statusStack);
 
@@ -79,19 +77,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             row.Children.Add(text);
 
             return row;
-        }
-
-        private static UIElement BuildTextLine(out TextBlock text)
-        {
-            text = new TextBlock
-            {
-                Margin = new Thickness(0, 0, 0, 6),
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = WindowForegroundBrush(),
-                TextTrimming = TextTrimming.CharacterEllipsis
-            };
-
-            return text;
         }
 
         private void RefreshCopierStatusPanel()

@@ -338,7 +338,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             double realized, 
             double unrealized, 
             bool shortened, 
-            Account acc = null)
+            Account acc = null,
+            bool anyFollowerOpen = false)
         {
             if (tb == null)
                 return;
@@ -367,7 +368,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             var instr = GetInstrument();
-            var inOpenPos = HasOpenInstrumentPosition(acc, instr);
+            var inOpenPos = HasOpenInstrumentPosition(acc, instr) || anyFollowerOpen;
             var value = inOpenPos ? unrealized : realized;
             
             tb.Inlines.Add(new Run(inOpenPos ? "Unrealized " : "Realized ")

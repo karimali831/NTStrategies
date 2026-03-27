@@ -14,6 +14,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
 
             BuildFollowerRows(accounts);
+            WireFollowerFlattenButtons(eng);
+            WireFollowerFreeTradeButtons(eng);
             EnforceSimOnlyModeUi(accounts);
             LoadActiveSessionToUi();
             RefreshRiskFieldset();
@@ -27,6 +29,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 r.FlattenBtn.Click += (s, e) =>
                 {
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER FLATTEN CLICK] acc={r?.Account?.Name} instr={GetInstrument()?.FullName}");
+
                     if (eng == null) return;
                     if (r.Account == null) return;
 

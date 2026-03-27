@@ -249,7 +249,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _masterQtyBox = null;
             _masterBracketBox = null;
             _masterPnlText = null;
-            _totalPnlText = null;
+            _followersTotalPnlText = null;
 
             _instrumentTabs = null;
             _btnAddInstrumentTab = null;

@@ -62,11 +62,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var totalR = 0.0;
                 var totalU = 0.0;
 
+                var followersR = 0.0;
+                var followersU = 0.0;
+                var openFollowerCount = 0;
+
                 if (GetMasterAccount() is Account master)
                 {
                     TryGetInstrumentUnrealized(master, instr, out var mu, out _);
                     _engine.TryGetRealizedPnl(master, out var mr);
-                    
+
                     totalR += mr;
                     totalU += mu;
 
@@ -82,12 +86,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var acc = row?.Account;
                     if (acc == null)
                         continue;
-                    
-                    TryGetInstrumentUnrealized(acc, instr, out var u, out _);
+
+                    TryGetInstrumentUnrealized(acc, instr, out var u, out var absQty);
                     _engine.TryGetRealizedPnl(acc, out var r);
 
                     totalR += r;
                     totalU += u;
+
+                    followersR += r;
+                    followersU += u;
+
+                    if (absQty > 0)
+                        openFollowerCount++;
 
                     if (row.PnlText != null)
                         SetPnlText(row.PnlText, "", r, u, shortened: true, acc);
@@ -96,8 +106,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RenderProgressBar(row.PnlBar, row.PnlBarStatusText, acc);
                 }
 
-                if (_totalPnlText != null)
-                    SetPnlText(_totalPnlText, "Total", totalR, totalU, shortened: false);
+                if (_followersTotalPnlText != null)
+                    SetPnlText(
+                        _followersTotalPnlText, "Total", followersR, followersU, shortened: false, acc: null, openFollowerCount > 1);
 
                 RenderFlattenEnablementUi();
                 RenderBreakEvenEnablementUi();
