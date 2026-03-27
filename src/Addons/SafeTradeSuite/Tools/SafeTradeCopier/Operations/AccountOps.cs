@@ -91,34 +91,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
         }
         
-        private bool HasAnyCheckedSimFollowersHealthy()
-        {
-            var query = _followerRows
-                .Where(r => r.EnabledCheck?.IsChecked == true && IsSimAccount(r.Account))
-                .ToList();
-
-            return query.Any() &&
-                   query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
-        }
-        
-        private bool HasAnyCheckedLiveFollowersHealthy()
-        {
-            var query = _followerRows
-                .Where(r => r.EnabledCheck?.IsChecked == true && !IsSimAccount(r.Account))
-                .ToList();
-
-            return query.Any() &&
-                   query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
-        }
-        
         private bool HasAnyCheckedFollowersHealthy()
         {
             var query = _followerRows
-                .Where(r => r.EnabledCheck?.IsChecked == true)
+                .Where(r => r?.Account != null && r.EnabledCheck?.IsChecked == true)
                 .ToList();
 
             return query.Any() &&
                    query.All(r => GetUiConnectionState(r.Account) == UiConnectionState.Connected);
+        }
+        
+        private int CountCheckedFollowersHealthy()
+        {
+            return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true && 
+                GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
         private IList<FollowerRow> GetCheckedFollowers()
@@ -139,12 +125,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private bool HasAnyCheckedFollowers()
         {
             return _followerRows.Any(r => r?.Account != null && r.EnabledCheck?.IsChecked == true);
-        }
-        
-        private int CountCheckedFollowersHealthy()
-        {
-            return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true && 
-                GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
         
         private static bool SameSnapshot(List<AccountSnap> a, List<AccountSnap> b)

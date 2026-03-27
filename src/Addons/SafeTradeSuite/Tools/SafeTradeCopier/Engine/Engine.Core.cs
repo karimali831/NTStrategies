@@ -137,11 +137,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     if (_isRequested && !IsReady_NoLock(out var reason))
                     {
-                        _isRequested = false;
                         DisarmUnsafe_NoLock("Config no longer valid");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: reason);
-                        Log($"COPY OFF (auto): {reason}");
+                        Log($"ARM pending: {reason}");
                         return;
                     }
 
@@ -297,7 +296,53 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!string.IsNullOrWhiteSpace(reason))
                     Log($"DISARMED: {reason}");
             }
+            
+            private bool AllowCopyNow()
+            {
+                var cutoff = DateTime.UtcNow.AddSeconds(-2).Ticks;
+                while (_copiedTicks.TryPeek(out var t) && t < cutoff)
+                    _copiedTicks.TryDequeue(out _);
 
+                return _copiedTicks.Count <= MaxCopiesPer2Sec;
+            }
+            
+            private void RecordCopy()
+            {
+                _copiedTicks.Enqueue(DateTime.UtcNow.Ticks);
+            }
+            
+            public void SetCopyEnabled(bool enabled)
+            {
+                lock (_gate)
+                {
+                    if (enabled)
+                    {
+                        _isRequested = true;
+
+                        if (!IsReady_NoLock(out var reason))
+                        {
+                            DisarmUnsafe_NoLock("COPY ON blocked");
+                            RaiseModeChanged_NoLock();
+                            RaiseReady_NoLock(reasonOverride: reason);
+                            Log($"ARM pending: {reason}");
+                            return;
+                        }
+
+                        RewireUnsafe_NoLock("COPY ON");
+                        RaiseModeChanged_NoLock();
+                        RaiseReady_NoLock();
+                        Log("COPY ON.");
+                    }
+                    else
+                    {
+                        _isRequested = false;
+                        DisarmUnsafe_NoLock("COPY OFF");
+                        RaiseModeChanged_NoLock();
+                        RaiseReady_NoLock();
+                        Log("COPY OFF.");
+                    }
+                }
+            }
 
             public void Log(string msg)
             {

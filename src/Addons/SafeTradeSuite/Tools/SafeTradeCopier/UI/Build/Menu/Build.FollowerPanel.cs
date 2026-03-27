@@ -11,6 +11,7 @@
          private Button _btnCopyOn;
          private Button _btnToggleAllFollowers;
          private StackPanel _followersBulkActionsPanel;
+         private ScrollViewer _followersScrollViewer;
          private readonly List<FollowerRow> _followerRows = new List<FollowerRow>();
          
          private void RenderFollowerPanel(SafeCopierEngine eng, Grid root)
@@ -55,14 +56,15 @@
              
              _btnToggleAllFollowers.Click += (s, e) => ToggleFollowersSelection(x => true);
              _followersBulkActionsPanel.Children.Add(_btnToggleAllFollowers);
- 
-             var isRequested = _activeInstrumentSession?.IsArmedRequested == true;
+
+             var isRequested = ActiveSessionRequested();
  
              _btnCopyOn = CreateFormButton(
                  isRequested ? "Disarm" : "Arm",
                  height: SmallButtonHeight(),
                  tone: isRequested ? FormButtonTone.Warning : FormButtonTone.Success,
-                 style: FormButtonStyle.Solid);
+                 style: FormButtonStyle.Solid,
+                 enabled: HasAnyCheckedFollowersHealthy());
  
              Grid.SetColumn(followersTitleText, 0);
              Grid.SetColumn(_followersBulkActionsPanel, 1);
@@ -80,8 +82,8 @@
                  Orientation = Orientation.Vertical
              };
              
-             var followersScroll = CreateScrollbar(_followersPanel, canContentScroll: true, height: 240);
-             followersStack.Children.Add(followersScroll);
+             _followersScrollViewer = CreateScrollbar(_followersPanel, canContentScroll: true, height: 240);
+             followersStack.Children.Add(_followersScrollViewer);
  
              var followersFieldset = BuildFieldset("Followers", followersStack);
  
@@ -89,7 +91,7 @@
  
              _btnCopyOn.Click += (s, e) =>
              {
-                 if (_activeInstrumentSession?.IsArmedRequested == true)
+                 if (ActiveSessionRequested())
                  {
                      RequestDisarmed("Copy manually disabled.");
                      return;
@@ -131,7 +133,7 @@
              if (_btnCopyOn == null)
                  return;
 
-             var requested = _activeInstrumentSession?.IsArmedRequested == true;
+             var requested = ActiveSessionRequested();
 
              _btnCopyOn.Content = requested ? "Disarm" : "Arm";
 
@@ -141,27 +143,12 @@
          
          private void RefreshFollowerBulkActionButtons()
          {
-             if (_followersBulkActionsPanel == null)
+             if (_btnToggleAllFollowers == null)
                  return;
- 
-             if (_btnToggleAllFollowers != null)
-                 _btnToggleAllFollowers.Content = AreAllMatchingFollowersChecked(x => true)
-                     ? "Deselect All"
-                     : "Select All";
-         }
- 
-         private bool AreAllMatchingFollowersChecked(Func<FollowerRow, bool> predicate)
-         {
-             var rows = _followerRows
-                 .Where(r => r?.Account != null)
-                 .Where(predicate)
-                 .Where(r => r.EnabledCheck != null && r.EnabledCheck.IsEnabled)
-                 .ToList();
- 
-             if (rows.Count == 0)
-                 return false;
- 
-             return rows.All(r => r.EnabledCheck.IsChecked == true);
+
+             _btnToggleAllFollowers.Content = ActiveSessionHasAllEnabledFollowers()
+                 ? "Deselect All"
+                 : "Select All";
          }
  
          private void ToggleFollowersSelection(Func<FollowerRow, bool> predicate)
@@ -190,6 +177,15 @@
              SaveUiToActiveSession("RenderFollowerPanel.ToggleFollowersSelection");
              ApplyConfigFromUi();
              RefreshFollowerBulkActionButtons();
+         }
+         
+         private void ScrollFollowersToTop()
+         {
+             if (_followersScrollViewer == null)
+                 return;
+
+             _followersScrollViewer.ScrollToHome();
+             _followersScrollViewer.ScrollToTop();
          }
      }
  }

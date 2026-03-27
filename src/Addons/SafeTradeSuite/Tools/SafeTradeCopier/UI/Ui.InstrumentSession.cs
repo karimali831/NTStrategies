@@ -655,7 +655,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"engineRequested={_engine?.IsRequested} armed={_engine?.Armed}");
 
                 RenderButtons();
+                RefreshFollowerBulkActionButtons();
                 RefreshCopierStatusPanel();
+                ScrollFollowersToTop();
             }
             catch (Exception ex)
             {

@@ -6,13 +6,12 @@ using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
-    
     public partial class SafeTradeCopierTool
     {
         private readonly List<InstrumentSession> _instrumentSessions = new List<InstrumentSession>();
         private InstrumentSession _activeInstrumentSession;
         private int _suppressSessionUiEventsDepth;
-        private bool _suppressSessionUiEvents => _suppressSessionUiEventsDepth > 0;
+        private bool SuppressSessionUiEvents => _suppressSessionUiEventsDepth > 0;
         
         private IDisposable BeginSessionUiSuppression()
         {
@@ -266,6 +265,98 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return false;
 
             return session.FollowersEnabled.Any(x => x.Value);
+        }
+        
+        private bool ActiveSessionHasAllEnabledFollowers()
+        {
+            if (_activeInstrumentSession?.FollowersEnabled == null)
+                return false;
+
+            var rows = _followerRows
+                .Where(r => r?.Account != null)
+                .Where(r => r.EnabledCheck != null && r.EnabledCheck.IsEnabled)
+                .ToList();
+
+            if (rows.Count == 0)
+                return false;
+
+            foreach (var row in rows)
+            {
+                if (!_activeInstrumentSession.FollowersEnabled.TryGetValue(row.Account.Name, out var enabled) || !enabled)
+                    return false;
+            }
+
+            return true;
+        }
+        
+        private bool ActiveSessionHasEnabledFollowers()
+        {
+            return _activeInstrumentSession?.FollowersEnabled != null
+                   && _activeInstrumentSession.FollowersEnabled.Any(x => x.Value);
+        }
+        
+        private bool ActiveSessionHasHealthyEnabledFollowers()
+        {
+            if (_activeInstrumentSession?.FollowersEnabled == null)
+                return false;
+
+            foreach (var kvp in _activeInstrumentSession.FollowersEnabled)
+            {
+                if (!kvp.Value)
+                    continue;
+
+                var account = Account.All.FirstOrDefault(a =>
+                    a != null &&
+                    string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
+
+                if (account != null && GetUiConnectionState(account) == UiConnectionState.Connected)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool CanRequestArmedForActiveSession(out string reason)
+        {
+            reason = null;
+
+            if (_activeInstrumentSession == null)
+            {
+                reason = "No active instrument session.";
+                return false;
+            }
+
+            if (_activeInstrumentSession.MasterAccount == null)
+            {
+                reason = "Select a master account first.";
+                return false;
+            }
+
+            var instrName = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
+            if (!IsValidInstrumentName(instrName))
+            {
+                reason = "Select a valid instrument first.";
+                return false;
+            }
+
+            if (!ActiveSessionHasEnabledFollowers())
+            {
+                reason = "Select at least one follower first.";
+                return false;
+            }
+
+            if (!ActiveSessionHasHealthyEnabledFollowers())
+            {
+                reason = "No connected followers selected.";
+                return false;
+            }
+
+            return true;
+        }
+        
+        private bool ActiveSessionRequested()
+        {
+            return _activeInstrumentSession?.IsArmedRequested == true;
         }
 
         private bool SessionHasOpenPosition(InstrumentSession session)

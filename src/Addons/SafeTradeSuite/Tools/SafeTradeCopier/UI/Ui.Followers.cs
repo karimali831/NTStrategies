@@ -78,7 +78,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
             RefreshRiskFieldset();
 
-            if (_activeInstrumentSession?.IsArmedRequested == true)
+            if (ActiveSessionRequested())
                 eng.SetCopyEnabled(true);
         }
         
@@ -355,48 +355,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 // When user changes follower settings, we re-apply config (no re-arm UX)
                 enabled.Checked += (s, e) =>
                 {
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER CHECKED EVT] acc={row.Account?.Name} suppress={_suppressSessionUiEvents} isLoaded={enabled.IsLoaded} checked={enabled.IsChecked}");
-
-                    if (_suppressSessionUiEvents || !enabled.IsLoaded || _activeInstrumentSession == null)
-                        return;
-
-                    RefreshCopierStatusPanel();
-                    RenderFollowerRowState(row);
-                    SaveUiToActiveSession("BuildFollowerRows.enabled.Checked");
-                    ApplyConfigFromUi();
-                    RefreshFollowerBulkActionButtons();
+                    HandleFollowerEnabledChanged(
+                        row,
+                        isChecked: true,
+                        source: "BuildFollowerRows.enabled.Checked");
                 };
 
                 enabled.Unchecked += (s, e) =>
                 {
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER UNCHECKED EVT] acc={row.Account?.Name} suppress={_suppressSessionUiEvents} isLoaded={enabled.IsLoaded} checked={enabled.IsChecked}");
-
-                    if (_suppressSessionUiEvents || !enabled.IsLoaded || _activeInstrumentSession == null)
-                        return;
-
-                    var instr = GetInstrument();
-                    if (HasOpenInstrumentPosition(row.Account, instr))
-                    {
-                        SetFollowerChecked(row, true, "BuildFollowerRows.enabled.Unchecked.revertOpenPosition");
-                        RenderFollowerRowState(row);
-                        RefreshCopierStatusPanel();
-                        RefreshFollowerBulkActionButtons();
-                        SavePersistentUiState();
-                        return;
-                    }
-
-                    RefreshCopierStatusPanel();
-                    RenderFollowerRowState(row);
-                    SaveUiToActiveSession("BuildFollowerRows.enabled.Unchecked");
-                    ApplyConfigFromUi();
-                    RefreshFollowerBulkActionButtons();
+                    HandleFollowerEnabledChanged(
+                        row,
+                        isChecked: false,
+                        source: "BuildFollowerRows.enabled.Unchecked");
                 };
                 
                 qtyBox.TextChanged += (s, e) =>
                 {
-                    if (_suppressSessionUiEvents) return;
+                    if (SuppressSessionUiEvents) return;
 
                     RenderQtyBoxState(qtyBox, ParseQtyOrDefault(_masterQtyBox?.Text));
                     SaveUiToActiveSession("BuildFollowerRows.qtyBox.TextChanged");
@@ -405,7 +380,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 atmBox.SelectionChanged += (s, e) =>
                 {
-                    if (_suppressSessionUiEvents) return;
+                    if (SuppressSessionUiEvents) return;
                     SaveUiToActiveSession("BuildFollowerRows.atmBox.SelectionChanged");
                     ApplyConfigFromUi();
                 };
@@ -425,6 +400,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RefreshFollowerBulkActionButtons();
         }
         
+        private void HandleFollowerEnabledChanged(FollowerRow row, bool isChecked, string source)
+        {
+            if (row?.Account == null || row.EnabledCheck == null)
+                return;
+
+            if (SuppressSessionUiEvents || !row.EnabledCheck.IsLoaded || _activeInstrumentSession == null)
+                return;
+
+            var instr = GetInstrument();
+
+            if (!isChecked && instr != null && HasOpenInstrumentPosition(row.Account, instr))
+            {
+                SetFollowerChecked(row, true, source + ".revertOpenPosition");
+                RenderFollowerRowState(row);
+                RefreshCopierStatusPanel();
+                RefreshFollowerBulkActionButtons();
+                return;
+            }
+
+            RenderFollowerRowState(row);
+
+            SaveUiToActiveSession(source);
+            ApplyConfigFromUi();
+
+            if (_activeInstrumentSession.IsArmedRequested)
+                _engine?.SetCopyEnabled(true);
+            else
+                _engine?.SetCopyEnabled(false);
+
+            RefreshCopierStatusPanel();
+            RenderButtons();
+            RefreshFollowerBulkActionButtons();
+        }
+        
         private void SetFollowerChecked(FollowerRow row, bool isChecked, string source)
         {
             if (row?.EnabledCheck == null)
@@ -435,7 +444,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             SafeTradeSuiteRuntime.PrintLog(
-                $"[SET FOLLOWER CHECK] source={source} acc={row.Account?.Name} before={before} after={isChecked} suppress={_suppressSessionUiEvents}");
+                $"[SET FOLLOWER CHECK] source={source} acc={row.Account?.Name} before={before} after={isChecked} suppress={SuppressSessionUiEvents}");
 
             row.EnabledCheck.IsChecked = isChecked;
         }

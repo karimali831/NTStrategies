@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentSelector.SelectionChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents)
+                if (SuppressSessionUiEvents)
                     return;
 
                 var instrumentName = NormalizeInstrumentName(_instrumentSelector.SelectedItem as string);
@@ -111,7 +111,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentSelector.LostKeyboardFocus += (s, e) =>
             {
-                if (_suppressSessionUiEvents)
+                if (SuppressSessionUiEvents)
                     return;
 
                 var instrumentName = GetSelectedInstrumentName();

@@ -88,6 +88,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\CopierStatusState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\FollowerCheckVisualState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\GuardAction.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\InstrumentTabDotState.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\MainMenuTab.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Enums\ThemeMode.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Helper\StringFormatter.cs" />
@@ -119,7 +120,6 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Core.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Risk.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.PnL.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.General.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Execution.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.Template.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.TemplateReader.cs" />

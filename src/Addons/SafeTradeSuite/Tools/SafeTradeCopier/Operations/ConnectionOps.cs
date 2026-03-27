@@ -87,7 +87,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine.IsRequested) return;
             if (!HasAnyCheckedFollowersHealthy()) return;
 
-            RequestArmed("Copy auto-rearmed after connection recovered.");
+            if (ActiveSessionRequested())
+                RequestArmed("Copy auto-rearmed after connection recovered.");
         }
         
         private void RequestArmed(string reason = null)
@@ -95,13 +96,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine == null || _activeInstrumentSession == null)
                 return;
 
+            if (!CanRequestArmedForActiveSession(out var blockReason))
+            {
+                _activeInstrumentSession.IsArmedRequested = false;
+                RenderButtons();
+                RefreshCopierStatusPanel();
+
+                if (!string.IsNullOrWhiteSpace(blockReason))
+                    _engine.Log(blockReason);
+
+                return;
+            }
+
             _activeInstrumentSession.IsArmedRequested = true;
+
             ApplyConfigFromUi();
             _engine.SetCopyEnabled(true);
 
             RenderButtons();
-            // RefreshInstrumentTabs();
             RefreshCopierStatusPanel();
+
+            if (!string.IsNullOrWhiteSpace(reason))
+                _engine.Log(reason);
         }
         
         private void RequestDisarmed(string reason)

@@ -232,7 +232,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBox.SelectionChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents || _isLoadingSessionUi)
+                if (SuppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 var latestAccounts = GetSelectableAccounts();
@@ -245,7 +245,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             void ApplyAndMaybeRewire()
             {
-                if (_suppressSessionUiEvents || _isLoadingSessionUi)
+                if (SuppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 var latestAccounts = GetSelectableAccounts();
@@ -254,13 +254,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SaveUiToActiveSession("RenderMasterPanel.ApplyAndMaybeRewire");
                 ApplyConfigFromUi();
 
-                if (_activeInstrumentSession?.IsArmedRequested == true)
+                if (ActiveSessionRequested())
                     eng.SetCopyEnabled(true);
             }
 
             _masterQtyBox.TextChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents || _isLoadingSessionUi)
+                if (SuppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 SaveUiToActiveSession("RenderMasterPanel._masterQtyBox.TextChanged ");
@@ -269,7 +269,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _masterBracketBox.SelectionChanged += (s, e) =>
             {
-                if (_suppressSessionUiEvents || _isLoadingSessionUi)
+                if (SuppressSessionUiEvents || _isLoadingSessionUi)
                     return;
 
                 SaveUiToActiveSession("RenderMasterPanel._masterBracketBox.SelectionChanged");

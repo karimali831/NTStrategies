@@ -253,7 +253,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _instrumentTabs = null;
             _btnAddInstrumentTab = null;
-
             _activeInstrumentSession = null;
 
             _followerRows.Clear();

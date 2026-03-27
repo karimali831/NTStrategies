@@ -121,24 +121,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             return _engine != null && _engine.IsRequested && _engine.Armed;
         }
-        
-        public bool ArmedWithLiveFollowersHealthy()
-        {
-            return Armed() && HasAnyCheckedLiveFollowersHealthy();
-        }
-        
-        public bool ArmedWithSimFollowersHealthy()
-        {
-            return Armed() && HasAnyCheckedSimFollowersHealthy();
-        }
-        
+
         private ReadyStatus GetReadyReason()
         {
             var disconnectedColor = DotDisconnectedBrush();
             var connectedColor = DotConnectedOnBrush();
             var warningColor = DotWarningBrush();
             var offColor = DotOffBrush();
-            
+
             var readyStatus = new ReadyStatus
             {
                 PrimaryReason = "Checking...",
@@ -149,54 +139,51 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             if (_engine is null)
             {
-                readyStatus.PrimaryReason = "Engine Initialisation Error";
+                readyStatus.PrimaryReason = "Engine initialisation error";
                 return readyStatus;
             }
 
             if (!IsMasterConnected(out _))
             {
-                readyStatus.PrimaryReason = "Master Disconnected";
+                readyStatus.PrimaryReason = "Master disconnected";
                 readyStatus.PrimaryDotColour = disconnectedColor;
                 return readyStatus;
             }
 
-            readyStatus.PrimaryDotColour = connectedColor;
-            var armedTxt = $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} {(Armed() ? "Armed" : "Disarmed")}";
-            
-            if (_simOnlyMode)
-            {
-                var simCopierReady = ArmedWithSimFollowersHealthy();
-                readyStatus.PrimaryReason = $"Sim {(simCopierReady ? "Copier" : "Master")} Ready";
-                
-                if (!HasAnyCheckedSimFollowersHealthy())
-                {
-                    readyStatus.SecondaryReason = "No followers selected";
-                    readyStatus.SecondaryDotColour = warningColor;
-                    return readyStatus;
-                }
+            var armed = Armed();
+            var requested = ActiveSessionRequested();
+            var ready = armed && HasAnyCheckedFollowersHealthy();
 
-                readyStatus.SecondaryReason = armedTxt;
-                readyStatus.SecondaryDotColour = Armed() ? connectedColor : warningColor;
+            readyStatus.PrimaryDotColour = connectedColor;
+            readyStatus.PrimaryReason = $"{(_simOnlyMode ? "Sim" : "Live")} {(ready ? "copier" : "master")} ready";
+
+            if (!HasAnyCheckedFollowersHealthy())
+            {
+                readyStatus.SecondaryReason = requested
+                    ? "Arm requested - check followers"
+                    : "No followers selected";
+
+                readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }
             
-            readyStatus.PrimaryReason = $"{(IsSimAccount(GetMasterAccount()) ? "Sim" : "Live")} Master Ready";
-            if (ArmedWithLiveFollowersHealthy())
+            if (requested && !armed)
             {
-                readyStatus.PrimaryReason = "Live Copier Ready";
-                readyStatus.PrimaryReasonColor = DotConnectedOnBrush();
-            }
-
-            if (!HasAnyCheckedLiveFollowersHealthy())
-            {
-                readyStatus.SecondaryReason = "No live followers selected";
+                readyStatus.SecondaryReason = "Re-arming...";
                 readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }
 
-            readyStatus.SecondaryReason = armedTxt;
-            readyStatus.SecondaryDotColour = Armed() ? connectedColor : warningColor;
+            if (ready && !_simOnlyMode)
+            {
+                readyStatus.PrimaryReasonColor = DotConnectedOnBrush();
+            }
             
+            readyStatus.SecondaryReason = armed
+                ? $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} armed"
+                : $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} disarmed";
+
+            readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
             return readyStatus;
         }
     }
