@@ -105,26 +105,22 @@
          {
              SafeTradeSuiteRuntime.PrintLog(
                  $"[BUILD FOLLOWERS CONTENT] activeInstr={_activeInstrumentSession?.InstrumentName} rowsBefore={_followerRows.Count}");
-     
+
              var host = new Grid();
              RenderFollowerPanel(_engine, host);
- 
+
              var accounts = GetSelectableAccounts();
-             
+
              BuildFollowerRows(accounts);
-             
-             foreach (var r in _followerRows)
-                 LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
-             
              EnforceSimOnlyModeUi(accounts);
              LoadActiveSessionToUi();
-             
+
              RenderFollowerRowsState();
              WireFollowerFlattenButtons(_engine);
              WireFollowerFreeTradeButtons(_engine);
              RefreshFollowerBulkActionButtons();
              RefreshCopierStatusPanel();
- 
+
              return host;
          }
  

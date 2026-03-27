@@ -50,30 +50,42 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_masterBox == null) return;
             if (_followersPanel == null) return;
             if (_engine == null) return;
-            
-            var masterAcc = GetMasterAccount();
-            var prevMasterName = masterAcc?.Name ?? "";
 
             var accounts = GetSelectableAccounts();
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
+            var accountsChanged = !SameSnapshot(_lastAccountsSnapshot, snap);
 
-            if (!SameSnapshot(_lastAccountsSnapshot, snap))
+            if (accountsChanged)
             {
                 _lastAccountsSnapshot = snap;
 
-                _masterBox.ItemsSource = accounts;
-                _masterBox.DisplayMemberPath = "Name";
+                var activeMasterName =
+                    _activeInstrumentSession?.MasterAccount?.Name
+                    ?? GetMasterAccount()?.Name
+                    ?? "";
 
-                var newMaster = !string.IsNullOrWhiteSpace(prevMasterName)
-                    ? accounts.FirstOrDefault(a => a.Name == prevMasterName)
-                    : null;
+                using (BeginSessionUiSuppression())
+                {
+                    _masterBox.ItemsSource = accounts;
+                    _masterBox.DisplayMemberPath = "Name";
 
-                _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
+                    var newMaster = !string.IsNullOrWhiteSpace(activeMasterName)
+                        ? accounts.FirstOrDefault(a => string.Equals(a.Name, activeMasterName, StringComparison.Ordinal))
+                        : null;
+
+                    _masterBox.SelectedItem = newMaster ?? accounts.FirstOrDefault();
+                }
+
+                RebuildFollowersAndRewire(_engine, accounts);
+                RefreshCopierStatusPanel();
+                RenderMasterSubmitButtonsState();
+                return;
             }
 
             EnforceSimOnlyModeUi(accounts);
-            LoadActiveSessionToUi();
             RenderFollowerRowsState();
+            RefreshFollowerBulkActionButtons();
+            RefreshCopierStatusPanel();
             RenderMasterSubmitButtonsState();
         }
         
@@ -134,32 +146,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return !a.Where((t, i) => !t.Equals(b[i])).Any();
         }
-        
-        private sealed class PrevFollowerState
-        {
-            public bool Included;
-            public string QtyText;
-            public string BracketName;
-        }
 
         private sealed class AccountSnap
         {
             private readonly string _name;
-            private readonly ConnectionStatus _status;
             private readonly string _connName;
 
             public AccountSnap(Account a)
             {
                 _name = a?.Name ?? "";
-                _status = a?.ConnectionStatus ?? ConnectionStatus.Disconnected;
-                _connName = a?.Connection != null ? a.Connection.Options?.Name ?? a.Connection.ToString() : "";
+                _connName = a?.Connection?.Options?.Name ?? "";
             }
 
             public override bool Equals(object obj)
             {
                 if (!(obj is AccountSnap o)) return false;
+
                 return string.Equals(_name, o._name, StringComparison.Ordinal)
-                       && _status == o._status
                        && string.Equals(_connName, o._connName, StringComparison.Ordinal);
             }
 
@@ -169,7 +172,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     var h = 17;
                     h = h * 31 + (_name?.GetHashCode() ?? 0);
-                    h = h * 31 + _status.GetHashCode();
                     h = h * 31 + (_connName?.GetHashCode() ?? 0);
                     return h;
                 }

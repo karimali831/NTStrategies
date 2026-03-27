@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -14,66 +12,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             SafeTradeSuiteRuntime.PrintLog(
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
-            
-            var selected = new HashSet<string>(
-                _followerRows
-                    .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
-                    .Select(r => r.Account.Name),
-                StringComparer.Ordinal);
 
-            var qtyOverrides = _followerRows
-                .Where(r => r?.Account != null)
-                .ToDictionary(
-                    r => r.Account.Name,
-                    r => r.QtyOverrideBox?.Text,
-                    StringComparer.Ordinal);
-
-            var bracketSelections = _followerRows
-                .Where(r => r?.Account != null)
-                .ToDictionary(
-                    r => r.Account.Name,
-                    r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
-                    StringComparer.Ordinal);
+            SaveUiToActiveSession("RebuildFollowersAndRewire.preRebuild");
 
             BuildFollowerRows(accounts);
-
-            foreach (var r in _followerRows)
-            {
-                if (r?.Account == null)
-                    continue;
-
-                if (r.EnabledCheck != null)
-                    SetFollowerChecked(r, selected.Contains(r.Account.Name), "RebuildFollowersAndRewire.restoreSelected");
-            }
-
             EnforceSimOnlyModeUi(accounts);
-            foreach (var r in _followerRows)
-            {
-                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
-
-                SafeTradeSuiteRuntime.PrintLog(
-                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
-
-                if (r?.Account == null)
-                    continue;
-
-                if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
-                {
-                    if (int.TryParse(qtyText, out var parsedQty))
-                        r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
-                    else
-                        r.QtyOverrideBox.Text = qtyText;
-                }
-
-                if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
-                    r.BracketOverrideBox != null &&
-                    r.BracketOverrideBox.Items.Contains(bracket))
-                {
-                    r.BracketOverrideBox.SelectedItem = bracket;
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
-                }
-            }
+            LoadActiveSessionToUi();
 
             ApplyConfigFromUi();
             RefreshRiskFieldset();

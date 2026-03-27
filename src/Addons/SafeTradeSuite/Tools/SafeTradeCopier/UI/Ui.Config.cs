@@ -97,6 +97,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     qtyOverrides[r.Account.Name] = qv;
 
                 var aText = r.BracketOverrideBox?.SelectedItem as string ?? "Inherit Master";
+                aText = NormalizeAtm(aText);
+
                 if (string.IsNullOrWhiteSpace(aText))
                     aText = "Inherit Master";
 

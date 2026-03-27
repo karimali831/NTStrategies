@@ -17,26 +17,55 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return s;
         }
 
-        private static bool IsFollowerFollowMasterExitOption(string s)
+        private void LoadFollowerAtmTemplatesIntoSuppress(ComboBox box, string accName)
         {
-            return string.Equals(
-                NormalizeAtm(s),
-                FollowMasterExitBracketOption,
-                StringComparison.OrdinalIgnoreCase);
-        }
+            if (box == null)
+                return;
 
-        private static bool IsFollowerInheritMasterOption(string s)
+            using (BeginSessionUiSuppression())
+            {
+                LoadAtmTemplatesInto(box, includeInherit: true);
+
+                var atm = _activeInstrumentSession != null &&
+                          _activeInstrumentSession.FollowerAtmOverrides.TryGetValue(accName, out var av)
+                    ? NormalizeAtm(av)
+                    : InheritMasterBracketOption;
+
+                if (box.Items.Contains(atm))
+                    box.SelectedItem = atm;
+                else if (box.Items.Contains(InheritMasterBracketOption))
+                    box.SelectedItem = InheritMasterBracketOption;
+                else
+                    box.SelectedItem = box.Items.Count > 0 ? box.Items[0] : null;
+            }
+        }
+        
+        private void LoadMasterAtmTemplatesIntoSuppress(ComboBox box)
         {
-            return string.Equals(
-                NormalizeAtm(s),
-                InheritMasterBracketOption,
-                StringComparison.OrdinalIgnoreCase);
+            if (box == null)
+                return;
+
+            using (BeginSessionUiSuppression())
+            {
+                LoadAtmTemplatesInto(box, includeInherit: false);
+
+                var atm = NormalizeAtm(_activeInstrumentSession?.MasterAtm);
+
+                if (box.Items.Contains(atm))
+                    box.SelectedItem = atm;
+                else if (box.Items.Contains("None"))
+                    box.SelectedItem = "None";
+                else
+                    box.SelectedItem = box.Items.Count > 0 ? box.Items[0] : null;
+            }
         }
 
         private static void LoadAtmTemplatesInto(ComboBox combo, bool includeInherit)
         {
             if (combo == null)
                 return;
+
+            var current = combo.SelectedItem as string;
 
             var items = new List<string>();
 
@@ -83,12 +112,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             combo.ItemsSource = finalItems;
 
-            if (includeInherit && finalItems.Contains(InheritMasterBracketOption))
-                combo.SelectedItem = InheritMasterBracketOption;
-            else if (finalItems.Contains("None"))
-                combo.SelectedItem = "None";
-            else
-                combo.SelectedItem = finalItems.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(current) && finalItems.Contains(current))
+                combo.SelectedItem = current;
         }
     }
 }

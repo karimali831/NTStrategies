@@ -123,7 +123,6 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Execution.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.Template.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.TemplateReader.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Atm\Atm.TemplateSpec.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Tool.Logging.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Tool.Theme.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Build\Build.CopierStatus.cs" />

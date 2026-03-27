@@ -151,7 +151,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _masterBox.ItemsSource = accounts;
                 _masterBox.DisplayMemberPath = "Name";
 
-                // ✅ choose initial master correctly before building followers
                 Account initialMaster = null;
 
                 if (_simOnlyMode)
@@ -172,10 +171,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (initialMaster == null)
                     initialMaster = accounts.FirstOrDefault();
 
-                _masterBox.SelectedItem = initialMaster;
-
-                // ATMs
-                LoadAtmTemplatesInto(_masterBracketBox, includeInherit: false);
+                using (BeginSessionUiSuppression())
+                {
+                    _masterBox.SelectedItem = initialMaster;
+                    LoadMasterAtmTemplatesIntoSuppress(_masterBracketBox);
+                }
 
                 // ---------------- UI -> Engine wiring ----------------
                 RenderButtons();
