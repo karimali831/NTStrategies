@@ -16,82 +16,74 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 $"[FOLLOWER REBUILD START] rows={_followerRows.Count}");
 
             _suppressSessionUiEvents = true;
-            try
-            {
-                var selected = new HashSet<string>(
-                    _followerRows
-                        .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
-                        .Select(r => r.Account.Name),
+      
+            var selected = new HashSet<string>(
+                _followerRows
+                    .Where(r => r?.EnabledCheck?.IsChecked == true && r.Account != null)
+                    .Select(r => r.Account.Name),
+                StringComparer.Ordinal);
+
+            var qtyOverrides = _followerRows
+                .Where(r => r?.Account != null)
+                .ToDictionary(
+                    r => r.Account.Name,
+                    r => r.QtyOverrideBox?.Text,
                     StringComparer.Ordinal);
 
-                var qtyOverrides = _followerRows
-                    .Where(r => r?.Account != null)
-                    .ToDictionary(
-                        r => r.Account.Name,
-                        r => r.QtyOverrideBox?.Text,
-                        StringComparer.Ordinal);
+            var bracketSelections = _followerRows
+                .Where(r => r?.Account != null)
+                .ToDictionary(
+                    r => r.Account.Name,
+                    r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
+                    StringComparer.Ordinal);
 
-                var bracketSelections = _followerRows
-                    .Where(r => r?.Account != null)
-                    .ToDictionary(
-                        r => r.Account.Name,
-                        r => NormalizeAtm(r.BracketOverrideBox?.SelectedItem as string),
-                        StringComparer.Ordinal);
+            BuildFollowerRows(accounts);
 
-                BuildFollowerRows(accounts);
-
-                foreach (var r in _followerRows)
-                {
-                    if (r?.Account == null)
-                        continue;
-
-                    if (r.EnabledCheck != null)
-                        r.EnabledCheck.IsChecked = selected.Contains(r.Account.Name);
-                }
-
-                EnforceSimOnlyModeUi(accounts);
-
-                foreach (var r in _followerRows)
-                {
-                    LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
-
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
-
-                    if (r?.Account == null)
-                        continue;
-
-                    if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
-                    {
-                        if (int.TryParse(qtyText, out var parsedQty))
-                            r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
-                        else
-                            r.QtyOverrideBox.Text = qtyText;
-                    }
-
-                    if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
-                        r.BracketOverrideBox != null &&
-                        r.BracketOverrideBox.Items.Contains(bracket))
-                    {
-                        r.BracketOverrideBox.SelectedItem = bracket;
-                        SafeTradeSuiteRuntime.PrintLog(
-                            $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
-                    }
-                }
-
-                WireFollowerFlattenButtons(eng);
-                WireFollowerFreeTradeButtons(eng);
-            }
-            finally
+            foreach (var r in _followerRows)
             {
-                _suppressSessionUiEvents = false;
+                if (r?.Account == null)
+                    continue;
+
+                if (r.EnabledCheck != null)
+                    SetFollowerChecked(r, selected.Contains(r.Account.Name), "RebuildFollowersAndRewire.restoreSelected");
+            }
+
+            EnforceSimOnlyModeUi(accounts);
+            foreach (var r in _followerRows)
+            {
+                LoadAtmTemplatesInto(r.BracketOverrideBox, includeInherit: true);
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[FOLLOWER BRACKET LOAD] acc={r.Account?.Name} defaultSelected={r.BracketOverrideBox?.SelectedItem}");
+
+                if (r?.Account == null)
+                    continue;
+
+                if (qtyOverrides.TryGetValue(r.Account.Name, out var qtyText) && r.QtyOverrideBox != null)
+                {
+                    if (int.TryParse(qtyText, out var parsedQty))
+                        r.QtyOverrideBox.Text = parsedQty > 99 ? "99" : qtyText;
+                    else
+                        r.QtyOverrideBox.Text = qtyText;
+                }
+
+                if (bracketSelections.TryGetValue(r.Account.Name, out var bracket) &&
+                    r.BracketOverrideBox != null &&
+                    r.BracketOverrideBox.Items.Contains(bracket))
+                {
+                    r.BracketOverrideBox.SelectedItem = bracket;
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER BRACKET RESTORE] acc={r.Account.Name} restored={r.BracketOverrideBox.SelectedItem}");
+                }
             }
 
             ApplyConfigFromUi();
             RefreshRiskFieldset();
 
-            if (eng.CopyEnabled)
+            if (_activeInstrumentSession?.IsArmedRequested == true)
                 eng.SetCopyEnabled(true);
+            
+            _suppressSessionUiEvents = false;;
         }
         
         private void WireFollowerFlattenButtons(SafeCopierEngine eng)
@@ -362,21 +354,31 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 };
                 
                 RenderLivePositionText(row.Position, row.Account);
+                RenderFollowerRowState(row);
                 
                 // When user changes follower settings, we re-apply config (no re-arm UX)
                 enabled.Checked += (s, e) =>
                 {
-                    if (_suppressSessionUiEvents) return;
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER CHECKED EVT] acc={row.Account?.Name} suppress={_suppressSessionUiEvents} isLoaded={enabled.IsLoaded} checked={enabled.IsChecked}");
+
+                    if (_suppressSessionUiEvents || !enabled.IsLoaded || _activeInstrumentSession == null)
+                        return;
+
                     RefreshCopierStatusPanel();
                     RenderFollowerRowState(row);
-                    SaveUiToActiveSession();
+                    SaveUiToActiveSession("BuildFollowerRows.enabled.Checked");
                     ApplyConfigFromUi();
                     RefreshFollowerBulkActionButtons();
                 };
 
                 enabled.Unchecked += (s, e) =>
                 {
-                    if (_suppressSessionUiEvents) return;
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER UNCHECKED EVT] acc={row.Account?.Name} suppress={_suppressSessionUiEvents} isLoaded={enabled.IsLoaded} checked={enabled.IsChecked}");
+
+                    if (_suppressSessionUiEvents || !enabled.IsLoaded || _activeInstrumentSession == null)
+                        return;
 
                     var instr = GetInstrument();
                     if (HasOpenInstrumentPosition(row.Account, instr))
@@ -384,7 +386,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         _suppressSessionUiEvents = true;
                         try
                         {
-                            row.EnabledCheck.IsChecked = true;
+                            SetFollowerChecked(row, true, "BuildFollowerRows.enabled.Unchecked.revertOpenPosition");
                         }
                         finally
                         {
@@ -400,7 +402,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     RefreshCopierStatusPanel();
                     RenderFollowerRowState(row);
-                    SaveUiToActiveSession();
+                    SaveUiToActiveSession("BuildFollowerRows.enabled.Unchecked");
                     ApplyConfigFromUi();
                     RefreshFollowerBulkActionButtons();
                 };
@@ -410,18 +412,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (_suppressSessionUiEvents) return;
 
                     RenderQtyBoxState(qtyBox, ParseQtyOrDefault(_masterQtyBox?.Text));
-                    SaveUiToActiveSession();
+                    SaveUiToActiveSession("BuildFollowerRows.qtyBox.TextChanged");
                     ApplyConfigFromUi();
                 };
 
                 atmBox.SelectionChanged += (s, e) =>
                 {
                     if (_suppressSessionUiEvents) return;
-                    SaveUiToActiveSession();
+                    SaveUiToActiveSession("BuildFollowerRows.atmBox.SelectionChanged");
                     ApplyConfigFromUi();
                 };
-
-                RenderFollowerRowState(row);
                 
                 qtyBox.VerticalContentAlignment = VerticalAlignment.Center;
                 position.HorizontalAlignment =  HorizontalAlignment.Center;
@@ -436,6 +436,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
             
             RefreshFollowerBulkActionButtons();
+        }
+        
+        private void SetFollowerChecked(FollowerRow row, bool isChecked, string source)
+        {
+            if (row?.EnabledCheck == null)
+                return;
+
+            var before = row.EnabledCheck.IsChecked == true;
+            if (before == isChecked)
+                return;
+
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[SET FOLLOWER CHECK] source={source} acc={row.Account?.Name} before={before} after={isChecked} suppress={_suppressSessionUiEvents}");
+
+            row.EnabledCheck.IsChecked = isChecked;
         }
         
         private void RenderQtyBoxState(TextBox qtyBox, int masterQty)
@@ -606,10 +621,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var hasOpenPosition = HasOpenInstrumentPosition(row.Account, instr);
 
             if (hasOpenPosition && row.EnabledCheck != null && row.EnabledCheck.IsChecked != true)
-                row.EnabledCheck.IsChecked = true;
+                SetFollowerChecked(row, true, "RenderFollowerRowState.hasOpenPosition");
 
             var isChecked = row.EnabledCheck?.IsChecked == true;
-            var isArmed = _engine?.CopyEnabled == true;
+            var isArmed = _engine?.IsRequested == true;
 
             if (row.EnabledCheck != null)
             {

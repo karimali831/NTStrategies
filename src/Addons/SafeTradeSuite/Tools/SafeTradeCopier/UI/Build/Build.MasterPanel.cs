@@ -237,7 +237,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var latestAccounts = GetSelectableAccounts();
 
-                SaveUiToActiveSession();
+                SaveUiToActiveSession("RenderMasterPanel._masterBox.SelectionChanged");
                 RebuildFollowersAndRewire(eng, latestAccounts);
                 LoadActiveSessionToUi();
                 RefreshRiskFieldset();
@@ -251,13 +251,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var latestAccounts = GetSelectableAccounts();
 
-                SaveUiToActiveSession();
                 RebuildFollowersAndRewire(eng, latestAccounts);
-
-                SaveUiToActiveSession();
+                SaveUiToActiveSession("RenderMasterPanel.ApplyAndMaybeRewire");
                 ApplyConfigFromUi();
 
-                if (eng.CopyEnabled)
+                if (_activeInstrumentSession?.IsArmedRequested == true)
                     eng.SetCopyEnabled(true);
             }
 
@@ -266,7 +264,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_suppressSessionUiEvents)
                     return;
 
-                SaveUiToActiveSession();
+                SaveUiToActiveSession("RenderMasterPanel._masterQtyBox.TextChanged ");
                 ApplyAndMaybeRewire();
             };
 
@@ -275,7 +273,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_suppressSessionUiEvents)
                     return;
 
-                SaveUiToActiveSession();
+                SaveUiToActiveSession("RenderMasterPanel._masterBracketBox.SelectionChanged");
                 ApplyConfigFromUi();
                 SavePersistentUiState();
                 RefreshFollowerBulkActionButtons();

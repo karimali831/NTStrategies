@@ -8,17 +8,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private sealed class InstrumentSession
         {
-            public string InstrumentName;
-            public Account MasterAccount;
-            public int MasterQty = 1;
-            public string MasterAtm = "None";
+            public string InstrumentName { get; set; } = "";
+            public Account MasterAccount { get; set; }
+            public int MasterQty { get; set; } = 1;
+            public string MasterAtm { get; set; } = "None";
+            public bool IsArmedRequested { get; set; }
 
-            public readonly Dictionary<string, bool> FollowersEnabled = new Dictionary<string, bool>(StringComparer.Ordinal);
-            public readonly Dictionary<string, int> FollowerQtyOverrides = new Dictionary<string, int>(StringComparer.Ordinal);
-            public readonly Dictionary<string, string> FollowerAtmOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
+            public Dictionary<string, bool> FollowersEnabled { get; } =
+                new Dictionary<string, bool>(StringComparer.Ordinal);
 
-            public bool UserManuallyDisarmed;
-            public bool AutoRearmPending;
+            public Dictionary<string, int> FollowerQtyOverrides { get; } =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+
+            public Dictionary<string, string> FollowerAtmOverrides { get; } =
+                new Dictionary<string, string>(StringComparer.Ordinal);
 
             public override string ToString()
             {

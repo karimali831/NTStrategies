@@ -84,40 +84,40 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private void TryAutoRearmAfterReconnect()
         {
             if (_engine == null) return;
-            if (_engine.CopyEnabled) return;
-            if (_userManuallyDisarmed) return;
-            if (!_autoRearmPending) return;
+            if (_engine.IsRequested) return;
             if (!HasAnyCheckedFollowersHealthy()) return;
 
-            RequestCopyEnabled("Copy auto-rearmed after connection recovered.");
-            _autoRearmPending = false;
+            RequestArmed("Copy auto-rearmed after connection recovered.");
         }
         
-        private void RequestCopyEnabled(string reason = null)
+        private void RequestArmed(string reason = null)
         {
-            if (_engine == null)
+            if (_engine == null || _activeInstrumentSession == null)
                 return;
+
+            _activeInstrumentSession.IsArmedRequested = true;
 
             ApplyConfigFromUi();
             _engine.SetCopyEnabled(true);
 
-            if (!string.IsNullOrWhiteSpace(reason))
-                RefreshCopierStatusPanel();
+            RefreshInstrumentTabs();
+            RefreshCopierStatusPanel();
         }
         
-        private void RequestCopyDisabled(bool manual, bool allowAutoRearm, string reason)
+        private void RequestDisarmed(string reason)
         {
             if (_engine == null)
                 return;
-
-            _userManuallyDisarmed = manual;
-            _autoRearmPending = allowAutoRearm;
+            
+            if (_activeInstrumentSession != null)
+                _activeInstrumentSession.IsArmedRequested = false;
 
             _engine.SetCopyEnabled(false);
 
             if (!string.IsNullOrWhiteSpace(reason))
                 _engine.Log(reason);
 
+            RefreshInstrumentTabs();
             RefreshCopierStatusPanel();
         }
         
@@ -137,12 +137,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!anySelectedBad)
                 return;
 
-            if (_engine.CopyEnabled)
+            if (_engine.IsRequested)
             {
-                RequestCopyDisabled(
-                    manual: false,
-                    allowAutoRearm: true,
-                    reason: "Copy disarmed: one or more selected followers lost connection.");
+                RequestDisarmed("Copy disarmed: one or more selected followers lost connection.");
             }
 
             RenderFollowerRowsState();

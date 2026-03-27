@@ -103,12 +103,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 ActivateOrCreateInstrumentSession(instrumentName);
 
-                if (_engine != null && _engine.CopyEnabled)
+                if (_engine != null && _engine.IsRequested)
                     _engine.SetCopyEnabled(true);
 
                 UpdateAddInstrumentButtonState();
-                // RenderFlattenMasterButtonState();
-                // RenderFlattenAllButtonState();
             };
 
             _instrumentSelector.LostKeyboardFocus += (s, e) =>

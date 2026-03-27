@@ -119,7 +119,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         public bool Armed()
         {
-            return _engine != null && _engine.CopyEnabled && _engine.Armed;
+            return _engine != null && _engine.IsRequested && _engine.Armed;
         }
         
         public bool ArmedWithLiveFollowersHealthy()

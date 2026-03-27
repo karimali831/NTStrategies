@@ -97,7 +97,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         lock (_gate)
                         {
-                            _copyEnabled = false;
+                            _isRequested = false;
                             DisarmUnsafe_NoLock($"Follower {f.Name} not Connected");
                             RaiseModeChanged_NoLock();
                             RaiseReady_NoLock(reasonOverride: $"Follower {f.Name} disconnected");

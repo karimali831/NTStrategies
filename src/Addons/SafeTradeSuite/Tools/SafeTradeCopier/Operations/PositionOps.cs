@@ -78,29 +78,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             var accounts = new List<Account>();
-     
+
             if (_masterBox?.SelectedItem is Account masterAcc)
                 accounts.Add(masterAcc);
-            
-            var checkedFollowerAccounts =  GetCheckedFollowers()
-                .Select(x => x.Account)
+
+            accounts.AddRange(
+                GetCheckedFollowers()
+                    .Select(x => x.Account)
+                    .Where(a => a != null));
+
+            accounts = accounts
+                .Distinct()
                 .ToList();
 
-            if (checkedFollowerAccounts.Any())
-            {
-                accounts.AddRange(checkedFollowerAccounts);
-            }
-
-            var canUndoAll = eng.CanUndoFreeTradeAll(checkedFollowerAccounts, instr);
+            var canUndoAll = eng.CanUndoFreeTradeAll(accounts, instr);
 
             if (canUndoAll)
-            {
                 eng.UndoFreeTradeAll(accounts, instr);
-            }
             else
-            {
                 eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints);
-            }
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)
@@ -190,10 +186,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 HasOpenInstrumentPosition(r.Account, instr));
         }
         
-        private string GetLivePosition(Account acc, bool masterPnl)
+        private string GetLivePosition(Account acc, bool isMasterPanel)
         {
             var instr = GetInstrument();
-            var posTxt = $"{(masterPnl ? "Position " : "")}Flat";
+            var posTxt = $"{(isMasterPanel ? "Position " : "")}Flat";
             
             if (acc?.Positions == null || instr == null)
                 return posTxt;
@@ -263,8 +259,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderFollowerRowsState();
             RefreshFollowerBulkActionButtons();
             RefreshCopierStatusPanel();
-            // RenderFlattenMasterButtonState();
-            // RenderFlattenAllButtonState();
             SavePersistentUiState();
 
             if (!HasAnyOpenPositionOnActiveInstrument())
@@ -273,13 +267,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine == null)
                 return;
 
-            if (_engine.CopyEnabled && _engine.Armed)
+            if (_engine.IsRequested && _engine.Armed)
                 return;
-
-            _userManuallyDisarmed = false;
-            _autoRearmPending = false;
             
-            RequestCopyEnabled("Auto re-armed because open positions exist on the active instrument.");
+            RequestArmed("Auto re-armed because open positions exist on the active instrument.");
             SavePersistentUiState();
         }
         
@@ -295,7 +286,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     continue;
 
                 if (HasOpenInstrumentPosition(row.Account, instr))
-                    row.EnabledCheck.IsChecked = true;
+                    SetFollowerChecked(row, true, "PositionOps.ForceEnableFollowersWithOpenPositions");
             }
         }
         

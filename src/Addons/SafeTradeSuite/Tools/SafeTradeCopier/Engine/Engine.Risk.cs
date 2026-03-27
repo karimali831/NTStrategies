@@ -21,7 +21,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     lock (_gate)
                     {
-                        _copyEnabled = false;
+                        _isRequested = false;
                         DisarmUnsafe_NoLock($"Master protection triggered: {reason}");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: reason);

@@ -9,8 +9,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
-        private bool _autoRearmPending;
-        private bool _userManuallyDisarmed;
         private bool _simOnlyMode = true;
         
         private UIElement SafeBuildUi(SafeCopierEngine engine)
@@ -126,7 +124,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     display.InvokeAsync(() =>
                     {
                         RefreshCopierStatusPanel();
-                        RenderButtons(eng.CopyEnabled);
+                        RenderButtons();
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
@@ -143,7 +141,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     display.InvokeAsync(() =>
                     {
                         RefreshCopierStatusPanel();
-                        RenderButtons(copyOn);
+                        RenderButtons();
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
@@ -180,7 +178,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 LoadAtmTemplatesInto(_masterBracketBox, includeInherit: false);
 
                 // ---------------- UI -> Engine wiring ----------------
-                RenderButtons(copyOn: eng.CopyEnabled);
+                RenderButtons();
                 RefreshCopierStatusPanel();
                 
                 _topPanelsGrid = topPanelsGrid;

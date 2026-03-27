@@ -29,7 +29,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         if (!IsReady_NoLock(out var reason))
                         {
-                            _copyEnabled = false;
+                            _isRequested = false;
                             DisarmUnsafe_NoLock("COPY ON blocked");
                             RaiseModeChanged_NoLock();
                             RaiseReady_NoLock(reasonOverride: reason);
@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             return;
                         }
 
-                        _copyEnabled = true;
+                        _isRequested = true;
                         RewireUnsafe_NoLock("COPY ON");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock();
@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                     else
                     {
-                        _copyEnabled = false;
+                        _isRequested = false;
                         DisarmUnsafe_NoLock("COPY OFF");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock();

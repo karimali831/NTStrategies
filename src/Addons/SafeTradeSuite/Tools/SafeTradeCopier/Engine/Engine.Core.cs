@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private Instrument _configuredInstrument;
 
             public volatile bool Armed;
-            private volatile bool _copyEnabled;
+            private volatile bool _isRequested;
             private readonly object _gate = new object();
 
             private readonly ConcurrentDictionary<string, long> _seen = new ConcurrentDictionary<string, long>();
@@ -63,9 +63,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private int _guardWatchdogRunning;
             private const int GuardWatchdogIntervalMs = 500;
 
-            public bool CopyEnabled
+            public bool IsRequested
             {
-                get { lock (_gate) return _copyEnabled; }
+                get { lock (_gate) return _isRequested; }
             }
 
             public void ApplyConfig(
@@ -86,7 +86,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     .Distinct()
                     .ToList() ?? new List<Account>();
                 
-
                 var name = instrName ?? "";
                 var instr = string.IsNullOrWhiteSpace(name) ? null : Instrument.GetInstrument(name);
                 
@@ -136,9 +135,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
-                    if (_copyEnabled && !IsReady_NoLock(out var reason))
+                    if (_isRequested && !IsReady_NoLock(out var reason))
                     {
-                        _copyEnabled = false;
+                        _isRequested = false;
                         DisarmUnsafe_NoLock("Config no longer valid");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: reason);
@@ -153,7 +152,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             private void RaiseModeChanged_NoLock()
             {
-                OnModeChanged?.Invoke(Armed, _copyEnabled);
+                OnModeChanged?.Invoke(Armed, _isRequested);
             }
 
             private void RaiseReady_NoLock(string reasonOverride = null)
@@ -198,7 +197,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void RewireUnsafe_NoLock(string reason)
             {
                 SafeTradeSuiteRuntime.PrintLog(
-                    $"[REWIRE] reason={reason} copyEnabled={_copyEnabled} armed={Armed} master={_configuredMaster?.Name} followers={_configuredFollowers?.Count ?? 0} instr={_configuredInstrumentName}");
+                    $"[REWIRE] reason={reason} isRequested={_isRequested} armed={Armed} master={_configuredMaster?.Name} followers={_configuredFollowers?.Count ?? 0} instr={_configuredInstrumentName}");
                 
                 _guardStateByAccount.Clear();
                 
@@ -235,7 +234,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 // Arm follower-copy logic only if copy is enabled and config is fully ready
-                if (!_copyEnabled || !IsReady_NoLock(out _))
+                if (!_isRequested || !IsReady_NoLock(out _))
                 {
                     Armed = false;
                     return;
@@ -353,7 +352,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 lock (_gate)
                 {
-                    _copyEnabled = false;
+                    _isRequested = false;
                     DisarmUnsafe_NoLock("Dispose");
                     RaiseModeChanged_NoLock();
                     RaiseReady_NoLock(reasonOverride: "Disposed");

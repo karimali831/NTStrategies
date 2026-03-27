@@ -90,14 +90,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                // Effect = new DropShadowEffect
-                // {
-                //     Color = Colors.Black,
-                //     BlurRadius = 2,
-                //     ShadowDepth = 1,
-                //     Opacity = 0.30
-                // }
+                VerticalAlignment = VerticalAlignment.Center
             };
 
             host.Children.Add(outerRing);
@@ -149,18 +142,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     eng.Log("Emergency stop cancelled by user.");
                     return;
                 }
-
-                _userManuallyDisarmed = true;
-                _autoRearmPending = false;
-
+                
                 eng.Log("Emergency stop confirmed.");
                 eng.EmergencyStopConfiguredAccounts();
 
                 RefreshCopierStatusPanel();
                 RenderFollowerRowsState();
                 RenderMasterSubmitButtonsState();
-                // RenderFlattenMasterButtonState();
-                // RenderFlattenAllButtonState();
                 RefreshFollowerBulkActionButtons();
             };
 

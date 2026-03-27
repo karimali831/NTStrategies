@@ -151,6 +151,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 closeButton.Foreground = isActive ? WindowForegroundBrush() : MutedForegroundBrush();
 
             closeButton.Click += OnInstrumentTabCloseClick;
+            
+            var dotState = GetInstrumentTabDotState(session);
+
+            var dot = new Border
+            {
+                Width = 8,
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                Margin = new Thickness(0, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = dotState == InstrumentTabDotState.None ? Visibility.Collapsed : Visibility.Visible,
+                Background = dotState == InstrumentTabDotState.Green
+                    ? SuccessActionBrush()
+                    : WarningActionBrush()
+            };
 
             var textBlock = new TextBlock
             {
@@ -170,12 +185,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Tag = session
             };
 
+            headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerPanel.ColumnDefinitions.Add(new ColumnDefinition());
             headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            Grid.SetColumn(textBlock, 0);
-            Grid.SetColumn(closeButton, 1);
+            Grid.SetColumn(dot, 0);
+            Grid.SetColumn(textBlock, 1);
+            Grid.SetColumn(closeButton, 2);
 
+            headerPanel.Children.Add(dot);
             headerPanel.Children.Add(textBlock);
             headerPanel.Children.Add(closeButton);
 

@@ -51,7 +51,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!IsStcEntryExecution(ord))
                     return;
 
-                if (!Armed || !_copyEnabled)
+                if (!Armed || !_isRequested)
                     return;
 
                 var execId = e.Execution.ExecutionId ?? "";
@@ -62,7 +62,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     lock (_gate)
                     {
-                        _copyEnabled = false;
+                        _isRequested = false;
                         DisarmUnsafe_NoLock("Circuit breaker: too many copies in short window");
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: "Circuit breaker tripped");

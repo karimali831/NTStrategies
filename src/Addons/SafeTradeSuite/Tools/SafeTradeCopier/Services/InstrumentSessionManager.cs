@@ -235,6 +235,74 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _suppressSessionUiEvents = false;
             }
         }
+        
+        private bool SessionHasEnabledFollowers(InstrumentSession session)
+        {
+            if (session?.FollowersEnabled == null)
+                return false;
+
+            return session.FollowersEnabled.Any(x => x.Value);
+        }
+
+        private bool SessionHasOpenPosition(InstrumentSession session)
+        {
+            if (session == null)
+                return false;
+
+            var instrName = NormalizeInstrumentName(session.InstrumentName);
+            if (string.IsNullOrWhiteSpace(instrName))
+                return false;
+
+            var instr = Instrument.GetInstrument(instrName);
+            if (instr == null)
+                return false;
+
+            if (session.MasterAccount != null && HasOpenInstrumentPosition(session.MasterAccount, instr))
+                return true;
+
+            if (session.FollowersEnabled == null)
+                return false;
+
+            foreach (var kvp in session.FollowersEnabled)
+            {
+                var account = Account.All.FirstOrDefault(a =>
+                    a != null &&
+                    string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
+
+                if (account != null && HasOpenInstrumentPosition(account, instr))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool SessionIsLiveArmed(InstrumentSession session)
+        {
+            return ReferenceEquals(session, _activeInstrumentSession)
+                   && _engine?.IsRequested == true
+                   && _engine.Armed;
+        }
+        
+        private InstrumentTabDotState GetInstrumentTabDotState(InstrumentSession session)
+        {
+            if (session == null)
+                return InstrumentTabDotState.None;
+
+            if (ReferenceEquals(session, _activeInstrumentSession))
+                return InstrumentTabDotState.None;
+
+            var hasOpenPosition = SessionHasOpenPosition(session);
+            var isLiveArmed = SessionIsLiveArmed(session);
+            var hasEnabledFollowers = SessionHasEnabledFollowers(session);
+
+            if (hasOpenPosition || isLiveArmed)
+                return InstrumentTabDotState.Green;
+
+            if (hasEnabledFollowers)
+                return InstrumentTabDotState.Yellow;
+
+            return InstrumentTabDotState.None;
+        }
 
         private void ShowFriendlyError(string title, string message)
         {

@@ -130,7 +130,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return false;
 
             var hasFollowersEnabled = HasAnyCheckedFollowers();
-            var isDisarmed = !_engine.CopyEnabled || !_engine.Armed;
+            var isDisarmed = !_engine.IsRequested || !_engine.Armed;
 
             return hasFollowersEnabled && isDisarmed;
         }

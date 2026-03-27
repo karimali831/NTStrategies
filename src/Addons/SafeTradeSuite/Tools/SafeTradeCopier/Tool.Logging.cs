@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using NinjaTrader.Core;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -39,6 +40,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 // never let logging crash the UI
             }
+        }
+        
+        private string DiagSessionFollowersMap()
+        {
+            if (_activeInstrumentSession?.FollowersEnabled == null)
+                return "";
+
+            return string.Join(",",
+                _activeInstrumentSession.FollowersEnabled
+                    .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
+                    .Select(kvp => $"{kvp.Key}:{(kvp.Value ? "1" : "0")}")
+            );
+        }
+
+        private int DiagSessionCheckedCount()
+        {
+            if (_activeInstrumentSession?.FollowersEnabled == null)
+                return 0;
+
+            return _activeInstrumentSession.FollowersEnabled.Count(kvp => kvp.Value);
         }
     }
 }
