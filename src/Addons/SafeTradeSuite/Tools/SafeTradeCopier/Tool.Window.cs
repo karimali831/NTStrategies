@@ -161,7 +161,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 EnsureInitialInstrumentSession();
                 RefreshInstrumentSelectorItems();
                 RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
                 Rehydrate();
             }, DispatcherPriority.ApplicationIdle);
         }

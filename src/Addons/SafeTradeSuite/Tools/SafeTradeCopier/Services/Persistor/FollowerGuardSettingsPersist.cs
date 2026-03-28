@@ -4,6 +4,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private FollowerGuard _lastAppliedFollowerGuardSettings;
+        
         private void LoadFollowerGuardSettingsFromState()
         {
             var settings = _persistedState?.FollowerShield ?? new FollowerShieldSettings();
@@ -35,23 +37,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void LoadFollowerGuardSettingsIntoUi()
         {
-            if (_fgEnabledCheckBox != null)
-                _fgEnabledCheckBox.IsChecked = _followerGuardEnabled;
+            _isLoadingFollowerGuardUi = true;
 
-            if (_fgEntryTimeoutTextBox != null)
-                _fgEntryTimeoutTextBox.Text = Math.Max(1, _followerGuardEntryFillTimeoutSeconds).ToString();
+            try
+            {
+                if (_fgEnabledCheckBox != null)
+                    _fgEnabledCheckBox.IsChecked = _followerGuardEnabled;
 
-            if (_fgDesyncGraceTextBox != null)
-                _fgDesyncGraceTextBox.Text = Math.Max(1, _followerGuardDesyncGraceSeconds).ToString();
+                if (_fgEntryTimeoutTextBox != null)
+                    _fgEntryTimeoutTextBox.Text = Math.Max(1, _followerGuardEntryFillTimeoutSeconds).ToString();
 
-            if (_fgOnEntryRejectComboBox != null)
-                _fgOnEntryRejectComboBox.SelectedItem = _followerGuardOnEntryReject;
+                if (_fgDesyncGraceTextBox != null)
+                    _fgDesyncGraceTextBox.Text = Math.Max(1, _followerGuardDesyncGraceSeconds).ToString();
 
-            if (_fgOnEntryTimeoutComboBox != null)
-                _fgOnEntryTimeoutComboBox.SelectedItem = _followerGuardOnEntryTimeout;
+                if (_fgOnEntryRejectComboBox != null)
+                    _fgOnEntryRejectComboBox.SelectedItem = _followerGuardOnEntryReject;
 
-            if (_fgOnDesyncComboBox != null)
-                _fgOnDesyncComboBox.SelectedItem = _followerGuardOnDesync;
+                if (_fgOnEntryTimeoutComboBox != null)
+                    _fgOnEntryTimeoutComboBox.SelectedItem = _followerGuardOnEntryTimeout;
+
+                if (_fgOnDesyncComboBox != null)
+                    _fgOnDesyncComboBox.SelectedItem = _followerGuardOnDesync;
+            }
+            finally
+            {
+                _isLoadingFollowerGuardUi = false;
+            }
         }
 
         private void ApplyFollowerGuardSettingsFromUi()
@@ -78,6 +89,27 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 OnEntryReject = _followerGuardOnEntryReject,
                 OnEntryTimeout = _followerGuardOnEntryTimeout,
                 OnDesync = _followerGuardOnDesync
+            };
+
+            if (_lastAppliedFollowerGuardSettings != null &&
+                _lastAppliedFollowerGuardSettings.Enabled == settings.Enabled &&
+                _lastAppliedFollowerGuardSettings.EntryFillTimeoutSeconds == settings.EntryFillTimeoutSeconds &&
+                _lastAppliedFollowerGuardSettings.DesyncGraceSeconds == settings.DesyncGraceSeconds &&
+                _lastAppliedFollowerGuardSettings.OnEntryReject == settings.OnEntryReject &&
+                _lastAppliedFollowerGuardSettings.OnEntryTimeout == settings.OnEntryTimeout &&
+                _lastAppliedFollowerGuardSettings.OnDesync == settings.OnDesync)
+            {
+                return;
+            }
+
+            _lastAppliedFollowerGuardSettings = new FollowerGuard
+            {
+                Enabled = settings.Enabled,
+                EntryFillTimeoutSeconds = settings.EntryFillTimeoutSeconds,
+                DesyncGraceSeconds = settings.DesyncGraceSeconds,
+                OnEntryReject = settings.OnEntryReject,
+                OnEntryTimeout = settings.OnEntryTimeout,
+                OnDesync = settings.OnDesync
             };
 
             _engine?.UpdateFollowerGuardSettings(settings);

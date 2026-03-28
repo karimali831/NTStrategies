@@ -59,7 +59,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 SaveFollowerGuardSettingsToState();
 
                 _persistedState.ActiveInstrumentName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
-                _persistedState.ActiveMainMenuTab = _activeMainMenuTab.ToString();
 
                 _persistedState.InstrumentSessions.Clear();
                 foreach (var session in _instrumentSessions)
@@ -153,11 +152,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
                     _activeInstrumentSession = _instrumentSessions[0];
 
-                if (!string.IsNullOrWhiteSpace(_persistedState.ActiveMainMenuTab) &&
-                    Enum.TryParse(_persistedState.ActiveMainMenuTab, out MainMenuTab parsedTab))
-                {
-                    _activeMainMenuTab = parsedTab;
-                }
+                _activeMainMenuTab = MainMenuTab.Copier;
             }
             catch (Exception ex)
             {

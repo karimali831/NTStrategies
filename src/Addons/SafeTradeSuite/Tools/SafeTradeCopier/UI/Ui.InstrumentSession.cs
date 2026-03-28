@@ -343,7 +343,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _instrumentSessions.Select(x => x?.InstrumentName));
             
             RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
+            LoadActiveSessionToUi("MoveInstrumentSessionToInsertIndex");
         }
 
         private void OnInstrumentTabsDragLeave(object sender, DragEventArgs e)
@@ -425,7 +425,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RefreshInstrumentSelectorItems();
 
                 RefreshInstrumentTabs();
-                LoadActiveSessionToUi();
+                LoadActiveSessionToUi("");
                 return;
             }
 
@@ -451,7 +451,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _instrumentSessions.Select(x => x?.InstrumentName));
             
             RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
+            LoadActiveSessionToUi("ActivateOrCreateInstrumentSession");
         }
 
         private void RemoveInstrumentSession(InstrumentSession sessionToRemove)
@@ -492,7 +492,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             RefreshInstrumentSelectorItems();
             RefreshInstrumentTabs();
-            LoadActiveSessionToUi();
+            LoadActiveSessionToUi("RemoveInstrumentSession");
         }
 
         private void SaveUiToActiveSession(string source)
@@ -570,10 +570,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
 
-        private void LoadActiveSessionToUi()
+        private void LoadActiveSessionToUi(string source)
         {
             if (VerboseSessionLogging)
             {
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[LOAD SESSION CALL] source={source} instr={_activeInstrumentSession?.InstrumentName}");
+                
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[LOAD SESSION TARGET] instr={_activeInstrumentSession?.InstrumentName} " +
                     $"sessionHash={_activeInstrumentSession?.GetHashCode() ?? 0}");

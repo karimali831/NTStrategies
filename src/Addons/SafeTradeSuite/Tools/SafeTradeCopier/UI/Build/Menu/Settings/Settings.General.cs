@@ -110,7 +110,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var accounts = GetSelectableAccounts();
 
             RebindMasterAccounts(accounts);
-            RebuildFollowersAndRewire(_engine, accounts);
             RefreshUiAfterAccountScopeChanged();
         }
     }

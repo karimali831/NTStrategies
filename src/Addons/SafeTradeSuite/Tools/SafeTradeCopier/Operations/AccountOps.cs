@@ -53,9 +53,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var accounts = GetSelectableAccounts();
             var snap = accounts.Select(a => new AccountSnap(a)).ToList();
             var snapshotChanged = !SameSnapshot(_lastAccountsSnapshot, snap);
+            
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[REFRESH ACCOUNTS UI] changed={snapshotChanged} " +
+                $"loading={_isLoadingSessionUi} suppress={SuppressSessionUiEvents} " +
+                $"count={accounts.Count}");
 
             if (snapshotChanged)
             {
+                SafeTradeSuiteRuntime.PrintLog("[REFRESH ACCOUNTS UI] rebuilding account-bound UI");
                 _lastAccountsSnapshot = snap;
 
                 if (!_isLoadingSessionUi && !SuppressSessionUiEvents)
@@ -131,35 +137,26 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return !a.Where((t, i) => !t.Equals(b[i])).Any();
         }
-
+        
         private sealed class AccountSnap
         {
             private readonly string _name;
-            private readonly string _connName;
 
             public AccountSnap(Account a)
             {
                 _name = a?.Name ?? "";
-                _connName = a?.Connection?.Options?.Name ?? "";
             }
 
             public override bool Equals(object obj)
             {
                 if (!(obj is AccountSnap o)) return false;
 
-                return string.Equals(_name, o._name, StringComparison.Ordinal)
-                       && string.Equals(_connName, o._connName, StringComparison.Ordinal);
+                return string.Equals(_name, o._name, StringComparison.Ordinal);
             }
 
             public override int GetHashCode()
             {
-                unchecked
-                {
-                    var h = 17;
-                    h = h * 31 + (_name?.GetHashCode() ?? 0);
-                    h = h * 31 + (_connName?.GetHashCode() ?? 0);
-                    return h;
-                }
+                return _name?.GetHashCode() ?? 0;
             }
         }
     }

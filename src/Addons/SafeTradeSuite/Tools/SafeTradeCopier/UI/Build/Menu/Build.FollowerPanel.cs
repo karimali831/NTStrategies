@@ -124,9 +124,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             BuildFollowerRows(accounts);
             EnforceSimOnlyModeUi(accounts);
-            LoadActiveSessionToUi();
+            LoadActiveSessionToUi("BuildFollowersContent");
 
-            RenderFollowerRowsState();
             WireFollowerFlattenButtons(_engine);
             WireFollowerFreeTradeButtons(_engine);
             RefreshFollowerBulkActionButtons();

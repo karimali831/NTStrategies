@@ -33,6 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 var accounts = GetSelectableAccounts();
                 SubscribeUiAccountEvents(accounts);
+                _lastAccountsSnapshot = accounts.Select(a => new AccountSnap(a)).ToList();
                 
                 var root = new Grid
                 {
@@ -182,6 +183,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RefreshCopierStatusPanel();
                 
                 _topPanelsGrid = topPanelsGrid;
+                _copierContent = null;
+                _settingsContent = null;
                 RefreshMainMenuTabs();
                 RefreshMainMenuContent();
                 RenderMasterSubmitButtonsState();

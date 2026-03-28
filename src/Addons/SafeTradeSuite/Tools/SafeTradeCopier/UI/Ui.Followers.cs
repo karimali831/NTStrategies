@@ -17,7 +17,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             WireFollowerFlattenButtons(eng);
             WireFollowerFreeTradeButtons(eng);
             EnforceSimOnlyModeUi(accounts);
-            LoadActiveSessionToUi();
+            LoadActiveSessionToUi("RebuildFollowersAndRewire");
             RefreshRiskFieldset();
         }
         

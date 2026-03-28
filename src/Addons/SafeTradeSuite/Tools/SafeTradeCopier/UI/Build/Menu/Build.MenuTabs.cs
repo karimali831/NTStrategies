@@ -25,6 +25,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private MainMenuTab _activeMainMenuTab = MainMenuTab.Copier;
         private Window _diagWindow;
         private TextBox _diagWindowTextBox;
+        private UIElement _copierContent;
+        private UIElement _settingsContent;
 
         private Border BuildMainMenuTabs()
         {
@@ -187,6 +189,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void RefreshMainMenuContent()
         {
+            if (VerboseSessionLogging)
+            {
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[MAIN MENU CONTENT] tab={_activeMainMenuTab} topPanelsVisible={(_activeMainMenuTab == MainMenuTab.Copier)}");
+            }
+
             if (_mainContentHost == null || _topPanelsGrid == null)
                 return;
 
@@ -206,19 +214,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             switch (_activeMainMenuTab)
             {
                 case MainMenuTab.Copier:
-                    _mainContentHost.Content = BuildFollowersContent();
+                    if (_copierContent == null)
+                        _copierContent = BuildFollowersContent();
+
+                    if (!ReferenceEquals(_mainContentHost.Content, _copierContent))
+                        _mainContentHost.Content = _copierContent;
+
                     break;
 
-                // case MainMenuTab.Positions:
-                //     _mainContentHost.Content = BuildPositionsContent();
-                //     break;
-                //
-                // case MainMenuTab.Trades:
-                //     _mainContentHost.Content = BuildTradesPlaceholder();
-                //     break;
-
                 case MainMenuTab.Settings:
-                    _mainContentHost.Content = BuildSettingsContent();
+                    if (_settingsContent == null)
+                        _settingsContent = BuildSettingsContent();
+
+                    if (!ReferenceEquals(_mainContentHost.Content, _settingsContent))
+                        _mainContentHost.Content = _settingsContent;
+
                     break;
             }
         }
