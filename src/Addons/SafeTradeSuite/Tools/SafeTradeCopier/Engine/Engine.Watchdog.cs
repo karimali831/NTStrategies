@@ -25,6 +25,8 @@
 
                 if (missingBracketScope != AutoFlattenProtectionScope.Disabled)
                     CheckMissingProtectiveBracket();
+                
+                RunAutoBreakEvenWatchdog();
             }
         }
     }

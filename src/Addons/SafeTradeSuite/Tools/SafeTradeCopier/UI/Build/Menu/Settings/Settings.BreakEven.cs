@@ -7,13 +7,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private double _freeTradeMinProfitPoints = 4;
         private double _freeTradePlusPoints = 1;
-
+        private BreakEvenMode _breakEvenMode = BreakEvenMode.Manual;
         private TextBox _freeTradeMinProfitPointsBox;
         private TextBox _freeTradePlusPointsBox;
         private ComboBox _breakEvenModeSelector;
-        private BreakEvenMode _breakEvenMode = BreakEvenMode.Manual;
         private bool BreakEvenDisabled => _breakEvenMode == BreakEvenMode.None;
-        
+        private bool BreakEvenAutoMode => _breakEvenMode == BreakEvenMode.Auto;
+        private bool BreakEvenManualMode => _breakEvenMode == BreakEvenMode.Manual;
         
         private UIElement RenderBreakEvenFieldset()
         {
@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var minProfitLbl = new TextBlock
             {
-                Text = "Min favour points",
+                Text = "Min profit points",
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 IsEnabled = !BreakEvenDisabled

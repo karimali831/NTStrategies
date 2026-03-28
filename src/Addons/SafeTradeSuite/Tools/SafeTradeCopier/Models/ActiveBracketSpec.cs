@@ -6,6 +6,7 @@
         {
             public sealed class ActiveBracketSpec
             {
+                public bool AutoBeSuppressedUntilFlat { get; set; }
                 public int StopTicks;
                 public int TargetTicks;
 

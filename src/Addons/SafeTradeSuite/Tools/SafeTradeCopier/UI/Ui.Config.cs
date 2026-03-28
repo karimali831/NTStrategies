@@ -38,7 +38,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 masterMaxDailyLoss: config.MasterMaxDailyLoss,
                 followerUseMasterRiskByAccountName: config.FollowerUseMasterRisk,
                 followerMaxDailyProfitByAccountName: config.FollowerMaxDailyProfit,
-                followerMaxDailyLossByAccountName: config.FollowerMaxDailyLoss
+                followerMaxDailyLossByAccountName: config.FollowerMaxDailyLoss,
+                breakEvenMode: _breakEvenMode,
+                freeTradeMinProfitPoints: _freeTradeMinProfitPoints,
+                freeTradePlusPoints: _freeTradePlusPoints
             );
 
             _lastAppliedConfig = config;
@@ -126,6 +129,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Followers = followers,
                 FollowerQtyOverrides = qtyOverrides,
                 FollowerAtmOverrides = atmOverrides,
+                BreakEvenMode = _breakEvenMode,
+                FreeTradeMinProfitPoints = _freeTradeMinProfitPoints,
+                FreeTradePlusPoints = _freeTradePlusPoints,
                 MasterMaxDailyProfit = _masterMaxDailyProfit,
                 MasterMaxDailyLoss = _masterMaxDailyLoss,
                 FollowerUseMasterRisk = useMasterRisk,
@@ -154,6 +160,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!string.Equals(a.MasterAtm ?? "", b.MasterAtm ?? "", StringComparison.Ordinal))
                 return false;
 
+            if (a.BreakEvenMode != b.BreakEvenMode)
+                return false;
+
+            if (Math.Abs(a.FreeTradeMinProfitPoints - b.FreeTradeMinProfitPoints) > 0.0000001)
+                return false;
+
+            if (Math.Abs(a.FreeTradePlusPoints - b.FreeTradePlusPoints) > 0.0000001)
+                return false;
+            
             if (a.Followers.Count != b.Followers.Count)
                 return false;
 

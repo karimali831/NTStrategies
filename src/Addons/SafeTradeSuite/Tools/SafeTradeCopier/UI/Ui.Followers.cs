@@ -63,44 +63,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
         
-        private void WireFollowerFreeTradeButtons(SafeCopierEngine eng)
-        {
-            foreach (var r in _followerRows)
-            {
-                if (r?.FreeTradeBtn == null)
-                    continue;
-
-                r.FreeTradeBtn.Click += (s, e) =>
-                {
-                    if (eng == null || r.Account == null)
-                        return;
-
-                    var instr = GetInstrument();
-                    if (instr == null)
-                    {
-                        eng.Log("Invalid instrument.");
-                        return;
-                    }
-
-                    if (BreakEvenDisabled)
-                    {
-                        eng.Log("Break-even disabled in Settings.");
-                        return;
-                    }
-
-                    if (eng.CanUndoFreeTrade(r.Account, instr, out _))
-                    {
-                        if (eng.UndoFreeTrade(r.Account, instr))
-                            eng.Log($"Break-even undone -> {r.Account.Name} ({instr.FullName})");
-                    }
-                    else
-                    {
-                        if (eng.ApplyFreeTrade(r.Account, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints))
-                            eng.Log($"Break-even applied -> {r.Account.Name} ({instr.FullName})");
-                    }
-                };
-            }
-        }
         
         private void BuildFollowerRows(List<Account> accounts)
         {

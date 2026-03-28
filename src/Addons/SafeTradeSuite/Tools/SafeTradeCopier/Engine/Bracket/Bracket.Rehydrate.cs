@@ -103,6 +103,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                                 {
                                     _activeBracketByAccInstr[BracketKey(acc, instr)] = new ActiveBracketSpec
                                     {
+                                        AutoBeSuppressedUntilFlat = false,
                                         StopTicks = stopTicks,
                                         TargetTicks = targetTicks,
                                         IsBuy = isBuy,

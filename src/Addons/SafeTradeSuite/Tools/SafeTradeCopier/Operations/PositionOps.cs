@@ -47,6 +47,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 eng.Log("Break-even disabled in Settings.");
                 return;
             }
+            
+            
+            if (BreakEvenAutoMode && !eng.CanUndoFreeTrade(masterAcc, instr, out _))
+            {
+                eng.Log("Break-even manual apply disabled in Auto mode.");
+                return;
+            }
 
             if (eng.CanUndoFreeTrade(masterAcc, instr, out _))
             {
@@ -93,10 +100,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var canUndoAll = eng.CanUndoFreeTradeAll(accounts, instr);
 
+            if (BreakEvenAutoMode && !canUndoAll)
+            {
+                eng.Log("Break-even manual apply disabled in Auto mode.");
+                return;
+            }
+
             if (canUndoAll)
                 eng.UndoFreeTradeAll(accounts, instr);
             else
                 eng.ApplyFreeTradeAll(accounts, instr, _freeTradeMinProfitPoints, _freeTradePlusPoints);
+
+            RenderBreakEvenEnablementUi();
         }
         
         private void FlattenAllSelected(SafeCopierEngine eng)

@@ -9,6 +9,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            private BreakEvenMode _breakEvenMode = BreakEvenMode.Manual;
+            private double _freeTradeMinProfitPoints = 4;
+            private double _freeTradePlusPoints = 1;
+            
             internal bool CanApplyFreeTrade(Account acc, Instrument instr, double minProfitPoints, out string reason)
             {
                 reason = "";
@@ -36,13 +40,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     reason = "No active bracket";
                     return false;
                 }
-
-                if (spec.IsFreeTradeApplied)
-                {
-                    reason = "Already Break-even";
-                    return false;
-                }
-
+                
                 if (spec.EntryPrice <= 0)
                 {
                     reason = "No entry price";
@@ -54,11 +52,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     reason = "No tracked stop";
                     return false;
                 }
-
+                
                 var net = GetNetPosition(acc, instr);
                 if (net == 0)
                 {
                     reason = "No open position";
+                    return false;
+                }
+
+                if (spec.IsFreeTradeApplied)
+                {
+                    reason = "Already Break-even";
                     return false;
                 }
 
@@ -131,10 +135,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (accounts == null || instr == null) return;
 
-                var applied = accounts.Where(a => a != null).Distinct()
-                    .Count(acc => UndoFreeTrade(acc, instr));
+                var targets = accounts.Where(a => a != null).Distinct().ToList();
+                var applied = targets.Count(acc => UndoFreeTrade(acc, instr));
 
-                Log($"[BE] UNDO ALL instr={instr.FullName} applied={applied}");
+                Log($"[BE] UNDO ALL instr={instr.FullName} targets={targets.Count} applied={applied}");
             }
 
             internal bool CanUndoFreeTrade(Account acc, Instrument instr, out string reason)
@@ -287,12 +291,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     x.CurrentStopPrice = restoreStopPrice;
                     x.IsFreeTradeApplied = false;
+                    x.AutoBeSuppressedUntilFlat = _breakEvenMode == BreakEvenMode.Auto;
                 });
-
+                
                 Log(
                     $"[BE] UNDO acc={acc.Name} instr={instr.FullName} " +
                     $"side={(spec.IsBuy ? "Long" : "Short")} " +
-                    $"entry={spec.EntryPrice:0.00} restoreStop={restoreStopPrice:0.00}");
+                    $"entry={spec.EntryPrice:0.00} restoreStop={restoreStopPrice:0.00} " +
+                    $"autoSuppressUntilFlat={(_breakEvenMode == BreakEvenMode.Auto)}");
 
                 return true;
             }
@@ -301,10 +307,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (accounts == null || instr == null) return;
 
-                var applied = accounts.Where(a => a != null).Distinct()
-                    .Count(acc => ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints));
+                var targets = accounts.Where(a => a != null).Distinct().ToList();
+                var applied = targets.Count(acc => ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints));
 
-                Log($"[BE] APPLY ALL instr={instr.FullName} applied={applied}");
+                Log($"[BE] APPLY ALL instr={instr.FullName} targets={targets.Count} applied={applied}");
             }
 
             private Order FindWorkingManagedStop(Account acc, Instrument instr, ActiveBracketSpec spec)
@@ -369,6 +375,63 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 return null;
+            }
+            
+            
+            private void RunAutoBreakEvenWatchdog()
+            {
+                
+                BreakEvenMode mode;
+                Instrument instr;
+                Account master;
+                List<Account> followers;
+                double minProfitPoints;
+                double plusPoints;
+
+                lock (_gate)
+                {
+                    mode = _breakEvenMode;
+                    instr = _instrument;
+                    master = _master;
+                    followers = _followers?.ToList() ?? new List<Account>();
+                    minProfitPoints = _freeTradeMinProfitPoints;
+                    plusPoints = _freeTradePlusPoints;
+                }
+
+                if (mode != BreakEvenMode.Auto)
+                    return;
+
+                if (instr == null)
+                    return;
+                
+                var accounts = new List<Account>();
+                if (master != null)
+                    accounts.Add(master);
+
+                accounts.AddRange(followers.Where(a => a != null));
+
+                foreach (var acc in accounts
+                             .Where(a => a != null)
+                             .GroupBy(a => a.Name ?? "", StringComparer.Ordinal)
+                             .Select(g => g.First()))
+                {
+                    if (!TryGetActiveBracketSpec(acc, instr, out var spec) || spec == null)
+                        continue;
+
+                    if (spec.AutoBeSuppressedUntilFlat)
+                        continue;
+
+                    var canApply = CanApplyFreeTrade(acc, instr, minProfitPoints, out _);
+                    if (!canApply)
+                        continue;
+
+                    if (ApplyFreeTrade(acc, instr, minProfitPoints, plusPoints))
+                    {
+                        Log(
+                            $"[BE AUTO] APPLY acc={acc.Name} instr={instr.FullName} " +
+                            $"minPts={minProfitPoints:0.##} plusPts={plusPoints:0.##}");
+                    }
+                }
             }
         }
     }

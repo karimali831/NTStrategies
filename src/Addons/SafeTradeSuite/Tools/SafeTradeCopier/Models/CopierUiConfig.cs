@@ -15,6 +15,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public List<Account> Followers;
             public Dictionary<string, int> FollowerQtyOverrides;
             public Dictionary<string, string> FollowerAtmOverrides;
+            public BreakEvenMode BreakEvenMode { get; set; }
+            public double FreeTradeMinProfitPoints { get; set; }
+            public double FreeTradePlusPoints { get; set; }
             public double MasterMaxDailyProfit { get; set; }
             public double MasterMaxDailyLoss { get; set; }
 

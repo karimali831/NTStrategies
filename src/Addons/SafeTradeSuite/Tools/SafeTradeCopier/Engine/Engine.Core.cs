@@ -79,7 +79,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 double masterMaxDailyLoss,
                 Dictionary<string, bool> followerUseMasterRiskByAccountName,
                 Dictionary<string, double> followerMaxDailyProfitByAccountName,
-                Dictionary<string, double> followerMaxDailyLossByAccountName)
+                Dictionary<string, double> followerMaxDailyLossByAccountName,
+                BreakEvenMode breakEvenMode,
+                double freeTradeMinProfitPoints,
+                double freeTradePlusPoints)
             {
                 var followersClean = followerAccounts?
                     .Where(a => a != null && masterAccount != null && !ReferenceEquals(a, masterAccount))
@@ -112,6 +115,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _configuredInstrumentName = name;
                     _configuredInstrument = instr;
                     _configuredMasterBracket = string.IsNullOrWhiteSpace(masterBracket) ? "None" : masterBracket.Trim();
+                    _breakEvenMode = breakEvenMode;
+                    _freeTradeMinProfitPoints = Math.Max(0, freeTradeMinProfitPoints);
+                    _freeTradePlusPoints = Math.Max(0, freeTradePlusPoints);
                     _configuredFollowerQtyOverrides =
                         followerQtyOverridesByAccountName ?? new Dictionary<string, int>(StringComparer.Ordinal);
                     _configuredFollowerAtmOverrides =
@@ -236,6 +242,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!_isRequested || !IsReady_NoLock(out _))
                 {
                     Armed = false;
+
+                    // Keep watchdog alive for master-only protection features
+                    // such as auto break-even and missing bracket checks.
+                    if (_master != null && _instrument != null)
+                        StartProtectiveWatchdog_NoLock();
+
                     return;
                 }
 

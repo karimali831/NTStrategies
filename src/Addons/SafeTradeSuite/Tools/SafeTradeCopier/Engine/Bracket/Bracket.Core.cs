@@ -96,15 +96,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var isFlat = GetNetPosition(acc, instr) == 0;
                 var hasWorkingBracket = HasWorkingBracketOrders(acc, instr);
 
-                if (isFlat && !hasWorkingBracket)
+                if (isFlat || !hasWorkingBracket)
                 {
                     ClearActiveBracket(acc, instr);
-                    Log($"[BRACKET CLEAR] acc={acc.Name} instr={instr.FullName} reason=flat_and_no_working_brackets");
+                    Log($"[BRACKET CLEAR] acc={acc.Name} instr={instr.FullName} isFlat={isFlat} hasWorkingBracket={hasWorkingBracket}");
+                    return;
                 }
-                else
-                {
-                    Log($"[BRACKET KEEP] acc={acc.Name} instr={instr.FullName} isFlat={isFlat} hasWorkingBracket={hasWorkingBracket}");
-                }
+
+                Log($"[BRACKET KEEP] acc={acc.Name} instr={instr.FullName} isFlat={isFlat} hasWorkingBracket={hasWorkingBracket}");
             }
             
             private void RemovePendingBracketForEntry(string entryName)

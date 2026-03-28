@@ -62,5 +62,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             return _activeInstrumentSession.FollowersEnabled.Count(kvp => kvp.Value);
         }
+        
     }
 }
