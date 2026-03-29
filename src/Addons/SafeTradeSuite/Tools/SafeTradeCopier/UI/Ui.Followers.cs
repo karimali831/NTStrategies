@@ -94,6 +94,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 var enabled = CreateCircularCheckBox();
                 enabled.ToolTip = "Enable follower";
+                ToolTipService.SetShowOnDisabled(enabled, true);
                 
                 var accountText = new TextBlock
                 {
@@ -163,13 +164,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     height: SmallButtonHeight());
                 RenderFlattenFollowerButtonState(flatten, enabled: false);
                 
+                var beText = BreakEvenAutoMode ? "Auto" : CheckIcon;
+                
                 var freeTrade = CreateFormButton(
-                    text: CheckIcon,
+                    text: beText,
                     tone: FormButtonTone.Primary,
                     style: FormButtonStyle.Solid,
                     width: 60,
                     height: SmallButtonHeight());
-                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, CheckIcon, all: false);
+                RenderFreeTradeButtonState(freeTrade, enabled: false, undoMode: false, beText, all: false);
                 
                 var allow = !_simOnlyMode || IsSimAccount(acc);
 

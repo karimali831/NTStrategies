@@ -151,25 +151,56 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine == null || _activeInstrumentSession?.FollowersEnabled == null)
                 return;
 
-            var anySelectedBad = _activeInstrumentSession.FollowersEnabled.Any(kvp =>
+            var instr = GetInstrument();
+            var anySelectedBad = false;
+            var changed = false;
+
+            foreach (var kvp in _activeInstrumentSession.FollowersEnabled.ToList())
             {
                 if (!kvp.Value)
-                    return false;
+                    continue;
 
                 var account = Account.All.FirstOrDefault(a =>
                     a != null &&
                     string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
 
-                return account == null || GetUiConnectionState(account) != UiConnectionState.Connected;
-            });
+                var unhealthy = account == null || GetUiConnectionState(account) != UiConnectionState.Connected;
+                if (!unhealthy)
+                    continue;
 
-            if (!anySelectedBad)
-                return;
+                anySelectedBad = true;
 
-            if (_engine.IsRequested)
+                var hasOpenPosition = account != null &&
+                                      instr != null &&
+                                      HasOpenInstrumentPosition(account, instr);
+
+                if (hasOpenPosition)
+                    continue;
+
+                _activeInstrumentSession.FollowersEnabled[kvp.Key] = false;
+
+                var row = _followerRows.FirstOrDefault(r =>
+                    r?.Account != null &&
+                    string.Equals(r.Account.Name, kvp.Key, StringComparison.Ordinal));
+
+                if (row?.EnabledCheck?.IsChecked == true)
+                    SetFollowerChecked(row, false, "HandleFollowerConnectionSafety.autoUncheckDisconnected");
+
+                changed = true;
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[FOLLOWER AUTO-UNCHECK] acc={kvp.Key} reason=connection-unhealthy");
+            }
+
+            if (anySelectedBad && _engine.IsRequested)
                 RequestDisarmed("Copy disarmed: one or more selected followers lost connection.");
 
+            if (changed)
+                SavePersistentUiState();
+
             RenderFollowerRowsState();
+            RefreshFollowerBulkActionButtons();
+            RefreshCopierStatusPanel();
             ApplyConfigFromUi();
         }
     }

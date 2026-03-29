@@ -109,6 +109,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return _followerRows.Count(r => r?.Account != null && r.EnabledCheck?.IsChecked == true && 
                 GetUiConnectionState(r.Account) == UiConnectionState.Connected);
         }
+
+        private bool AllFollowersUnhealthy()
+        {
+            var anyFollowerRows = _followerRows.Any(r => r?.Account != null);
+            var anyHealthyFollowersAvailable = _followerRows.Any(r =>
+                r?.Account != null &&
+                GetUiConnectionState(r.Account) == UiConnectionState.Connected);
+
+            return anyFollowerRows && !anyHealthyFollowersAvailable;
+        }
         
         private IList<FollowerRow> GetCheckedFollowers()
         {

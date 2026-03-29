@@ -267,6 +267,36 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return session.FollowersEnabled.Any(x => x.Value);
         }
         
+        private bool SessionMasterConnected(InstrumentSession session)
+        {
+            if (session?.MasterAccount == null)
+                return false;
+
+            return GetUiConnectionState(session.MasterAccount) == UiConnectionState.Connected;
+        }
+
+        private bool SessionHasHealthyEnabledFollowers(InstrumentSession session)
+        {
+            if (session?.FollowersEnabled == null)
+                return false;
+
+            foreach (var kvp in session.FollowersEnabled)
+            {
+                if (!kvp.Value)
+                    continue;
+
+                var account = Account.All.FirstOrDefault(a =>
+                    a != null &&
+                    string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
+
+                if (account != null && GetUiConnectionState(account) == UiConnectionState.Connected)
+                    return true;
+            }
+
+            return false;
+        }
+
+        
         private bool ActiveSessionHasAllEnabledFollowers()
         {
             if (_activeInstrumentSession?.FollowersEnabled == null)
@@ -398,6 +428,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                    && _engine.Armed;
         }
         
+        
         private InstrumentTabDotState GetInstrumentTabDotState(InstrumentSession session)
         {
             if (session == null)
@@ -408,14 +439,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var hasOpenPosition = SessionHasOpenPosition(session);
             var isLiveArmed = SessionIsLiveArmed(session);
-            var hasEnabledFollowers = SessionHasEnabledFollowers(session);
+            var masterConnected = SessionMasterConnected(session);
+            var hasHealthyEnabledFollowers = SessionHasHealthyEnabledFollowers(session);
+            var hasAnyEnabledFollowers = SessionHasEnabledFollowers(session);
 
             if (hasOpenPosition || isLiveArmed)
                 return InstrumentTabDotState.Green;
 
-            if (hasEnabledFollowers)
+            // Yellow only if the session has something intentionally configured
+            // and at least part of it is actually usable.
+            if (masterConnected && hasHealthyEnabledFollowers)
                 return InstrumentTabDotState.Yellow;
 
+            // Optional:
+            // if you want a disconnected / broken configured session to show some warning,
+            // introduce a Red state instead of Yellow.
+            // For now, keep it visually quiet.
             return InstrumentTabDotState.None;
         }
 

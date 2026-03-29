@@ -13,6 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             display?.InvokeAsync(() =>
             {
                 var instr = GetInstrument();
+                var beText = BreakEvenAutoMode ? "Auto" : CheckIcon;
 
                 if (instr == null)
                 {
@@ -36,7 +37,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             _btnFreeTradeAll,
                             false,
                             false,
-                            BreakEvenAutoMode ? "Auto BE" : "Break-even All",
+                            BreakEvenAutoMode ? "Auto BE All" : "Break-even All",
                             all: true,
                             toolTip: tip);
 
@@ -68,7 +69,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     foreach (var row in _followerRows)
                     {
                         if (row?.FreeTradeBtn != null)
-                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, CheckIcon, all: false, toolTip: tip);
+                            RenderFreeTradeButtonState(row.FreeTradeBtn, false, false, beText, all: false, toolTip: tip);
                     }
 
                     return;
@@ -113,7 +114,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     anyCanApplyOrUndo |= enabledMaster;
                     canUndoAll |= canUndoMaster;
                 }
-
+                
                 foreach (var row in _followerRows)
                 {
                     if (row?.Account == null || row.FreeTradeBtn == null)
@@ -126,7 +127,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             row.FreeTradeBtn,
                             false,
                             false,
-                            CheckIcon,
+                            beText,
                             all: false,
                             toolTip: "Enable this follower first.");
                         continue;
@@ -170,7 +171,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_btnFreeTradeAll != null)
                 {
                     var allEnabled = BreakEvenAutoMode ? canUndoAll : anyCanApplyOrUndo;
-                    var allText = BreakEvenAutoMode ? "Auto BE" : "Break-even All";
+                    var allText = BreakEvenAutoMode ? "Auto BE All" : "Break-even All";
 
                     var allToolTip = canUndoAll
                         ? "Undo break-even for all eligible selected accounts."
@@ -266,7 +267,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             btn.Content = undoMode ? $"Undo BE{(all ? " All" : "")}" : btnText;
             btn.ToolTip = toolTip ?? (enabled
-                ? (undoMode ? "Undo break-even." : "Apply break-even.")
+                ? undoMode ? "Undo break-even." : "Apply break-even."
                 : "Break-even unavailable.");
 
             ApplyButtonTheme(btn, tone, FormButtonStyle.Solid, enabled);

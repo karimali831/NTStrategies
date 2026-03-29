@@ -39,6 +39,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 VerticalAlignment = VerticalAlignment.Center
             };
             
+            ToolTipService.SetShowOnDisabled(checkbox, true);
             ApplyCircularCheckBoxStyle(checkbox);
             return checkbox;
         }

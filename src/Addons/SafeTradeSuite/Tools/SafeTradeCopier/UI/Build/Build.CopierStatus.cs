@@ -137,12 +137,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var armed = Armed();
             var requested = ActiveSessionRequested();
-            var ready = armed && AreAllCheckedFollowersHealthy();
+
+            var anyCheckedFollowers = HasAnyCheckedFollowers();
+            var healthyCheckedFollowers = CountCheckedFollowersHealthy();
+            var allCheckedFollowersHealthy = anyCheckedFollowers && AreAllCheckedFollowersHealthy();
+            
+            var ready = armed && allCheckedFollowersHealthy;
 
             readyStatus.PrimaryDotColour = connectedColor;
             readyStatus.PrimaryReason = $"{(_simOnlyMode ? "Sim" : "Live")} {(ready ? "copier" : "master")} ready";
 
-            if (!HasAnyCheckedFollowers())
+            if (AllFollowersUnhealthy())
+            {
+                readyStatus.SecondaryReason = "All followers unhealthy";
+                readyStatus.SecondaryDotColour = disconnectedColor;
+                return readyStatus;
+            }
+
+            if (!anyCheckedFollowers)
             {
                 readyStatus.SecondaryReason = requested
                     ? "Arm requested - select followers"
@@ -151,7 +163,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return readyStatus;
             }
 
-            if (!AreAllCheckedFollowersHealthy())
+            if (!allCheckedFollowersHealthy)
             {
                 readyStatus.SecondaryReason = requested
                     ? "Arm requested - check followers"
@@ -159,7 +171,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 readyStatus.SecondaryDotColour = warningColor;
                 return readyStatus;
             }
-            
+
             if (requested && !armed)
             {
                 readyStatus.SecondaryReason = "Arm requested - waiting";
@@ -168,13 +180,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             if (ready && !_simOnlyMode)
-            {
                 readyStatus.PrimaryReasonColor = DotConnectedOnBrush();
-            }
-            
+
             readyStatus.SecondaryReason = armed
-                ? $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} armed"
-                : $"Follower{(CountCheckedFollowersHealthy() == 1 ? "" : "s")} disarmed";
+                ? $"Follower{(healthyCheckedFollowers == 1 ? "" : "s")} armed"
+                : $"Follower{(healthyCheckedFollowers == 1 ? "" : "s")} disarmed";
 
             readyStatus.SecondaryDotColour = armed ? connectedColor : warningColor;
             return readyStatus;
