@@ -52,18 +52,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var currentNet = GetNetPosition(master, instr);
                 if (currentNet != 0)
                 {
-                    var confirmed = ShowConfirmDialog(
-                        _window,
-                        "Confirm additional entry",
-                        $"There is already an open position on {master.Name} for {instr.FullName} (net {currentNet})",
-                        okText: "Submit another order",
-                        cancelText: "Cancel");
-
-                    if (!confirmed)
-                    {
-                        eng.Log("Master submit cancelled by user.");
-                        return;
-                    }
+                    eng.Log(
+                        $"Master submit blocked -> {master.Name}: open position already exists on {instr.FullName} (net {currentNet}).");
+                    return;
                 }
 
                 var qty = ParseQtyOrDefault(_masterQtyBox?.Text);

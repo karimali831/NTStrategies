@@ -203,29 +203,41 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             if (_engine == null)
                 return;
-            
+
             var pending = _engine.IsMasterSubmitInFlight();
             var masterConnected = IsMasterConnected(out var masterAcc);
             var masterLocked = _engine.TryGetAccountLockReason(masterAcc, out var lockShortReason, out var lockFullReason);
-            var enabled = !pending && masterConnected && !masterLocked;
+
+            var instr = GetInstrument();
+            var hasOpenPosition = masterAcc != null && instr != null && HasOpenInstrumentPosition(masterAcc, instr);
+
+            var enabled = !pending && masterConnected && !masterLocked && !hasOpenPosition;
 
             if (_btnBuyMkt != null)
             {
                 _btnBuyMkt.IsEnabled = enabled;
-                _btnBuyMkt.ToolTip = masterConnected
-                    ? masterLocked ? lockShortReason : "Submit a market buy on the master account"
-                    : "Master account is disconnected";
-                
+                _btnBuyMkt.ToolTip = !masterConnected
+                    ? "Master account is disconnected"
+                    : masterLocked
+                        ? lockShortReason
+                        : hasOpenPosition
+                            ? $"Master already has an open position on {instr?.FullName ?? "this instrument"}"
+                            : "Submit a market buy on the master account";
+
                 ApplyButtonTheme(_btnBuyMkt, FormButtonTone.Success, FormButtonStyle.Solid, enabled);
             }
 
             if (_btnSellMkt != null)
             {
                 _btnSellMkt.IsEnabled = enabled;
-                _btnSellMkt.ToolTip = masterConnected
-                    ? masterLocked ? lockFullReason :  "Submit a market sell on the master account"
-                    : "Master account is disconnected";
-                
+                _btnSellMkt.ToolTip = !masterConnected
+                    ? "Master account is disconnected"
+                    : masterLocked
+                        ? lockFullReason
+                        : hasOpenPosition
+                            ? $"Master already has an open position on {instr?.FullName ?? "this instrument"}"
+                            : "Submit a market sell on the master account";
+
                 ApplyButtonTheme(_btnSellMkt, FormButtonTone.Danger, FormButtonStyle.Solid, enabled);
             }
         }
