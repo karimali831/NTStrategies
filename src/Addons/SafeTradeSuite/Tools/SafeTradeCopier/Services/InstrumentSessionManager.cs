@@ -180,6 +180,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void EnsureInitialInstrumentSession()
         {
+            LogInstrumentSessions("EnsureInitialInstrumentSession.start");
+            LogSavedInstrumentOrder("EnsureInitialInstrumentSession.start");
+            
             var available = GetAvailableInstruments();
 
             if (_instrumentSessions.Count == 0)
@@ -218,6 +221,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _activeInstrumentSession = _instrumentSessions[0];
 
             _engine?.RehydrateActiveBracketsFromLiveOrders();
+            
+            LogInstrumentSessions("EnsureInitialInstrumentSession.end");
+            LogSavedInstrumentOrder("EnsureInitialInstrumentSession.end");
         }
         
         private void RefreshInstrumentSelectorItems()
@@ -473,6 +479,45 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
         }
 
+        // Logging
+        private static string DiagInstrumentOrder(IEnumerable<InstrumentSession> sessions)
+        {
+            if (sessions == null)
+                return "(null)";
+
+            return string.Join(" > ",
+                sessions.Select((x, i) =>
+                    $"{i}:{NormalizeInstrumentName(x?.InstrumentName)}"));
+        }
+
+        private static string DiagInstrumentNames(IEnumerable<string> names)
+        {
+            if (names == null)
+                return "(null)";
+
+            return string.Join(" > ",
+                names.Select((x, i) => $"{i}:{NormalizeInstrumentName(x)}"));
+        }
+
+        private void LogInstrumentSessions(string source)
+        {
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[INSTRUMENT SESSIONS] source={source} " +
+                $"active={NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName)} " +
+                $"count={_instrumentSessions.Count} " +
+                $"order={DiagInstrumentOrder(_instrumentSessions)}");
+        }
+
+        private void LogSavedInstrumentOrder(string source)
+        {
+            var saved = SafeTradeSuiteRuntime.GetSavedInstrumentsSnapshot();
+
+            SafeTradeSuiteRuntime.PrintLog(
+                $"[SAVED INSTRUMENT ORDER] source={source} " +
+                $"count={saved.Count} " +
+                $"order={DiagInstrumentNames(saved)}");
+        }
+        
         private void LogStatus(string message)
         {
             _engine?.Log(message);

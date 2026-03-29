@@ -38,8 +38,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentTabs.DragOver += OnInstrumentTabsDragOver;
             _instrumentTabs.DragLeave -= OnInstrumentTabsDragLeave;
             _instrumentTabs.DragLeave += OnInstrumentTabsDragLeave;
-
+            
+            LogInstrumentSessions("RefreshInstrumentTabs.start");
+            
             NormalizeInstrumentSessions();
+
+            LogInstrumentSessions("RefreshInstrumentTabs.afterNormalize");
 
             _instrumentTabs.SelectionChanged -= OnInstrumentTabsSelectionChanged;
 
@@ -339,9 +343,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _instrumentSessions.Insert(insertIndex, draggedSession);
             _activeInstrumentSession = draggedSession;
 
+            LogInstrumentSessions("MoveInstrumentSessionToInsertIndex.afterReorder");
+
             SafeTradeSuiteRuntime.SaveInstrumentOrder(
                 _instrumentSessions.Select(x => x?.InstrumentName));
-            
+
+            LogSavedInstrumentOrder("MoveInstrumentSessionToInsertIndex.afterSaveOrder");
+
+            SavePersistentUiState();
+
             RefreshInstrumentTabs();
             LoadActiveSessionToUi("MoveInstrumentSessionToInsertIndex");
         }

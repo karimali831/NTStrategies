@@ -77,6 +77,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         FollowerAtmOverrides = new Dictionary<string, string>(session.FollowerAtmOverrides)
                     });
                 }
+                
+                LogInstrumentSessions("SavePersistentUiState.beforeSave");
+                LogSavedInstrumentOrder("SavePersistentUiState.beforeSave");
 
                 SafeTradeSuiteRuntime.SaveCopierUiState(_persistedState);
             }
@@ -153,6 +156,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _activeInstrumentSession = _instrumentSessions[0];
 
                 _activeMainMenuTab = MainMenuTab.Copier;
+                
+                LogInstrumentSessions("LoadPersistentUiState.end");
+                LogSavedInstrumentOrder("LoadPersistentUiState.end");
             }
             catch (Exception ex)
             {
