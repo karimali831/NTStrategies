@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using NinjaTrader.Cbi;
 
@@ -19,9 +20,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var qty = e.Position.Quantity;
 
             lock (_uiNet)
-                _uiNet[key] = qty;
+            {
+                if (Math.Abs(qty) > 0)
+                    _uiNet[key] = qty;
+                else
+                    _uiNet.Remove(key);
+            }
 
             RenderPnlUi();
+            // RenderMasterSubmitButtonsState();
             RenderFlattenEnablementUi();
             RenderBreakEvenEnablementUi();
             // InvalidatePositionsPanel();
@@ -45,14 +52,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
             }
 
-            if (text.StartsWith("Long", System.StringComparison.OrdinalIgnoreCase))
+            if (text.StartsWith("Long", StringComparison.OrdinalIgnoreCase))
             {
                 // tb.Foreground = SuccessActionBrush();
                 tb.ToolTip = "Live long position";
                 return;
             }
 
-            if (text.StartsWith("Short", System.StringComparison.OrdinalIgnoreCase))
+            if (text.StartsWith("Short", StringComparison.OrdinalIgnoreCase))
             {
                 // tb.Foreground = DangerActionBrush();
                 tb.ToolTip = "Live short position";

@@ -234,7 +234,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _btnWindowMaximize = null;
             _btnWindowClose = null;
             _windowTitleBar = null;
-            
+
             _masterBox = null;
             _instrumentSelector = null;
             _followersPanel = null;
@@ -257,6 +257,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _followerRows.Clear();
             _lastAccountsSnapshot.Clear();
             _instrumentSessions.Clear();
+
+            _lastAppliedConfig = null;
         }
 
         public void Dispose()

@@ -31,6 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 RenderFlattenMasterButtonState();
                 RenderFlattenAllButtonState();
+                RenderMasterSubmitButtonsState();
             }, DispatcherPriority.Background);
         }
         
