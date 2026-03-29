@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             WindowState windowState = WindowState.Normal)
         {
             _isClosing = false;
-            _engine = new SafeCopierEngine();
+            _engine = new SafeCopierEngine(this);
             LoadPersistentUiState();
 
             _window = new Window

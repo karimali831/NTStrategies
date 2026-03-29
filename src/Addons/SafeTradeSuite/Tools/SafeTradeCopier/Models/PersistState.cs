@@ -18,6 +18,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             public List<InstrumentSessionState> InstrumentSessions { get; set; } =
                 new List<InstrumentSessionState>();
+            public List<TradeHistoryItemState> TradeHistory { get; set; } =
+                new List<TradeHistoryItemState>();
         }
 
         [Serializable]
@@ -82,6 +84,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             public Dictionary<string, string> FollowerAtmOverrides { get; set; } =
                 new Dictionary<string, string>();
+        }
+        
+        [Serializable]
+        public sealed class TradeHistoryItemState
+        {
+            public int TradeNumber { get; set; }
+            public string InstrumentName { get; set; }
+            public string MarketPosition { get; set; }
+            public int OrderQty { get; set; }
+            public string AccountName { get; set; }
+            public DateTime EntryTimeUtc { get; set; }
+            public DateTime? ExitTimeUtc { get; set; }
+            public double EntryPrice { get; set; }
+            public double ExitPrice { get; set; }
+            public double RealizedPnL { get; set; }
+            public string BracketUsed { get; set; }
+            public bool IsMaster { get; set; }
+            public string Outcome { get; set; }
+            public bool BreakEvenApplied { get; set; }
+            public BreakEvenTriggerKind BreakEvenKind { get; set; }
+            public FlattenTriggerReason PendingFlattenReason { get; set; }
+            public string PendingFlattenDetail { get; set; }
+            public bool WasFlattenedManually { get; set; }
+
+            public string EntryOrderName { get; set; }
+            public string ExitOrderName { get; set; }
         }
     }
 }

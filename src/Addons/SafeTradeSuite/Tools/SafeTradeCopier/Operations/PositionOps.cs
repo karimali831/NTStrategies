@@ -144,7 +144,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (_masterPnlBar != null)
                         _masterPnlBar.Tag = "ORDER_FILLED";
 
-                    eng.EnsureFlatInstrument(master, instr);
+                    MarkTradeManualFlatten(master, instr);
+                    eng.EnsureFlatInstrument(master, instr, FlattenTriggerReason.ManualFlattenAll);
                     anySubmitted = true;
                 }
                 else
@@ -167,7 +168,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (r.PnlBar != null)
                         r.PnlBar.Tag = "ORDER_FILLED";
 
-                    eng.EnsureFlatInstrument(r.Account, instr);
+                    MarkTradeManualFlatten(r.Account, instr);
+                    eng.EnsureFlatInstrument(r.Account, instr, FlattenTriggerReason.ManualFlattenAll);
                     anySubmitted = true;
                 }
 

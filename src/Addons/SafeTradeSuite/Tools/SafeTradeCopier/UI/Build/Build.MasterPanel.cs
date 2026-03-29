@@ -183,7 +183,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (eng == null || master == null || instr == null)
                     return;
 
-                eng.EnsureFlatInstrument(master, instr);
+                eng.EnsureFlatInstrument(master, instr, FlattenTriggerReason.ManualFlatten);
             };
 
             Grid.SetColumn(_masterPositionText, 0);

@@ -13,6 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public partial class SafeCopierEngine
         {
             private Account _master;
+            private readonly SafeTradeCopierTool _owner;
             private List<Account> _followers = new List<Account>();
             private string _instrumentName;
             private Instrument _instrument;
@@ -62,6 +63,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             // Watchdog
             private int _guardWatchdogRunning;
             private const int GuardWatchdogIntervalMs = 500;
+            
+            public SafeCopierEngine(SafeTradeCopierTool owner)
+            {
+                _owner = owner;
+            }
 
             public bool IsRequested
             {

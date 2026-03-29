@@ -250,6 +250,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"[BE] APPLY acc={acc.Name} instr={instr.FullName} " +
                     $"side={(spec.IsBuy ? "Long" : "Short")} " +
                     $"entry={spec.EntryPrice:0.00} plusPts={plusPoints:0.##} oldStop={oldStopPrice:0.00} newStop={newStopPrice:0.00}");
+                
+                _owner?.MarkTradeBreakEven(
+                    acc,
+                    instr,
+                    _breakEvenMode == BreakEvenMode.Auto
+                        ? BreakEvenTriggerKind.Auto
+                        : BreakEvenTriggerKind.Manual);
 
                 return true;
             }

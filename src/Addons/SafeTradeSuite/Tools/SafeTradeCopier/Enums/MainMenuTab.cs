@@ -5,7 +5,7 @@
         private enum MainMenuTab
         {
             Copier,
-            Positions,
+            Positions, // not used
             Trades,
             Settings,
             Diag

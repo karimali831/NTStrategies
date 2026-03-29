@@ -19,7 +19,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
             }
             
-            public void EnsureFlatInstrument(Account acc, Instrument instr)
+            public void EnsureFlatInstrument(Account acc, Instrument instr, FlattenTriggerReason reason, string detail = null)
             {
                 if (acc == null || instr == null)
                     return;
@@ -202,7 +202,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     try
                     {
-                        EnsureFlatInstrument(f, instr);
+                        EnsureFlatInstrument(f, instr, FlattenTriggerReason.FollowMasterExit);
                         Log($"Follow-master-exit flatten -> {f.Name} ({instr.FullName})");
                     }
                     catch (Exception ex)

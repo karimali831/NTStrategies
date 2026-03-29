@@ -33,6 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     orderName.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase);
 
                 HandleBracketExitOutcome(_master, e.Execution);
+                _owner?.TryTrackTradeExitFromExecution(_master, e.Execution);
 
                 if (IsStcEntryExecution(ord))
                 {
@@ -40,6 +41,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
 
                     TrySubmitBracketOnFill(_master, e.Execution);
+
+                    _owner?.TrackEntryExecution(
+                        _master,
+                        e.Execution,
+                        isMaster: true,
+                        bracketUsed: _configuredMasterBracket);
                 }
 
                 if (isMasterExitExecution)
@@ -147,6 +154,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (acc == null) return;
 
                 HandleBracketExitOutcome(acc, e.Execution);
+                _owner?.TryTrackTradeExitFromExecution(acc, e.Execution);
 
                 // Brackets only submit if there's a pending entry name for this fill.
                 SafeTradeSuiteRuntime.PrintLog(
@@ -156,7 +164,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                 {
                     Log($"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
+
                     TrySubmitBracketOnFill(acc, e.Execution);
+
+                    _owner?.TrackEntryExecution(
+                        acc,
+                        e.Execution,
+                        isMaster: false,
+                        bracketUsed: ResolveFollowerBracket(acc));
+
                     MarkFollowerEntryResolved(acc);
                     ResetFollowerDesync(acc);
                 }

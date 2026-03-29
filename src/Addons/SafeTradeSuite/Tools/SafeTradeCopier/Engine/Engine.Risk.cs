@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     DisableFollower(acc, reason);
                 }
 
-                EnsureFlatInstrument(acc, instr);
+                EnsureFlatInstrument(acc, instr, FlattenTriggerReason.RiskProtection, reason);
             }
             
             public void UpdateRiskProtectionSettings(

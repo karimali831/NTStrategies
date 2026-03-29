@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         {
                             try
                             {
-                                EnsureFlatInstrument(acc, instr);
+                                EnsureFlatInstrument(acc, instr, FlattenTriggerReason.Panic);
                                 Log($"[PANIC] flatten requested -> acc={acc.Name} instr={instr.FullName}");
                             }
                             catch (Exception ex)

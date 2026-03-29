@@ -8,6 +8,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private SafeTradeCopierUiState _persistedState = new SafeTradeCopierUiState();
         
+        
         private void EnsurePersistedStateDefaults()
         {
             if (_persistedState == null)
@@ -39,6 +40,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_persistedState.Risk.FollowerMaxDailyLoss == null)
                 _persistedState.Risk.FollowerMaxDailyLoss =
                     new Dictionary<string, double>(StringComparer.Ordinal);
+            
+            if (_persistedState.TradeHistory == null)
+                _persistedState.TradeHistory = new List<TradeHistoryItemState>();
         }
         
         private void SavePersistentUiState()
@@ -57,6 +61,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 SaveRiskSettingsToState();
                 SaveFollowerGuardSettingsToState();
+                SaveTradeHistoryToState();
 
                 _persistedState.ActiveInstrumentName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
 
@@ -108,6 +113,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 LoadRiskSettingsFromState();
                 LoadFollowerGuardSettingsFromState();
+                LoadTradeHistoryFromState();
 
                 _instrumentSessions.Clear();
                 var accounts = GetSelectableAccounts();

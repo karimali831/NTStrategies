@@ -102,12 +102,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     case GuardAction.Flatten:
                         if (_instrument != null)
-                            EnsureFlatInstrument(follower, _instrument);
+                            EnsureFlatInstrument(follower, _instrument, FlattenTriggerReason.FollowerGuard, reason);
                         return;
 
                     case GuardAction.FlattenAndDisable:
                         if (_instrument != null)
-                            EnsureFlatInstrument(follower, _instrument);
+                            EnsureFlatInstrument(follower, _instrument, FlattenTriggerReason.FollowerGuard, reason);
 
                         DisableFollower(follower, reason);
                         return;
@@ -118,7 +118,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     case GuardAction.RetryThenFlatten:
                         if (_instrument != null)
-                            EnsureFlatInstrument(follower, _instrument);
+                            EnsureFlatInstrument(follower, _instrument, FlattenTriggerReason.FollowerGuard, reason);
 
                         DisableFollower(follower, reason);
                         return;

@@ -57,7 +57,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (r.PnlBar != null)
                         r.PnlBar.Tag = "ORDER_FILLED";
 
-                    eng.EnsureFlatInstrument(r.Account, instr);
+                    MarkTradeManualFlatten(r.Account, instr);
+                    eng.EnsureFlatInstrument(r.Account, instr, FlattenTriggerReason.ManualFlatten);
                     eng.Log($"Flatten submitted -> {r.Account.Name} ({instr.FullName})");
                 };
             }
