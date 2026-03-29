@@ -15,8 +15,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
+                    // Soft disarm only.
+                    // Keep order/execution handlers alive so panic flatten fills still get tracked.
                     _isRequested = false;
-                    DisarmUnsafe_NoLock("Emergency stop");
+                    Armed = false;
                     RaiseModeChanged_NoLock();
                     RaiseReady_NoLock(reasonOverride: "Emergency stop active");
 
@@ -53,13 +55,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         {
                             try
                             {
+                                _owner?.MarkTradeFlattenIntent(acc, instr, FlattenTriggerReason.Panic);
                                 EnsureFlatInstrument(acc, instr, FlattenTriggerReason.Panic);
                                 Log($"[PANIC] flatten requested -> acc={acc.Name} instr={instr.FullName}");
                             }
                             catch (Exception ex)
                             {
-                                Log(
-                                    $"[PANIC] flatten failed -> acc={acc?.Name} instr={instr?.FullName} msg={ex.Message}");
+                                Log($"[PANIC] flatten failed -> acc={acc?.Name} instr={instr?.FullName} msg={ex.Message}");
                             }
                         }
                     }

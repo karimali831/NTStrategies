@@ -1,10 +1,19 @@
 ﻿using System;
+using System.Windows.Threading;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 {
     public partial class SafeTradeCopierTool
     {
+        private readonly object _tradeGate = new object();
+        
+        private void RequestTradesUiRefresh()
+        {
+            var display = _uiDispatcher ?? _window?.Dispatcher;
+            display?.InvokeAsync(RefreshTradesPanel, DispatcherPriority.Background);
+        }
+        
         private void TrackEntryExecution(Account acc, Execution execution, bool isMaster, string bracketUsed)
         {
             if (acc == null || execution?.Order == null || execution.Instrument == null)
@@ -13,38 +22,37 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var instr = execution.Instrument;
             var key = TradeKey(acc, instr);
 
-            if (_activeTrades.ContainsKey(key))
-                return;
-
-            var order = execution.Order;
-            var isBuySide =
-                order.OrderAction == OrderAction.Buy ||
-                order.OrderAction == OrderAction.BuyToCover;
-
-            var qty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
-            if (qty <= 0)
-                qty = 1;
-
-            _activeTrades[key] = new ActiveTradeRuntime
+            lock (_tradeGate)
             {
-                TradeNumber = _nextTradeNumber++,
-                Key = key,
-                InstrumentName = instr.FullName,
-                MarketPosition = isBuySide ? "Long" : "Short",
-                OrderQty = qty,
-                AccountName = acc.Name,
-                EntryTimeUtc = execution.Time.ToUniversalTime(),
-                EntryPrice = execution.Price,
-                BracketUsed = string.IsNullOrWhiteSpace(bracketUsed) ? "None" : bracketUsed,
-                IsMaster = isMaster,
-                EntryOrderName = (order.Name ?? "").Trim(),
-                BreakEvenApplied = false,
-                BreakEvenKind = BreakEvenTriggerKind.None,
-                PendingFlattenReason = FlattenTriggerReason.None,
-                PendingFlattenDetail = null
-            };
+                if (_activeTrades.ContainsKey(key))
+                    return;
 
-            RefreshTradesPanel();
+                var order = execution.Order;
+                var isBuySide =
+                    order.OrderAction == OrderAction.Buy ||
+                    order.OrderAction == OrderAction.BuyToCover;
+
+                var qty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
+                if (qty <= 0)
+                    qty = 1;
+
+                _activeTrades[key] = new ActiveTradeRuntime
+                {
+                    TradeNumber = _nextTradeNumber++,
+                    Key = key,
+                    InstrumentName = instr.FullName,
+                    MarketPosition = isBuySide ? "Long" : "Short",
+                    OrderQty = qty,
+                    AccountName = acc.Name,
+                    EntryTimeUtc = execution.Time.ToUniversalTime(),
+                    EntryPrice = execution.Price,
+                    BracketUsed = string.IsNullOrWhiteSpace(bracketUsed) ? "None" : bracketUsed,
+                    IsMaster = isMaster,
+                    EntryOrderName = (order.Name ?? "").Trim()
+                };
+            }
+
+            RequestTradesUiRefresh();
             SavePersistentUiState();
         }
 
@@ -78,14 +86,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (acc == null || instr == null)
                 return;
 
-            var key = TradeKey(acc, instr);
-            if (!_activeTrades.TryGetValue(key, out var trade) || trade == null)
-                return;
+            lock (_tradeGate)
+            {
+                var key = TradeKey(acc, instr);
+                if (!_activeTrades.TryGetValue(key, out var trade) || trade == null)
+                    return;
 
-            trade.BreakEvenApplied = kind != BreakEvenTriggerKind.None;
-            trade.BreakEvenKind = kind;
+                trade.BreakEvenApplied = true;
+                trade.BreakEvenKind = kind;
+            }
 
-            RefreshTradesPanel();
+            RequestTradesUiRefresh();
             SavePersistentUiState();
         }
 
@@ -94,14 +105,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (acc == null || instr == null)
                 return;
 
-            var key = TradeKey(acc, instr);
-            if (!_activeTrades.TryGetValue(key, out var trade) || trade == null)
-                return;
+            lock (_tradeGate)
+            {
+                var key = TradeKey(acc, instr);
+                if (!_activeTrades.TryGetValue(key, out var trade) || trade == null)
+                    return;
 
-            trade.PendingFlattenReason = reason;
-            trade.PendingFlattenDetail = string.IsNullOrWhiteSpace(detail) ? null : detail;
+                trade.PendingFlattenReason = reason;
+                trade.PendingFlattenDetail = detail;
+            }
 
-            RefreshTradesPanel();
+            RequestTradesUiRefresh();
             SavePersistentUiState();
         }
 
@@ -118,8 +132,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var instr = execution.Instrument;
             var key = TradeKey(acc, instr);
 
-            if (!_activeTrades.TryGetValue(key, out var active) || active == null)
-                return;
+            ActiveTradeRuntime active;
+            lock (_tradeGate)
+            {
+                if (!_activeTrades.TryGetValue(key, out active) || active == null)
+                    return;
+            }
 
             var orderName = (execution.Order.Name ?? "").Trim();
             var exitPrice = execution.Price;
@@ -141,32 +159,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             var outcome = BuildTradeOutcomeLabel(active, orderName);
 
-            _tradeHistory.Insert(0, new TradeHistoryItemState
+            lock (_tradeGate)
             {
-                TradeNumber = active.TradeNumber,
-                InstrumentName = active.InstrumentName,
-                MarketPosition = active.MarketPosition,
-                OrderQty = active.OrderQty,
-                AccountName = active.AccountName,
-                EntryTimeUtc = active.EntryTimeUtc,
-                ExitTimeUtc = exitTimeUtc,
-                EntryPrice = active.EntryPrice,
-                ExitPrice = exitPrice,
-                RealizedPnL = pnl,
-                BracketUsed = active.BracketUsed,
-                Outcome = outcome,
-                IsMaster = active.IsMaster,
-                BreakEvenApplied = active.BreakEvenApplied,
-                BreakEvenKind = active.BreakEvenKind,
-                PendingFlattenReason = active.PendingFlattenReason,
-                PendingFlattenDetail = active.PendingFlattenDetail,
-                EntryOrderName = active.EntryOrderName,
-                ExitOrderName = orderName
-            });
+                _tradeHistory.Insert(0, new TradeHistoryItemState
+                {
+                    TradeNumber = active.TradeNumber,
+                    InstrumentName = active.InstrumentName,
+                    MarketPosition = active.MarketPosition,
+                    OrderQty = active.OrderQty,
+                    AccountName = active.AccountName,
+                    EntryTimeUtc = active.EntryTimeUtc,
+                    ExitTimeUtc = exitTimeUtc,
+                    EntryPrice = active.EntryPrice,
+                    ExitPrice = exitPrice,
+                    RealizedPnL = pnl,
+                    BracketUsed = active.BracketUsed,
+                    Outcome = outcome,
+                    IsMaster = active.IsMaster,
+                    BreakEvenApplied = active.BreakEvenApplied,
+                    BreakEvenKind = active.BreakEvenKind,
+                    WasFlattenedManually = active.WasFlattenedManually,
+                    EntryOrderName = active.EntryOrderName,
+                    ExitOrderName = orderName
+                });
 
-            _activeTrades.Remove(key);
+                _activeTrades.Remove(key);
+            }
 
-            RefreshTradesPanel();
+            RequestTradesUiRefresh();
             SavePersistentUiState();
         }
 

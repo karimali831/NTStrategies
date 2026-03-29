@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Child = scroll
             };
 
-            RefreshTradesPanel();
+            RequestTradesUiRefresh();
             return _tradesPanelRoot;
         }
 
@@ -51,17 +51,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var g = CreateTableRowGrid(new Thickness(0, 0, 0, 6));
             g.Background = TableHeaderBrush();
 
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });   // #
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });  // Instrument
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // Side
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });   // Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });  // Account
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(135) });  // Entry
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(135) });  // Exit
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });   // PnL
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });  // Bracket
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Outcome
-
+            CreateColumnDefinitions(g);
             AddTradesHeaderCell(g, "#", 0);
             AddTradesHeaderCell(g, "Instrument", 1);
             AddTradesHeaderCell(g, "Side", 2);
@@ -69,7 +59,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             AddTradesHeaderCell(g, "Account", 4);
             AddTradesHeaderCell(g, "Entry", 5);
             AddTradesHeaderCell(g, "Exit", 6);
-            AddTradesHeaderCell(g, "PnL", 7);
+            AddTradesHeaderCell(g, "Profit", 7);
             AddTradesHeaderCell(g, "Bracket", 8);
             AddTradesHeaderCell(g, "Outcome", 9);
 
@@ -83,6 +73,20 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             g.Children.Add(tb);
         }
 
+        private static void CreateColumnDefinitions(Grid g)
+        {
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });   // #
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });  // Instrument
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });   // Side
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });   // Qty
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });  // Entry
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });  // Exit
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // PnL
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Bracket
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });  // Outcome
+        }
+
         private void RefreshTradesPanel()
         {
             if (_tradesRowsHost == null)
@@ -90,21 +94,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             _tradesRowsHost.Children.Clear();
 
-            if (_tradeHistory.Count == 0)
+            System.Collections.Generic.List<TradeHistoryItemState> ordered;
+            lock (_tradeGate)
             {
-                _tradesRowsHost.Children.Add(new TextBlock
+                if (_tradeHistory.Count == 0)
                 {
-                    Text = "No completed trades yet.",
-                    Margin = new Thickness(6, 8, 6, 8),
-                    Foreground = MutedForegroundBrush()
-                });
-                return;
-            }
+                    _tradesRowsHost.Children.Add(new TextBlock
+                    {
+                        Text = "No completed trades yet.",
+                        Margin = new Thickness(6, 8, 6, 8),
+                        Foreground = MutedForegroundBrush()
+                    });
+                    return;
+                }
 
-            var ordered = _tradeHistory
-                .OrderByDescending(x => x.IsMaster)
-                .ThenByDescending(x => x.TradeNumber)
-                .ToList();
+                ordered = _tradeHistory
+                    .OrderByDescending(x => x.IsMaster)
+                    .ThenByDescending(x => x.TradeNumber)
+                    .ToList();
+            }
 
             var rowIndex = 0;
             foreach (var t in ordered)
@@ -112,17 +120,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var row = CreateTableRowGrid(new Thickness(0, 0, 0, 4));
                 row.Background = GetFollowerRowBackgroundBrush(rowIndex);
 
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(135) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(135) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-
+                CreateColumnDefinitions(row);
                 AddTradesCell(row, t.TradeNumber.ToString(), 0);
                 AddTradesCell(row, t.InstrumentName, 1);
                 AddTradesCell(row, t.MarketPosition, 2);
@@ -130,7 +128,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 AddTradesCell(row, t.AccountName, 4);
                 AddTradesCell(row, ToLocalTradeTime(t.EntryTimeUtc), 5);
                 AddTradesCell(row, t.ExitTimeUtc.HasValue ? ToLocalTradeTime(t.ExitTimeUtc.Value) : "", 6);
-                AddTradesCell(row, t.RealizedPnL.ToString("0.00"), 7, GetTradePnlBrush(t.RealizedPnL));
+                AddTradesCell(row, FmtUsd(t.RealizedPnL), 7, GetTradePnlBrush(t.RealizedPnL));
                 AddTradesCell(row, t.BracketUsed, 8);
                 AddTradesCell(row, t.Outcome, 9);
 

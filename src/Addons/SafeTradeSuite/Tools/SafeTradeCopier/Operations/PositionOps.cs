@@ -276,7 +276,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderFollowerRowsState();
             RefreshFollowerBulkActionButtons();
             RefreshCopierStatusPanel();
-            SavePersistentUiState();
+            // SavePersistentUiState();
 
             if (!HasAnyOpenPositionOnActiveInstrument())
                 return;

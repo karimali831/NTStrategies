@@ -118,7 +118,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Persist\Persist.Trades.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\Risk\RiskEvaluator.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\PnLTrackerService.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\TradeService.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Services\TradeTrackerService.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Tool.Window.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Core.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Engine\Engine.Risk.cs" />
