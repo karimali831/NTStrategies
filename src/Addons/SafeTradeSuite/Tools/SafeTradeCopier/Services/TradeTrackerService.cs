@@ -13,6 +13,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             var display = _uiDispatcher ?? _window?.Dispatcher;
             display?.InvokeAsync(RefreshTradesPanel, DispatcherPriority.Background);
         }
+
+        private void DisarmCopier()
+        {
+            RequestDisarmed("Protection triggered");
+        }
         
         private void TrackEntryExecution(Account acc, Execution execution, bool isMaster, string bracketUsed)
         {

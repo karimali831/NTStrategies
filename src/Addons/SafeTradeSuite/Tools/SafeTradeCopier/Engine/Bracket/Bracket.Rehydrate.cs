@@ -50,7 +50,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                                     if (o?.Instrument == null)
                                         continue;
 
-                                    if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                                    if (!IsSameInstrument(o.Instrument, instr))
                                         continue;
 
                                     var isLive =

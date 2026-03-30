@@ -9,40 +9,47 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
-            internal static bool HasWorkingBracketOrders(Account acc, Instrument instr)
+            internal bool HasWorkingBracketOrders(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
                     return false;
-                
-                foreach (var o in acc.Orders)
+
+                try
                 {
-                    if (o?.Instrument == null)
-                        continue;
+                    var specFound = TryGetActiveBracketSpec(acc, instr, out var spec) && spec != null;
+                    var stop = specFound ? FindWorkingManagedStop(acc, instr, spec) : FindAnyWorkingManagedStop(acc, instr);
+                    var target = specFound ? FindWorkingManagedTarget(acc, instr, spec) : FindAnyWorkingManagedTarget(acc, instr);
 
-                    if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
-                        continue;
+                    var hasStop = stop != null;
+                    var hasTarget = target != null;
+                    var result = hasStop || hasTarget;
 
-                    var isWorking =
-                        o.OrderState == OrderState.Working ||
-                        o.OrderState == OrderState.Accepted ||
-                        o.OrderState == OrderState.Submitted ||
-                        o.OrderState == OrderState.PartFilled;
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[HAS WORKING RESULT] acc={acc.Name} instr={instr.FullName} " +
+                        $"specFound={specFound} oco={spec?.StopOco ?? ""} " +
+                        $"hasStop={hasStop} stopName={(stop?.Name ?? "")} stopState={(stop?.OrderState.ToString() ?? "")} " +
+                        $"hasTarget={hasTarget} targetName={(target?.Name ?? "")} targetState={(target?.OrderState.ToString() ?? "")} " +
+                        $"result={result}");
 
-                    if (!isWorking)
-                        continue;
-
-                    var name = (o.Name ?? "").Trim();
-
-                    if (name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
-                        name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("Stop1", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("Target1", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
+                    return result;
                 }
-                
-                return false;
+                catch (Exception ex)
+                {
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[HAS WORKING ERROR] acc={acc?.Name} instr={instr?.FullName} msg={ex.Message}");
+                    return false;
+                }
+            }
+
+            private static bool IsWorking(Order o)
+            {
+                return
+                    o.OrderState == OrderState.Working ||
+                    o.OrderState == OrderState.Accepted ||
+                    o.OrderState == OrderState.Submitted ||
+                    o.OrderState == OrderState.PartFilled ||
+                    o.OrderState == OrderState.ChangePending ||
+                    o.OrderState == OrderState.ChangeSubmitted;
             }
             
             private bool HasWorkingEntryOrders(Account acc, Instrument instr)
@@ -55,22 +62,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (o?.Instrument == null)
                         continue;
 
-                    if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    if (!IsSameInstrument(o.Instrument, instr))
                         continue;
 
-                    var isWorking =
-                        o.OrderState == OrderState.Working ||
-                        o.OrderState == OrderState.Accepted ||
-                        o.OrderState == OrderState.Submitted ||
-                        o.OrderState == OrderState.PartFilled ||
-                        o.OrderState == OrderState.Initialized;
+                    var isWorkingEntry = IsWorking(o) || o.OrderState == OrderState.Initialized;
 
-                    if (!isWorking)
+                    if (!isWorkingEntry)
                         continue;
 
                     var name = (o.Name ?? "").Trim();
                     if (name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                         return true;
+                }
+
+                return false;
+            }
+            
+            private bool HasWorkingManagedExitOrder(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return false;
+
+                foreach (var o in acc.Orders)
+                {
+                    if (o?.Instrument == null)
+                        continue;
+
+                    if (!IsSameInstrument(o.Instrument, instr))
+                        continue;
+
+                    if (!IsWorking(o))
+                        continue;
+
+                    var name = (o.Name ?? "").Trim();
+
+                    if (name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
                 }
 
                 return false;
@@ -90,16 +121,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         if (o?.Instrument == null)
                             continue;
 
-                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                        if (!IsSameInstrument(o.Instrument, instr))
                             continue;
 
-                        if (o.OrderState == OrderState.Working ||
-                            o.OrderState == OrderState.Accepted ||
-                            o.OrderState == OrderState.Submitted ||
-                            o.OrderState == OrderState.PartFilled)
-                        {
+                        if (IsWorking(o))
                             result.Add(o);
-                        }
                     }
                 }
                 catch (Exception ex)
@@ -111,7 +137,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return result;
             }
             
-            private static List<Instrument> CollectActiveInstruments(Account acc)
+            private List<Instrument> CollectActiveInstruments(Account acc)
             {
                 var result = new Dictionary<string, Instrument>(StringComparer.Ordinal);
 
@@ -137,13 +163,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (o?.Instrument == null)
                         continue;
 
-                    var isWorking =
-                        o.OrderState == OrderState.Working ||
-                        o.OrderState == OrderState.Accepted ||
-                        o.OrderState == OrderState.Submitted ||
-                        o.OrderState == OrderState.PartFilled;
-
-                    if (!isWorking)
+                    if (!IsWorking(o))
                         continue;
 
                     var key = o.Instrument.FullName ?? "";
@@ -152,6 +172,136 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 
                 return result.Values.ToList();
+            }
+            
+            private Order FindWorkingManagedStop(Account acc, Instrument instr, ActiveBracketSpec spec)
+            {
+                if (acc == null || instr == null || spec == null)
+                    return null;
+                
+                var requireOco = !string.IsNullOrWhiteSpace(spec.StopOco);
+
+                foreach (var o in acc.Orders)
+                {
+                    if (o?.Instrument == null)
+                        continue;
+
+                    if (!IsSameInstrument(o.Instrument, instr))
+                        continue;
+
+                    if (!IsWorking(o))
+                        continue;
+
+                    var name = (o.Name ?? "").Trim();
+                    if (!name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var oco = (o.Oco ?? "").Trim();
+
+                    if (requireOco)
+                    {
+                        if (string.Equals(oco, spec.StopOco, StringComparison.Ordinal))
+                            return o;
+
+                        continue;
+                    }
+
+                    return o;
+                }
+                
+                return null;
+            }
+            
+            private Order FindAnyWorkingManagedStop(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return null;
+
+                try
+                {
+                    foreach (var o in acc.Orders)
+                    {
+                        if (o?.Instrument == null)
+                            continue;
+
+                        if (!IsSameInstrument(o.Instrument, instr))
+                            continue;
+                        
+                        if (!IsWorking(o))
+                            continue;
+
+                        var name = (o.Name ?? "").Trim();
+                        if (name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase))
+                            return o;
+                    }
+                }
+                catch
+                {
+                }
+
+                return null;
+            }
+
+            private Order FindAnyWorkingManagedTarget(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return null;
+                
+                foreach (var o in acc.Orders)
+                {
+                    if (o?.Instrument == null)
+                        continue;
+
+                    if (!IsSameInstrument(o.Instrument, instr))
+                        continue;
+
+                    if (!IsWorking(o))
+                        continue;
+
+                    var name = (o.Name ?? "").Trim();
+                    if (name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase))
+                        return o;
+                }
+
+                return null;
+            }
+            
+            private Order FindWorkingManagedTarget(Account acc, Instrument instr, ActiveBracketSpec spec)
+            {
+                if (acc == null || instr == null || spec == null)
+                    return null;
+                
+                var requireOco = !string.IsNullOrWhiteSpace(spec.StopOco);
+
+                foreach (var o in acc.Orders)
+                {
+                    if (o?.Instrument == null)
+                        continue;
+
+                    if (!IsSameInstrument(o.Instrument, instr))
+                        continue;
+
+                    if (!IsWorking(o))
+                        continue;
+
+                    var name = (o.Name ?? "").Trim();
+                    if (!name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var oco = (o.Oco ?? "").Trim();
+
+                    if (requireOco)
+                    {
+                        if (string.Equals(oco, spec.StopOco, StringComparison.Ordinal))
+                            return o;
+
+                        continue;
+                    }
+
+                    return o;
+                }
+                
+                return null;
             }
         }
     }

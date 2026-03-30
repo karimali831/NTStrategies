@@ -13,14 +13,17 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             private readonly ConcurrentDictionary<string, byte> _flattenInFlight =
                 new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-            
+
             private static string FlattenKey(Account acc, Instrument instr)
             {
                 return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
             }
-            
+
             public void EnsureFlatInstrument(Account acc, Instrument instr, FlattenTriggerReason reason, string detail = null)
             {
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[ENSURE FLAT ENTER] acc={acc?.Name} instr={instr?.FullName} trigger={reason} reason={reason}");
+                
                 if (acc == null || instr == null)
                     return;
 
@@ -42,6 +45,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=already-in-flight");
                     return;
                 }
+
+                _owner?.MarkTradeFlattenIntent(acc, instr, reason, detail);
 
                 Task.Run(async () =>
                 {
@@ -84,39 +89,34 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
                 });
             }
-            
+
             private void FlattenInstrument(Account acc, Instrument instr, int pass)
             {
                 if (acc == null || instr == null)
                     return;
 
-                List<Order> orders;
+                List<Order> liveOrders;
                 try
                 {
-                    orders = acc.Orders?.ToList() ?? new List<Order>();
+                    liveOrders = GetRelevantOrdersForFlatten(acc, instr);
                 }
                 catch (Exception ex)
                 {
                     Log(
                         $"Flatten orders snapshot failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, msg={ex.Message}");
-                    orders = new List<Order>();
+                    liveOrders = new List<Order>();
                 }
 
-                var instrumentOrders = orders
-                    .Where(o => o?.Instrument != null &&
-                                string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
-                    .ToList();
-
-                foreach (var o in instrumentOrders)
+                if (liveOrders.Count > 0)
                 {
                     Log(
-                        $"Flatten inspect order -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                        $"name={o.Name}, signal={o.Name}, state={o.OrderState}, qty={o.Quantity}");
+                        $"Flatten snapshot -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                        $"liveOrders={liveOrders.Count}");
                 }
 
                 try
                 {
-                    var cancellable = instrumentOrders
+                    var cancellable = liveOrders
                         .Where(o =>
                             o.OrderState == OrderState.Working ||
                             o.OrderState == OrderState.Accepted ||
@@ -127,8 +127,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (cancellable.Length > 0)
                     {
                         acc.Cancel(cancellable);
+
+                        var summary = string.Join(
+                            ", ",
+                            cancellable.Select(o =>
+                                $"{(o.Name ?? "").Trim()}:{o.OrderState}:qty={o.Quantity}"));
+
                         Log(
-                            $"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, count={cancellable.Length}");
+                            $"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                            $"count={cancellable.Length}, orders=[{summary}]");
                     }
                 }
                 catch (Exception ex)
@@ -180,6 +187,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         $"Flatten market submit failed -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
                         $"msg={ex.Message}");
                 }
+            }
+
+            private static List<Order> GetRelevantOrdersForFlatten(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return new List<Order>();
+
+                var orders = acc.Orders?.ToList() ?? new List<Order>();
+
+                return orders
+                    .Where(o => o?.Instrument != null)
+                    .Where(o => IsSameInstrument(o.Instrument, instr))
+                    .Where(o =>
+                        o.OrderState == OrderState.Working ||
+                        o.OrderState == OrderState.Accepted ||
+                        o.OrderState == OrderState.Submitted ||
+                        o.OrderState == OrderState.PartFilled)
+                    .ToList();
             }
 
             private void FlattenFollowersThatUseMasterExit(Instrument instr)

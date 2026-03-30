@@ -9,25 +9,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private static int GetNetPosition(Account acc, Instrument instr)
         {
-            if (acc == null || instr == null) return 0;
+            if (acc == null || instr == null)
+                return 0;
+
+            var net = 0;
 
             foreach (var p in acc.Positions)
             {
-                if (p?.Instrument == null) continue;
-                if (p.Instrument.FullName != instr.FullName) continue;
+                if (p?.Instrument == null)
+                    continue;
+
+                if (!ReferenceEquals(p.Instrument, instr))
+                    continue;
 
                 var qty = (int)Math.Round((double)p.Quantity, MidpointRounding.AwayFromZero);
-                if (p.MarketPosition == MarketPosition.Short)
-                    qty = -Math.Abs(qty);
-                else if (p.MarketPosition == MarketPosition.Long)
-                    qty = Math.Abs(qty);
-                else
-                    qty = 0;
 
-                return qty;
+                if (p.MarketPosition == MarketPosition.Short)
+                    net -= Math.Abs(qty);
+                else if (p.MarketPosition == MarketPosition.Long)
+                    net += Math.Abs(qty);
             }
 
-            return 0;
+            return net;
         }
         
         private void FreeTradeMasterSelected(SafeCopierEngine eng)

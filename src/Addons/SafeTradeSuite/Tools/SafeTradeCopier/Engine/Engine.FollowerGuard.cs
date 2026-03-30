@@ -75,6 +75,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 Log($"[GUARD] follower disabled -> {follower.Name} reason={reason}");
+
+                _owner?.DisarmCopier();
             }
 
             private bool IsFollowerGuardDisabled(Account follower)

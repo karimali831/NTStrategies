@@ -107,7 +107,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!CanRequestArmedForActiveSession(out var blockReason))
             {
                 _activeInstrumentSession.IsArmedRequested = true;
-                RenderButtons();
+                RenderCopierButton();
                 RefreshCopierStatusPanel();
 
                 if (!string.IsNullOrWhiteSpace(blockReason))
@@ -121,7 +121,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             ApplyConfigFromUi();
             _engine.SetCopyEnabled(true);
 
-            RenderButtons();
+            RenderCopierButton();
             RefreshCopierStatusPanel();
 
             if (!string.IsNullOrWhiteSpace(reason))
@@ -141,7 +141,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!string.IsNullOrWhiteSpace(reason))
                 _engine.Log(reason);
 
-            RenderButtons();
+            RenderCopierButton();
             // RefreshInstrumentTabs();
             RefreshCopierStatusPanel();
         }

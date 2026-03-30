@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             return host;
         }
  
-        private void RenderButtons()
+        private void RenderCopierButton()
         {
             if (_btnCopyOn == null)
                 return;

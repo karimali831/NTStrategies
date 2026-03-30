@@ -20,8 +20,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     order.OrderState != OrderState.Cancelled)
                     return;
 
+                var hasPosition =
+                    TryGetLivePosition(order.Account, order.Instrument, out _, out var absQty) &&
+                    absQty > 0;
+
+                if (hasPosition)
+                {
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[SYNC] ENTRY CLEANUP SKIPPED (position exists) acc={order.Account?.Name} " +
+                        $"instr={order.Instrument?.FullName} entry={name}");
+
+                    return;
+                }
+
                 RemovePendingBracketForEntry(name);
-                Log($"[SYNC] ENTRY CLEARED acc={order.Account?.Name} instr={order.Instrument?.FullName} state={order.OrderState}");
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[SYNC] ENTRY CLEARED acc={order.Account?.Name} instr={order.Instrument?.FullName} state={order.OrderState}");
             }
 
             private bool HasPendingBracketForEntry(string entryName)
@@ -47,7 +62,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         if (o?.Instrument == null)
                             continue;
 
-                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                        if (!IsSameInstrument(o.Instrument, instr))
                             continue;
 
                         var name = (o.Name ?? "").Trim();
@@ -129,6 +144,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (kv.Value < cutoff)
                         _seen.TryRemove(kv.Key, out _);
                 }
+            }
+            
+            private static bool IsSameInstrument(Instrument a, Instrument b)
+            {
+                if (a == null || b == null)
+                    return false;
+
+                // Fast path (best case)
+                if (ReferenceEquals(a, b))
+                    return true;
+
+                // Fallback (safety)
+                return string.Equals(a.FullName, b.FullName, StringComparison.Ordinal);
             }
 
             private bool FollowerUsesMasterExit(Account follower)

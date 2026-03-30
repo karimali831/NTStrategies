@@ -15,9 +15,22 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (acc == null || instr == null)
                     return;
 
-                Log($"[RISK PROTECT] flatten -> acc={acc.Name} instr={instr.FullName} reason={reason}");
+                var isMaster = _master != null && ReferenceEquals(acc, _master);
 
-                if (_master != null && ReferenceEquals(acc, _master))
+                Log($"[RISK PROTECT] flatten -> acc={acc.Name} instr={instr.FullName} reason={reason} isMaster={isMaster}");
+
+                if (!isMaster)
+                    DisableFollower(acc, reason);
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[RISK PROTECT CALL FLATTEN] acc={acc.Name} instr={instr.FullName} reason={reason}");
+
+                EnsureFlatInstrument(acc, instr, FlattenTriggerReason.RiskProtection, reason);
+
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[RISK PROTECT FLATTEN RETURNED] acc={acc.Name} instr={instr.FullName}");
+
+                if (isMaster)
                 {
                     lock (_gate)
                     {
@@ -26,13 +39,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         RaiseModeChanged_NoLock();
                         RaiseReady_NoLock(reasonOverride: reason);
                     }
-                }
-                else
-                {
-                    DisableFollower(acc, reason);
-                }
 
-                EnsureFlatInstrument(acc, instr, FlattenTriggerReason.RiskProtection, reason);
+                    _owner?.DisarmCopier();
+                }
             }
             
             public void UpdateRiskProtectionSettings(

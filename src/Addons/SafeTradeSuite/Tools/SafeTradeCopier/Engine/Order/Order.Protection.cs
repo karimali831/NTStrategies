@@ -20,16 +20,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     if (o?.Instrument == null)
                         continue;
 
-                    if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                    if (!IsSameInstrument(o.Instrument, instr))
                         continue;
 
-                    var isWorking =
-                        o.OrderState == OrderState.Working ||
-                        o.OrderState == OrderState.Accepted ||
-                        o.OrderState == OrderState.Submitted ||
-                        o.OrderState == OrderState.PartFilled;
-
-                    if (!isWorking)
+                    if (!IsWorking(o))
                         continue;
 
                     var name = (o.Name ?? "").Trim();

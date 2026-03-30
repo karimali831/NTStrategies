@@ -264,7 +264,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     double avgEntryPrice;
                     bool shouldSubmitInitialBracket;
                     bool shouldResizeWorkingBracket;
-                    string existingOco;
 
                     lock (_gate)
                     {
@@ -288,8 +287,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         if (shouldSubmitInitialBracket)
                             pb.BracketSubmitted = true;
 
-                        existingOco = pb.BracketOco;
-
                         shouldResizeWorkingBracket =
                             pb.BracketSubmitted &&
                             !shouldSubmitInitialBracket &&
@@ -308,7 +305,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
                         var exitAction = pbIsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                        var orders = new System.Collections.Generic.List<Order>(2);
+                        var orders = new List<Order>(2);
 
                         var stopPrice = 0.0;
                         var targetPrice = 0.0;
@@ -415,6 +412,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         if (TryGetActiveBracketSpec(account, instr, out var spec) && spec != null)
                         {
+                            SafeTradeSuiteRuntime.PrintLog(
+                                $"[BRACKET RESIZE PATH] acc={account.Name} instr={instr.FullName} entry={entryName} " +
+                                $"currentSpecQty={spec.Qty} newQty={totalFilledQty} currentEntry={spec.EntryPrice:0.00} newEntry={avgEntryPrice:0.00} oco={spec.StopOco}");
+
                             try
                             {
                                 ResizeAndRepriceWorkingBracket(account, instr, spec, totalFilledQty, avgEntryPrice);
@@ -423,6 +424,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                             {
                                 Log($"[BRACKET RESIZE FAILED] acc={account.Name} instr={instr.FullName} msg={ex.Message}");
                             }
+                        }
+                        else
+                        {
+                            Log(
+                                $"[BRACKET RESIZE SKIPPED] acc={account.Name} instr={instr.FullName} entry={entryName} " +
+                                $"reason=no-active-spec totalFilledQty={totalFilledQty} avgEntry={avgEntryPrice:0.00}");
                         }
                     }
 
@@ -442,7 +449,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 catch (Exception ex)
                 {
                     LogUnhandled("TrySubmitBracketOnFill", ex);
-                    throw;
+                    return;
                 }
             }
 
@@ -475,18 +482,36 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 lock (_gate)
                 {
-                    _pendingBrackets[entryName] = new PendingBracket
+                    if (_pendingBrackets.TryGetValue(entryName, out var existing) && existing != null)
                     {
-                        EntryName = entryName,
-                        OriginalQty = Math.Max(1, qty),
-                        IsBuy = action == OrderAction.Buy,
-                        StopTicks = Math.Max(0, stopTicks),
-                        TargetTicks = Math.Max(0, targetTicks),
-                        FilledQty = 0,
-                        EntryValueSum = 0.0,
-                        BracketSubmitted = false,
-                        BracketOco = null
-                    };
+                        existing.OriginalQty += Math.Max(1, qty);
+                        existing.StopTicks = Math.Max(0, stopTicks);
+                        existing.TargetTicks = Math.Max(0, targetTicks);
+                        existing.IsBuy = action == OrderAction.Buy;
+
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[FOLLOWER PENDING UPSERT] entry={entryName} addQty={qty} originalQty={existing.OriginalQty} " +
+                            $"filledQty={existing.FilledQty} stopTicks={existing.StopTicks} targetTicks={existing.TargetTicks}");
+                    }
+                    else
+                    {
+                        _pendingBrackets[entryName] = new PendingBracket
+                        {
+                            EntryName = entryName,
+                            OriginalQty = Math.Max(1, qty),
+                            IsBuy = action == OrderAction.Buy,
+                            StopTicks = Math.Max(0, stopTicks),
+                            TargetTicks = Math.Max(0, targetTicks),
+                            FilledQty = 0,
+                            EntryValueSum = 0.0,
+                            BracketSubmitted = false,
+                            BracketOco = null
+                        };
+
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[FOLLOWER PENDING NEW] entry={entryName} originalQty={Math.Max(1, qty)} " +
+                            $"stopTicks={Math.Max(0, stopTicks)} targetTicks={Math.Max(0, targetTicks)}");
+                    }
                 }
 
                 Log($"Follower submit -> {acc.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");

@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -65,11 +63,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (!Armed || !_isRequested)
                     return;
-
-                var execId = e.Execution.ExecutionId ?? "";
-                if (string.IsNullOrWhiteSpace(execId))
-                    execId = $"{e.Execution.Time.Ticks}_{e.Execution.Price}_{e.Execution.Quantity}_{e.Execution.MarketPosition}";
-
+                
                 if (!AllowCopyNow())
                 {
                     lock (_gate)
@@ -82,28 +76,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
-                var masterExecQty = (int)Math.Round((double)e.Execution.Quantity, MidpointRounding.AwayFromZero);
-                masterExecQty = Math.Abs(masterExecQty);
-                if (masterExecQty <= 0) return;
-
-                var followerAction = e.Execution.Order?.OrderAction ?? OrderAction.Buy;
-
-                CancellationToken token;
-                lock (_gate)
-                    token = _cts.Token;
-
-                Task.Run(async () =>
-                {
-                    await _submitLock.WaitAsync(token).ConfigureAwait(false);
-                    try
-                    {
-                        await CopyToFollowers(execId, followerAction, masterExecQty, token).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        _submitLock.Release();
-                    }
-                }, token);
+                ProcessMasterEntryAggregate(e.Execution);
             }
 
             private static bool IsStcEntryExecution(Order ord)
@@ -146,42 +119,81 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private void OnFollowerExecution(object sender, ExecutionEventArgs e)
             {
-                if (e?.Execution == null) return;
+                if (e?.Execution == null)
+                    return;
 
-                // Only manage brackets for the instrument we’re operating on
-                if (_instrument == null) return;
+                if (_instrument == null)
+                    return;
+
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
 
                 var acc = e.Execution.Account;
-                if (acc == null) return;
+                if (acc == null)
+                    return;
 
                 HandleBracketExitOutcome(acc, e.Execution);
                 _owner?.TryTrackTradeExitFromExecution(acc, e.Execution);
 
-                // Brackets only submit if there's a pending entry name for this fill.
                 SafeTradeSuiteRuntime.PrintLog(
                     $"[FOLLOWER EXEC -> TRY BRACKET] name={e.Execution?.Order?.Name}");
-                
+
                 var orderName = (e.Execution?.Order?.Name ?? "").Trim();
-                if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase) &&
-                    e.Execution?.Order != null)
+                if (!orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase) || e.Execution.Order == null)
+                    return;
+
+                _owner?.TrackEntryExecution(
+                    acc,
+                    e.Execution,
+                    isMaster: false,
+                    bracketUsed: ResolveFollowerBracket(acc));
+
+                if (e.Execution.Order.OrderState != OrderState.PartFilled &&
+                    e.Execution.Order.OrderState != OrderState.Filled)
+                    return;
+
+                Log(
+                    $"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} " +
+                    $"orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
+
+                var fillQty = Math.Abs((int)Math.Round((double)e.Execution.Quantity, MidpointRounding.AwayFromZero));
+                if (fillQty > 0 && TryGetFollowerEntryProgressByOrderName(orderName, out var progress) && progress != null)
                 {
-                    _owner?.TrackEntryExecution(
-                        acc,
-                        e.Execution,
-                        isMaster: false,
-                        bracketUsed: ResolveFollowerBracket(acc));
-
-                    if (e.Execution.Order.OrderState == OrderState.PartFilled ||
-                        e.Execution.Order.OrderState == OrderState.Filled)
+                    lock (_gate)
                     {
-                        Log($"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
-
-                        TrySubmitBracketOnFill(acc, e.Execution);
-                        MarkFollowerEntryResolved(acc);
-                        ResetFollowerDesync(acc);
+                        progress.FilledQty += fillQty;
+                        progress.LastUpdateUtc = DateTime.UtcNow;
                     }
+
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[FOLLOWER AGG] acc={acc.Name} entry={progress.MasterEntryName} orderName={progress.FollowerOrderName} " +
+                        $"filled={progress.FilledQty} requested={progress.RequestedQty}");
+                }
+
+                var bracketMode = ResolveFollowerBracket(acc);
+                var followMasterExit = FollowerUsesMasterExit(acc);
+                var hasOwnBracket =
+                    !string.IsNullOrWhiteSpace(bracketMode) &&
+                    !string.Equals(bracketMode, "None", StringComparison.OrdinalIgnoreCase) &&
+                    !followMasterExit;
+
+                if (hasOwnBracket)
+                    TrySubmitBracketOnFill(acc, e.Execution);
+
+                var shouldResolveGuard = false;
+                if (TryGetFollowerEntryProgressByOrderName(orderName, out progress) && progress != null)
+                {
+                    lock (_gate)
+                    {
+                        if (progress.RequestedQty > 0 && progress.FilledQty >= progress.RequestedQty)
+                            shouldResolveGuard = true;
+                    }
+                }
+
+                if (shouldResolveGuard)
+                {
+                    MarkFollowerEntryResolved(acc);
+                    ResetFollowerDesync(acc);
                 }
             }
         }

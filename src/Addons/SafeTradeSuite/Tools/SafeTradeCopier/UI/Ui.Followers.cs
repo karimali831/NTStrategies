@@ -334,7 +334,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             SyncEngineRequestedStateForActiveSession();
             
             RefreshCopierStatusPanel();
-            RenderButtons();
+            RenderCopierButton();
             RefreshFollowerBulkActionButtons();
         }
         

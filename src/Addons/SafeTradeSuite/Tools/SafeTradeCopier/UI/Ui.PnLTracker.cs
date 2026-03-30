@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             _engine.TryGetActiveBracketSpec(account, instr, out var spec);
 
             var hasOpenPosition = TryGetInstrumentUnrealized(account, instr, out var uTmp, out var qTmp);
-            var hasLiveBracket = spec != null && SafeCopierEngine.HasWorkingBracketOrders(account, instr);
+            var hasLiveBracket = spec != null && _engine.HasWorkingBracketOrders(account, instr);
 
             if (hasOpenPosition && hasLiveBracket)
             {

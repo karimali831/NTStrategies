@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     display.InvokeAsync(() =>
                     {
                         RefreshCopierStatusPanel();
-                        RenderButtons();
+                        RenderCopierButton();
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
@@ -142,7 +142,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     display.InvokeAsync(() =>
                     {
                         RefreshCopierStatusPanel();
-                        RenderButtons();
+                        RenderCopierButton();
                         RenderFollowerRowsState();
                         RenderMasterSubmitButtonsState();
                     }, DispatcherPriority.Background);
@@ -179,7 +179,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
 
                 // ---------------- UI -> Engine wiring ----------------
-                RenderButtons();
+                RenderCopierButton();
                 RefreshCopierStatusPanel();
                 
                 _topPanelsGrid = topPanelsGrid;

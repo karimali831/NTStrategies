@@ -15,7 +15,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_instrument == null)
                     return;
 
-                if (e.Order.Instrument == null || e.Order.Instrument.FullName != _instrument.FullName)
+                if (e.Order.Instrument == null || !IsSameInstrument(e.Order.Instrument, _instrument))
                     return;
 
                 var name = (e.Order.Name ?? "").Trim();
@@ -38,11 +38,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var name = (e.Order.Name ?? "").Trim();
                 if (!name.StartsWith("STC:", StringComparison.OrdinalIgnoreCase))
                     return;
+                
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[FOLLOWER ORDER UPDATE] acc={e.Order?.Account?.Name} " +
+                    $"name={(e.Order?.Name ?? "").Trim()} " +
+                    $"state={e.Order?.OrderState} " +
+                    $"instr={e.Order?.Instrument?.FullName} " +
+                    $"oco={(e.Order?.Oco ?? "").Trim()} " +
+                    $"qty={e.Order?.Quantity}");
 
                 HandlePendingEntryCleanup(e.Order);
                 SyncBracketFromOrderUpdate(e.Order);
 
-                var acc = e.Order.Account;
+                var acc = e.Order?.Account;
                 if (acc != null && name.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
                 {
                     FollowerGuard settings;
@@ -51,6 +59,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     if (e.Order.OrderState == OrderState.Rejected)
                     {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[FOLLOWER ENTRY RESOLVE] acc={acc.Name} name={name} reason=rejected");
+
                         MarkFollowerEntryResolved(acc);
                         ApplyGuardAction(
                             acc,
@@ -61,7 +72,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     }
 
                     if (e.Order.OrderState == OrderState.Cancelled)
-                        MarkFollowerEntryResolved(acc);
+                    {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[FOLLOWER ENTRY CANCELLED] acc={acc.Name} name={name} " +
+                            $"hasWorkingEntry={HasWorkingEntryOrders(acc, e.Order.Instrument)}");
+
+                        if (!HasWorkingEntryOrders(acc, e.Order.Instrument))
+                            MarkFollowerEntryResolved(acc);
+                    }
                 }
             }
         }
