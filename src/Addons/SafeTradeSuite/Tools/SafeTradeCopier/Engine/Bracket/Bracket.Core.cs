@@ -21,155 +21,159 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return (acc?.Name ?? "") + "|" + (instr?.FullName ?? "");
             }
             
-        private void ResizeAndRepriceWorkingBracket(
-            Account acc,
-            Instrument instr,
-            ActiveBracketSpec spec,
-            int newQty,
-            double avgEntryPrice)
-        {
-            if (acc == null || instr == null || spec == null)
-                return;
-
-            var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
-            if (tickSize <= 0)
-                return;
-
-            var newStopPrice = 0.0;
-            var newTargetPrice = 0.0;
-
-            if (spec.StopTicks > 0)
+            private void ResizeAndRepriceWorkingBracket(
+                Account acc,
+                Instrument instr,
+                ActiveBracketSpec spec,
+                int newQty,
+                double avgEntryPrice)
             {
-                newStopPrice = spec.IsBuy
-                    ? avgEntryPrice - spec.StopTicks * tickSize
-                    : avgEntryPrice + spec.StopTicks * tickSize;
+                if (acc == null || instr == null || spec == null)
+                    return;
 
-                newStopPrice = RoundToTick(newStopPrice, tickSize);
-            }
+                var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
+                if (tickSize <= 0)
+                    return;
 
-            if (spec.TargetTicks > 0)
-            {
-                newTargetPrice = spec.IsBuy
-                    ? avgEntryPrice + spec.TargetTicks * tickSize
-                    : avgEntryPrice - spec.TargetTicks * tickSize;
-
-                newTargetPrice = RoundToTick(newTargetPrice, tickSize);
-            }
-
-            Log(
-                $"[BRACKET RESIZE PATH] acc={acc.Name} instr={instr.FullName} " +
-                $"currentSpecQty={spec.Qty} newQty={newQty} currentEntry={spec.EntryPrice:0.00} " +
-                $"newEntry={avgEntryPrice:0.00} oco={spec.StopOco}");
-
-            var stop = FindWorkingManagedStop(acc, instr, spec);
-            var target = FindWorkingManagedTarget(acc, instr, spec);
-
-            Log(
-                $"[BRACKET RESIZE PATH] acc={acc.Name} instr={instr.FullName} " +
-                $"stopFound={(stop != null)} targetFound={(target != null)} " +
-                $"newStop={newStopPrice:0.00} newTarget={newTargetPrice:0.00}");
-
-            // If we cannot find the live managed orders, do NOT leave a stale partial bracket in place.
-            // Rebuild a fresh protective bracket for the full live quantity.
-            if ((spec.StopTicks > 0 && stop == null) || (spec.TargetTicks > 0 && target == null))
-            {
-                Log(
-                    $"[BRACKET RESIZE FAILURE] acc={acc.Name} instr={instr.FullName} " +
-                    $"reason=missing-live-orders qty={newQty} avgEntry={avgEntryPrice:0.00}");
-
-                DumpLiveOrders(acc, instr, spec, newQty);
-
-                // DO NOT rebuild here — let watchdog handle safety
-                return;
-            }
-
-            var changes = new List<Order>();
-
-            if (stop != null && spec.StopTicks > 0)
-            {
-                stop.QuantityChanged = newQty;
-                stop.StopPriceChanged = newStopPrice;
-                changes.Add(stop);
-            }
-
-            if (target != null && spec.TargetTicks > 0)
-            {
-                target.QuantityChanged = newQty;
-                target.LimitPriceChanged = newTargetPrice;
-                changes.Add(target);
-            }
-
-            if (changes.Count == 0)
-                return;
-
-            acc.Change(changes.ToArray());
-
-            UpdateActiveBracketSpec(acc, instr, x =>
-            {
-                x.Qty = newQty;
-                x.EntryFilledQty = newQty;
-                x.EntryValueSum = avgEntryPrice * newQty;
-                x.EntryPrice = avgEntryPrice;
+                var newStopPrice = 0.0;
+                var newTargetPrice = 0.0;
 
                 if (spec.StopTicks > 0)
                 {
-                    x.OriginalStopPrice = newStopPrice;
-                    x.CurrentStopPrice = newStopPrice;
+                    newStopPrice = spec.IsBuy
+                        ? avgEntryPrice - spec.StopTicks * tickSize
+                        : avgEntryPrice + spec.StopTicks * tickSize;
+
+                    newStopPrice = RoundToTick(newStopPrice, tickSize);
                 }
 
                 if (spec.TargetTicks > 0)
-                    x.TargetPrice = newTargetPrice;
-            });
+                {
+                    newTargetPrice = spec.IsBuy
+                        ? avgEntryPrice + spec.TargetTicks * tickSize
+                        : avgEntryPrice - spec.TargetTicks * tickSize;
 
-            Log(
-                $"[BRACKET RESIZE] acc={acc.Name} instr={instr.FullName} qty={newQty} " +
-                $"avgEntry={avgEntryPrice:0.00} stop={newStopPrice:0.00} target={newTargetPrice:0.00}");
-        }
-        
-        private void DumpLiveOrders(
-            Account acc,
-            Instrument instr,
-            ActiveBracketSpec spec,
-            int expectedQty)
-        {
-            try
-            {
-                var orders = acc.Orders
-                    .Where(o => o?.Instrument != null &&
-                                IsSameInstrument(o.Instrument, instr))
-                    .ToList();
+                    newTargetPrice = RoundToTick(newTargetPrice, tickSize);
+                }
 
-                Log($"[ORDER DUMP] acc={acc.Name} instr={instr.FullName} expectedQty={expectedQty} specOco={spec?.StopOco}");
+                Log(
+                    $"[BRACKET RESIZE PATH] acc={acc.Name} instr={instr.FullName} " +
+                    $"currentSpecQty={spec.Qty} newQty={newQty} currentEntry={spec.EntryPrice:0.00} " +
+                    $"newEntry={avgEntryPrice:0.00} oco={spec.StopOco}");
 
-                foreach (var o in orders)
+                var stop = FindWorkingManagedStop(acc, instr, spec);
+                var target = FindWorkingManagedTarget(acc, instr, spec);
+
+                Log(
+                    $"[BRACKET RESIZE PATH] acc={acc.Name} instr={instr.FullName} " +
+                    $"stopFound={(stop != null)} targetFound={(target != null)} " +
+                    $"newStop={newStopPrice:0.00} newTarget={newTargetPrice:0.00}");
+
+                // If we cannot find the live managed orders, do NOT leave a stale partial bracket in place.
+                // Rebuild a fresh protective bracket for the full live quantity.
+                if ((spec.StopTicks > 0 && stop == null) || (spec.TargetTicks > 0 && target == null))
                 {
                     Log(
-                        $"[ORDER] name={o.Name} state={o.OrderState} qty={o.Quantity} " +
-                        $"oco={o.Oco} limit={o.LimitPrice:0.00} stop={o.StopPrice:0.00}");
+                        $"[BRACKET RESIZE FAILURE] acc={acc.Name} instr={instr.FullName} " +
+                        $"reason=missing-live-orders qty={newQty} avgEntry={avgEntryPrice:0.00}");
+
+                    DumpLiveOrders(acc, instr, spec, newQty);
+
+                    // DO NOT rebuild here — let watchdog handle safety
+                    return;
                 }
 
-                if (TryGetLivePosition(acc, instr, out var mp, out var liveQty))
+                var changes = new List<Order>();
+
+                if (stop != null && spec.StopTicks > 0)
                 {
-                    Log($"[POSITION] mp={mp} qty={liveQty}");
+                    stop.QuantityChanged = newQty;
+                    stop.StopPriceChanged = newStopPrice;
+                    changes.Add(stop);
                 }
-                else
+
+                if (target != null && spec.TargetTicks > 0)
                 {
-                    Log("[POSITION] none");
+                    target.QuantityChanged = newQty;
+                    target.LimitPriceChanged = newTargetPrice;
+                    changes.Add(target);
                 }
+
+                if (changes.Count == 0)
+                    return;
+
+                acc.Change(changes.ToArray());
+
+                UpdateActiveBracketSpec(acc, instr, x =>
+                {
+                    x.Qty = newQty;
+                    x.EntryFilledQty = newQty;
+                    x.EntryValueSum = avgEntryPrice * newQty;
+                    x.EntryPrice = avgEntryPrice;
+
+                    if (spec.StopTicks > 0)
+                    {
+                        x.OriginalStopPrice = newStopPrice;
+                        x.CurrentStopPrice = newStopPrice;
+                    }
+
+                    if (spec.TargetTicks > 0)
+                        x.TargetPrice = newTargetPrice;
+                });
+
+                Log(
+                    $"[BRACKET RESIZE] acc={acc.Name} instr={instr.FullName} qty={newQty} " +
+                    $"avgEntry={avgEntryPrice:0.00} stop={newStopPrice:0.00} target={newTargetPrice:0.00}");
             }
-            catch (Exception ex)
+        
+            private void DumpLiveOrders(
+                Account acc,
+                Instrument instr,
+                ActiveBracketSpec spec,
+                int expectedQty)
             {
-                Log($"[ORDER DUMP FAILED] {ex.Message}");
+                try
+                {
+                    var orders = acc.Orders
+                        .Where(o => o?.Instrument != null &&
+                                    IsSameInstrument(o.Instrument, instr))
+                        .ToList();
+
+                    Log($"[ORDER DUMP] acc={acc.Name} instr={instr.FullName} expectedQty={expectedQty} specOco={spec?.StopOco}");
+
+                    foreach (var o in orders)
+                    {
+                        Log(
+                            $"[ORDER] name={o.Name} state={o.OrderState} qty={o.Quantity} " +
+                            $"oco={o.Oco} limit={o.LimitPrice:0.00} stop={o.StopPrice:0.00}");
+                    }
+
+                    if (TryGetLivePosition(acc, instr, out var mp, out var liveQty))
+                    {
+                        Log($"[POSITION] mp={mp} qty={liveQty}");
+                    }
+                    else
+                    {
+                        Log("[POSITION] none");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[ORDER DUMP FAILED] {ex.Message}");
+                }
             }
-        }
 
             private void ClearActiveBracket(Account acc, Instrument instr)
             {
-                if (acc == null || instr == null) return;
+                if (acc == null || instr == null)
+                    return;
+
+                var key = BracketKey(acc, instr);
 
                 lock (_gate)
                 {
-                    _activeBracketByAccInstr.Remove(BracketKey(acc, instr));
+                    _activeBracketByAccInstr.Remove(key);
+                    _lastHasWorkingState.Remove(key);
                 }
             }
 
@@ -184,7 +188,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return _activeBracketByAccInstr.TryGetValue(BracketKey(acc, instr), out spec);
                 }
             }
-            
+                
             private void UpdateActiveBracketSpec(Account acc, Instrument instr, Action<ActiveBracketSpec> update)
             {
                 if (acc == null || instr == null || update == null)

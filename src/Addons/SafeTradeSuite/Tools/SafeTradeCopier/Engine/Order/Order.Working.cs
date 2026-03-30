@@ -9,6 +9,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         public partial class SafeCopierEngine
         {
+            private readonly Dictionary<string, bool> _lastHasWorkingState = new Dictionary<string, bool>();
+            
             internal bool HasWorkingBracketOrders(Account acc, Instrument instr)
             {
                 if (acc == null || instr == null)
@@ -22,15 +24,35 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     var hasStop = stop != null;
                     var hasTarget = target != null;
+
+                    // Keep this permissive for now because during partial fills / exchange transitions
+                    // there are valid moments where one side is present while the other is changing.
                     var result = hasStop || hasTarget;
 
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[HAS WORKING RESULT] acc={acc.Name} instr={instr.FullName} " +
-                        $"specFound={specFound} oco={spec?.StopOco ?? ""} " +
-                        $"hasStop={hasStop} stopName={(stop?.Name ?? "")} stopState={(stop?.OrderState.ToString() ?? "")} " +
-                        $"hasTarget={hasTarget} targetName={(target?.Name ?? "")} targetState={(target?.OrderState.ToString() ?? "")} " +
-                        $"result={result}");
+                    var pos = acc.Positions.FirstOrDefault(p => p?.Instrument != null && IsSameInstrument(p.Instrument, instr));
+                    var hasPosition = pos != null && Math.Abs(pos.Quantity) > 0;
 
+                    var key = $"{acc.Name}|{instr.FullName}";
+                    var prev = _lastHasWorkingState.TryGetValue(key, out var last) ? last : (bool?)null;
+
+                    if (prev == null || prev.Value != result)
+                    {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[HAS WORKING CHANGE] acc={acc.Name} instr={instr.FullName} " +
+                            $"hasPosition={hasPosition} posQty={(pos != null ? Math.Abs(pos.Quantity) : 0)} " +
+                            $"specFound={specFound} oco={spec?.StopOco ?? ""} " +
+                            $"hasStop={hasStop} stopName={(stop?.Name ?? "")} stopState={(stop != null ? stop.OrderState.ToString() : "")} " +
+                            $"hasTarget={hasTarget} targetName={(target?.Name ?? "")} targetState={(target != null ? target.OrderState.ToString() : "")} " +
+                            $"result={result}");
+                    }
+
+                    if (hasPosition && !result)
+                    {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[WARNING] Position open but NO working bracket! acc={acc.Name} instr={instr.FullName}");
+                    }
+
+                    _lastHasWorkingState[key] = result;
                     return result;
                 }
                 catch (Exception ex)
