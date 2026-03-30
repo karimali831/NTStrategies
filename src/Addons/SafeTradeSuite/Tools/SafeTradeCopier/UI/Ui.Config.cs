@@ -15,6 +15,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         private readonly Dictionary<string, double> _followerMaxDailyProfit = new Dictionary<string, double>(StringComparer.Ordinal);
         private readonly Dictionary<string, double> _followerMaxDailyLoss = new Dictionary<string, double>(StringComparer.Ordinal);
         
+        private void ApplyConfigFromUiAndRefresh()
+        {
+            if (_engine == null)
+                return;
+
+            ApplyConfigFromUi();
+            RenderFollowerRowsState();
+            RefreshCopierStatusPanel();
+            RefreshFollowerBulkActionButtons();
+            RefreshRiskFieldset();
+            RenderMasterSubmitButtonsState();
+            RenderFlattenEnablementUi();
+            RenderBreakEvenEnablementUi();
+        }
+        
         private void ApplyConfigFromUi()
         {
             if (_engine == null)

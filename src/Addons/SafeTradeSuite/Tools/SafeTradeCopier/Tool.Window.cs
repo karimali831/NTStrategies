@@ -96,7 +96,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         {
             _isClosing = false;
             _engine = new SafeCopierEngine(this);
+            
             LoadPersistentUiState();
+            _lastAppliedConfig = null;
 
             _window = new Window
             {
@@ -161,8 +163,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 EnsureInitialInstrumentSession();
                 RefreshInstrumentSelectorItems();
                 RefreshInstrumentTabs();
+
+                ApplyConfigFromUiAndRefresh();
                 Rehydrate();
-            }, DispatcherPriority.ApplicationIdle);
+            }, DispatcherPriority.Loaded);
         }
 
         private void CloseCurrentWindowForRebuild()
@@ -203,12 +207,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void Rehydrate()
         {
+            ApplyConfigFromUiAndRefresh();
+
             _engine?.RehydrateActiveBracketsFromLiveOrders();
             EnsureEnabledFollowersAndAutoRearmForOpenPositions();
+
             RenderFollowerRowsState();
             RefreshCopierStatusPanel();
-            // RenderFlattenMasterButtonState();
-            // RenderFlattenAllButtonState();
             RenderFlattenEnablementUi();
             RenderBreakEvenEnablementUi();
             RenderPnlUi();

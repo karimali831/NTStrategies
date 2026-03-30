@@ -111,7 +111,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 RequestArmed("Manual enable requested.");
             };
         }
-         
+        
         private UIElement BuildFollowersContent()
         {
             SafeTradeSuiteRuntime.PrintLog(
@@ -128,8 +128,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             WireFollowerFlattenButtons(_engine);
             WireFollowerFreeTradeButtons(_engine);
-            RefreshFollowerBulkActionButtons();
-            RefreshCopierStatusPanel();
+
+            ApplyConfigFromUiAndRefresh();
 
             return host;
         }
