@@ -32,7 +32,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     order.OrderAction == OrderAction.Buy ||
                     order.OrderAction == OrderAction.BuyToCover;
 
-                var qty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
+                var qty = Math.Abs((int)Math.Round((double)order.Quantity, MidpointRounding.AwayFromZero));
+                if (qty <= 0)
+                    qty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
+
                 if (qty <= 0)
                     qty = 1;
 
@@ -58,7 +61,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private void TryTrackTradeExitFromExecution(Account acc, Execution execution)
         {
-            if (acc == null || execution?.Order == null)
+            if (acc == null || execution?.Order == null || execution.Instrument == null)
                 return;
 
             var name = (execution.Order.Name ?? "").Trim();
@@ -70,7 +73,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!isExit)
                 return;
 
-            TryCloseTradeFromExecution(acc, execution);
+            AccumulateAndMaybeCloseTradeFromExecution(acc, execution);
         }
 
         private void MarkTradeBreakEvenApplied(Account acc, Instrument instr, bool isAuto)
@@ -124,7 +127,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             MarkTradeFlattenIntent(acc, instr, FlattenTriggerReason.ManualFlatten);
         }
 
-        private void TryCloseTradeFromExecution(Account acc, Execution execution)
+        private void AccumulateAndMaybeCloseTradeFromExecution(Account acc, Execution execution)
         {
             if (acc == null || execution?.Order == null || execution.Instrument == null)
                 return;
@@ -137,15 +140,46 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (!_activeTrades.TryGetValue(key, out active) || active == null)
                     return;
+
+                var exitQty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
+                if (exitQty <= 0)
+                    return;
+
+                active.ClosedQty += exitQty;
+                active.ExitValueSum += execution.Price * exitQty;
+                active.LastExitTimeUtc = execution.Time.ToUniversalTime();
+                active.LastExitOrderName = (execution.Order.Name ?? "").Trim();
+
+                if (active.ClosedQty < active.OrderQty)
+                    return;
             }
 
-            var orderName = (execution.Order.Name ?? "").Trim();
-            var exitPrice = execution.Price;
-            var exitTimeUtc = execution.Time.ToUniversalTime();
+            FinalizeTrackedTrade(acc, instr);
+        }
+        
+        private void FinalizeTrackedTrade(Account acc, Instrument instr)
+        {
+            if (acc == null || instr == null)
+                return;
 
-            var exitQty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
-            if (exitQty <= 0)
-                exitQty = active.OrderQty;
+            var key = TradeKey(acc, instr);
+
+            ActiveTradeRuntime active;
+            lock (_tradeGate)
+            {
+                if (!_activeTrades.TryGetValue(key, out active) || active == null)
+                    return;
+
+                _activeTrades.Remove(key);
+            }
+
+            var closedQty = Math.Max(1, active.OrderQty);
+            var avgExitPrice = active.ClosedQty > 0
+                ? active.ExitValueSum / active.ClosedQty
+                : active.EntryPrice;
+
+            var exitTimeUtc = active.LastExitTimeUtc ?? DateTime.UtcNow;
+            var exitOrderName = active.LastExitOrderName ?? "";
 
             var pointValue = instr.MasterInstrument?.PointValue ?? 0.0;
             var pnl = 0.0;
@@ -153,11 +187,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (pointValue > 0)
             {
                 pnl = string.Equals(active.MarketPosition, "Long", StringComparison.OrdinalIgnoreCase)
-                    ? (exitPrice - active.EntryPrice) * pointValue * exitQty
-                    : (active.EntryPrice - exitPrice) * pointValue * exitQty;
+                    ? (avgExitPrice - active.EntryPrice) * pointValue * closedQty
+                    : (active.EntryPrice - avgExitPrice) * pointValue * closedQty;
             }
 
-            var outcome = BuildTradeOutcomeLabel(active, orderName);
+            var outcome = BuildTradeOutcomeLabel(active, exitOrderName);
 
             lock (_tradeGate)
             {
@@ -171,7 +205,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     EntryTimeUtc = active.EntryTimeUtc,
                     ExitTimeUtc = exitTimeUtc,
                     EntryPrice = active.EntryPrice,
-                    ExitPrice = exitPrice,
+                    ExitPrice = avgExitPrice,
                     RealizedPnL = pnl,
                     BracketUsed = active.BracketUsed,
                     Outcome = outcome,
@@ -180,10 +214,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     BreakEvenKind = active.BreakEvenKind,
                     WasFlattenedManually = active.WasFlattenedManually,
                     EntryOrderName = active.EntryOrderName,
-                    ExitOrderName = orderName
+                    ExitOrderName = exitOrderName
                 });
-
-                _activeTrades.Remove(key);
             }
 
             RequestTradesUiRefresh();

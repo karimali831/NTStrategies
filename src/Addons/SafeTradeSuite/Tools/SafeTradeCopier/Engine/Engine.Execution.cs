@@ -37,16 +37,19 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (IsStcEntryExecution(ord))
                 {
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
-
-                    TrySubmitBracketOnFill(_master, e.Execution);
-
                     _owner?.TrackEntryExecution(
                         _master,
                         e.Execution,
                         isMaster: true,
                         bracketUsed: _configuredMasterBracket);
+
+                    if (ord?.OrderState == OrderState.PartFilled || ord?.OrderState == OrderState.Filled)
+                    {
+                        SafeTradeSuiteRuntime.PrintLog(
+                            $"[MASTER EXEC -> TRY BRACKET OnMasterExecution] name={e.Execution?.Order?.Name}");
+
+                        TrySubmitBracketOnFill(_master, e.Execution);
+                    }
                 }
 
                 if (isMasterExitExecution)
@@ -161,20 +164,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     $"[FOLLOWER EXEC -> TRY BRACKET] name={e.Execution?.Order?.Name}");
                 
                 var orderName = (e.Execution?.Order?.Name ?? "").Trim();
-                if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase))
+                if (orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase) &&
+                    e.Execution?.Order != null)
                 {
-                    Log($"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
-
-                    TrySubmitBracketOnFill(acc, e.Execution);
-
                     _owner?.TrackEntryExecution(
                         acc,
                         e.Execution,
                         isMaster: false,
                         bracketUsed: ResolveFollowerBracket(acc));
 
-                    MarkFollowerEntryResolved(acc);
-                    ResetFollowerDesync(acc);
+                    if (e.Execution.Order.OrderState == OrderState.PartFilled ||
+                        e.Execution.Order.OrderState == OrderState.Filled)
+                    {
+                        Log($"[FOLLOWER ENTRY FILL] acc={acc.Name} instr={_instrument?.FullName} orderName={orderName} qty={e.Execution.Quantity} price={e.Execution.Price}");
+
+                        TrySubmitBracketOnFill(acc, e.Execution);
+                        MarkFollowerEntryResolved(acc);
+                        ResetFollowerDesync(acc);
+                    }
                 }
             }
         }

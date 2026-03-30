@@ -58,7 +58,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             AddMainMenuTab(MainMenuTab.Copier, "Copier", CreateCopierIcon());
             // AddMainMenuTab(MainMenuTab.Positions, "Positions", CreateGridIcon());
-            AddMainMenuTab(MainMenuTab.Trades, "Trades", CreateListIcon());
+            AddMainMenuTab(MainMenuTab.Trades, "Trades History", CreateListIcon());
             AddMainMenuTab(MainMenuTab.Settings, "Settings", CreateCogIcon());
 
             if (_showStatusBox)

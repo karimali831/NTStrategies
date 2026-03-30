@@ -9,6 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
     {
         private Border _tradesPanelRoot;
         private StackPanel _tradesRowsHost;
+        private bool _hasTrades;
 
         private UIElement BuildTradesPlaceholder()
         {
@@ -22,6 +23,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 Orientation = Orientation.Vertical
             };
 
+            content.Children.Add(BuildTradesToolbar());
             content.Children.Add(BuildTradesHeaderRow());
             content.Children.Add(_tradesRowsHost);
 
@@ -44,6 +46,69 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
             RequestTradesUiRefresh();
             return _tradesPanelRoot;
+        }
+        
+        private UIElement BuildTradesToolbar()
+        {
+            var grid = new Grid
+            {
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var info = new TextBlock
+            {
+                Text = "Completed trades history",
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = PrimaryTextBrush(),
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(4, 0, 8, 0)
+            };
+
+            var clearBtn = CreateFormButton(
+                text: "Clear Trades",
+                width: 115,
+                tone: FormButtonTone.Danger,
+                style: FormButtonStyle.Solid,
+                enabled: _hasTrades,
+                margin: new Thickness(0, 0, 5, 0),
+                height: SmallButtonHeight(),
+                bold: true);
+
+            clearBtn.Click += (s, e) => ClearTradesHistory();
+
+            Grid.SetColumn(info, 0);
+            Grid.SetColumn(clearBtn, 1);
+
+            grid.Children.Add(info);
+            grid.Children.Add(clearBtn);
+
+            return grid;
+        }
+        
+        private void ClearTradesHistory()
+        {
+            var confirmed = ShowConfirmDialog(
+                _window,
+                "Clear trades history",
+                "This will permanently remove all rows from the trades table, including any currently tracked active trades.\n\nThis action cannot be undone.",
+                okText: "Delete all",
+                cancelText: "Cancel");
+
+            if (!confirmed)
+                return;
+
+            lock (_tradeGate)
+            {
+                _tradeHistory.Clear();
+                _activeTrades.Clear();
+            }
+
+            RequestTradesUiRefresh();
+            SavePersistentUiState();
+            _engine?.Log("Trades history cleared.");
         }
 
         private static Grid BuildTradesHeaderRow()
@@ -75,15 +140,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
         private static void CreateColumnDefinitions(Grid g)
         {
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });   // #
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(35) });  // #
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });  // Instrument
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });   // Side
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });   // Qty
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Account
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });  // Side
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25) });  // Qty
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Account
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });  // Entry
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });  // Exit
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });   // PnL
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });  // Bracket
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });  // Profit
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); // Bracket
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });  // Outcome
         }
 
@@ -99,6 +164,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 if (_tradeHistory.Count == 0)
                 {
+                    _hasTrades = false;
                     _tradesRowsHost.Children.Add(new TextBlock
                     {
                         Text = "No completed trades yet.",
@@ -108,6 +174,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
+                _hasTrades = true;
                 ordered = _tradeHistory
                     .OrderByDescending(x => x.IsMaster)
                     .ThenByDescending(x => x.TradeNumber)
