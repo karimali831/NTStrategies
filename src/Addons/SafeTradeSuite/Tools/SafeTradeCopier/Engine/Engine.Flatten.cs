@@ -22,19 +22,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public void EnsureFlatInstrument(Account acc, Instrument instr, FlattenTriggerReason reason, string detail = null)
             {
                 SafeTradeSuiteRuntime.PrintLog(
-                    $"[ENSURE FLAT ENTER] acc={acc?.Name} instr={instr?.FullName} trigger={reason} reason={reason}");
-                
+                    $"[ENSURE FLAT ENTER] acc={acc?.Name} instr={instr?.FullName} trigger={reason} detail={detail}");
+
                 if (acc == null || instr == null)
                     return;
 
+                var rt = GetOrCreateProtectionRuntime(acc, instr);
+
                 if (acc.ConnectionStatus != ConnectionStatus.Connected)
                 {
+                    SetProtectionState(rt, ProtectionState.Faulted, "Flatten skipped: disconnected");
                     Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=disconnected");
                     return;
                 }
 
                 if (!TryGetLivePosition(acc, instr, out _, out _))
                 {
+                    SetProtectionState(rt, ProtectionState.Flat, "Flatten skipped: no live position");
                     Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=no-live-position");
                     return;
                 }
@@ -46,6 +50,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
+                SetProtectionState(rt, ProtectionState.FlattenPending, $"Flatten requested: {reason}");
                 _owner?.MarkTradeFlattenIntent(acc, instr, reason, detail);
 
                 Task.Run(async () =>
@@ -69,6 +74,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                                 if (!hasLivePositionAfter && workingAfter == 0)
                                 {
                                     ClearActiveBracket(acc, instr);
+                                    SetProtectionState(rt, ProtectionState.Flat, "Flatten complete.");
                                     Log($"Flatten complete -> acc={acc.Name}, instr={instr.FullName}, pass={pass}");
                                     return;
                                 }
@@ -86,8 +92,32 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     finally
                     {
                         _flattenInFlight.TryRemove(key, out _);
+
+                        var hasLivePositionAfterAll = TryGetLivePosition(acc, instr, out _, out var qtyAfterAll);
+                        var workingAfterAll = GetWorkingOrdersForInstrument(acc, instr).Count;
+
+                        if (!hasLivePositionAfterAll && workingAfterAll == 0)
+                        {
+                            ClearActiveBracket(acc, instr);
+                            SetProtectionState(rt, ProtectionState.Flat, "Flatten complete.");
+                        }
+                        else
+                        {
+                            SetProtectionState(
+                                rt,
+                                ProtectionState.Faulted,
+                                $"Flatten ended but account still not flat. qty={qtyAfterAll}, working={workingAfterAll}");
+                        }
                     }
                 });
+            }
+                        
+            private bool IsFlattenInFlight(Account acc, Instrument instr)
+            {
+                if (acc == null || instr == null)
+                    return false;
+
+                return _flattenInFlight.ContainsKey(FlattenKey(acc, instr));
             }
 
             private void FlattenInstrument(Account acc, Instrument instr, int pass)

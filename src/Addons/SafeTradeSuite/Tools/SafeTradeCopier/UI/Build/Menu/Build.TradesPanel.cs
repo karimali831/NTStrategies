@@ -72,7 +72,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 width: 115,
                 tone: FormButtonTone.Danger,
                 style: FormButtonStyle.Solid,
-                enabled: _hasTrades,
+                // enabled: _hasTrades,
                 margin: new Thickness(0, 0, 5, 0),
                 height: SmallButtonHeight(),
                 bold: true);

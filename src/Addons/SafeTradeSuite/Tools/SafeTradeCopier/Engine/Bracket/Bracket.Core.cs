@@ -230,7 +230,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
 
                 var name = (ord.Name ?? "").Trim();
-
                 var isKnownExit =
                     name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase) ||
                     name.StartsWith("STC:SL", StringComparison.OrdinalIgnoreCase) ||
@@ -239,29 +238,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (!isKnownExit)
                     return;
 
-                var hasLivePosition = TryGetLivePosition(acc, instr, out var mp, out var absQty);
-                var net = GetNetPosition(acc, instr);
-                var hasWorkingBracket = HasWorkingBracketOrders(acc, instr);
+                var rt = GetOrCreateProtectionRuntime(acc, instr);
+                rt.LastExitOrderName = name;
+                rt.LastExitExecutionUtc = DateTime.UtcNow;
 
-                SafeTradeSuiteRuntime.PrintLog(
+                var evaluated = EvaluateProtectionState(acc, instr);
+
+                Log(
                     $"[BRACKET EXIT CHECK] acc={acc.Name} instr={instr.FullName} " +
-                    $"orderName={name} mp={mp} absQty={absQty} net={net} hasLivePosition={hasLivePosition} " +
-                    $"hasWorkingBracket={hasWorkingBracket}");
+                    $"orderName={name} state={evaluated.State} reason={evaluated.LastReason}");
 
-                if (!hasLivePosition || absQty <= 0 || net == 0)
+                if (evaluated.State == ProtectionState.Flat)
                 {
                     ClearActiveBracket(acc, instr);
-                    Log($"[BRACKET CLEAR] acc={acc.Name} instr={instr.FullName} orderName={name} net={net} hasWorkingBracket={hasWorkingBracket}");
                     return;
                 }
 
-                if (hasWorkingBracket)
-                {
-                    Log($"[BRACKET KEEP] acc={acc.Name} instr={instr.FullName} orderName={name} net={net} hasWorkingBracket={hasWorkingBracket}");
-                    return;
-                }
-
-                Log($"[BRACKET EXIT IN PROGRESS] acc={acc.Name} instr={instr.FullName} orderName={name} net={net} hasWorkingBracket={hasWorkingBracket}");
+                if (evaluated.State == ProtectionState.Faulted)
+                    ConfirmProtectionBreachIfNeeded(acc, instr);
             }
             
             private void RemovePendingBracketForEntry(string entryName)
