@@ -11,10 +11,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public string Key { get; set; }
             public string InstrumentName { get; set; }
             public string MarketPosition { get; set; }
-            public int OrderQty { get; set; }
             public string AccountName { get; set; }
             public DateTime EntryTimeUtc { get; set; }
-            public double EntryPrice { get; set; }
             public string BracketUsed { get; set; }
             public bool IsMaster { get; set; }
             public bool BreakEvenApplied { get; set; }
@@ -23,6 +21,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public FlattenTriggerReason PendingFlattenReason { get; set; }
             public string PendingFlattenDetail { get; set; }
             public string EntryOrderName { get; set; }
+
+            public int EntryFilledQty;
+            public double EntryValueSum;
+
             public int ClosedQty;
             public double ExitValueSum;
             public DateTime? LastExitTimeUtc;

@@ -100,6 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public double ExitPrice { get; set; }
             public double RealizedPnL { get; set; }
             public string BracketUsed { get; set; }
+
             public bool IsMaster { get; set; }
             public string Outcome { get; set; }
             public bool BreakEvenApplied { get; set; }

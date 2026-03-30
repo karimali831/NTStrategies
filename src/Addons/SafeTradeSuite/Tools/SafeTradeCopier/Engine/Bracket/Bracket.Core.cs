@@ -139,6 +139,156 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 return _configuredMasterBracket ?? "None";
             }
+            
+            private Order FindWorkingManagedTarget(Account acc, Instrument instr, ActiveBracketSpec spec)
+            {
+                if (acc == null || instr == null || spec == null)
+                    return null;
+
+                try
+                {
+                    foreach (var o in acc.Orders)
+                    {
+                        if (o?.Instrument == null)
+                            continue;
+
+                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                            continue;
+
+                        var isWorking =
+                            o.OrderState == OrderState.Working ||
+                            o.OrderState == OrderState.Accepted ||
+                            o.OrderState == OrderState.Submitted;
+
+                        if (!isWorking)
+                            continue;
+
+                        var name = (o.Name ?? "").Trim();
+                        if (!name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        if (!string.IsNullOrWhiteSpace(spec.StopOco))
+                        {
+                            var oco = (o.Oco ?? "").Trim();
+                            if (string.Equals(oco, spec.StopOco, StringComparison.Ordinal))
+                                return o;
+                        }
+                    }
+
+                    foreach (var o in acc.Orders)
+                    {
+                        if (o?.Instrument == null)
+                            continue;
+
+                        if (!string.Equals(o.Instrument.FullName, instr.FullName, StringComparison.Ordinal))
+                            continue;
+
+                        var isWorking =
+                            o.OrderState == OrderState.Working ||
+                            o.OrderState == OrderState.Accepted ||
+                            o.OrderState == OrderState.Submitted;
+
+                        if (!isWorking)
+                            continue;
+
+                        var name = (o.Name ?? "").Trim();
+                        if (name.StartsWith("STC:TP", StringComparison.OrdinalIgnoreCase))
+                            return o;
+                    }
+                }
+                catch
+                {
+                    return null;
+                }
+
+                return null;
+            }
+
+            private void ResizeAndRepriceWorkingBracket(
+                Account acc,
+                Instrument instr,
+                ActiveBracketSpec spec,
+                int newQty,
+                double avgEntryPrice)
+            {
+                if (acc == null || instr == null || spec == null)
+                    return;
+
+                var tickSize = instr.MasterInstrument?.TickSize ?? 0.0;
+                if (tickSize <= 0)
+                    return;
+
+                var stop = FindWorkingManagedStop(acc, instr, spec);
+                var target = FindWorkingManagedTarget(acc, instr, spec);
+
+                var changes = new System.Collections.Generic.List<Order>();
+
+                if (stop != null && spec.StopTicks > 0)
+                {
+                    var newStopPrice = spec.IsBuy
+                        ? avgEntryPrice - spec.StopTicks * tickSize
+                        : avgEntryPrice + spec.StopTicks * tickSize;
+
+                    newStopPrice = RoundToTick(newStopPrice, tickSize);
+
+                    stop.QuantityChanged = newQty;
+                    stop.StopPriceChanged = newStopPrice;
+                    changes.Add(stop);
+                }
+
+                if (target != null && spec.TargetTicks > 0)
+                {
+                    var newTargetPrice = spec.IsBuy
+                        ? avgEntryPrice + spec.TargetTicks * tickSize
+                        : avgEntryPrice - spec.TargetTicks * tickSize;
+
+                    newTargetPrice = RoundToTick(newTargetPrice, tickSize);
+
+                    target.QuantityChanged = newQty;
+                    target.LimitPriceChanged = newTargetPrice;
+                    changes.Add(target);
+                }
+
+                if (changes.Count == 0)
+                    return;
+
+                acc.Change(changes.ToArray());
+
+                UpdateActiveBracketSpec(acc, instr, x =>
+                {
+                    x.Qty = newQty;
+                    x.EntryFilledQty = newQty;
+                    x.EntryValueSum = avgEntryPrice * newQty;
+                    x.EntryPrice = avgEntryPrice;
+
+                    if (spec.StopTicks > 0)
+                    {
+                        x.OriginalStopPrice = spec.IsBuy
+                            ? RoundToTick(avgEntryPrice - spec.StopTicks * tickSize, tickSize)
+                            : RoundToTick(avgEntryPrice + spec.StopTicks * tickSize, tickSize);
+
+                        x.CurrentStopPrice = x.OriginalStopPrice;
+                    }
+
+                    if (spec.TargetTicks > 0)
+                    {
+                        x.TargetPrice = spec.IsBuy
+                            ? RoundToTick(avgEntryPrice + spec.TargetTicks * tickSize, tickSize)
+                            : RoundToTick(avgEntryPrice - spec.TargetTicks * tickSize, tickSize);
+                    }
+                });
+
+                Log(
+                    $"[BRACKET RESIZE] acc={acc.Name} instr={instr.FullName} qty={newQty} avgEntry={avgEntryPrice:0.00}");
+            }
+            
+            private static double RoundToTick(double price, double tickSize)
+            {
+                if (tickSize <= 0)
+                    return price;
+
+                return Math.Round(price / tickSize, MidpointRounding.AwayFromZero) * tickSize;
+            }
         }
     }
 }

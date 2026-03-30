@@ -55,10 +55,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _pendingBrackets[entryName] = new PendingBracket
                     {
                         EntryName = entryName,
-                        Qty = qty,
+                        OriginalQty = Math.Max(1, qty),
                         IsBuy = action == OrderAction.Buy,
                         StopTicks = Math.Max(0, stopTicks),
-                        TargetTicks = Math.Max(0, targetTicks)
+                        TargetTicks = Math.Max(0, targetTicks),
+                        FilledQty = 0,
+                        EntryValueSum = 0.0,
+                        BracketSubmitted = false,
+                        BracketOco = null
                     };
 
                     SafeTradeSuiteRuntime.PrintLog(
@@ -209,54 +213,42 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
             }
 
-            private void TrySubmitBracketOnFill(Account master, Execution execution)
+            private void TrySubmitBracketOnFill(Account account, Execution execution)
             {
                 try
                 {
                     SafeTradeSuiteRuntime.PrintLog(
-                        $"[TRY SUBMIT BRACKET ON FILL] acc={master?.Name} orderName={execution?.Order?.Name} instr={execution?.Order?.Instrument?.FullName} price={execution?.Price}");
+                        $"[TRY SUBMIT BRACKET ON FILL] acc={account?.Name} orderName={execution?.Order?.Name} instr={execution?.Order?.Instrument?.FullName} price={execution?.Price}");
 
-                    if (master == null || execution == null)
+                    if (account == null || execution == null)
                         return;
 
                     var ord = execution.Order;
                     if (ord == null)
                         return;
 
-                    var name = ord.Name ?? "";
-                    if (string.IsNullOrWhiteSpace(name))
+                    var entryName = (ord.Name ?? "").Trim();
+                    if (string.IsNullOrWhiteSpace(entryName))
                         return;
 
-                    PendingBracket pb;
-                    lock (_gate)
+                    var instr = ord.Instrument;
+                    if (instr == null)
                     {
-                        if (!_pendingBrackets.TryGetValue(name, out pb))
-                        {
-                            Log($"[BRACKET MISS] No pending bracket found for entry '{name}'");
-                            return;
-                        }
-
-                        SafeTradeSuiteRuntime.PrintLog(
-                            $"[BRACKET PENDING FOUND] entry={name} qty={pb.Qty} isBuy={pb.IsBuy} stopTicks={pb.StopTicks} targetTicks={pb.TargetTicks}");
+                        Log($"Bracket skipped: missing instrument for {entryName}.");
+                        return;
                     }
 
-                    if (pb.StopTicks <= 0 && pb.TargetTicks <= 0)
+                    var fillQty = Math.Abs((int)Math.Round((double)execution.Quantity, MidpointRounding.AwayFromZero));
+                    if (fillQty <= 0)
                     {
-                        RemovePendingBracketForEntry(name);
+                        Log($"Bracket skipped: invalid fill qty for {entryName}.");
                         return;
                     }
 
                     var fillPrice = execution.Price;
                     if (fillPrice <= 0)
                     {
-                        Log($"Bracket skipped: invalid fill price for {name}.");
-                        return;
-                    }
-
-                    var instr = ord.Instrument;
-                    if (instr == null)
-                    {
-                        Log($"Bracket skipped: missing instrument for {name}.");
+                        Log($"Bracket skipped: invalid fill price for {entryName}.");
                         return;
                     }
 
@@ -267,106 +259,184 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         return;
                     }
 
-                    var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
-                    var exitAction = pb.IsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
+                    PendingBracket pb;
+                    int totalFilledQty;
+                    double avgEntryPrice;
+                    bool shouldSubmitInitialBracket;
+                    bool shouldResizeWorkingBracket;
+                    string existingOco;
 
-                    var orders = new List<Order>(2);
-
-                    var currentStopPrice = 0.0;
-                    var targetPrice = 0.0;
-                    string stopOrderName = null;
-                    string targetOrderName = null;
-
-                    if (pb.TargetTicks > 0)
+                    lock (_gate)
                     {
-                        targetPrice = pb.IsBuy
-                            ? fillPrice + pb.TargetTicks * tickSize
-                            : fillPrice - pb.TargetTicks * tickSize;
+                        if (!_pendingBrackets.TryGetValue(entryName, out pb) || pb == null)
+                        {
+                            Log($"[BRACKET MISS] No pending bracket found for entry '{entryName}'");
+                            return;
+                        }
 
-                        var tgt = master.CreateOrder(
-                            instr,
-                            exitAction,
-                            OrderType.Limit,
-                            OrderEntry.Manual,
-                            TimeInForce.Day,
-                            pb.Qty,
-                            targetPrice,
-                            0,
-                            oco,
-                            "STC:TP",
-                            DateTime.MaxValue,
-                            null
-                        );
+                        pb.FilledQty += fillQty;
+                        pb.EntryValueSum += fillPrice * fillQty;
 
-                        targetOrderName = "STC:TP";
-                        orders.Add(tgt);
+                        totalFilledQty = pb.FilledQty;
+                        avgEntryPrice = pb.EntryValueSum / Math.Max(1, pb.FilledQty);
+
+                        shouldSubmitInitialBracket =
+                            !pb.BracketSubmitted &&
+                            (pb.StopTicks > 0 || pb.TargetTicks > 0) &&
+                            totalFilledQty > 0;
+
+                        if (shouldSubmitInitialBracket)
+                            pb.BracketSubmitted = true;
+
+                        existingOco = pb.BracketOco;
+
+                        shouldResizeWorkingBracket =
+                            pb.BracketSubmitted &&
+                            !shouldSubmitInitialBracket &&
+                            totalFilledQty > 0;
                     }
 
-                    if (pb.StopTicks > 0)
+                    SafeTradeSuiteRuntime.PrintLog(
+                        $"[BRACKET FILL ACCUM] entry={entryName} fillQty={fillQty} totalFilledQty={totalFilledQty} avgEntry={avgEntryPrice:0.00}");
+
+                    if (shouldSubmitInitialBracket)
                     {
-                        currentStopPrice = pb.IsBuy
-                            ? fillPrice - pb.StopTicks * tickSize
-                            : fillPrice + pb.StopTicks * tickSize;
+                        var pbStopTicks = pb.StopTicks;
+                        var pbTargetTicks = pb.TargetTicks;
+                        var pbIsBuy = pb.IsBuy;
 
-                        var stp = master.CreateOrder(
-                            instr,
-                            exitAction,
-                            OrderType.StopMarket,
-                            OrderEntry.Manual,
-                            TimeInForce.Day,
-                            pb.Qty,
-                            0,
-                            currentStopPrice,
-                            oco,
-                            "STC:SL",
-                            DateTime.MaxValue,
-                            null
-                        );
+                        var oco = "STC:BRK:" + Guid.NewGuid().ToString("N");
+                        var exitAction = pbIsBuy ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                        stopOrderName = "STC:SL";
-                        orders.Add(stp);
+                        var orders = new System.Collections.Generic.List<Order>(2);
+
+                        var stopPrice = 0.0;
+                        var targetPrice = 0.0;
+                        string stopOrderName = null;
+                        string targetOrderName = null;
+
+                        if (pbTargetTicks > 0)
+                        {
+                            targetPrice = pbIsBuy
+                                ? avgEntryPrice + pbTargetTicks * tickSize
+                                : avgEntryPrice - pbTargetTicks * tickSize;
+
+                            targetPrice = RoundToTick(targetPrice, tickSize);
+
+                            var tgt = account.CreateOrder(
+                                instr,
+                                exitAction,
+                                OrderType.Limit,
+                                OrderEntry.Manual,
+                                TimeInForce.Day,
+                                totalFilledQty,
+                                targetPrice,
+                                0,
+                                oco,
+                                "STC:TP",
+                                DateTime.MaxValue,
+                                null
+                            );
+
+                            targetOrderName = "STC:TP";
+                            orders.Add(tgt);
+                        }
+
+                        if (pbStopTicks > 0)
+                        {
+                            stopPrice = pbIsBuy
+                                ? avgEntryPrice - pbStopTicks * tickSize
+                                : avgEntryPrice + pbStopTicks * tickSize;
+
+                            stopPrice = RoundToTick(stopPrice, tickSize);
+
+                            var stp = account.CreateOrder(
+                                instr,
+                                exitAction,
+                                OrderType.StopMarket,
+                                OrderEntry.Manual,
+                                TimeInForce.Day,
+                                totalFilledQty,
+                                0,
+                                stopPrice,
+                                oco,
+                                "STC:SL",
+                                DateTime.MaxValue,
+                                null
+                            );
+
+                            stopOrderName = "STC:SL";
+                            orders.Add(stp);
+                        }
+
+                        if (orders.Count > 0)
+                        {
+                            lock (_gate)
+                            {
+                                pb.BracketOco = oco;
+
+                                _activeBracketByAccInstr[BracketKey(account, instr)] =
+                                    new ActiveBracketSpec
+                                    {
+                                        AutoBeSuppressedUntilFlat = false,
+                                        StopTicks = pbStopTicks,
+                                        TargetTicks = pbTargetTicks,
+                                        IsBuy = pbIsBuy,
+                                        Qty = totalFilledQty,
+                                        EntryFilledQty = totalFilledQty,
+                                        EntryValueSum = avgEntryPrice * totalFilledQty,
+                                        EntryPrice = avgEntryPrice,
+                                        OriginalStopPrice = stopPrice,
+                                        CurrentStopPrice = stopPrice,
+                                        TargetPrice = targetPrice,
+                                        IsFreeTradeApplied = false,
+                                        StopOrderName = stopOrderName,
+                                        TargetOrderName = targetOrderName,
+                                        StopOco = oco
+                                    };
+                            }
+
+                            SafeTradeSuiteRuntime.PrintLog(
+                                $"[BRACKET SUBMIT] acc={account.Name} instr={instr.FullName} avgEntry={avgEntryPrice:0.00} qty={totalFilledQty} oco={oco} stopPrice={stopPrice:0.00} targetPrice={targetPrice:0.00}");
+
+                            try
+                            {
+                                account.Submit(orders.ToArray());
+                                Log($"Bracket submitted -> {account.Name} {instr.FullName} OCO={oco} qty={totalFilledQty} @ avgEntry={avgEntryPrice:0.00}");
+                            }
+                            catch
+                            {
+                                ClearActiveBracket(account, instr);
+                                throw;
+                            }
+                        }
                     }
-
-                    if (orders.Count == 0)
+                    else if (shouldResizeWorkingBracket)
                     {
-                        RemovePendingBracketForEntry(name);
-                        return;
+                        if (TryGetActiveBracketSpec(account, instr, out var spec) && spec != null)
+                        {
+                            try
+                            {
+                                ResizeAndRepriceWorkingBracket(account, instr, spec, totalFilledQty, avgEntryPrice);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log($"[BRACKET RESIZE FAILED] acc={account.Name} instr={instr.FullName} msg={ex.Message}");
+                            }
+                        }
                     }
 
                     lock (_gate)
                     {
-                        _activeBracketByAccInstr[BracketKey(master, instr)] =
-                            new ActiveBracketSpec
-                            {
-                                AutoBeSuppressedUntilFlat = false,
-                                StopTicks = pb.StopTicks,
-                                TargetTicks = pb.TargetTicks,
-                                IsBuy = pb.IsBuy,
-                                Qty = pb.Qty,
-                                EntryPrice = fillPrice,
-                                OriginalStopPrice = currentStopPrice,
-                                CurrentStopPrice = currentStopPrice,
-                                TargetPrice = targetPrice,
-                                IsFreeTradeApplied = false,
-                                StopOrderName = stopOrderName,
-                                TargetOrderName = targetOrderName,
-                                StopOco = oco
-                            };
-                    }
+                        if (_pendingBrackets.TryGetValue(entryName, out pb) &&
+                            pb != null &&
+                            pb.FilledQty >= pb.OriginalQty)
+                        {
+                            _pendingBrackets.Remove(entryName);
 
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[BRACKET SUBMIT] acc={master.Name} instr={instr.FullName} fill={fillPrice:0.00} oco={oco} stopPrice={currentStopPrice:0.00} targetPrice={targetPrice:0.00} qty={pb.Qty}");
-
-                    try
-                    {
-                        master.Submit(orders.ToArray());
-                        RemovePendingBracketForEntry(name);
-                        Log($"Bracket submitted -> {master.Name} {instr.FullName} OCO={oco} (SL={pb.StopTicks}t TP={pb.TargetTicks}t @ fill={fillPrice:0.00})");
-                    }
-                    catch
-                    {
-                        ClearActiveBracket(master, instr);
-                        throw;
+                            SafeTradeSuiteRuntime.PrintLog(
+                                $"[BRACKET PENDING COMPLETE] entry={entryName} filledQty={pb.FilledQty} originalQty={pb.OriginalQty}");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -408,10 +478,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     _pendingBrackets[entryName] = new PendingBracket
                     {
                         EntryName = entryName,
-                        Qty = qty,
+                        OriginalQty = Math.Max(1, qty),
                         IsBuy = action == OrderAction.Buy,
                         StopTicks = Math.Max(0, stopTicks),
-                        TargetTicks = Math.Max(0, targetTicks)
+                        TargetTicks = Math.Max(0, targetTicks),
+                        FilledQty = 0,
+                        EntryValueSum = 0.0,
+                        BracketSubmitted = false,
+                        BracketOco = null
                     };
                 }
 

@@ -7,11 +7,15 @@
             public sealed class ActiveBracketSpec
             {
                 public bool AutoBeSuppressedUntilFlat { get; set; }
+
                 public int StopTicks;
                 public int TargetTicks;
 
                 public bool IsBuy;
                 public int Qty;
+
+                public int EntryFilledQty;
+                public double EntryValueSum;
 
                 public double EntryPrice;
                 public double OriginalStopPrice;

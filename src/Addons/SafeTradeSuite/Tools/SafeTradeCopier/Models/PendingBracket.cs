@@ -5,10 +5,16 @@
         private sealed class PendingBracket
         {
             public string EntryName;
-            public int Qty;
+            public int OriginalQty;
             public bool IsBuy;
             public int StopTicks;
             public int TargetTicks;
+
+            public int FilledQty;
+            public double EntryValueSum;
+
+            public bool BracketSubmitted;
+            public string BracketOco;
         }
     }
 }
