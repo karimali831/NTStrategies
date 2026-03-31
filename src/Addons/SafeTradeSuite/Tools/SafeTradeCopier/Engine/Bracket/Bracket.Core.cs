@@ -173,7 +173,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 lock (_gate)
                 {
                     _activeBracketByAccInstr.Remove(key);
-                    _lastHasWorkingState.Remove(key);
                 }
             }
 

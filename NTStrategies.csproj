@@ -100,6 +100,7 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Helper\TreeHelper.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\ActiveBracketSpec.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\FollowerEntryProgress.cs" />
+        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\InstrumentSession.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\MasterEntryAggregate.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\PendingEntryAggregate.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\Models\ProtectionRuntime.cs" />
@@ -178,8 +179,6 @@
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.OrderQtyBox.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Position.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\FollowerRow.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\InstrumentSession.cs" />
-        <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\ViewModels\RiskSettings.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.Followers.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.InstrumentSession.cs" />
         <Compile Include="src\Addons\SafeTradeSuite\Tools\SafeTradeCopier\UI\Ui.PnLTracker.cs" />

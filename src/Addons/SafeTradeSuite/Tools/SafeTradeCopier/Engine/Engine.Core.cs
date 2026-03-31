@@ -28,7 +28,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private volatile bool _isRequested;
             private readonly object _gate = new object();
 
-            private readonly ConcurrentDictionary<string, long> _seen = new ConcurrentDictionary<string, long>();
+            private readonly ConcurrentDictionary<string, long> _seen =
+                new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
             private readonly ConcurrentQueue<long> _copiedTicks = new ConcurrentQueue<long>();
 
             // Safety defaults (not exposed to UI)
@@ -159,6 +160,55 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     RewireUnsafe_NoLock("Config changed");
                     RaiseReady_NoLock();
                 }
+            }
+            
+            public bool CanResumeAfterReconnect(out string reason)
+            {
+                lock (_gate)
+                {
+                    if (!IsReady_NoLock(out reason))
+                        return false;
+                }
+
+                var targets = new List<(Account Acc, Instrument Instr)>();
+
+                lock (_gate)
+                {
+                    if (_master != null && _instrument != null)
+                        targets.Add((_master, _instrument));
+
+                    foreach (var f in _followers)
+                    {
+                        if (f != null && _instrument != null)
+                            targets.Add((f, _instrument));
+                    }
+                }
+
+                foreach (var t in targets
+                             .GroupBy(x => $"{x.Acc?.Name}|{x.Instr?.FullName}", StringComparer.Ordinal)
+                             .Select(g => g.First()))
+                {
+                    if (t.Acc == null || t.Instr == null)
+                        continue;
+
+                    if (t.Acc.ConnectionStatus != ConnectionStatus.Connected)
+                    {
+                        reason = $"Resume blocked: {t.Acc.Name} is not connected.";
+                        return false;
+                    }
+
+                    var state = EvaluateProtectionState(t.Acc, t.Instr);
+
+                    if (state.State == ProtectionState.Faulted)
+                    {
+                        reason =
+                            $"Resume blocked: protection fault on {t.Acc.Name} {t.Instr.FullName}. {state.LastReason}";
+                        return false;
+                    }
+                }
+
+                reason = "";
+                return true;
             }
 
             private void RaiseModeChanged_NoLock()
@@ -409,6 +459,66 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private void StopFollowerGuardWatchdog_NoLock()
             {
                 Interlocked.Exchange(ref _guardWatchdogRunning, 0);
+            }
+            
+            private void SeenCleanup()
+            {
+                if (_seen.Count <= 5000)
+                    return;
+
+                var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
+                foreach (var kv in _seen.ToArray())
+                {
+                    if (kv.Value < cutoff)
+                        _seen.TryRemove(kv.Key, out _);
+                }
+            }
+            
+            private bool TryMarkSeen(Account acc, Execution execution)
+            {
+                if (acc == null || execution == null)
+                    return false;
+
+                SeenCleanup();
+
+                var key = BuildSeenKey(acc, execution);
+                return _seen.TryAdd(key, DateTime.UtcNow.Ticks);
+            }
+            
+            private static string BuildSeenKey(Account acc, Execution execution)
+            {
+                var accountName = acc?.Name?.Trim() ?? "";
+                var instrumentName = execution?.Instrument?.FullName?.Trim()
+                                     ?? execution?.Order?.Instrument?.FullName?.Trim()
+                                     ?? "";
+
+                var execId = execution?.ExecutionId?.Trim();
+                if (!string.IsNullOrWhiteSpace(execId))
+                    return $"{accountName}|{instrumentName}|{execId}";
+
+                var orderName = execution?.Order?.Name?.Trim() ?? "";
+                var orderId = execution?.Order?.OrderId?.Trim() ?? "";
+                var timeTicks = execution?.Time.Ticks ?? 0;
+                var price = execution?.Price ?? 0.0;
+                var qty = execution?.Quantity ?? 0;
+                var marketPosition = execution?.MarketPosition.ToString() ?? "";
+
+                return
+                    $"{accountName}|{instrumentName}|FALLBACK|" +
+                    $"{orderName}|{orderId}|{timeTicks}|{price:0.########}|{qty}|{marketPosition}";
+            }
+            
+            private void FollowMasterExitSeenCleanup()
+            {
+                if (_followMasterExitSeen.Count <= 5000)
+                    return;
+
+                var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
+                foreach (var kv in _followMasterExitSeen.ToArray())
+                {
+                    if (kv.Value < cutoff)
+                        _followMasterExitSeen.TryRemove(kv.Key, out _);
+                }
             }
 
             public void Dispose()

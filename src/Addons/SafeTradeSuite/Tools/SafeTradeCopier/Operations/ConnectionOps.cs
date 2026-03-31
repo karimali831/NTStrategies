@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             {
                 RefreshAccountsUi();
                 HandleFollowerConnectionSafety();
-                TryAutoRearmAfterReconnect();
+                TryResumeAfterReconnect();
                 RefreshCopierStatusPanel();
                 RenderMasterSubmitButtonsState();
 
@@ -82,21 +82,43 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }, DispatcherPriority.Background);
         }
         
-        private void TryAutoRearmAfterReconnect()
+        private void TryResumeAfterReconnect()
         {
-            if (_engine == null)
+            if (_engine == null || _activeInstrumentSession == null)
                 return;
 
-            if (_engine.IsRequested)
+            if (!_activeInstrumentSession.IsArmedRequested)
                 return;
 
-            if (!ActiveSessionRequested())
+            if (!_activeInstrumentSession.IsConnectionSuspended)
                 return;
 
             if (!ActiveSessionHasHealthyEnabledFollowers())
                 return;
+            
+            if (!ActiveSessionHasHealthyMaster())
+                return;
 
-            RequestArmed("Copy auto-rearmed after connection recovered.");
+            ApplyConfigFromUi(force: true);
+
+            if (!_engine.CanResumeAfterReconnect(out var reason))
+            {
+                if (!string.IsNullOrWhiteSpace(reason))
+                    _engine.Log(reason);
+
+                RefreshCopierStatusPanel();
+                return;
+            }
+
+            _activeInstrumentSession.IsConnectionSuspended = false;
+            _activeInstrumentSession.ConnectionSuspendReason = "";
+
+            _engine.SetCopyEnabled(true);
+
+            _activeInstrumentSession.IsConnectionSuspended = false;
+            _activeInstrumentSession.ConnectionSuspendReason = "";
+
+            _engine.Log("Copy resumed after connection recovered and recovery checks passed.");
         }
         
         private void RequestArmed(string reason = null)
@@ -107,6 +129,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (!CanRequestArmedForActiveSession(out var blockReason))
             {
                 _activeInstrumentSession.IsArmedRequested = true;
+                _activeInstrumentSession.IsConnectionSuspended = false;
+                _activeInstrumentSession.ConnectionSuspendReason = "";
+
                 RenderCopierButton();
                 RefreshCopierStatusPanel();
 
@@ -117,6 +142,8 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             }
 
             _activeInstrumentSession.IsArmedRequested = true;
+            _activeInstrumentSession.IsConnectionSuspended = false;
+            _activeInstrumentSession.ConnectionSuspendReason = "";
 
             ApplyConfigFromUi();
             _engine.SetCopyEnabled(true);
@@ -134,7 +161,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 return;
 
             if (_activeInstrumentSession != null)
+            {
                 _activeInstrumentSession.IsArmedRequested = false;
+                _activeInstrumentSession.IsConnectionSuspended = false;
+                _activeInstrumentSession.ConnectionSuspendReason = "";
+            }
 
             _engine.SetCopyEnabled(false);
 
@@ -142,8 +173,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 _engine.Log(reason);
 
             RenderCopierButton();
-            // RefreshInstrumentTabs();
             RefreshCopierStatusPanel();
+        }
+        
+        private void RequestConnectionSuspend(string reason)
+        {
+            if (_engine == null)
+                return;
+
+            if (_activeInstrumentSession != null)
+            {
+                _activeInstrumentSession.IsConnectionSuspended = true;
+                _activeInstrumentSession.ConnectionSuspendReason = reason ?? "";
+            }
+
+            _engine.SetCopyEnabled(false);
+
+            if (!string.IsNullOrWhiteSpace(reason))
+                _engine.Log(reason);
+
+            RenderCopierButton();
+            RefreshCopierStatusPanel();
+        }
+        
+        private bool ActiveSessionHasHealthyMaster()
+        {
+            return _activeInstrumentSession?.MasterAccount != null &&
+                   GetUiConnectionState(_activeInstrumentSession.MasterAccount) == UiConnectionState.Connected;
         }
         
         private void HandleFollowerConnectionSafety()
@@ -151,11 +207,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (_engine == null || _activeInstrumentSession?.FollowersEnabled == null)
                 return;
 
-            var instr = GetInstrument();
             var anySelectedBad = false;
-            var changed = false;
 
-            foreach (var kvp in _activeInstrumentSession.FollowersEnabled.ToList())
+            foreach (var kvp in _activeInstrumentSession.FollowersEnabled)
             {
                 if (!kvp.Value)
                     continue;
@@ -165,38 +219,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     string.Equals(a.Name, kvp.Key, StringComparison.Ordinal));
 
                 var unhealthy = account == null || GetUiConnectionState(account) != UiConnectionState.Connected;
-                if (!unhealthy)
-                    continue;
-
-                anySelectedBad = true;
-
-                var hasOpenPosition = account != null &&
-                                      instr != null &&
-                                      HasOpenInstrumentPosition(account, instr);
-
-                if (hasOpenPosition)
-                    continue;
-
-                _activeInstrumentSession.FollowersEnabled[kvp.Key] = false;
-
-                var row = _followerRows.FirstOrDefault(r =>
-                    r?.Account != null &&
-                    string.Equals(r.Account.Name, kvp.Key, StringComparison.Ordinal));
-
-                if (row?.EnabledCheck?.IsChecked == true)
-                    SetFollowerChecked(row, false, "HandleFollowerConnectionSafety.autoUncheckDisconnected");
-
-                changed = true;
-
-                SafeTradeSuiteRuntime.PrintLog(
-                    $"[FOLLOWER AUTO-UNCHECK] acc={kvp.Key} reason=connection-unhealthy");
+                if (unhealthy)
+                {
+                    anySelectedBad = true;
+                    break;
+                }
             }
 
             if (anySelectedBad && _engine.IsRequested)
-                RequestDisarmed("Copy disarmed: one or more selected followers lost connection.");
-
-            if (changed)
-                SavePersistentUiState();
+            {
+                if (_activeInstrumentSession == null || !_activeInstrumentSession.IsConnectionSuspended)
+                    RequestConnectionSuspend("Copy suspended: one or more selected followers lost connection.");
+            }
 
             RenderFollowerRowsState();
             RefreshFollowerBulkActionButtons();

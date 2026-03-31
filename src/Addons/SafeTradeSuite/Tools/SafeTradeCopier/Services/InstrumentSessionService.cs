@@ -367,6 +367,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 reason = "Select a master account first.";
                 return false;
             }
+            
+            if (!ActiveSessionHasHealthyMaster())
+            {
+                reason = "Master account is not connected.";
+                return false;
+            }
 
             var instrName = NormalizeInstrumentName(_activeInstrumentSession.InstrumentName);
             if (!IsValidInstrumentName(instrName))

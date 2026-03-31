@@ -30,7 +30,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             RenderBreakEvenEnablementUi();
         }
         
-        private void ApplyConfigFromUi()
+        private void ApplyConfigFromUi(bool force = false)
         {
             if (_engine == null)
                 return;
@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             if (config == null)
                 return;
 
-            if (AreConfigsEqual(_lastAppliedConfig, config))
+            if (!force && AreConfigsEqual(_lastAppliedConfig, config))
                 return;
 
             _engine.ApplyConfig(

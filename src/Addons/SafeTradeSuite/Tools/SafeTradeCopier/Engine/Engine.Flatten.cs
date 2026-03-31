@@ -36,7 +36,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
-                if (!TryGetLivePosition(acc, instr, out _, out _))
+                var hasLivePositionNow = TryGetLivePosition(acc, instr, out _, out _);
+                var workingNow = GetWorkingOrdersForInstrument(acc, instr);
+
+                if (!hasLivePositionNow && workingNow.Count == 0)
                 {
                     SetProtectionState(rt, ProtectionState.Flat, "Flatten skipped: no live position");
                     Log($"Flatten skipped -> acc={acc.Name}, instr={instr.FullName}, reason=no-live-position");
@@ -65,11 +68,33 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                                 await Task.Delay(400).ConfigureAwait(false);
 
                                 var hasLivePositionAfter = TryGetLivePosition(acc, instr, out var mpAfter, out var qtyAfter);
-                                var workingAfter = GetWorkingOrdersForInstrument(acc, instr).Count;
+                                var workingAfterOrders = GetWorkingOrdersForInstrument(acc, instr);
+                                var workingAfter = workingAfterOrders.Count;
+
+                                var workingNames = workingAfter > 0
+                                    ? string.Join(
+                                        ", ",
+                                        workingAfterOrders.Select(o =>
+                                            $"{(o?.Name ?? "").Trim()}:{o?.OrderState}:qty={o?.Quantity}"))
+                                    : "";
 
                                 Log(
                                     $"Flatten verify -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                                    $"hasLivePos={hasLivePositionAfter}, mpAfter={mpAfter}, qtyAfter={qtyAfter}, workingAfter={workingAfter}");
+                                    $"hasLivePos={hasLivePositionAfter}, mpAfter={mpAfter}, qtyAfter={qtyAfter}, " +
+                                    $"workingAfter={workingAfter}, workingNames=[{workingNames}]");
+
+                                if (hasLivePositionAfter && workingAfter > 0)
+                                {
+                                    var onlyFlattenOrdersRemain = workingAfterOrders.All(o =>
+                                        ((o?.Name ?? "").Trim()).StartsWith("STC:FLATTEN", StringComparison.OrdinalIgnoreCase));
+
+                                    if (onlyFlattenOrdersRemain)
+                                    {
+                                        Log(
+                                            $"[FLATTEN STALLED] acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
+                                            $"reason=flatten order(s) still working but position unchanged.");
+                                    }
+                                }
 
                                 if (!hasLivePositionAfter && workingAfter == 0)
                                 {
@@ -93,8 +118,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     {
                         _flattenInFlight.TryRemove(key, out _);
 
-                        var hasLivePositionAfterAll = TryGetLivePosition(acc, instr, out _, out var qtyAfterAll);
-                        var workingAfterAll = GetWorkingOrdersForInstrument(acc, instr).Count;
+                        var hasLivePositionAfterAll = TryGetLivePosition(acc, instr, out var mpAfterAll, out var qtyAfterAll);
+                        var workingAfterAllOrders = GetWorkingOrdersForInstrument(acc, instr);
+                        var workingAfterAll = workingAfterAllOrders.Count;
+
+                        var workingAfterAllNames = workingAfterAll > 0
+                            ? string.Join(
+                                ", ",
+                                workingAfterAllOrders.Select(o =>
+                                    $"{(o?.Name ?? "").Trim()}:{o?.OrderState}:qty={o?.Quantity}"))
+                            : "";
 
                         if (!hasLivePositionAfterAll && workingAfterAll == 0)
                         {
@@ -103,6 +136,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         }
                         else
                         {
+                            Log(
+                                $"[FLATTEN FINAL FAULT] acc={acc.Name}, instr={instr.FullName}, " +
+                                $"hasLivePos={hasLivePositionAfterAll}, mpAfter={mpAfterAll}, qtyAfter={qtyAfterAll}, " +
+                                $"workingAfter={workingAfterAll}, workingNames=[{workingAfterAllNames}]");
+
                             SetProtectionState(
                                 rt,
                                 ProtectionState.Faulted,
@@ -139,11 +177,21 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (liveOrders.Count > 0)
                 {
+                    var orderSummary = string.Join(
+                        ", ",
+                        liveOrders.Select(o =>
+                            $"{(o?.Name ?? "").Trim()}:{o?.OrderState}:qty={o?.Quantity}"));
+
                     Log(
                         $"Flatten snapshot -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                        $"liveOrders={liveOrders.Count}");
+                        $"liveOrders={liveOrders.Count}, orders=[{orderSummary}]");
                 }
-
+                else
+                {
+                    Log(
+                        $"Flatten snapshot -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, liveOrders=0");
+                }
+                
                 try
                 {
                     var cancellable = liveOrders
@@ -166,6 +214,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         Log(
                             $"Flatten cancel submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
                             $"count={cancellable.Length}, orders=[{summary}]");
+                    }
+                    else
+                    {
+                        Log($"Flatten cancel skipped -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, count=0");
                     }
                 }
                 catch (Exception ex)
@@ -207,9 +259,18 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     acc.Submit(new[] { ord });
 
+                    var postSubmitOrders = GetWorkingOrdersForInstrument(acc, instr);
+                    var postSubmitSummary = postSubmitOrders.Count > 0
+                        ? string.Join(
+                            ", ",
+                            postSubmitOrders.Select(o =>
+                                $"{(o?.Name ?? "").Trim()}:{o?.OrderState}:qty={o?.Quantity}"))
+                        : "";
+
                     Log(
                         $"Flatten market submitted -> acc={acc.Name}, instr={instr.FullName}, pass={pass}, " +
-                        $"marketPosition={marketPosition}, action={action}, qty={qty}");
+                        $"marketPosition={marketPosition}, action={action}, qty={qty}, " +
+                        $"workingAfterSubmit={postSubmitOrders.Count}, workingNames=[{postSubmitSummary}]");
                 }
                 catch (Exception ex)
                 {

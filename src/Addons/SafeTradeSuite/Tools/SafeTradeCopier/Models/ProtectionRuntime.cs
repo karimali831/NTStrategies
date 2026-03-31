@@ -9,7 +9,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public string AccountName { get; set; }
             public string InstrumentName { get; set; }
             public ProtectionState State { get; set; } = ProtectionState.Flat;
-            public DateTime LastStateChangeUtc { get; set; } = DateTime.UtcNow;
+            public DateTime? LastStateChangeUtc { get; set; }
             public bool HasLivePosition { get; set; }
             public int NetQuantity { get; set; }
             public bool HasWorkingEntry { get; set; }
@@ -18,11 +18,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public bool FlattenInFlight { get; set; }
             public bool ExitExecutionSeenRecently { get; set; }
             public DateTime? LastExitExecutionUtc { get; set; }
-            public string LastEntryName { get; set; }
             public string LastExitOrderName { get; set; }
             public string LastReason { get; set; }
             public bool BreachPending { get; set; }
             public DateTime? BreachFirstDetectedUtc { get; set; }
+            public DateTime? LastEntryExecutionUtc { get; set; }
         }
     }
 }

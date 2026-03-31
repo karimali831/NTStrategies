@@ -14,6 +14,10 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             public string MasterAtm { get; set; } = "None";
             public bool IsArmedRequested { get; set; }
 
+            // Transient runtime suspension. Do NOT clear IsArmedRequested on connection loss.
+            public bool IsConnectionSuspended { get; set; }
+            public string ConnectionSuspendReason { get; set; } = "";
+
             public Dictionary<string, bool> FollowersEnabled { get; } =
                 new Dictionary<string, bool>(StringComparer.Ordinal);
 

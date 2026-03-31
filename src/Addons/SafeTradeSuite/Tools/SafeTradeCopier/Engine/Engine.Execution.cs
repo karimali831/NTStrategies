@@ -21,6 +21,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (_instrument == null) return;
                 if (e.Execution.Instrument == null || e.Execution.Instrument.FullName != _instrument.FullName)
                     return;
+                
+                if (!TryMarkSeen(_master, e.Execution))
+                {
+                    Log(
+                        $"[EXEC DUP SKIP] scope=MASTER acc={_master?.Name} " +
+                        $"instr={e.Execution?.Instrument?.FullName} execId={e.Execution?.ExecutionId}");
+                    return;
+                }
 
                 var ord = e.Execution.Order;
                 var orderName = (ord?.Name ?? "").Trim();
@@ -35,6 +43,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 if (IsStcEntryExecution(ord))
                 {
+                    var rt = GetOrCreateProtectionRuntime(_master, _instrument);
+                    rt.LastEntryExecutionUtc = DateTime.UtcNow;
+                    
                     _owner?.TrackEntryExecution(
                         _master,
                         e.Execution,
@@ -76,7 +87,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     return;
                 }
 
-                ProcessMasterEntryAggregate(e.Execution);
+                _ = ProcessMasterEntryAggregate(e.Execution);
             }
 
             private static bool IsStcEntryExecution(Order ord)
@@ -114,6 +125,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             
             private bool TryMarkFollowMasterExitSeen(string key)
             {
+                FollowMasterExitSeenCleanup();
                 return _followMasterExitSeen.TryAdd(key, DateTime.UtcNow.Ticks);
             }
             
@@ -131,6 +143,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var acc = e.Execution.Account;
                 if (acc == null)
                     return;
+                
+                if (!TryMarkSeen(acc, e.Execution))
+                {
+                    Log(
+                        $"[EXEC DUP SKIP] scope=FOLLOWER acc={acc?.Name} " +
+                        $"instr={e.Execution?.Instrument?.FullName} execId={e.Execution?.ExecutionId}");
+                    return;
+                }
 
                 HandleBracketExitOutcome(acc, e.Execution);
                 _owner?.TryTrackTradeExitFromExecution(acc, e.Execution);
@@ -141,13 +161,16 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var orderName = (e.Execution?.Order?.Name ?? "").Trim();
                 if (!orderName.StartsWith("STC:ENTRY:", StringComparison.OrdinalIgnoreCase) || e.Execution.Order == null)
                     return;
+                
+                var rt = GetOrCreateProtectionRuntime(acc, _instrument);
+                rt.LastEntryExecutionUtc = DateTime.UtcNow;
 
                 _owner?.TrackEntryExecution(
                     acc,
                     e.Execution,
                     isMaster: false,
                     bracketUsed: ResolveFollowerBracket(acc));
-
+                
                 if (e.Execution.Order.OrderState != OrderState.PartFilled &&
                     e.Execution.Order.OrderState != OrderState.Filled)
                     return;
@@ -159,15 +182,28 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var fillQty = Math.Abs((int)Math.Round((double)e.Execution.Quantity, MidpointRounding.AwayFromZero));
                 if (fillQty > 0 && TryGetFollowerEntryProgressByOrderName(orderName, out var progress) && progress != null)
                 {
+                    int filledAfter;
+                    int requestedAfter;
+
                     lock (_gate)
                     {
                         progress.FilledQty += fillQty;
                         progress.LastUpdateUtc = DateTime.UtcNow;
+
+                        filledAfter = progress.FilledQty;
+                        requestedAfter = progress.RequestedQty;
+                    }
+
+                    if (filledAfter > requestedAfter)
+                    {
+                        Log(
+                            $"[FOLLOWER PROGRESS VIOLATION] acc={acc.Name} entry={progress.MasterEntryName} " +
+                            $"orderName={progress.FollowerOrderName} filled={filledAfter} requested={requestedAfter}");
                     }
 
                     SafeTradeSuiteRuntime.PrintLog(
                         $"[FOLLOWER AGG] acc={acc.Name} entry={progress.MasterEntryName} orderName={progress.FollowerOrderName} " +
-                        $"filled={progress.FilledQty} requested={progress.RequestedQty}");
+                        $"filled={filledAfter} requested={requestedAfter}");
                 }
 
                 var bracketMode = ResolveFollowerBracket(acc);

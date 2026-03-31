@@ -39,24 +39,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (rt == null)
                     return;
 
-                var changed = rt.State != newState || !string.Equals(rt.LastReason ?? "", reason ?? "", StringComparison.Ordinal);
+                var normalizedReason = reason ?? "";
+                var changed = rt.State != newState ||
+                    !string.Equals(rt.LastReason ?? "", normalizedReason, StringComparison.Ordinal);
+
+                if (!changed)
+                    return;
 
                 rt.State = newState;
-                rt.LastReason = reason ?? "";
+                rt.LastReason = normalizedReason;
+                rt.LastStateChangeUtc = DateTime.UtcNow;
 
-                if (changed)
-                {
-                    rt.LastStateChangeUtc = DateTime.UtcNow;
-
-                    SafeTradeSuiteRuntime.PrintLog(
-                        $"[PROTECTION STATE] acc={rt.AccountName} instr={rt.InstrumentName} " +
-                        $"state={rt.State} reason={rt.LastReason}");
-                }
+                SafeTradeSuiteRuntime.PrintLog(
+                    $"[PROTECTION STATE] acc={rt.AccountName} instr={rt.InstrumentName} " +
+                    $"state={rt.State} reason={rt.LastReason}");
             }
 
-           private ProtectionRuntime EvaluateProtectionState(Account acc, Instrument instr)
+            private ProtectionRuntime EvaluateProtectionState(Account acc, Instrument instr)
             {
-                var key = BracketKey(acc, instr);
                 var rt = GetOrCreateProtectionRuntime(acc, instr);
 
                 var hasLivePosition = TryGetLivePosition(acc, instr, out _, out var absQty) && absQty > 0;
@@ -65,9 +65,14 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 var hasWorkingBracket = HasWorkingBracketOrders(acc, instr);
                 var hasPendingBracket = HasPendingBracketForInstrument(acc, instr);
                 var flattenInFlight = IsFlattenInFlight(acc, instr);
+
                 var exitSeenRecently =
                     rt.LastExitExecutionUtc.HasValue &&
                     (DateTime.UtcNow - rt.LastExitExecutionUtc.Value).TotalMilliseconds <= 1500;
+
+                var entrySeenRecently =
+                    rt.LastEntryExecutionUtc.HasValue &&
+                    (DateTime.UtcNow - rt.LastEntryExecutionUtc.Value).TotalMilliseconds <= 1500;
 
                 rt.HasLivePosition = hasLivePosition;
                 rt.NetQuantity = net;
@@ -95,15 +100,15 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     newState = ProtectionState.EntryPending;
                     reason = "Entry working, no live position yet.";
                 }
-                else if (hasLivePosition && (hasPendingBracket || hasWorkingEntry) && !hasWorkingBracket)
-                {
-                    newState = ProtectionState.BracketPending;
-                    reason = "Live position exists while bracket is pending/building.";
-                }
                 else if (hasLivePosition && hasWorkingBracket)
                 {
                     newState = ProtectionState.Protected;
                     reason = "Live position with working bracket.";
+                }
+                else if (hasLivePosition && (hasWorkingEntry || hasPendingBracket || entrySeenRecently))
+                {
+                    newState = ProtectionState.BracketPending;
+                    reason = "Live position exists while bracket is pending/building.";
                 }
                 else if (hasLivePosition && exitSeenRecently)
                 {
@@ -112,13 +117,25 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 }
                 else if (hasLivePosition)
                 {
-                    newState = ProtectionState.Faulted;
-                    reason = "Live position without bracket or valid transition.";
+                    var grace =
+                        rt.LastStateChangeUtc.HasValue &&
+                        (DateTime.UtcNow - rt.LastStateChangeUtc.Value).TotalMilliseconds <= 500;
+
+                    if (grace)
+                    {
+                        newState = ProtectionState.BracketPending;
+                        reason = "Grace window after transition.";
+                    }
+                    else
+                    {
+                        newState = ProtectionState.Faulted;
+                        reason = "Live position without bracket or valid transition.";
+                    }
                 }
                 else
                 {
-                    newState = ProtectionState.Faulted;
-                    reason = "Unclassified protection state.";
+                    newState = ProtectionState.Flat;
+                    reason = "Flat";
                 }
 
                 SetProtectionState(rt, newState, reason);
@@ -172,6 +189,11 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     rt.BreachPending = true;
                     rt.BreachFirstDetectedUtc = now;
+
+                    Log(
+                        $"[WARNING] Protection breach pending -> acc={acc.Name} instr={instr.FullName} " +
+                        $"state={rt.State} reason={rt.LastReason}");
+
                     Log($"[PROTECTION BREACH PENDING] acc={acc.Name} instr={instr.FullName} reason={rt.LastReason}");
                     return;
                 }

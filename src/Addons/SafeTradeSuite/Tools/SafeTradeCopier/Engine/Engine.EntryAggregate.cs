@@ -16,7 +16,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
             private readonly Dictionary<string, FollowerEntryProgress> _followerEntryProgress =
                 new Dictionary<string, FollowerEntryProgress>(StringComparer.Ordinal);
             
-            private void ProcessMasterEntryAggregate(Execution execution)
+            private async Task ProcessMasterEntryAggregate(Execution execution)
             {
                 var ord = execution?.Order;
                 if (ord == null)
@@ -30,10 +30,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 if (fillQty <= 0)
                     return;
 
-                MasterEntryAggregate agg;
+                MasterEntryAggregate snapshot;
+                int totalFilledQty;
+                double entryValueSum;
+
                 lock (_gate)
                 {
-                    if (!_masterEntryAgg.TryGetValue(entryName, out agg) || agg == null)
+                    if (!_masterEntryAgg.TryGetValue(entryName, out var agg) || agg == null)
                     {
                         agg = new MasterEntryAggregate
                         {
@@ -50,19 +53,30 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     agg.TotalFilledQty += fillQty;
                     agg.EntryValueSum += execution.Price * fillQty;
+
+                    totalFilledQty = agg.TotalFilledQty;
+                    entryValueSum = agg.EntryValueSum;
+
+                    snapshot = new MasterEntryAggregate
+                    {
+                        EntryName = agg.EntryName,
+                        IsBuy = agg.IsBuy,
+                        TotalFilledQty = agg.TotalFilledQty,
+                        EntryValueSum = agg.EntryValueSum
+                    };
                 }
 
-                var avgEntry = agg.TotalFilledQty > 0
-                    ? agg.EntryValueSum / agg.TotalFilledQty
+                var avgEntry = totalFilledQty > 0
+                    ? entryValueSum / totalFilledQty
                     : 0.0;
 
                 Log(
-                    $"[MASTER AGG] entry={entryName} fillQty={fillQty} totalFilled={agg.TotalFilledQty} avgEntry={avgEntry:0.00}");
+                    $"[MASTER AGG] entry={entryName} fillQty={fillQty} totalFilled={totalFilledQty} avgEntry={avgEntry:0.00}");
 
-                TryCopyAggregateToFollowers(entryName, agg);
+                await TryCopyAggregateToFollowers(entryName, snapshot);
             }
             
-            private async void TryCopyAggregateToFollowers(string entryName, MasterEntryAggregate agg)
+            private async Task TryCopyAggregateToFollowers(string entryName, MasterEntryAggregate agg)
             {
                 if (agg == null || string.IsNullOrWhiteSpace(entryName))
                     return;
@@ -132,6 +146,9 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     var followerOrderName = BuildFollowerOrderName(entryName, f.Name);
 
                     FollowerEntryProgress progress;
+                    int requestedBefore;
+                    int deltaQty;
+
                     lock (_gate)
                     {
                         if (!_followerEntryProgress.TryGetValue(progressKey, out progress) || progress == null)
@@ -148,11 +165,24 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                             _followerEntryProgress[progressKey] = progress;
                         }
+
+                        requestedBefore = progress.RequestedQty;
+                        deltaQty = desiredQty - requestedBefore;
+
+                        if (deltaQty > 0)
+                        {
+                            progress.RequestedQty += deltaQty;   // reserve BEFORE submit
+                            progress.LastUpdateUtc = DateTime.UtcNow;
+                        }
                     }
 
-                    var deltaQty = desiredQty - progress.RequestedQty;
                     if (deltaQty <= 0)
+                    {
+                        Log(
+                            $"[FOLLOWER DELTA SKIP] acc={f.Name} instr={instrSnap.FullName} entry={entryName} " +
+                            $"desired={desiredQty} requested={requestedBefore} delta={deltaQty}");
                         continue;
+                    }
 
                     var bracketMode = ResolveFollowerBracket(f);
                     var followMasterExit = FollowerUsesMasterExit(f);
@@ -163,7 +193,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                     Log(
                         $"[FOLLOWER DELTA COPY] acc={f.Name} instr={instrSnap.FullName} entry={entryName} " +
-                        $"desired={desiredQty} requested={progress.RequestedQty} delta={deltaQty} " +
+                        $"desired={desiredQty} requested={requestedBefore} delta={deltaQty} " +
                         $"mode={(followMasterExit ? "FOLLOW_MASTER_EXIT" : hasOwnBracket ? $"OWN_BRACKET:{bracketMode}" : "ENTRY_ONLY")}");
 
                     try
@@ -201,20 +231,23 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                             f.Submit(new[] { ord });
                         }
-
-                        lock (_gate)
-                        {
-                            progress.RequestedQty += deltaQty;
-                            progress.LastUpdateUtc = DateTime.UtcNow;
-                        }
-
+                        
                         RecordCopy();
-
                         if (StaggerMsPerFollower > 0)
                             await Task.Delay(StaggerMsPerFollower).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
+                        lock (_gate)
+                        {
+                            if (_followerEntryProgress.TryGetValue(progressKey, out var rollbackProgress) &&
+                                rollbackProgress != null)
+                            {
+                                rollbackProgress.RequestedQty = Math.Max(0, rollbackProgress.RequestedQty - deltaQty);
+                                rollbackProgress.LastUpdateUtc = DateTime.UtcNow;
+                            }
+                        }
+
                         MarkFollowerEntryResolved(f);
                         ApplyGuardAction(
                             f,

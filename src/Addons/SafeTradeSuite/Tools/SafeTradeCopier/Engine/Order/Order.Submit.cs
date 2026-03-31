@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
@@ -71,146 +68,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 Log($"Master submit -> {master.Name}: {action} MKT qty={qty} instr={instr.FullName} ATM='{atmTemplateName}' (ST={stopTicks} TK={targetTicks})");
                 master.Submit(new[] { entry });
-            }
-
-            private async Task CopyToFollowers(string execId, OrderAction action, int masterExecQty, CancellationToken token)
-            {
-                SeenCleanup();
-
-                List<Account> followerSnap;
-                Account masterSnap;
-                Instrument instrSnap;
-                FollowerGuard guard;
-
-                lock (_gate)
-                {
-                    followerSnap = _followers.ToList();
-                    masterSnap = _master;
-                    instrSnap = _instrument;
-                    guard = _followerGuard ?? new FollowerGuard();
-                }
-
-                foreach (var f in followerSnap)
-                {
-                    if (token.IsCancellationRequested)
-                        return;
-
-                    if (f == null)
-                        continue;
-
-                    if (masterSnap != null && ReferenceEquals(f, masterSnap))
-                        continue;
-
-                    if (instrSnap == null)
-                        return;
-
-                    if (f.ConnectionStatus != ConnectionStatus.Connected)
-                    {
-                        lock (_gate)
-                        {
-                            _isRequested = false;
-                            DisarmUnsafe_NoLock($"Follower {f.Name} not Connected");
-                            RaiseModeChanged_NoLock();
-                            RaiseReady_NoLock(reasonOverride: $"Follower {f.Name} disconnected");
-                        }
-                        return;
-                    }
-
-                    var seenKey = $"{execId}|{f.Name}|{instrSnap.FullName}";
-                    if (!_seen.TryAdd(seenKey, DateTime.UtcNow.Ticks))
-                        continue;
-
-                    if (!CanEnterForRisk(f, out _, out var longReason))
-                    {
-                        Log($"Copy skipped -> {f.Name}: {longReason}");
-                        continue;
-                    }
-
-                    var qtyToCopy = ResolveFollowerQty(f, masterExecQty);
-                    if (qtyToCopy < 1)
-                    {
-                        Log($"Copy skipped -> {f.Name}: invalid follower qty ({qtyToCopy}). Must be >= 1.");
-                        continue;
-                    }
-
-                    if (qtyToCopy > _maxAbsQtyPerFollower)
-                    {
-                        Log($"Copy skipped -> {f.Name}: follower qty ({qtyToCopy}) exceeds max allowed ({_maxAbsQtyPerFollower}).");
-                        continue;
-                    }
-
-                    if (IsFollowerGuardDisabled(f))
-                    {
-                        Log($"Copy skipped -> {f.Name}: follower disabled by guard.");
-                        continue;
-                    }
-
-                    if (HasAnyOpenFollowerTradeState(f, instrSnap, out var openStateReason))
-                    {
-                        Log($"[FOLLOWER COPY GATE] skip acc={f.Name} instr={instrSnap.FullName} reason={openStateReason}");
-                        continue;
-                    }
-
-                    Log($"[FOLLOWER COPY GATE] allow acc={f.Name} instr={instrSnap.FullName} qty={qtyToCopy}");
-
-                    var bracketMode = ResolveFollowerBracket(f);
-                    var followMasterExit = FollowerUsesMasterExit(f);
-                    var hasOwnBracket =
-                        !string.IsNullOrWhiteSpace(bracketMode) &&
-                        !string.Equals(bracketMode, "None", StringComparison.OrdinalIgnoreCase) &&
-                        !followMasterExit;
-
-                    Log(
-                        $"Copy -> {f.Name}: action={action}, qty={qtyToCopy}, instr={instrSnap.FullName}, " +
-                        $"mode={(followMasterExit ? "FOLLOW_MASTER_EXIT" : hasOwnBracket ? $"OWN_BRACKET:{bracketMode}" : "ENTRY_ONLY")}");
-
-                    try
-                    {
-                        var entryName = $"STC:ENTRY:{execId}:{f.Name}";
-                        if (hasOwnBracket)
-                        {
-                            MarkFollowerEntrySubmitted(f, entryName);
-                            SubmitFollowerMarketWithBracket(f, instrSnap, action, qtyToCopy, bracketMode, entryName);
-                        }
-                        else
-                        {
-                            MarkFollowerEntrySubmitted(f, entryName);
-
-                            var ord = f.CreateOrder(
-                                instrSnap,
-                                action,
-                                OrderType.Market,
-                                OrderEntry.Manual,
-                                TimeInForce.Day,
-                                qtyToCopy,
-                                0,
-                                0,
-                                string.Empty,
-                                entryName,
-                                DateTime.MaxValue,
-                                null
-                            );
-
-                            f.Submit(new[] { ord });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        MarkFollowerEntryResolved(f);
-
-                        ApplyGuardAction(
-                            f,
-                            guard.OnEntryReject,
-                            $"Follower entry submit failed: {ex.Message}");
-
-                        continue;
-                    }
-
-                    RecordCopy();
-
-                    if (StaggerMsPerFollower > 0)
-                        await Task.Delay(StaggerMsPerFollower, token).ConfigureAwait(false);
-                }
             }
 
             private void TrySubmitBracketOnFill(Account account, Execution execution)
@@ -436,8 +293,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                     lock (_gate)
                     {
                         if (_pendingBrackets.TryGetValue(entryName, out pb) &&
-                            pb != null &&
-                            pb.FilledQty >= pb.OriginalQty)
+                            pb != null && pb.FilledQty >= pb.OriginalQty)
                         {
                             _pendingBrackets.Remove(entryName);
 
@@ -449,7 +305,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 catch (Exception ex)
                 {
                     LogUnhandled("TrySubmitBracketOnFill", ex);
-                    return;
                 }
             }
 

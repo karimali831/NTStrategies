@@ -132,19 +132,6 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
 
                 return false;
             }
-
-            private void SeenCleanup()
-            {
-                if (_seen.Count <= 5000)
-                    return;
-
-                var cutoff = DateTime.UtcNow.AddMinutes(-30).Ticks;
-                foreach (var kv in _seen.ToArray())
-                {
-                    if (kv.Value < cutoff)
-                        _seen.TryRemove(kv.Key, out _);
-                }
-            }
             
             private static bool IsSameInstrument(Instrument a, Instrument b)
             {

@@ -107,10 +107,12 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         
         private void OnSimModeChanged()
         {
+            SafeTradeSuiteRuntime.PrintLog("Sim mode change");
+
             var accounts = GetSelectableAccounts();
 
             RebindMasterAccounts(accounts);
-            RefreshUiAfterAccountScopeChanged();
+            RebuildFollowersAndRewire(_engine, accounts);
         }
     }
 }
