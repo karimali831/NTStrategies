@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
         public SafeTradeCopierTool.GuardAction OnDesync { get; set; } = SafeTradeCopierTool.GuardAction.FlattenAndDisable;
 
         // Keep these hidden for now until engine paths exist.
-        public SafeTradeCopierTool.GuardAction OnChangeFailure { get; set; } = SafeTradeCopierTool.GuardAction.RetryThenFlatten;
-        public SafeTradeCopierTool.GuardAction OnCancelFailure { get; set; } = SafeTradeCopierTool.GuardAction.RetryThenFlatten;
+        // public SafeTradeCopierTool.GuardAction OnChangeFailure { get; set; } = SafeTradeCopierTool.GuardAction.RetryThenFlatten;
+        // public SafeTradeCopierTool.GuardAction OnCancelFailure { get; set; } = SafeTradeCopierTool.GuardAction.RetryThenFlatten;
     }
 }

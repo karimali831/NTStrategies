@@ -8,9 +8,9 @@
             LogOnly,
             DisableFollower,
             Flatten,
-            FlattenAndDisable,
-            RetryThenDisable,
-            RetryThenFlatten
+            FlattenAndDisable
+            // RetryThenDisable,
+            // RetryThenFlatten
         }
     }
 }

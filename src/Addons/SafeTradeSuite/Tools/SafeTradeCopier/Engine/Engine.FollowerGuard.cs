@@ -72,11 +72,29 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                 {
                     state.IsGuardDisabled = true;
                     state.LastGuardReason = reason ?? "";
+                    state.PendingEntryTimeUtc = null;
+                    state.EntryWorking = false;
+                    state.PendingEntryName = null;
+                    state.DesyncDetectedAtUtc = null;
                 }
 
                 Log($"[GUARD] follower disabled -> {follower.Name} reason={reason}");
 
-                _owner?.DisarmCopier();
+                if (!HasAnyActiveHealthyFollower_NoLock())
+                {
+                    Log("[GUARD] no healthy followers remain -> disarming copier");
+                    _owner?.DisarmCopier();
+                }
+            }
+            
+            private bool HasAnyActiveHealthyFollower_NoLock()
+            {
+                var followers = _followers?.ToList() ?? new List<Account>();
+
+                return followers.Any(f =>
+                    f != null &&
+                    f.ConnectionStatus == ConnectionStatus.Connected &&
+                    !IsFollowerGuardDisabled(f));
             }
 
             private bool IsFollowerGuardDisabled(Account follower)
@@ -114,13 +132,13 @@ namespace NinjaTrader.NinjaScript.AddOns.SafeTradeSuite.Tools.SafeTradeCopier
                         DisableFollower(follower, reason);
                         return;
 
-                    case GuardAction.RetryThenDisable:
-                        DisableFollower(follower, reason);
-                        return;
-
-                    case GuardAction.RetryThenFlatten:
-                        if (_instrument != null)
-                            EnsureFlatInstrument(follower, _instrument, FlattenTriggerReason.FollowerGuard, reason);
+                    // case GuardAction.RetryThenDisable:
+                    //     DisableFollower(follower, reason);
+                    //     return;
+                    //
+                    // case GuardAction.RetryThenFlatten:
+                    //     if (_instrument != null)
+                    //         EnsureFlatInstrument(follower, _instrument, FlattenTriggerReason.FollowerGuard, reason);
 
                         DisableFollower(follower, reason);
                         return;
