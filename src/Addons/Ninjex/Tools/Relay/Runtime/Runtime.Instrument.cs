@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex
 {
-    internal partial class NinjexRuntime
+    public partial class NinjexRuntime
     {
         private static readonly object Gate = new object();
 

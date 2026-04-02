@@ -10,6 +10,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
     {
         private MenuManager _menuManager;
         private readonly string _instanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        private bool _licenseInitialized;
 
         protected override void OnStateChange()
         {
@@ -30,6 +31,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
                     _menuManager = null;
 
                     NinjexRuntime.DisposeRelayIfExists();
+                    NinjexRuntime.DisposeLicenseManagerIfExists();
                 }
                 catch (Exception ex)
                 {
@@ -51,6 +53,8 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
 
                 w.Dispatcher.InvokeAsync(async () =>
                 {
+                    EnsureLicenseInitialized();
+
                     for (var i = 0; i < 30; i++)
                     {
                         if (TryInitMenu(w))
@@ -58,7 +62,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
 
                         await Task.Delay(100);
                     }
-                    
 
                     NinjexRuntime.PrintLog($"AddOns[{_instanceId}] Failed to initialize menu.");
                 }, DispatcherPriority.Loaded);
@@ -67,6 +70,17 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
             {
                 NinjexRuntime.PrintLog("OnWindowCreated error: " + ex);
             }
+        }
+
+        private void EnsureLicenseInitialized()
+        {
+            if (_licenseInitialized)
+                return;
+
+            _licenseInitialized = true;
+
+            var licenseManager = NinjexRuntime.GetOrCreateLicenseManager();
+            _ = licenseManager.InitializeAsync();
         }
 
         private bool TryInitMenu(Window cc)
@@ -88,7 +102,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
             });
 
             _menuManager.HookToolsMenu(toolsRoot, nodes);
-            
             return true;
         }
     }

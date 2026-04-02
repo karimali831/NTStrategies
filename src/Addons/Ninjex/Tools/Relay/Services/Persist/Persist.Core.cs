@@ -7,8 +7,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
     public partial class RelayTool
     {
         private RelayToolUiState _persistedState = new RelayToolUiState();
-        
-        
+
         private void EnsurePersistedStateDefaults()
         {
             if (_persistedState == null)
@@ -30,28 +29,35 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 _persistedState.InstrumentSessions = new List<InstrumentSessionState>();
 
             if (_persistedState.Risk.FollowerUseMasterRisk == null)
+            {
                 _persistedState.Risk.FollowerUseMasterRisk =
                     new Dictionary<string, bool>(StringComparer.Ordinal);
+            }
 
             if (_persistedState.Risk.FollowerMaxDailyProfit == null)
+            {
                 _persistedState.Risk.FollowerMaxDailyProfit =
                     new Dictionary<string, double>(StringComparer.Ordinal);
+            }
 
             if (_persistedState.Risk.FollowerMaxDailyLoss == null)
+            {
                 _persistedState.Risk.FollowerMaxDailyLoss =
                     new Dictionary<string, double>(StringComparer.Ordinal);
-            
+            }
+
             if (_persistedState.TradeHistory == null)
                 _persistedState.TradeHistory = new List<TradeHistoryItemState>();
         }
-        
+
         private void SavePersistentUiState()
         {
             try
             {
                 EnsurePersistedStateDefaults();
 
-                _persistedState.Appearance.SimOnlyMode = _simOnlyMode;
+                // Persist user preference only. Do not persist effective enforced mode.
+                _persistedState.Appearance.SimOnlyMode = _userSimOnlyMode;
                 _persistedState.Appearance.ShowStatusBox = _showStatusBox;
                 _persistedState.Appearance.ThemeMode = _themeMode;
 
@@ -64,6 +70,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 SaveTradeHistoryToState();
 
                 _persistedState.ActiveInstrumentName = NormalizeInstrumentName(_activeInstrumentSession?.InstrumentName);
+                _persistedState.ActiveMainMenuTab = _activeMainMenuTab.ToString();
 
                 _persistedState.InstrumentSessions.Clear();
                 foreach (var session in _instrumentSessions)
@@ -82,7 +89,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                         FollowerAtmOverrides = new Dictionary<string, string>(session.FollowerAtmOverrides)
                     });
                 }
-                
+
                 LogInstrumentSessions("SavePersistentUiState.beforeSave");
                 LogSavedInstrumentOrder("SavePersistentUiState.beforeSave");
 
@@ -93,7 +100,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 LogUnhandled("SavePersistentUiState()", ex);
             }
         }
-        
+
         private void LoadPersistentUiState()
         {
             try
@@ -103,7 +110,8 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
 
                 EnsurePersistedStateDefaults();
 
-                _simOnlyMode = _persistedState.Appearance.SimOnlyMode;
+                // Load preference only. Effective mode is recomputed from license + preference.
+                _userSimOnlyMode = _persistedState.Appearance.SimOnlyMode;
                 _showStatusBox = _persistedState.Appearance.ShowStatusBox;
                 _themeMode = _persistedState.Appearance.ThemeMode;
 
@@ -161,8 +169,18 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 if (_activeInstrumentSession == null && _instrumentSessions.Count > 0)
                     _activeInstrumentSession = _instrumentSessions[0];
 
-                _activeMainMenuTab = MainMenuTab.Copier;
-                
+                if (!string.IsNullOrWhiteSpace(_persistedState.ActiveMainMenuTab) &&
+                    Enum.TryParse(_persistedState.ActiveMainMenuTab, true, out MainMenuTab parsedTab))
+                {
+                    _activeMainMenuTab = parsedTab;
+                }
+                else
+                {
+                    _activeMainMenuTab = MainMenuTab.Copier;
+                }
+
+                RecomputeEffectiveSimMode(rebuildUiBindings: false);
+
                 LogInstrumentSessions("LoadPersistentUiState.end");
                 LogSavedInstrumentOrder("LoadPersistentUiState.end");
             }

@@ -10,6 +10,9 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
     public partial class RelayTool
     {
         private bool _simOnlyMode = true;
+        private bool _userSimOnlyMode = true;
+        private bool _liveModePermitted;
+        private CheckBox _simModeCheckBox;
         
         private UIElement SafeBuildUi(RelayEngine engine)
         {

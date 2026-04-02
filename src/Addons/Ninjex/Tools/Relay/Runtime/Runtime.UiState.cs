@@ -4,7 +4,7 @@ using System.Web.Script.Serialization;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex
 {
-    internal partial class NinjexRuntime
+    public partial class NinjexRuntime
     {
         private static readonly string RelayToolUiStateFilePath =
             Path.Combine(

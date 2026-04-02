@@ -18,25 +18,27 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 Margin = new Thickness(0, 4, 0, 0)
             };
 
-            // Sim mode
-            var simMode = CreateCheckBox(
+            _simModeCheckBox = CreateCheckBox(
                 text: "Simulation Mode",
                 isChecked: _simOnlyMode,
                 margin: new Thickness(0, 0, 0, 8));
 
-            simMode.Checked += (s, e) =>
+            _simModeCheckBox.Checked += (s, e) =>
             {
-                _simOnlyMode = true;
-                OnSimModeChanged();
+                _userSimOnlyMode = true;
+                SavePersistentUiState();
+                RecomputeEffectiveSimMode(rebuildUiBindings: true);
             };
 
-            simMode.Unchecked += (s, e) =>
+            _simModeCheckBox.Unchecked += (s, e) =>
             {
-                _simOnlyMode = false;
-                OnSimModeChanged();
+                _userSimOnlyMode = false;
+                SavePersistentUiState();
+                RecomputeEffectiveSimMode(rebuildUiBindings: true);
             };
 
-            // Status log
+            UpdateSimModeUiState();
+
             var showStatusBox = CreateCheckBox(
                 text: "Show status log",
                 isChecked: _showStatusBox);
@@ -52,8 +54,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 _showStatusBox = false;
                 RebuildMainMenuTabs();
             };
-            
-            // Theme
+
             var themeRow = new Grid
             {
                 Margin = new Thickness(0, 6, 0, 0)
@@ -98,7 +99,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
             themeRow.Children.Add(themeLbl);
             themeRow.Children.Add(_themeSelector);
 
-            generalPanel.Children.Add(simMode);
+            generalPanel.Children.Add(_simModeCheckBox);
             generalPanel.Children.Add(showStatusBox);
             generalPanel.Children.Add(themeRow);
 

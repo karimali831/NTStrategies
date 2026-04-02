@@ -4,11 +4,11 @@
     {
         private enum MainMenuTab
         {
-            Copier,
-            Positions, // not used
-            Trades,
-            Settings,
-            Diag
+            Copier = 0,
+            Trades = 1,
+            Settings = 2,
+            License = 3,
+            Diag = 4
         }
     }
 }

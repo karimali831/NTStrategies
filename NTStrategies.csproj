@@ -64,6 +64,12 @@
     <ItemGroup>
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="src\Addons\Ninjex\AddOns.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Api\LicenseApiClient.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Helper\MachineFingerprintHelper.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Models\LicenseValidationRequest.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Models\LicenseState.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Models\LicenseValidationResult.cs" />
+        <Compile Include="src\Addons\Ninjex\Licensing\Services\LicenseManager.cs" />
         <Compile Include="src\Addons\Ninjex\Menu\MenuManager.cs" />
         <Compile Include="src\Addons\Ninjex\Menu\MenuNodes.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Engine\Bracket\Bracket.Rehydrate.cs" />
@@ -116,9 +122,11 @@
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Operations\ConnectionOps.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Operations\OrderOps.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Operations\PositionOps.cs" />
+        <Compile Include="src\Addons\Ninjex\Tools\Relay\Runtime\Runtime.License.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Runtime\Runtime.Core.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Runtime\Runtime.Instrument.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Runtime\Runtime.UiState.cs" />
+        <Compile Include="src\Addons\Ninjex\Tools\Relay\Runtime\Runtime.VersionInfo.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\InstrumentSessionService.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\Persist\Persist.FollowerGuardSettings.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\Persist\Persist.Core.cs" />
@@ -127,6 +135,7 @@
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\Risk\RiskEvaluator.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\PnLTrackerService.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Services\TradeTrackerService.cs" />
+        <Compile Include="src\Addons\Ninjex\Tools\Relay\Tool.Licensing.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Tool.Window.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Engine\Engine.Core.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\Engine\Engine.Risk.cs" />
@@ -144,6 +153,7 @@
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Build.MasterPanel.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Build.DiagBox.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Build.FollowerPanel.cs" />
+        <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Build.Licensing.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Build.MenuTabs.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Build.TradesPanel.cs" />
         <Compile Include="src\Addons\Ninjex\Tools\Relay\UI\Build\Menu\Settings\Settings.BreakEven.cs" />

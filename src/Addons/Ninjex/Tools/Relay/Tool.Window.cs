@@ -13,7 +13,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         private readonly string _toolId = Guid.NewGuid().ToString("N").Substring(0, 8);
         private readonly object _windowGate = new object();
         private bool _isClosing;
-        
+
         private Window _window;
         private Dispatcher _uiDispatcher;
         private static RelayEngine _engine;
@@ -21,7 +21,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         private ComboBox _instrumentSelector;
         private StackPanel _followersPanel;
         private List<AccountSnap> _lastAccountsSnapshot = new List<AccountSnap>();
-        
+
+        private TabItem _licenseTab;
+        private TextBlock _licenseStatusText;
+        private TextBlock _licenseFingerprintText;
+        private TextBlock _licenseVersionText;
+
         public void Show()
         {
             NinjexRuntime.PrintLog($"Relay[{_toolId}] Show()");
@@ -88,7 +93,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 }
             }
         }
-        
+
         private void CreateAndShowWindow(
             double? left = null,
             double? top = null,
@@ -96,7 +101,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         {
             _isClosing = false;
             _engine = new RelayEngine(this);
-            
+
             LoadPersistentUiState();
             _lastAppliedConfig = null;
 
@@ -113,7 +118,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 AllowsTransparency = false,
                 Content = new Grid
                 {
-                    Margin = new Thickness(3), // space for shadow
+                    Margin = new Thickness(3),
                     Children =
                     {
                         BuildChromedWindowContent(_engine)
@@ -130,7 +135,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
             WindowChrome.SetWindowChrome(_window, new WindowChrome
             {
                 CaptionHeight = 0,
-                // ResizeBorderThickness = new Thickness(6),
                 CornerRadius = new CornerRadius(8),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false,
@@ -155,8 +159,13 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
 
             HookConnectionStatusUpdates();
 
+            var licenseManager = NinjexRuntime.GetOrCreateLicenseManager();
+            licenseManager.LicenseStateChanged += OnLicenseStateChanged;
+
             _window.Show();
             _window.WindowState = windowState;
+
+            ApplyLicenseState(licenseManager.State);
 
             _uiDispatcher.InvokeAsync(() =>
             {
@@ -201,7 +210,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 CloseCurrentWindowForRebuild();
                 TearDownUiState();
 
-                CreateAndShowWindow( left, top, state);
+                CreateAndShowWindow(left, top, state);
             }
         }
 
@@ -218,7 +227,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
             RenderBreakEvenEnablementUi();
             RenderPnlUi();
         }
-        
+
         private void TearDownEngine()
         {
             UnhookConnectionStatusUpdates();
@@ -230,9 +239,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 _engine = null;
             }
         }
-        
+
         private void TearDownUiState()
         {
+            var licenseManager = NinjexRuntime.GetOrCreateLicenseManager();
+            licenseManager.LicenseStateChanged -= OnLicenseStateChanged;
+
             _window = null;
             _uiDispatcher = null;
             _btnWindowMinimize = null;
@@ -264,6 +276,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
             _instrumentSessions.Clear();
 
             _lastAppliedConfig = null;
+
+            _licensingContent = null;
+            _licenseTab = null;
+            _licenseStatusText = null;
+            _licenseFingerprintText = null;
+            _licenseVersionText = null;
         }
 
         public void Dispose()
@@ -278,7 +296,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 TearDownUiState();
             }
         }
-        
+
         private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             lock (_windowGate)

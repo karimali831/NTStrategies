@@ -3,7 +3,7 @@ using NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex
 {
-    internal partial class NinjexRuntime
+    public partial class NinjexRuntime
     {
         private static RelayTool _relay;
 
@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
         {
             if (_relay == null)
                 _relay = new RelayTool();
-            
+
             return _relay;
         }
 
@@ -33,7 +33,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex
                 _relay = null;
             }
         }
-        
+
         public static void PrintLog(string msg)
         {
             Code.Output.Process(

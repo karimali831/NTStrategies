@@ -27,6 +27,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         private TextBox _diagWindowTextBox;
         private UIElement _relayContent;
         private UIElement _settingsContent;
+        private UIElement _licensingContent;
 
         private Border BuildMainMenuTabs()
         {
@@ -55,15 +56,15 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         {
             _mainMenuTabItems.Clear();
             _mainMenuTabsPanel.Children.Clear();
-            
+
             AddMainMenuTab(MainMenuTab.Copier, "Relay", CreateCopierIcon());
-            // AddMainMenuTab(MainMenuTab.Positions, "Positions", CreateGridIcon());
             AddMainMenuTab(MainMenuTab.Trades, "Trades History", CreateListIcon());
             AddMainMenuTab(MainMenuTab.Settings, "Settings", CreateCogIcon());
+            AddMainMenuTab(MainMenuTab.License, "License", CreateShieldIcon());
 
             if (_showStatusBox)
                 AddMainMenuTab(MainMenuTab.Diag, "Diag", CreateListIcon());
-            
+
             RefreshMainMenuTabs();
         }
 
@@ -133,16 +134,15 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 Icon = icon
             });
         }
-        
+
         private void RebuildMainMenuTabs()
         {
             if (_mainMenuTabsPanel == null)
                 return;
 
-            // if user hid Diag while it was active, move back to Copier
             if (!_showStatusBox && _activeMainMenuTab == MainMenuTab.Diag)
                 _activeMainMenuTab = MainMenuTab.Copier;
-            
+
             BuildMenuTabs();
         }
 
@@ -166,7 +166,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
 
                 item.Border.CornerRadius = new CornerRadius(3, 3, 0, 0);
 
-                // Active tab drops 1px lower so it visually erases the wrapper bottom line beneath it
                 item.Border.Margin = active
                     ? new Thickness(0, 0, 12, -1)
                     : new Thickness(0, 0, 12, 0);
@@ -186,7 +185,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                     : MutedForegroundBrush();
             }
         }
-        
+
         private void RefreshMainMenuContent()
         {
             if (VerboseSessionLogging)
@@ -221,7 +220,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                         _mainContentHost.Content = _relayContent;
 
                     break;
-                
+
                 case MainMenuTab.Trades:
                     _mainContentHost.Content = BuildTradesPlaceholder();
                     break;
@@ -229,15 +228,23 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
                 case MainMenuTab.Settings:
                     if (_settingsContent == null)
                         _settingsContent = BuildSettingsContent();
-                    
 
                     if (!ReferenceEquals(_mainContentHost.Content, _settingsContent))
                         _mainContentHost.Content = _settingsContent;
 
                     break;
+
+                case MainMenuTab.License:
+                    if (_licensingContent == null)
+                        _licensingContent = BuildLicensingPanel();
+
+                    if (!ReferenceEquals(_mainContentHost.Content, _licensingContent))
+                        _mainContentHost.Content = _licensingContent;
+
+                    break;
             }
         }
-        
+
         private void OpenDiagWindow()
         {
             if (!_showStatusBox)
@@ -284,7 +291,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         {
             return Geometry.Parse("M3,3 H13 V13 H3 Z M6,6 H16 V16 H6 Z");
         }
-        
+
         private static Geometry CreateUsersIcon()
         {
             return Geometry.Parse("F1 M 4,8 A 2,2 0 1 1 4,4 A 2,2 0 1 1 4,8 M 8.5,7.5 A 1.5,1.5 0 1 1 8.5,4.5 A 1.5,1.5 0 1 1 8.5,7.5 M 1,11 C 1,9.5 3,9 4,9 C 5,9 7,9.5 7,11 M 6.5,11 C 6.7,10 7.8,9.3 9,9.3 C 10,9.3 11,9.8 11,11");
@@ -303,6 +310,11 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         private static Geometry CreateCogIcon()
         {
             return Geometry.Parse("F1 M 6,1.5 L 7,1.5 L 7.3,2.7 C 7.7,2.8 8.1,3 8.4,3.2 L 9.5,2.6 L 10.2,3.3 L 9.6,4.4 C 9.8,4.7 10,5.1 10.1,5.5 L 11.3,5.8 L 11.3,6.8 L 10.1,7.1 C 10,7.5 9.8,7.9 9.6,8.2 L 10.2,9.3 L 9.5,10 L 8.4,9.4 C 8.1,9.6 7.7,9.8 7.3,9.9 L 7,11.1 L 6,11.1 L 5.7,9.9 C 5.3,9.8 4.9,9.6 4.6,9.4 L 3.5,10 L 2.8,9.3 L 3.4,8.2 C 3.2,7.9 3,7.5 2.9,7.1 L 1.7,6.8 L 1.7,5.8 L 2.9,5.5 C 3,5.1 3.2,4.7 3.4,4.4 L 2.8,3.3 L 3.5,2.6 L 4.6,3.2 C 4.9,3 5.3,2.8 5.7,2.7 Z M 6.5,4.2 A 1.8,1.8 0 1 1 6.5,7.8 A 1.8,1.8 0 1 1 6.5,4.2");
+        }
+
+        private static Geometry CreateShieldIcon()
+        {
+            return Geometry.Parse("F1 M 6.5,1 L 11,2.5 L 11,6.2 C 11,8.7 9.5,10.9 6.5,12.3 C 3.5,10.9 2,8.7 2,6.2 L 2,2.5 Z");
         }
     }
 }
