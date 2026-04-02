@@ -1,4 +1,5 @@
-﻿using NinjaTrader.NinjaScript.AddOns.Ninjex.Licensing.Models;
+﻿using System.Windows;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.Licensing.Models;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
 {
@@ -21,12 +22,10 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.Tools.RelayTool
         {
             if (_simModeCheckBox == null)
                 return;
-
-            _simModeCheckBox.IsChecked = _simOnlyMode;
-            _simModeCheckBox.IsEnabled = _liveModePermitted;
-            _simModeCheckBox.ToolTip = _liveModePermitted
-                ? "Toggle simulation mode."
-                : "A valid live license is required to disable simulation mode.";
+            
+            _simModeCheckBox.Visibility = _liveModePermitted
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void ApplyLicenseState(LicenseState state)
