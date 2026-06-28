@@ -7,7 +7,6 @@ using System.Linq;
 using System.Windows.Media;
 using System.Xml.Serialization;
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 #endregion
 
@@ -126,8 +125,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             if (timeValue >= startTime && timeValue < endTime)
             {
-                var price = Closes[1][0];
-                var volume = Volumes[1][0];
+                double price = Closes[1][0];
+                double volume = Volumes[1][0];
 
                 AddVolumeAtPrice(price, volume);
                 return;
@@ -166,10 +165,10 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (price <= 0 || volume <= 0)
                 return;
 
-            int safeRowSizeTicks = Math.Max(1, RowSizeTicks);
-            double bucketSize = TickSize * safeRowSizeTicks;
+            var safeRowSizeTicks = Math.Max(1, RowSizeTicks);
+            var bucketSize = TickSize * safeRowSizeTicks;
 
-            int bucket = (int)Math.Round(price / bucketSize, MidpointRounding.AwayFromZero);
+            var bucket = (int)Math.Round(price / bucketSize, MidpointRounding.AwayFromZero);
 
             if (!volumeByBucket.ContainsKey(bucket))
                 volumeByBucket[bucket] = 0;
@@ -338,7 +337,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private static DateTime ConvertTime(DateTime sourceTime, TimeZoneInfo sourceZone, TimeZoneInfo destinationZone)
         {
-            var unspecified = DateTime.SpecifyKind(sourceTime, DateTimeKind.Unspecified);
+            DateTime unspecified = DateTime.SpecifyKind(sourceTime, DateTimeKind.Unspecified);
             return TimeZoneInfo.ConvertTime(unspecified, sourceZone, destinationZone);
         }
 

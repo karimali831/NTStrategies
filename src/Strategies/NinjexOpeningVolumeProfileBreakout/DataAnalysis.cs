@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (string.IsNullOrWhiteSpace(dataFilePath))
                 return;
 
-            DateTime profileDate = easternNow.Date;
+            var profileDate = easternNow.Date;
 
             if (lastProfileLoggedDate == profileDate)
                 return;
@@ -165,7 +165,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableDataCollection || !LogRejectedSetups)
                 return;
 
-            DateTime easternNow = ConvertChartTimeToEastern
+            var easternNow = ConvertChartTimeToEastern
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
                 : Time[0];
 
@@ -203,8 +203,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
                 : Time[0];
 
-            double bodyHigh = Math.Max(Open[0], Close[0]);
-            double bodyLow = Math.Min(Open[0], Close[0]);
+            var bodyHigh = Math.Max(Open[0], Close[0]);
+            var bodyLow = Math.Min(Open[0], Close[0]);
 
             pendingSetup = new PendingSetup
             {
@@ -249,16 +249,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             pendingSetup.BarsTracked++;
 
-            double pointValue = Instrument.MasterInstrument.PointValue;
-            int safeQuantity = Math.Max(1, pendingSetup.Quantity);
+            var pointValue = Instrument.MasterInstrument.PointValue;
+            var safeQuantity = Math.Max(1, pendingSetup.Quantity);
 
-            bool targetHit = false;
-            bool stopHit = false;
+            var targetHit = false;
+            var stopHit = false;
 
             if (pendingSetup.Direction == "LONG")
             {
-                double mfe = (High[0] - pendingSetup.EntryPrice) * pointValue * safeQuantity;
-                double mae = (Low[0] - pendingSetup.EntryPrice) * pointValue * safeQuantity;
+                var mfe = (High[0] - pendingSetup.EntryPrice) * pointValue * safeQuantity;
+                var mae = (Low[0] - pendingSetup.EntryPrice) * pointValue * safeQuantity;
 
                 pendingSetup.MfeUsd = Math.Max(pendingSetup.MfeUsd, mfe);
                 pendingSetup.MaeUsd = Math.Min(pendingSetup.MaeUsd, mae);
@@ -268,8 +268,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (pendingSetup.Direction == "SHORT")
             {
-                double mfe = (pendingSetup.EntryPrice - Low[0]) * pointValue * safeQuantity;
-                double mae = (pendingSetup.EntryPrice - High[0]) * pointValue * safeQuantity;
+                var mfe = (pendingSetup.EntryPrice - Low[0]) * pointValue * safeQuantity;
+                var mae = (pendingSetup.EntryPrice - High[0]) * pointValue * safeQuantity;
 
                 pendingSetup.MfeUsd = Math.Max(pendingSetup.MfeUsd, mfe);
                 pendingSetup.MaeUsd = Math.Min(pendingSetup.MaeUsd, mae);
@@ -280,8 +280,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (targetHit && stopHit)
             {
-                string outcome = SameBarStopFirst ? "SameBarBoth_StopFirst" : "SameBarBoth_TargetFirst";
-                double exitPrice = SameBarStopFirst ? pendingSetup.StopPrice : pendingSetup.TargetPrice;
+                var outcome = SameBarStopFirst ? "SameBarBoth_StopFirst" : "SameBarBoth_TargetFirst";
+                var exitPrice = SameBarStopFirst ? pendingSetup.StopPrice : pendingSetup.TargetPrice;
 
                 FinalizePendingSetup(outcome, Time[0], exitPrice, "Both stop and target touched in same bar. OHLC cannot determine true sequence.");
                 return;

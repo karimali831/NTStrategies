@@ -157,55 +157,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrySubmitBarCloseEntry();
         }
 
-        private NinjexOpeningVolumeProfile CreateOpeningProfileIndicator()
-        {
-#if RIDER
-            return new NinjexOpeningVolumeProfile
-            {
-                ProfileStartTime = ProfileStartTime,
-                ProfileEndTime = ProfileEndTime,
-                RowSizeTicks = RowSizeTicks,
-                ValueAreaPercent = ValueAreaPercent,
-                UseTickDataForProfile = UseTickDataForProfile,
-                ConvertChartTimeToEastern = ConvertChartTimeToEastern,
-                SourceTimeZoneId = SourceTimeZoneId,
-                ShowPanel = ShowProfilePanel,
-                ShowHorizontalLines = ShowProfileHorizontalLines,
-                ShowVAH = true,
-                ShowVAL = true,
-                ShowPOC = true
-            };
-#else
-            return NinjexOpeningVolumeProfile(
-                ProfileStartTime,
-                ProfileEndTime,
-                RowSizeTicks,
-                ValueAreaPercent,
-                UseTickDataForProfile,
-                ConvertChartTimeToEastern,
-                SourceTimeZoneId,
-                ShowProfilePanel,
-                ShowProfileHorizontalLines,
-                true,
-                true,
-                true);
-#endif
-        }
-        
-        private bool LoadActiveProfileLevels()
-        {
-            if (openingProfile == null)
-                return false;
-
-            activeVAH = openingProfile.VAH[0];
-            activeVAL = openingProfile.VAL[0];
-            activePOC = openingProfile.POC[0];
-
-            return IsValidLevel(activeVAH)
-                   && IsValidLevel(activeVAL)
-                   && activeVAH > activeVAL;
-        }
-
         private void UpdateBreakoutArming(int timeValue, int profileEnd)
         {
             if (timeValue <= profileEnd)

@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StrategyTemplate>
+  <StrategyType>NinjaTrader.NinjaScript.Strategies.MicroPBV2</StrategyType>
+  <Strategy>
+    <MicroPBV2 xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <IsVisible>true</IsVisible>
+      <calculate2>OnEachTick</calculate2>
+      <AreLinesConfigurable>true</AreLinesConfigurable>
+      <ArePlotsConfigurable>true</ArePlotsConfigurable>
+      <BarsPeriodSerializable>
+        <BarsPeriodTypeSerialize>4</BarsPeriodTypeSerialize>
+        <BaseBarsPeriodType>Minute</BaseBarsPeriodType>
+        <BaseBarsPeriodValue>1</BaseBarsPeriodValue>
+        <VolumetricDeltaType>BidAsk</VolumetricDeltaType>
+        <MarketDataType>Last</MarketDataType>
+        <PointAndFigurePriceType>Close</PointAndFigurePriceType>
+        <ReversalType>Tick</ReversalType>
+        <Value>5</Value>
+        <Value2>1</Value2>
+      </BarsPeriodSerializable>
+      <BarsToLoad>0</BarsToLoad>
+      <Calculate>OnEachTick</Calculate>
+      <Displacement>0</Displacement>
+      <DisplayInDataBox>true</DisplayInDataBox>
+      <From>2025-01-02T00:00:00</From>
+      <IsAutoScale>true</IsAutoScale>
+      <Lines />
+      <MaximumBarsLookBack>TwoHundredFiftySix</MaximumBarsLookBack>
+      <Name>MicroPBV2</Name>
+      <Panel>-1</Panel>
+      <Plots />
+      <ScaleJustification>Right</ScaleJustification>
+      <ShowTransparentPlotsInDataBox>false</ShowTransparentPlotsInDataBox>
+      <To>2025-03-14T00:00:00</To>
+      <IsDataSeriesRequired>true</IsDataSeriesRequired>
+      <IsOverlay>true</IsOverlay>
+      <SelectedValueSeries>0</SelectedValueSeries>
+      <Gtd>1800-01-01T00:00:00</Gtd>
+      <Template />
+      <TimeInForce>Gtc</TimeInForce>
+      <BarsPeriodParameter>
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:int">0</Max>
+        <Min xsi:type="xsd:int">0</Min>
+        <Name />
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>0</ValueSerializable>
+      </BarsPeriodParameter>
+      <BarsRequiredToTrade>20</BarsRequiredToTrade>
+      <Category>Backtest</Category>
+      <ConnectionLossHandling>KeepRunning</ConnectionLossHandling>
+      <DaysToLoad>1</DaysToLoad>
+      <DefaultQuantity>1</DefaultQuantity>
+      <DisconnectDelaySeconds>10</DisconnectDelaySeconds>
+      <EntriesPerDirection>1</EntriesPerDirection>
+      <EntryHandling>UniqueEntries</EntryHandling>
+      <ExitOnSessionCloseSeconds>10</ExitOnSessionCloseSeconds>
+      <IncludeCommission>false</IncludeCommission>
+      <IsAggregated>false</IsAggregated>
+      <IsExitOnSessionCloseStrategy>true</IsExitOnSessionCloseStrategy>
+      <IsFillLimitOnTouch>false</IsFillLimitOnTouch>
+      <IsOptimizeDataSeries>false</IsOptimizeDataSeries>
+      <IsStableSession>true</IsStableSession>
+      <IsTickReplay>false</IsTickReplay>
+      <IsTradingHoursBreakLineVisible>true</IsTradingHoursBreakLineVisible>
+      <IsWaitUntilFlat>false</IsWaitUntilFlat>
+      <NumberRestartAttempts>4</NumberRestartAttempts>
+      <OptimizationPeriod>10</OptimizationPeriod>
+      <OrderFillResolution>High</OrderFillResolution>
+      <OrderFillResolutionType>Tick</OrderFillResolutionType>
+      <OrderFillResolutionValue>1</OrderFillResolutionValue>
+      <RestartsWithinMinutes>5</RestartsWithinMinutes>
+      <SetOrderQuantity>Strategy</SetOrderQuantity>
+      <Slippage>0</Slippage>
+      <StartBehavior>WaitUntilFlat</StartBehavior>
+      <StopTargetHandling>PerEntryExecution</StopTargetHandling>
+      <SupportsOptimizationGraph>true</SupportsOptimizationGraph>
+      <TestPeriod>28</TestPeriod>
+      <TradingHoursSerializable>CME US Index Futures RTH</TradingHoursSerializable>
+      <DrawOnPricePanel>false</DrawOnPricePanel>
+      <ZOrder>-2147483648</ZOrder>
+      <DebugMode>false</DebugMode>
+      <IsHistorical>false</IsHistorical>
+      <Contracts>1</Contracts>
+      <EnableLongs>true</EnableLongs>
+      <EnableShorts>true</EnableShorts>
+      <BlockDuplicateInstances>true</BlockDuplicateInstances>
+      <DuplicateCancelWorkingOrders>true</DuplicateCancelWorkingOrders>
+      <DuplicateFlattenInstrument>true</DuplicateFlattenInstrument>
+      <MinMinutesFromOpen>15</MinMinutesFromOpen>
+      <MaxMinutesFromOpen>120</MaxMinutesFromOpen>
+      <MidBreakStartMin>0</MidBreakStartMin>
+      <MidBreakEndMin>0</MidBreakEndMin>
+      <EMAFast>9</EMAFast>
+      <EMASlow>21</EMASlow>
+      <ADXPeriod>14</ADXPeriod>
+      <ADXMin>15</ADXMin>
+      <ADXMax>45</ADXMax>
+      <LookbackBars>6</LookbackBars>
+      <ConfirmBars>1</ConfirmBars>
+      <ConfirmAboveEmaTicks>5</ConfirmAboveEmaTicks>
+      <StrongBodyTicks>4</StrongBodyTicks>
+      <LongTouchTicks>2</LongTouchTicks>
+      <ShortTouchTicks>2</ShortTouchTicks>
+      <MaxStopTicks>100</MaxStopTicks>
+      <MaxProfitTicks>140</MaxProfitTicks>
+      <OneMinuteConfirmBars>2</OneMinuteConfirmBars>
+      <MinStopOffsetTicks>2</MinStopOffsetTicks>
+      <MaxDailyLossPerContractUSD>500</MaxDailyLossPerContractUSD>
+      <MaxDailyProfitPerContractUSD>700</MaxDailyProfitPerContractUSD>
+      <ConsistencyRule>None</ConsistencyRule>
+      <MinMinutesBetweenTrades>10</MinMinutesBetweenTrades>
+      <EmergencyStopTicks>105</EmergencyStopTicks>
+      <ProtectiveWatchdogSeconds>0</ProtectiveWatchdogSeconds>
+      <AutoEmergencyStop>true</AutoEmergencyStop>
+      <DynamicContractSizing>false</DynamicContractSizing>
+      <UseBreakEven>false</UseBreakEven>
+      <UseAggressiveBE>true</UseAggressiveBE>
+      <BE_TriggerTicks>12</BE_TriggerTicks>
+      <BE_PlusTicks>6</BE_PlusTicks>
+      <ApiEnabled>false</ApiEnabled>
+      <ApiBaseUrl>https://karimali.uk</ApiBaseUrl>
+      <ApiTimeoutMs>7000</ApiTimeoutMs>
+      <TddPlanContextId>12</TddPlanContextId>
+      <TddSendIntervalSeconds>1</TddSendIntervalSeconds>
+      <OverrideTrailingDrawdown>0</OverrideTrailingDrawdown>
+    </MicroPBV2>
+  </Strategy>
+</StrategyTemplate>
