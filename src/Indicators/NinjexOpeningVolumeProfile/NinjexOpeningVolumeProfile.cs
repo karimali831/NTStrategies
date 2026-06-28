@@ -1,36 +1,22 @@
 ﻿#region Using declarations
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using System.Windows.Media;
 using System.Xml.Serialization;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Ninjex;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
     public class NinjexOpeningVolumeProfile : Indicator
     {
-        private readonly Dictionary<int, double> volumeByBucket = new Dictionary<int, double>();
+        private NinjexOpeningVolumeProfileEngine profileEngine;
 
         private TimeZoneInfo sourceTimeZone;
         private TimeZoneInfo easternTimeZone;
-
-        private DateTime activeProfileDate = Core.Globals.MinDate;
-        private DateTime completedProfileDate = Core.Globals.MinDate;
-
-        private bool activeProfileFinalized;
-
-        private double currentVAH = double.NaN;
-        private double currentVAL = double.NaN;
-        private double currentPOC = double.NaN;
-
-        private double displayedVAH = double.NaN;
-        private double displayedVAL = double.NaN;
-        private double displayedPOC = double.NaN;
 
         private const string PanelTag = "NinjexOpeningVolumeProfile_Panel";
         private const string VAHLineTag = "NinjexOpeningVolumeProfile_VAH";
@@ -81,6 +67,8 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 easternTimeZone = FindTimeZoneOrLocal("Eastern Standard Time");
                 sourceTimeZone = FindTimeZoneOrLocal(SourceTimeZoneId);
+
+                profileEngine = new NinjexOpeningVolumeProfileEngine();
             }
         }
 
@@ -106,132 +94,33 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void ProcessTickProfile()
         {
+            if (profileEngine == null)
+                return;
+
             if (CurrentBars[1] < 1)
                 return;
 
-            DateTime tickChartTime = Times[1][0];
-            DateTime profileTime = ConvertChartTimeToProfileTime(tickChartTime);
-            DateTime profileDate = profileTime.Date;
+            var tickChartTime = Times[1][0];
+            var profileTime = ConvertChartTimeToProfileTime(tickChartTime);
 
-            if (activeProfileDate != profileDate)
-                StartNewProfile(profileDate);
+            var finalizedNow = profileEngine.ProcessTick(
+                profileTime,
+                Closes[1][0],
+                Volumes[1][0],
+                TickSize,
+                ProfileStartTime,
+                ProfileEndTime,
+                RowSizeTicks,
+                ValueAreaPercent);
 
-            if (activeProfileFinalized)
-                return;
-
-            var timeValue = ToTime(profileTime);
-            var startTime = NormalizeTimeInput(ProfileStartTime);
-            var endTime = NormalizeTimeInput(ProfileEndTime);
-
-            if (timeValue >= startTime && timeValue < endTime)
+            if (finalizedNow)
             {
-                double price = Closes[1][0];
-                double volume = Volumes[1][0];
+                UpdateOutputSeries();
+                UpdatePanel();
 
-                AddVolumeAtPrice(price, volume);
-                return;
+                if (ShowHorizontalLines)
+                    DrawHorizontalLevels();
             }
-
-            if (timeValue >= endTime && volumeByBucket.Count > 0)
-            {
-                FinalizeProfile();
-
-                displayedVAH = currentVAH;
-                displayedVAL = currentVAL;
-                displayedPOC = currentPOC;
-
-                completedProfileDate = activeProfileDate;
-                activeProfileFinalized = true;
-            }
-        }
-
-        private void StartNewProfile(DateTime profileDate)
-        {
-            activeProfileDate = profileDate;
-            activeProfileFinalized = false;
-
-            volumeByBucket.Clear();
-
-            currentVAH = double.NaN;
-            currentVAL = double.NaN;
-            currentPOC = double.NaN;
-
-            // Do not clear displayed levels here.
-            // This keeps the previous completed profile visible until the new one completes.
-        }
-
-        private void AddVolumeAtPrice(double price, double volume)
-        {
-            if (price <= 0 || volume <= 0)
-                return;
-
-            var safeRowSizeTicks = Math.Max(1, RowSizeTicks);
-            var bucketSize = TickSize * safeRowSizeTicks;
-
-            var bucket = (int)Math.Round(price / bucketSize, MidpointRounding.AwayFromZero);
-
-            if (!volumeByBucket.ContainsKey(bucket))
-                volumeByBucket[bucket] = 0;
-
-            volumeByBucket[bucket] += volume;
-        }
-
-        private void FinalizeProfile()
-        {
-            if (volumeByBucket.Count == 0)
-                return;
-
-            var safeRowSizeTicks = Math.Max(1, RowSizeTicks);
-            var bucketSize = TickSize * safeRowSizeTicks;
-
-            var pocBucket = volumeByBucket
-                .OrderByDescending(x => x.Value)
-                .ThenBy(x => x.Key)
-                .First()
-                .Key;
-
-            var totalVolume = volumeByBucket.Values.Sum();
-
-            var safeValueArea = Math.Max(1, Math.Min(100, ValueAreaPercent));
-            var targetVolume = totalVolume * (safeValueArea / 100.0);
-
-            var sortedBuckets = volumeByBucket.Keys.OrderBy(x => x).ToList();
-
-            var pocIndex = sortedBuckets.IndexOf(pocBucket);
-            var lowerIndex = pocIndex;
-            var upperIndex = pocIndex;
-
-            var accumulatedVolume = volumeByBucket[pocBucket];
-
-            while (accumulatedVolume < targetVolume && (lowerIndex > 0 || upperIndex < sortedBuckets.Count - 1))
-            {
-                var lowerVolume = lowerIndex > 0
-                    ? volumeByBucket[sortedBuckets[lowerIndex - 1]]
-                    : -1;
-
-                var upperVolume = upperIndex < sortedBuckets.Count - 1
-                    ? volumeByBucket[sortedBuckets[upperIndex + 1]]
-                    : -1;
-
-                if (upperVolume >= lowerVolume && upperIndex < sortedBuckets.Count - 1)
-                {
-                    upperIndex++;
-                    accumulatedVolume += Math.Max(0, upperVolume);
-                }
-                else if (lowerIndex > 0)
-                {
-                    lowerIndex--;
-                    accumulatedVolume += Math.Max(0, lowerVolume);
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            currentPOC = Instrument.MasterInstrument.RoundToTickSize(pocBucket * bucketSize);
-            currentVAH = Instrument.MasterInstrument.RoundToTickSize(sortedBuckets[upperIndex] * bucketSize);
-            currentVAL = Instrument.MasterInstrument.RoundToTickSize(sortedBuckets[lowerIndex] * bucketSize);
         }
 
         private void UpdateOutputSeries()
@@ -240,14 +129,17 @@ namespace NinjaTrader.NinjaScript.Indicators
             Values[1][0] = double.NaN;
             Values[2][0] = double.NaN;
 
-            if (ShowVAH && IsValidLevel(displayedVAH))
-                Values[0][0] = displayedVAH;
+            if (profileEngine == null || !profileEngine.HasCompletedProfile)
+                return;
 
-            if (ShowVAL && IsValidLevel(displayedVAL))
-                Values[1][0] = displayedVAL;
+            if (ShowVAH && IsValidLevel(profileEngine.LatestVAH))
+                Values[0][0] = profileEngine.LatestVAH;
 
-            if (ShowPOC && IsValidLevel(displayedPOC))
-                Values[2][0] = displayedPOC;
+            if (ShowVAL && IsValidLevel(profileEngine.LatestVAL))
+                Values[1][0] = profileEngine.LatestVAL;
+
+            if (ShowPOC && IsValidLevel(profileEngine.LatestPOC))
+                Values[2][0] = profileEngine.LatestPOC;
         }
 
         private void UpdatePanel()
@@ -258,13 +150,15 @@ namespace NinjaTrader.NinjaScript.Indicators
                 return;
             }
 
-            var dateText = completedProfileDate == Core.Globals.MinDate
-                ? "No completed profile"
-                : completedProfileDate.ToString("dd MMM yyyy");
+            var hasProfile = profileEngine != null && profileEngine.HasCompletedProfile;
 
-            var vahText = IsValidLevel(displayedVAH) ? displayedVAH.ToString("0.00") : "-";
-            var valText = IsValidLevel(displayedVAL) ? displayedVAL.ToString("0.00") : "-";
-            var pocText = IsValidLevel(displayedPOC) ? displayedPOC.ToString("0.00") : "-";
+            var dateText = hasProfile
+                ? profileEngine.LatestProfileDate.ToString("dd MMM yyyy")
+                : "No completed profile";
+
+            var vahText = hasProfile ? profileEngine.LatestVAH.ToString("0.00") : "-";
+            var valText = hasProfile ? profileEngine.LatestVAL.ToString("0.00") : "-";
+            var pocText = hasProfile ? profileEngine.LatestPOC.ToString("0.00") : "-";
 
             var text =
                 "Opening Volume Profile 09:30-09:45 ET\n" +
@@ -283,18 +177,26 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void DrawHorizontalLevels()
         {
-            if (ShowVAH && IsValidLevel(displayedVAH))
-                Draw.HorizontalLine(this, VAHLineTag, displayedVAH, Brushes.RoyalBlue);
+            if (profileEngine == null || !profileEngine.HasCompletedProfile)
+            {
+                RemoveDrawObject(VAHLineTag);
+                RemoveDrawObject(VALLineTag);
+                RemoveDrawObject(POCLineTag);
+                return;
+            }
+
+            if (ShowVAH && IsValidLevel(profileEngine.LatestVAH))
+                Draw.HorizontalLine(this, VAHLineTag, profileEngine.LatestVAH, Brushes.RoyalBlue);
             else
                 RemoveDrawObject(VAHLineTag);
 
-            if (ShowVAL && IsValidLevel(displayedVAL))
-                Draw.HorizontalLine(this, VALLineTag, displayedVAL, Brushes.RoyalBlue);
+            if (ShowVAL && IsValidLevel(profileEngine.LatestVAL))
+                Draw.HorizontalLine(this, VALLineTag, profileEngine.LatestVAL, Brushes.RoyalBlue);
             else
                 RemoveDrawObject(VALLineTag);
 
-            if (ShowPOC && IsValidLevel(displayedPOC))
-                Draw.HorizontalLine(this, POCLineTag, displayedPOC, Brushes.Red);
+            if (ShowPOC && IsValidLevel(profileEngine.LatestPOC))
+                Draw.HorizontalLine(this, POCLineTag, profileEngine.LatestPOC, Brushes.Red);
             else
                 RemoveDrawObject(POCLineTag);
         }
@@ -310,14 +212,6 @@ namespace NinjaTrader.NinjaScript.Indicators
         private static bool IsValidLevel(double value)
         {
             return !double.IsNaN(value) && !double.IsInfinity(value) && value > 0;
-        }
-
-        private static int NormalizeTimeInput(int value)
-        {
-            if (value > 0 && value < 2400)
-                return value * 100;
-
-            return value;
         }
 
         private static TimeZoneInfo FindTimeZoneOrLocal(string timeZoneId)
@@ -418,6 +312,34 @@ namespace NinjaTrader.NinjaScript.Indicators
         public Series<double> POC
         {
             get { return Values[2]; }
+        }
+        
+        [Browsable(false)]
+        [XmlIgnore]
+        public double LatestVAH
+        {
+            get { return profileEngine != null ? profileEngine.LatestVAH : double.NaN; }
+        }
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public double LatestVAL
+        {
+            get { return profileEngine != null ? profileEngine.LatestVAL : double.NaN; }
+        }
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public double LatestPOC
+        {
+            get { return profileEngine != null ? profileEngine.LatestPOC : double.NaN; }
+        }
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public DateTime LatestProfileDate
+        {
+            get { return profileEngine != null ? profileEngine.LatestProfileDate : Core.Globals.MinDate; }
         }
 
         #endregion

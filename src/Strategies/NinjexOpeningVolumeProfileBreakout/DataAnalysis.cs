@@ -42,6 +42,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public double MfeUsd;
             public double MaeUsd;
+            
+            public double EntryDistanceTicks;
+            public double EntryDistancePoints;
         }
         
         private void ConfigureDataCollection()
@@ -92,6 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "profile_width",
                 "entry_offset_ticks",
                 "min_retracement_ticks",
+                "max_distance_ticks",
                 "enable_longs",
                 "enable_shorts",
                 "long_armed",
@@ -103,6 +107,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "body_high",
                 "body_low",
                 "entry_price",
+                "entry_distance_ticks",
+                "entry_distance_points",
                 "stop_price",
                 "target_price",
                 "stop_loss_usd",
@@ -149,6 +155,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bodyHigh: double.NaN,
                 bodyLow: double.NaN,
                 entryPrice: double.NaN,
+                entryDistanceTicks: double.NaN,
+                entryDistancePoints: double.NaN,
                 stopPrice: double.NaN,
                 targetPrice: double.NaN,
                 barsTracked: 0,
@@ -168,6 +176,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var easternNow = ConvertChartTimeToEastern
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
                 : Time[0];
+            
+            var entryDistanceTicks = GetEntryDistanceTicks(direction, Close[0]);
+            var entryDistancePoints = entryDistanceTicks * TickSize;
 
             AppendDataRow(
                 eventType: "REJECTED_SETUP",
@@ -183,6 +194,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bodyHigh: bodyHigh,
                 bodyLow: bodyLow,
                 entryPrice: Close[0],
+                entryDistanceTicks,
+                entryDistancePoints,
                 stopPrice: double.NaN,
                 targetPrice: double.NaN,
                 barsTracked: 0,
@@ -199,12 +212,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableDataCollection || !TrackForwardOutcome)
                 return;
 
-            DateTime easternNow = ConvertChartTimeToEastern
+            var easternNow = ConvertChartTimeToEastern
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
                 : Time[0];
 
             var bodyHigh = Math.Max(Open[0], Close[0]);
             var bodyLow = Math.Min(Open[0], Close[0]);
+            
+            var entryDistanceTicks = GetEntryDistanceTicks(direction, entryPrice);
+            var entryDistancePoints = entryDistanceTicks * TickSize;
 
             pendingSetup = new PendingSetup
             {
@@ -226,6 +242,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BodyLow = bodyLow,
 
                 EntryPrice = entryPrice,
+                EntryDistanceTicks = entryDistanceTicks,
+                EntryDistancePoints = entryDistancePoints,
                 StopPrice = stopPrice,
                 TargetPrice = targetPrice,
 
@@ -324,6 +342,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bodyHigh: pendingSetup.BodyHigh,
                 bodyLow: pendingSetup.BodyLow,
                 entryPrice: pendingSetup.EntryPrice,
+                entryDistanceTicks: pendingSetup.EntryDistanceTicks,
+                entryDistancePoints: pendingSetup.EntryDistancePoints,
                 stopPrice: pendingSetup.StopPrice,
                 targetPrice: pendingSetup.TargetPrice,
                 barsTracked: pendingSetup.BarsTracked,
@@ -351,6 +371,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             double bodyHigh,
             double bodyLow,
             double entryPrice,
+            double entryDistanceTicks,
+            double entryDistancePoints,
             double stopPrice,
             double targetPrice,
             int barsTracked,
@@ -391,6 +413,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CsvNumber(profileWidth),
                     EntryOffsetTicks.ToString(CultureInfo.InvariantCulture),
                     MinRetracementTicks.ToString(CultureInfo.InvariantCulture),
+                    MaxDistanceTicksFromBreakoutLevel.ToString(CultureInfo.InvariantCulture),
                     EnableLongs.ToString(),
                     EnableShorts.ToString(),
                     longBreakoutArmed.ToString(),
@@ -402,6 +425,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CsvNumber(bodyHigh),
                     CsvNumber(bodyLow),
                     CsvNumber(entryPrice),
+                    CsvNumber(entryDistanceTicks),
+                    CsvNumber(entryDistancePoints),
                     CsvNumber(stopPrice),
                     CsvNumber(targetPrice),
                     CsvNumber(StopLossUsd),

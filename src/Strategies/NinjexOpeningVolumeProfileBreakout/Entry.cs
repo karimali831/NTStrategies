@@ -72,6 +72,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
+                if (!IsEntryDistanceAllowed("LONG", Close[0]))
+                {
+                    double distanceTicks = GetEntryDistanceTicks("LONG", Close[0]);
+
+                    DebugPrint("Long blocked: entry too far from VAH. DistanceTicks=" + distanceTicks);
+                    LogRejectedSetup("LONG", "TooFarFromBreakoutLevel", bodyHigh, bodyLow);
+                    return;
+                }
+
                 SubmitManagedLong();
                 return;
             }
@@ -82,6 +91,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     DebugPrint("Short blocked: minimum retracement inside range not satisfied.");
                     LogRejectedSetup("SHORT", "NotArmed", bodyHigh, bodyLow);
+                    return;
+                }
+
+                if (!IsEntryDistanceAllowed("SHORT", Close[0]))
+                {
+                    var distanceTicks = GetEntryDistanceTicks("SHORT", Close[0]);
+
+                    DebugPrint("Short blocked: entry too far from VAL. DistanceTicks=" + distanceTicks);
+                    LogRejectedSetup("SHORT", "TooFarFromBreakoutLevel", bodyHigh, bodyLow);
                     return;
                 }
 
@@ -149,6 +167,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             tradesToday++;
 
             DebugPrint("Short submitted. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
+        }
+        
+        private double GetEntryDistanceTicks(string direction, double entryPrice)
+        {
+            if (direction == "LONG")
+                return Math.Abs(entryPrice - GetLongTrigger()) / TickSize;
+
+            if (direction == "SHORT")
+                return Math.Abs(entryPrice - GetShortTrigger()) / TickSize;
+
+            return double.NaN;
+        }
+
+        private bool IsEntryDistanceAllowed(string direction, double entryPrice)
+        {
+            if (MaxDistanceTicksFromBreakoutLevel <= 0)
+                return true;
+
+            var distanceTicks = GetEntryDistanceTicks(direction, entryPrice);
+
+            return !double.IsNaN(distanceTicks)
+                   && distanceTicks <= MaxDistanceTicksFromBreakoutLevel;
         }
     }
 }

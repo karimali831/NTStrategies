@@ -84,6 +84,7 @@
         <Content Include="src\Indicators\EMA\Templates\Default.xml" />
         <Compile Include="src\Indicators\NinjexPinBarDots\NinjexPinBarDots.cs" />
         <Compile Include="src\Indicators\NinjexVolumetricFVG\NinjexVolumetricFVG.cs" />
+        <Compile Include="src\Shared\NinjexOpeningVolumeProfileEngine.cs" />
         <Compile Include="src\Strategies\ApexMicroPBLiveV3\ApexMicroPBLiveV3.cs" />
         <Compile Include="src\Strategies\BaselineTrendPullback\Features.cs" />
         <Compile Include="src\Strategies\BaselineTrendPullback\Base.cs" />

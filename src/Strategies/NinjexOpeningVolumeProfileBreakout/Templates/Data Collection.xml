@@ -46,11 +46,11 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">945</Max>
-        <Min xsi:type="xsd:int">945</Min>
+        <Max xsi:type="xsd:int">940</Max>
+        <Min xsi:type="xsd:int">940</Min>
         <Name>ProfileEndTime</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>945</ValueSerializable>
+        <ValueSerializable>940</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -193,24 +193,6 @@
         <Max xsi:type="xsd:boolean">true</Max>
         <Min xsi:type="xsd:boolean">true</Min>
         <Name>ConvertChartTimeToEastern</Name>
-        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>True</ValueSerializable>
-      </Parameter>
-      <Parameter>
-        <EnumValuesSerializable />
-        <Increment>1</Increment>
-        <Max xsi:type="xsd:boolean">true</Max>
-        <Min xsi:type="xsd:boolean">true</Min>
-        <Name>AddProfileIndicatorToChart</Name>
-        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>True</ValueSerializable>
-      </Parameter>
-      <Parameter>
-        <EnumValuesSerializable />
-        <Increment>1</Increment>
-        <Max xsi:type="xsd:boolean">true</Max>
-        <Min xsi:type="xsd:boolean">true</Min>
-        <Name>ShowProfilePanel</Name>
         <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
         <ValueSerializable>True</ValueSerializable>
       </Parameter>
@@ -368,7 +350,7 @@
       <DrawOnPricePanel>false</DrawOnPricePanel>
       <ZOrder>-2147483648</ZOrder>
       <ProfileStartTime>930</ProfileStartTime>
-      <ProfileEndTime>945</ProfileEndTime>
+      <ProfileEndTime>940</ProfileEndTime>
       <RowSizeTicks>1</RowSizeTicks>
       <ValueAreaPercent>70</ValueAreaPercent>
       <UseTickDataForProfile>true</UseTickDataForProfile>
@@ -386,8 +368,6 @@
       <Quantity>1</Quantity>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>
       <SourceTimeZoneId>GMT Standard Time</SourceTimeZoneId>
-      <AddProfileIndicatorToChart>true</AddProfileIndicatorToChart>
-      <ShowProfilePanel>true</ShowProfilePanel>
       <ShowProfileHorizontalLines>true</ShowProfileHorizontalLines>
       <EnableDebug>false</EnableDebug>
       <EnableDataCollection>true</EnableDataCollection>

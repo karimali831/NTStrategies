@@ -57,6 +57,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 200)]
         [Display(Name = "Min Retracement Ticks", Order = 15, GroupName = "Entry")]
         public int MinRetracementTicks { get; set; }
+        
+        [NinjaScriptProperty]
+        [Range(0, 500)]
+        [Display(Name = "Max Distance Ticks From Breakout Level", Order = 16, GroupName = "Entry")]
+        public int MaxDistanceTicksFromBreakoutLevel { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100000)]
@@ -95,15 +100,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Source Time Zone Id", Order = 41, GroupName = "Time")]
         public string SourceTimeZoneId { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Add Profile Indicator To Chart", Order = 50, GroupName = "Visual")]
-        public bool AddProfileIndicatorToChart { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Show Profile Panel", Order = 51, GroupName = "Visual")]
-        public bool ShowProfilePanel { get; set; }
-
+        
         [NinjaScriptProperty]
         [Display(Name = "Show Profile Horizontal Lines", Order = 52, GroupName = "Visual")]
         public bool ShowProfileHorizontalLines { get; set; }

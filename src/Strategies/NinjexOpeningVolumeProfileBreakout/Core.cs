@@ -2,15 +2,13 @@
 using System;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.Ninjex;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningVolumeProfileBreakout : Strategy
     {
-        private NinjexOpeningVolumeProfile openingProfile;
-
         private TimeZoneInfo sourceTimeZone;
         private TimeZoneInfo easternTimeZone;
 
@@ -50,7 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Profile
                 ProfileStartTime = 930;
-                ProfileEndTime = 945;
+                ProfileEndTime = 940;
                 RowSizeTicks = 1;
                 ValueAreaPercent = 70;
                 UseTickDataForProfile = true;
@@ -62,6 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryEndTime = 1100;
                 EntryOffsetTicks = 0;
                 MinRetracementTicks = 15;
+                MaxDistanceTicksFromBreakoutLevel = 0;
 
                 // Risk management
                 ProfitTargetUsd = 700;
@@ -78,8 +77,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SourceTimeZoneId = "GMT Standard Time";
 
                 // Visual
-                AddProfileIndicatorToChart = true;
-                ShowProfilePanel = true;
                 ShowProfileHorizontalLines = true;
 
                 // Debug
@@ -105,10 +102,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 easternTimeZone = FindTimeZoneOrLocal("Eastern Standard Time");
                 sourceTimeZone = FindTimeZoneOrLocal(SourceTimeZoneId);
 
-                openingProfile = CreateOpeningProfileIndicator();
-
-                if (AddProfileIndicatorToChart)
-                    AddChartIndicator(openingProfile);
+                profileEngine = new NinjexOpeningVolumeProfileEngine();
 
                 ConfigureDataCollection();
             }
@@ -116,6 +110,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
+            if (UseTickDataForProfile && BarsInProgress == 1)
+            {
+                ProcessProfileTickForStrategy();
+                return;
+            }
+
             if (BarsInProgress != 0)
                 return;
 
@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             ResetDailyStateIfNeeded();
-            
+
             UpdatePendingSetupOutcome();
 
             ManageBreakEven();
@@ -134,13 +134,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            if (!LoadActiveProfileLevels())
-                return;
-            
             var easternNow = ConvertChartTimeToEastern
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
                 : Time[0];
 
+            if (!LoadActiveProfileLevels(easternNow.Date))
+                return;
+
+
+            DrawStrategyProfileLevels();
             LogDailyProfileIfNeeded(easternNow);
 
             var timeValue = ToTime(easternNow);
@@ -156,7 +158,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             TrySubmitBarCloseEntry();
         }
-
+        
         private void UpdateBreakoutArming(int timeValue, int profileEnd)
         {
             if (timeValue <= profileEnd)
