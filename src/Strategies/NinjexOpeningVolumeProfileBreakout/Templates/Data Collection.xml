@@ -46,11 +46,11 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">940</Max>
-        <Min xsi:type="xsd:int">940</Min>
+        <Max xsi:type="xsd:int">945</Max>
+        <Min xsi:type="xsd:int">945</Min>
         <Name>ProfileEndTime</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>940</ValueSerializable>
+        <ValueSerializable>945</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -91,11 +91,11 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:boolean">false</Max>
-        <Min xsi:type="xsd:boolean">false</Min>
+        <Max xsi:type="xsd:boolean">true</Max>
+        <Min xsi:type="xsd:boolean">true</Min>
         <Name>EnableShorts</Name>
         <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>False</ValueSerializable>
+        <ValueSerializable>True</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -127,11 +127,11 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">15</Max>
-        <Min xsi:type="xsd:int">15</Min>
+        <Max xsi:type="xsd:int">0</Max>
+        <Min xsi:type="xsd:int">0</Min>
         <Name>MinRetracementTicks</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>15</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -163,20 +163,20 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:double">100</Max>
-        <Min xsi:type="xsd:double">100</Min>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
         <Name>BreakEvenProfitTriggerUsd</Name>
         <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>100</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:double">50</Max>
-        <Min xsi:type="xsd:double">50</Min>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
         <Name>BreakEvenPlusUsd</Name>
         <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>50</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -185,7 +185,7 @@
         <Min xsi:type="xsd:int">10</Min>
         <Name>MaxTradesPerDay</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>1</ValueSerializable>
+        <ValueSerializable>10</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -386,7 +386,7 @@
       <DrawOnPricePanel>false</DrawOnPricePanel>
       <ZOrder>-2147483648</ZOrder>
       <ProfileStartTime>930</ProfileStartTime>
-      <ProfileEndTime>940</ProfileEndTime>
+      <ProfileEndTime>945</ProfileEndTime>
       <RowSizeTicks>1</RowSizeTicks>
       <ValueAreaPercent>70</ValueAreaPercent>
       <UseTickDataForProfile>true</UseTickDataForProfile>
@@ -400,7 +400,7 @@
       <ProfitTargetUsd>700</ProfitTargetUsd>
       <StopLossUsd>350</StopLossUsd>
       <BreakEvenProfitTriggerUsd>0</BreakEvenProfitTriggerUsd>
-      <BreakEvenPlusUsd>50</BreakEvenPlusUsd>
+      <BreakEvenPlusUsd>0</BreakEvenPlusUsd>
       <MaxTradesPerDay>10</MaxTradesPerDay>
       <Quantity>1</Quantity>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>

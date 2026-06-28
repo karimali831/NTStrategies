@@ -37,6 +37,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 var actualEntryDistanceTicks = GetEntryDistanceTicks(direction, price);
 
+                var stopTicks = pendingActualTradePlan != null
+                    ? pendingActualTradePlan.StopTicks
+                    : CurrencyToTicks(StopLossUsd, quantity);
+
+                var targetTicks = pendingActualTradePlan != null
+                    ? pendingActualTradePlan.TargetTicks
+                    : CurrencyToTicks(ProfitTargetUsd, quantity);
+
+                double plannedStopPrice;
+                double plannedTargetPrice;
+
+                if (direction == "LONG")
+                {
+                    plannedStopPrice = Instrument.MasterInstrument.RoundToTickSize(price - stopTicks * TickSize);
+                    plannedTargetPrice = Instrument.MasterInstrument.RoundToTickSize(price + targetTicks * TickSize);
+                }
+                else
+                {
+                    plannedStopPrice = Instrument.MasterInstrument.RoundToTickSize(price + stopTicks * TickSize);
+                    plannedTargetPrice = Instrument.MasterInstrument.RoundToTickSize(price - targetTicks * TickSize);
+                }
+
                 activeActualTrade = new ActualTradeState
                 {
                     Direction = direction,
@@ -49,8 +71,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     VAL = pendingActualTradePlan?.VAL ?? activeVAL,
                     POC = pendingActualTradePlan?.POC ?? activePOC,
 
-                    StopPrice = pendingActualTradePlan?.PlannedStopPrice ?? double.NaN,
-                    TargetPrice = pendingActualTradePlan?.PlannedTargetPrice ?? double.NaN,
+                    StopPrice = plannedStopPrice,
+                    TargetPrice = plannedTargetPrice,
 
                     EntryDistanceTicks = actualEntryDistanceTicks,
                     EntryDistancePoints = actualEntryDistanceTicks * TickSize
@@ -105,8 +127,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             string direction,
             string signalName,
             double expectedEntry,
-            double stopPrice,
-            double targetPrice)
+            int stopTicks,
+            int targetTicks)
         {
             var easternNow = ConvertChartTimeToEastern
                 ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
@@ -123,8 +145,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SignalTimeEt = easternNow,
 
                 SignalEntryPrice = expectedEntry,
-                PlannedStopPrice = stopPrice,
-                PlannedTargetPrice = targetPrice,
+
+                StopTicks = stopTicks,
+                TargetTicks = targetTicks,
 
                 VAH = activeVAH,
                 VAL = activeVAL,

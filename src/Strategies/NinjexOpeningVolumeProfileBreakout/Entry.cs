@@ -141,74 +141,84 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             var expectedEntry = Close[0];
 
-            var stopDistance = CurrencyToPriceDistance(StopLossUsd, Quantity);
-            var targetDistance = CurrencyToPriceDistance(ProfitTargetUsd, Quantity);
+            var stopTicks = CurrencyToTicks(StopLossUsd, Quantity);
+            var targetTicks = CurrencyToTicks(ProfitTargetUsd, Quantity);
 
-            var stopPrice = Instrument.MasterInstrument.RoundToTickSize(expectedEntry - stopDistance);
-            var targetPrice = Instrument.MasterInstrument.RoundToTickSize(expectedEntry + targetDistance);
-
-            if (stopPrice >= expectedEntry || targetPrice <= expectedEntry)
+            if (stopTicks <= 0 || targetTicks <= 0)
             {
-                DebugPrint("Long skipped: invalid bracket. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
+                DebugPrint("Long skipped: invalid bracket ticks. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
                 return;
             }
 
-            SetStopLoss(LongSignal, CalculationMode.Price, stopPrice, false);
-            SetProfitTarget(LongSignal, CalculationMode.Price, targetPrice);
-            
+            SetStopLoss(LongSignal, CalculationMode.Ticks, stopTicks, false);
+            SetProfitTarget(LongSignal, CalculationMode.Ticks, targetTicks);
+
             longBreakoutArmed = false;
             shortBreakoutArmed = false;
             breakEvenMoved = false;
-            
+
             PreparePendingActualTradePlan(
                 direction: "LONG",
                 signalName: LongSignal,
                 expectedEntry: expectedEntry,
-                stopPrice: stopPrice,
-                targetPrice: targetPrice);
+                stopTicks: stopTicks,
+                targetTicks: targetTicks);
 
             EnterLong(Quantity, LongSignal);
             tradesToday++;
 
-            DebugPrint("Long submitted. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
+            DebugPrint(
+                "Long submitted. ExpectedEntry=" + expectedEntry
+                                                 + " StopTicks=" + stopTicks
+                                                 + " TargetTicks=" + targetTicks);
         }
 
         private void SubmitManagedShort()
         {
             var expectedEntry = Close[0];
 
-            var stopDistance = CurrencyToPriceDistance(StopLossUsd, Quantity);
-            var targetDistance = CurrencyToPriceDistance(ProfitTargetUsd, Quantity);
+            var stopTicks = CurrencyToTicks(StopLossUsd, Quantity);
+            var targetTicks = CurrencyToTicks(ProfitTargetUsd, Quantity);
 
-            var stopPrice = Instrument.MasterInstrument.RoundToTickSize(expectedEntry + stopDistance);
-            var targetPrice = Instrument.MasterInstrument.RoundToTickSize(expectedEntry - targetDistance);
-
-            if (stopPrice <= expectedEntry || targetPrice >= expectedEntry)
+            if (stopTicks <= 0 || targetTicks <= 0)
             {
-                DebugPrint("Short skipped: invalid bracket. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
+                DebugPrint("Short skipped: invalid bracket ticks. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
                 return;
             }
 
-            SetStopLoss(ShortSignal, CalculationMode.Price, stopPrice, false);
-            SetProfitTarget(ShortSignal, CalculationMode.Price, targetPrice);
-            
+            SetStopLoss(ShortSignal, CalculationMode.Ticks, stopTicks, false);
+            SetProfitTarget(ShortSignal, CalculationMode.Ticks, targetTicks);
+
             longBreakoutArmed = false;
             shortBreakoutArmed = false;
             breakEvenMoved = false;
-            
+
             PreparePendingActualTradePlan(
                 direction: "SHORT",
                 signalName: ShortSignal,
                 expectedEntry: expectedEntry,
-                stopPrice: stopPrice,
-                targetPrice: targetPrice);
+                stopTicks: stopTicks,
+                targetTicks: targetTicks);
 
             EnterShort(Quantity, ShortSignal);
             tradesToday++;
 
-            DebugPrint("Short submitted. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
+            DebugPrint(
+                "Short submitted. ExpectedEntry=" + expectedEntry
+                                                  + " StopTicks=" + stopTicks
+                                                  + " TargetTicks=" + targetTicks);
         }
         
+        private int CurrencyToTicks(double currencyAmount, int quantity)
+        {
+            var tickValue = Instrument.MasterInstrument.PointValue * TickSize;
+            var safeQuantity = Math.Max(1, quantity);
+
+            if (currencyAmount <= 0 || tickValue <= 0)
+                return 0;
+
+            return Math.Max(1, (int)Math.Round(currencyAmount / (tickValue * safeQuantity), MidpointRounding.AwayFromZero));
+        }
         
         private double GetEntryDistanceTicks(string direction, double entryPrice)
         {

@@ -44,8 +44,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             public DateTime SignalTimeEt;
 
             public double SignalEntryPrice;
-            public double PlannedStopPrice;
-            public double PlannedTargetPrice;
+
+            public int StopTicks;
+            public int TargetTicks;
 
             public double VAH;
             public double VAL;
