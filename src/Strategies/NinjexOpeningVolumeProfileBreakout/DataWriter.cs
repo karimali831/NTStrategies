@@ -43,16 +43,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
-                runId = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+                runId = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
 
-                var directory = Path.Combine(NinjaTrader.Core.Globals.UserDataDir, DataDirectoryName);
+                var directory = Path.Combine(Core.Globals.UserDataDir, DataDirectoryName);
                 Directory.CreateDirectory(directory);
 
                 var instrumentName = Instrument != null
                     ? SanitizeFileName(Instrument.FullName)
                     : "instrument";
 
-                var fileName = DataFilePrefix + "_" + instrumentName + ".csv";
+                var fileName = DataFilePrefix + "_" + instrumentName + "_" + runId + ".csv";
 
                 dataFilePath = Path.Combine(directory, fileName);
 
@@ -65,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
          
-           private void AppendDataRow(
+        private void AppendDataRow(
             string eventType,
             string decision,
             DateTime dateEt,
@@ -100,6 +100,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
+                EnsureCsvHeader();
+
                 var instrumentName = Instrument != null ? Instrument.FullName : "";
 
                 var profileWidth = IsValidLevel(activeVAH) && IsValidLevel(activeVAL)
