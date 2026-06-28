@@ -71,7 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 						}
 					}
 					
-					if (TradeCooldownMinutes > 0 && lastTradeTime > Core.Globals.MinDate)
+					if (TradeCooldownMinutes > 0 && lastTradeTime > NinjaTrader.Core.Globals.MinDate)
 					{
 						var minsSinceTrade = (GetEtTime() - lastTradeTime).TotalMinutes;
 						if (minsSinceTrade < TradeCooldownMinutes)

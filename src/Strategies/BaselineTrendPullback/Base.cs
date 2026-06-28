@@ -21,7 +21,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ATR atr;
 
         private BaselineLogger _log;
-        private DateTime _lastSessionDate = Core.Globals.MinDate;
+        private DateTime _lastSessionDate = NinjaTrader.Core.Globals.MinDate;
 
         protected override void OnStateChange()
         {

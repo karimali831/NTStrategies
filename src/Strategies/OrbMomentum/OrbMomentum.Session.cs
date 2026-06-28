@@ -50,7 +50,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             primaryFilled = false;
             reEntryWaitPullback = false;
             reEntryDir = 0;
-            lastTradeTime = Core.Globals.MinDate;
+            lastTradeTime = NinjaTrader.Core.Globals.MinDate;
 
             runnerSubmitted = false;
             runnerStopMoved = false;
