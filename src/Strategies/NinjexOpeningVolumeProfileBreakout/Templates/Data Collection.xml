@@ -136,6 +136,15 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
+        <Max xsi:type="xsd:int">0</Max>
+        <Min xsi:type="xsd:int">0</Min>
+        <Name>MaxDistanceTicksFromBreakoutLevel</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>0</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
         <Max xsi:type="xsd:double">700</Max>
         <Min xsi:type="xsd:double">700</Min>
         <Name>ProfitTargetUsd</Name>
@@ -172,8 +181,8 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">1</Max>
-        <Min xsi:type="xsd:int">1</Min>
+        <Max xsi:type="xsd:int">10</Max>
+        <Min xsi:type="xsd:int">10</Min>
         <Name>MaxTradesPerDay</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
         <ValueSerializable>1</ValueSerializable>
@@ -265,6 +274,33 @@
         <Max xsi:type="xsd:boolean">true</Max>
         <Min xsi:type="xsd:boolean">true</Min>
         <Name>SameBarStopFirst</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>True</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">true</Max>
+        <Min xsi:type="xsd:boolean">true</Min>
+        <Name>EnableResearchMode</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>True</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:int">50</Max>
+        <Min xsi:type="xsd:int">50</Min>
+        <Name>MaxResearchSetupsPerDay</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>50</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">true</Max>
+        <Min xsi:type="xsd:boolean">true</Min>
+        <Name>LogActualTrades</Name>
         <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
         <ValueSerializable>True</ValueSerializable>
       </Parameter>
@@ -360,11 +396,12 @@
       <EntryEndTime>1100</EntryEndTime>
       <EntryOffsetTicks>0</EntryOffsetTicks>
       <MinRetracementTicks>0</MinRetracementTicks>
+      <MaxDistanceTicksFromBreakoutLevel>0</MaxDistanceTicksFromBreakoutLevel>
       <ProfitTargetUsd>700</ProfitTargetUsd>
       <StopLossUsd>350</StopLossUsd>
       <BreakEvenProfitTriggerUsd>0</BreakEvenProfitTriggerUsd>
       <BreakEvenPlusUsd>50</BreakEvenPlusUsd>
-      <MaxTradesPerDay>1</MaxTradesPerDay>
+      <MaxTradesPerDay>10</MaxTradesPerDay>
       <Quantity>1</Quantity>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>
       <SourceTimeZoneId>GMT Standard Time</SourceTimeZoneId>
@@ -378,6 +415,9 @@
       <TrackForwardOutcome>true</TrackForwardOutcome>
       <ForwardBarsToTrack>48</ForwardBarsToTrack>
       <SameBarStopFirst>true</SameBarStopFirst>
+      <EnableResearchMode>true</EnableResearchMode>
+      <MaxResearchSetupsPerDay>50</MaxResearchSetupsPerDay>
+      <LogActualTrades>true</LogActualTrades>
     </NinjexOpeningVolumeProfileBreakout>
   </Strategy>
 </StrategyTemplate>

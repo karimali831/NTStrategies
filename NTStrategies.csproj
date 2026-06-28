@@ -113,9 +113,14 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\BreakEven.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataAnalysis.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Core.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataModels.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataWriter.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Entry.cs" />
-        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Indicator.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Profile.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Params.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Core.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Diag.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Drawing.cs" />

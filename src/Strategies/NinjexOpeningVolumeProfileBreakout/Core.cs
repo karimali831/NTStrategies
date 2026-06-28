@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Entry
                 EnableLongs = true;
-                EnableShorts = false;
+                EnableShorts = true;
                 EntryStartTime = 950;
                 EntryEndTime = 1100;
                 EntryOffsetTicks = 0;
@@ -91,6 +91,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TrackForwardOutcome = true;
                 ForwardBarsToTrack = 48;
                 SameBarStopFirst = true;
+                
+                EnableResearchMode = true;
+                MaxResearchSetupsPerDay = 50;
+                LogActualTrades = true;
             }
             else if (State == State.Configure)
             {
@@ -113,6 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (UseTickDataForProfile && BarsInProgress == 1)
             {
                 ProcessProfileTickForStrategy();
+                UpdateResearchSetupsFromTick();
                 return;
             }
 
@@ -124,14 +129,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             ResetDailyStateIfNeeded();
 
-            UpdatePendingSetupOutcome();
+            UpdateResearchSetupBarTracking();
 
             ManageBreakEven();
 
             if (tradingLockedForDay)
-                return;
-
-            if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
             var easternNow = ConvertChartTimeToEastern
@@ -140,7 +142,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!LoadActiveProfileLevels(easternNow.Date))
                 return;
-
 
             DrawStrategyProfileLevels();
             LogDailyProfileIfNeeded(easternNow);
@@ -226,8 +227,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (activeTradeDate == tradeDate)
                 return;
             
-            if (activeTradeDate != NinjaTrader.Core.Globals.MinDate && activeTradeDate != tradeDate && pendingSetup != null)
-                FinalizePendingSetup("NewDay", Time[0], Close[0], "New trading date reached before stop/target outcome.");
+            if (activeTradeDate != Core.Globals.MinDate && activeTradeDate != tradeDate)
+                FlushResearchSetupsForNewDay();
 
             activeTradeDate = tradeDate;
 
@@ -241,6 +242,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             activeVAH = double.NaN;
             activeVAL = double.NaN;
             activePOC = double.NaN;
+            
+            researchSetupsToday = 0;
 
             DebugPrint("New trading day: " + activeTradeDate.ToString("yyyyMMdd"));
         }

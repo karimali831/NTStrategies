@@ -1,14 +1,14 @@
 ﻿using System;
+using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningVolumeProfileBreakout : Strategy
     {
+        private PendingActualTradePlan pendingActualTradePlan;
+        
         private void TrySubmitBarCloseEntry()
         {
-            if (tradesToday >= MaxTradesPerDay)
-                return;
-
             var longTrigger = GetLongTrigger();
             var shortTrigger = GetShortTrigger();
 
@@ -74,10 +74,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!IsEntryDistanceAllowed("LONG", Close[0]))
                 {
-                    double distanceTicks = GetEntryDistanceTicks("LONG", Close[0]);
+                    var distanceTicks = GetEntryDistanceTicks("LONG", Close[0]);
 
                     DebugPrint("Long blocked: entry too far from VAH. DistanceTicks=" + distanceTicks);
                     LogRejectedSetup("LONG", "TooFarFromBreakoutLevel", bodyHigh, bodyLow);
+                    return;
+                }
+
+                var candidate = BuildSetupCandidate("LONG", "Eligible", bodyHigh, bodyLow);
+                StartResearchSetup(candidate);
+
+                if (Position.MarketPosition != MarketPosition.Flat)
+                {
+                    LogRejectedSetup("LONG", "ActualTradeSkipped_PositionNotFlat", bodyHigh, bodyLow);
+                    return;
+                }
+
+                if (tradesToday >= MaxTradesPerDay)
+                {
+                    LogRejectedSetup("LONG", "ActualTradeSkipped_MaxTradesReached", bodyHigh, bodyLow);
                     return;
                 }
 
@@ -103,6 +118,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
+                var candidate = BuildSetupCandidate("SHORT", "Eligible", bodyHigh, bodyLow);
+                StartResearchSetup(candidate);
+
+                if (Position.MarketPosition != MarketPosition.Flat)
+                {
+                    LogRejectedSetup("SHORT", "ActualTradeSkipped_PositionNotFlat", bodyHigh, bodyLow);
+                    return;
+                }
+
+                if (tradesToday >= MaxTradesPerDay)
+                {
+                    LogRejectedSetup("SHORT", "ActualTradeSkipped_MaxTradesReached", bodyHigh, bodyLow);
+                    return;
+                }
+
                 SubmitManagedShort();
             }
         }
@@ -125,12 +155,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             SetStopLoss(LongSignal, CalculationMode.Price, stopPrice, false);
             SetProfitTarget(LongSignal, CalculationMode.Price, targetPrice);
-
-            StartPendingSetup("LONG", "Submitted", expectedEntry, stopPrice, targetPrice);
-
+            
             longBreakoutArmed = false;
             shortBreakoutArmed = false;
             breakEvenMoved = false;
+            
+            PreparePendingActualTradePlan(
+                direction: "LONG",
+                signalName: LongSignal,
+                expectedEntry: expectedEntry,
+                stopPrice: stopPrice,
+                targetPrice: targetPrice);
 
             EnterLong(Quantity, LongSignal);
             tradesToday++;
@@ -156,18 +191,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             SetStopLoss(ShortSignal, CalculationMode.Price, stopPrice, false);
             SetProfitTarget(ShortSignal, CalculationMode.Price, targetPrice);
-
-            StartPendingSetup("SHORT", "Submitted", expectedEntry, stopPrice, targetPrice);
-
+            
             longBreakoutArmed = false;
             shortBreakoutArmed = false;
             breakEvenMoved = false;
+            
+            PreparePendingActualTradePlan(
+                direction: "SHORT",
+                signalName: ShortSignal,
+                expectedEntry: expectedEntry,
+                stopPrice: stopPrice,
+                targetPrice: targetPrice);
 
             EnterShort(Quantity, ShortSignal);
             tradesToday++;
 
             DebugPrint("Short submitted. Entry=" + expectedEntry + " Stop=" + stopPrice + " Target=" + targetPrice);
         }
+        
         
         private double GetEntryDistanceTicks(string direction, double entryPrice)
         {
@@ -189,6 +230,59 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return !double.IsNaN(distanceTicks)
                    && distanceTicks <= MaxDistanceTicksFromBreakoutLevel;
+        }
+        
+        private SetupCandidate BuildSetupCandidate(string direction, string decision, double bodyHigh, double bodyLow)
+        {
+            var easternNow = ConvertChartTimeToEastern
+                ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
+                : Time[0];
+
+            var entryPrice = Close[0];
+            var stopDistance = CurrencyToPriceDistance(StopLossUsd, Quantity);
+            var targetDistance = CurrencyToPriceDistance(ProfitTargetUsd, Quantity);
+
+            var stopPrice = direction == "LONG"
+                ? Instrument.MasterInstrument.RoundToTickSize(entryPrice - stopDistance)
+                : Instrument.MasterInstrument.RoundToTickSize(entryPrice + stopDistance);
+
+            var targetPrice = direction == "LONG"
+                ? Instrument.MasterInstrument.RoundToTickSize(entryPrice + targetDistance)
+                : Instrument.MasterInstrument.RoundToTickSize(entryPrice - targetDistance);
+
+            var breakoutLevel = direction == "LONG" ? GetLongTrigger() : GetShortTrigger();
+            var entryDistanceTicks = GetEntryDistanceTicks(direction, entryPrice);
+
+            return new SetupCandidate
+            {
+                Direction = direction,
+                Decision = decision,
+
+                SignalDateEt = easternNow.Date,
+                SignalTimeChart = Time[0],
+                SignalTimeEt = easternNow,
+
+                VAH = activeVAH,
+                VAL = activeVAL,
+                POC = activePOC,
+
+                Open = Open[0],
+                High = High[0],
+                Low = Low[0],
+                Close = Close[0],
+                BodyHigh = bodyHigh,
+                BodyLow = bodyLow,
+
+                EntryPrice = entryPrice,
+                BreakoutLevel = breakoutLevel,
+                EntryDistanceTicks = entryDistanceTicks,
+                EntryDistancePoints = entryDistanceTicks * TickSize,
+
+                StopPrice = stopPrice,
+                TargetPrice = targetPrice,
+
+                Quantity = Quantity
+            };
         }
     }
 }

@@ -141,5 +141,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Same Bar Stop First", Order = 207, GroupName = "Data Collection")]
         public bool SameBarStopFirst { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Research Mode", Order = 208, GroupName = "Data Collection")]
+        public bool EnableResearchMode { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 500)]
+        [Display(Name = "Max Research Setups Per Day", Order = 209, GroupName = "Data Collection")]
+        public int MaxResearchSetupsPerDay { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Log Actual Trades", Order = 210, GroupName = "Data Collection")]
+        public bool LogActualTrades { get; set; }
     }
 }
