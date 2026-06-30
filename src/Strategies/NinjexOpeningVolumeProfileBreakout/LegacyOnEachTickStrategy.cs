@@ -20,19 +20,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool tradingLockedForDay;
 
-        private int tradesToday;
+        private int winningTradesToday;
+        private int losingTradesToday;
         private int breakEvenTradesToday;
+        
+        private const string LongSignal = "OVP_Long";
+        private const string ShortSignal = "OVP_Short";
 
-        private bool atmCreationPending;
-        private bool atmActive;
-        private bool atmPositionWasOpen;
+        private bool breakEvenMoved;
 
-        private string atmStrategyId = string.Empty;
-        private string atmOrderId = string.Empty;
-		private int lastEntryDirection;
+        private string activeTradeDirection = string.Empty;
+        private double activeTradeEntryPrice = double.NaN;
+        private int activeTradeQuantity;
 
         private double previousPrice = double.NaN;
-		private bool hasSeenRealtimeEligibleTick;
 		private DateTime lastDebugPrintTime = Core.Globals.MinDate;
 		
         private bool preEntryLongSweep;
@@ -53,7 +54,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name = "Ninjex Opening Volume Profile Breakout";
-                Description = "ATM-based opening volume profile breakout strategy using VAH/VAL from Ninjex Opening Volume Profile.";
+                Description = "Managed-order opening volume profile breakout strategy using VAH/VAL from Ninjex Opening Volume Profile.";
 
                 Calculate = Calculate.OnEachTick;
 
@@ -78,15 +79,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ConvertChartTimeToEastern = true;
                 SourceTimeZoneId = "GMT Standard Time";
 
-                AtmTemplateName = "Your ATM Template Name";
                 Quantity = 1;
 
                 EntryOffsetTicks = 0;
                 MinRetracementTicks = 15;
-				AllowCatchUpEntryOnFirstRealtimeTick = true;
-                MaxTradesIfBreakEven = 2;
-                BreakEvenMinCurrency = -100;
-                BreakEvenMaxCurrency = 300;
+				StopLossUsd = 250;
+				ProfitTargetUsd = 500;
+				BreakEvenProfitTriggerUsd = 250;
+				BreakEvenPlusUsd = 10;
+
+				MaxLosingTradesPerDay = 1;
+				MaxWinningTradesPerDay = 2;
 
                 AddProfileIndicatorToChart = true;
                 ShowProfilePanel = true;
@@ -105,60 +108,57 @@ namespace NinjaTrader.NinjaScript.Strategies
                 easternTimeZone = FindTimeZoneOrLocal("Eastern Standard Time");
                 sourceTimeZone = FindTimeZoneOrLocal(SourceTimeZoneId);
                 
-                if (AddProfileIndicatorToChart)
-	                profileEngine = new NinjexOpeningVolumeProfileEngine();
+                profileEngine = new NinjexOpeningVolumeProfileEngine();
             }
         }
 
-       	protected override void OnBarUpdate()
-		{
-		    if (BarsInProgress != 0)
+        protected override void OnBarUpdate()
+        {
+	        if (UseTickDataForProfile && BarsInProgress == 1)
+	        {
+		        ProcessProfileTickForStrategy();
 		        return;
-		
-		    if (CurrentBar < 20)
+	        }
+
+	        if (BarsInProgress != 0)
 		        return;
+
+	        if (CurrentBar < 20)
+		        return;
+
+	        ResetDailyStateIfNeeded();
 		
-		    ResetDailyStateIfNeeded();
-		
-		    // ATM methods can only be used in realtime.
-		    // Historical processing may still calculate/reset state, but must never submit ATM orders.
-		    if (State != State.Realtime)
-		    {
+	        ManageBreakEven();
+
+	        if (tradingLockedForDay)
+	        {
 		        previousPrice = Close[0];
 		        return;
-		    }
-		
-		    UpdateAtmState();
-		
-		    if (tradingLockedForDay)
-		    {
+	        }
+
+	        if (Position.MarketPosition != MarketPosition.Flat)
+	        {
 		        previousPrice = Close[0];
 		        return;
-		    }
-		
-		    if (atmCreationPending || atmActive)
-		    {
-		        previousPrice = Close[0];
-		        return;
-		    }
-		
-		    if (!LoadActiveProfileLevels())
-		    {
-		        previousPrice = Close[0];
-		        return;
-		    }
+	        }
 		
 		    DateTime easternNow = ConvertChartTimeToEastern
-		        ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
-		        : Time[0];
+			    ? ConvertTime(Time[0], sourceTimeZone, easternTimeZone)
+			    : Time[0];
+
+		    if (!LoadActiveProfileLevels(easternNow.Date))
+		    {
+			    previousPrice = Close[0];
+			    return;
+		    }
 		
-		    int timeValue = ToTime(easternNow);
+		    var timeValue = ToTime(easternNow);
 		
-		    int profileEnd = NormalizeTimeInput(ProfileEndTime);
-		    int entryStart = NormalizeTimeInput(EntryStartTime);
-		    int entryEnd = NormalizeTimeInput(EntryEndTime);
+		    var profileEnd = NormalizeTimeInput(ProfileEndTime);
+		    var entryStart = NormalizeTimeInput(EntryStartTime);
+		    var entryEnd = NormalizeTimeInput(EntryEndTime);
 		
-		    double price = Close[0];
+		    var price = Close[0];
 
 			longRetraceArmedThisTick = false;
 			shortRetraceArmedThisTick = false;
@@ -172,37 +172,65 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    }
 		
 		    TrySubmitEntry(price);
-		
 		    previousPrice = price;
 		}
-
-        private bool LoadActiveProfileLevels()
+        
+        private bool LoadActiveProfileLevels(DateTime expectedProfileDate)
         {
-            if (profileEngine == null)
-                return false;
+	        if (profileEngine == null || !profileEngine.HasCompletedProfile)
+		        return false;
 
-            activeVAH = profileEngine.LatestVAH;
-            activeVAL = profileEngine.LatestVAL;
-            activePOC = profileEngine.LatestPOC;
+	        if (profileEngine.LatestProfileDate.Date != expectedProfileDate.Date)
+		        return false;
 
-            return IsValidLevel(activeVAH)
-                && IsValidLevel(activeVAL)
-                && IsValidLevel(activePOC)
-                && activeVAH > activeVAL;
+	        activeVAH = profileEngine.LatestVAH;
+	        activeVAL = profileEngine.LatestVAL;
+	        activePOC = profileEngine.LatestPOC;
+
+	        return IsValidLevel(activeVAH)
+	               && IsValidLevel(activeVAL)
+	               && IsValidLevel(activePOC)
+	               && activeVAH > activeVAL;
+        }
+
+        
+        private void ProcessProfileTickForStrategy()
+        {
+	        if (profileEngine == null)
+		        return;
+
+	        if (CurrentBars.Length <= 1 || CurrentBars[1] < 1)
+		        return;
+
+	        var tickChartTime = Times[1][0];
+
+	        var profileTime = ConvertChartTimeToEastern
+		        ? ConvertTime(tickChartTime, sourceTimeZone, easternTimeZone)
+		        : tickChartTime;
+
+	        profileEngine.ProcessTick(
+		        profileTime,
+		        Closes[1][0],
+		        Volumes[1][0],
+		        TickSize,
+		        ProfileStartTime,
+		        ProfileEndTime,
+		        RowSizeTicks,
+		        ValueAreaPercent);
         }
 
         private void TrackPreEntrySweepsAndRetraces(int timeValue, int profileEnd, int entryStart, double price)
 		{
-		    double longTrigger = GetLongTrigger();
-		    double shortTrigger = GetShortTrigger();
+		    var longTrigger = GetLongTrigger();
+		    var shortTrigger = GetShortTrigger();
 		
-		    double retraceDistance = Math.Max(0, MinRetracementTicks) * TickSize;
+		    var retraceDistance = Math.Max(0, MinRetracementTicks) * TickSize;
 		
 		    // Important:
 			// Do not treat the exact profile end bar/tick as a pre-entry sweep.
 			// On a 5-minute chart, the 09:45 timestamp belongs to the final profile bar.
 			// Pre-entry sweep tracking should only begin AFTER the profile has completed.
-			bool beforeEntryWindow = timeValue > profileEnd && timeValue < entryStart;
+			var beforeEntryWindow = timeValue > profileEnd && timeValue < entryStart;
 		
 		    if (beforeEntryWindow)
 			{
@@ -223,8 +251,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		    if (preEntryLongSweep && !longRetraceSatisfied)
 		    {
-		        bool insideRange = price <= activeVAH && price >= activeVAL;
-		        bool enoughRetrace = price <= longTrigger - retraceDistance;
+		        var insideRange = price <= activeVAH && price >= activeVAL;
+		        var enoughRetrace = price <= longTrigger - retraceDistance;
 		
 		        if (insideRange && enoughRetrace)
 		        {
@@ -241,8 +269,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		    if (preEntryShortSweep && !shortRetraceSatisfied)
 		    {
-		        bool insideRange = price >= activeVAL && price <= activeVAH;
-		        bool enoughRetrace = price >= shortTrigger + retraceDistance;
+		        var insideRange = price >= activeVAL && price <= activeVAH;
+		        var enoughRetrace = price >= shortTrigger + retraceDistance;
 		
 		        if (insideRange && enoughRetrace)
 		        {
@@ -260,41 +288,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
        	private void TrySubmitEntry(double price)
 		{
-		    if (tradesToday >= MaxTradesIfBreakEven)
-		    {
-		        DebugPrintThrottled("No entry: max trades reached. TradesToday=" + tradesToday);
-		        return;
-		    }
-		
-		    if (string.IsNullOrWhiteSpace(AtmTemplateName) || AtmTemplateName == "Your ATM Template Name")
-		    {
-		        DebugPrintThrottled("No entry: ATM template name is not set.");
-		        return;
-		    }
-		
-		    double longTrigger = GetLongTrigger();
-		    double shortTrigger = GetShortTrigger();
-		
-		   	bool previousWasInsideRange = IsInsideProfileRange(previousPrice);
+			if (!CanTakeNewTrade())
+			{
+				DebugPrintThrottled(
+					"No entry: daily risk lock or active position."
+					+ " WinsToday=" + winningTradesToday
+					+ " LossesToday=" + losingTradesToday
+					+ " BEToday=" + breakEvenTradesToday
+					+ " Locked=" + tradingLockedForDay
+					+ " Position=" + Position.MarketPosition);
 
-			bool crossedLong = !double.IsNaN(previousPrice)
-			    && previousWasInsideRange
-			    && previousPrice < longTrigger
-			    && price >= longTrigger;
+				return;
+			}
 			
-			bool crossedShort = !double.IsNaN(previousPrice)
-			    && previousWasInsideRange
-			    && previousPrice > shortTrigger
-			    && price <= shortTrigger;
+		    var longTrigger = GetLongTrigger();
+		    var shortTrigger = GetShortTrigger();
+		
+		   	var previousWasInsideRange = IsInsideProfileRange(previousPrice);
+
+			var crossedLong = !double.IsNaN(previousPrice)
+			                  && previousWasInsideRange
+			                  && previousPrice < longTrigger
+			                  && price >= longTrigger;
 			
-			// Disabled by design:
-			// A valid entry must break out FROM INSIDE the VAH/VAL range.
-			// Catch-up entries cannot prove that the move came from inside the range.
-			bool catchUpLong = false;
-			bool catchUpShort = false;
+			var crossedShort = !double.IsNaN(previousPrice)
+			                   && previousWasInsideRange
+			                   && previousPrice > shortTrigger
+			                   && price <= shortTrigger;
 			
-			bool longBlockedByRetrace = preEntryLongSweep && !longRetraceSatisfied;
-			bool shortBlockedByRetrace = preEntryShortSweep && !shortRetraceSatisfied;
+			var longBlockedByRetrace = preEntryLongSweep && !longRetraceSatisfied;
+			var shortBlockedByRetrace = preEntryShortSweep && !shortRetraceSatisfied;
 			
 			// Extra safety:
 			// If retrace was satisfied on THIS tick, do not enter on this same tick.
@@ -302,14 +325,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (longRetraceArmedThisTick)
 			{
 			    DebugPrint("Long retrace armed this tick. No entry allowed until fresh VAH cross.");
-			    hasSeenRealtimeEligibleTick = true;
 			    return;
 			}
 			
 			if (shortRetraceArmedThisTick)
 			{
 			    DebugPrint("Short retrace armed this tick. No entry allowed until fresh VAL cross.");
-			    hasSeenRealtimeEligibleTick = true;
 			    return;
 			}
 			
@@ -324,17 +345,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			    + " ShortTrigger=" + shortTrigger
 			    + " CrossLong=" + crossedLong
 			    + " CrossShort=" + crossedShort
-			    + " CatchUpLong=" + catchUpLong
-			    + " CatchUpShort=" + catchUpShort
 			    + " PreLongSweep=" + preEntryLongSweep
 			    + " LongRetraceOk=" + longRetraceSatisfied
 			    + " PreShortSweep=" + preEntryShortSweep
 			    + " ShortRetraceOk=" + shortRetraceSatisfied
-			    + " TradesToday=" + tradesToday);
+			    + " WinsToday=" + winningTradesToday
+			    + " LossesToday=" + losingTradesToday
+			    + " BEToday=" + breakEvenTradesToday);
 			
-			hasSeenRealtimeEligibleTick = true;
-			
-			if (crossedLong || catchUpLong)
+			if (crossedLong)
 			{
 			    if (longBlockedByRetrace)
 			    {
@@ -342,11 +361,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 			        return;
 			    }
 			
-			    SubmitAtmEntry(OrderAction.Buy);
+			    SubmitManagedLong();
 			    return;
 			}
 			
-			if (crossedShort || catchUpShort)
+			if (crossedShort)
 			{
 			    if (shortBlockedByRetrace)
 			    {
@@ -354,8 +373,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			        return;
 			    }
 			
-			    SubmitAtmEntry(OrderAction.SellShort);
-			    return;
+			    SubmitManagedShort();
 			}
 		}
 
@@ -370,162 +388,271 @@ namespace NinjaTrader.NinjaScript.Strategies
             return Instrument.MasterInstrument.RoundToTickSize(
                 activeVAL - EntryOffsetTicks * TickSize);
         }
-
-        private void SubmitAtmEntry(OrderAction action)
-		{
-		    if (State != State.Realtime)
-		        return;
-		
-		    if (atmCreationPending || atmActive)
-		        return;
-		
-		    if (tradingLockedForDay)
-		    return;
-		
-			lastEntryDirection = action == OrderAction.Buy ? 1 : -1;
-			
-			atmStrategyId = GetAtmStrategyUniqueId();
-			atmOrderId = GetAtmStrategyUniqueId();
-
-            atmCreationPending = true;
-            atmActive = false;
-            atmPositionWasOpen = false;
-
-            DebugPrint("Submitting ATM entry. Action=" + action + " Template=" + AtmTemplateName);
-
-            AtmStrategyCreate(
-                action,
-                OrderType.Market,
-                0,
-                0,
-                TimeInForce.Day,
-                atmOrderId,
-                AtmTemplateName,
-                atmStrategyId,
-                (atmCallbackErrorCode, atmCallbackId) =>
-                {
-                    if (atmCallbackId != atmStrategyId)
-                        return;
-
-                    if (atmCallbackErrorCode == ErrorCode.NoError)
-                    {
-                        atmCreationPending = false;
-                        atmActive = true;
-                        tradesToday++;
-
-                        DebugPrint("ATM created. TradesToday=" + tradesToday);
-                    }
-                    else
-                    {
-                        atmCreationPending = false;
-                        atmActive = false;
-                        tradingLockedForDay = true;
-
-                        DebugPrint("ATM creation failed. Error=" + atmCallbackErrorCode);
-                    }
-                });
-        }
-		
-		private void ArmRetraceAfterBreakEven()
-		{
-		    previousPrice = double.NaN;
-		
-		    if (lastEntryDirection > 0)
-		    {
-		        preEntryLongSweep = true;
-		        longRetraceSatisfied = false;
-		        longRetraceArmedThisTick = false;
-		
-		        DebugPrint("Long BE completed. Long side now requires retrace before next VAH breakout.");
-		        return;
-		    }
-		
-		    if (lastEntryDirection < 0)
-		    {
-		        preEntryShortSweep = true;
-		        shortRetraceSatisfied = false;
-		        shortRetraceArmedThisTick = false;
-		
-		        DebugPrint("Short BE completed. Short side now requires retrace before next VAL breakout.");
-		        return;
-		    }
-		}
-
-        private void UpdateAtmState()
+        
+        private void SubmitManagedLong()
         {
-            if (!atmActive || string.IsNullOrWhiteSpace(atmStrategyId))
-                return;
+	        var stopTicks = CurrencyToTicks(StopLossUsd, Quantity);
+	        var targetTicks = CurrencyToTicks(ProfitTargetUsd, Quantity);
 
-            MarketPosition atmPosition = GetAtmStrategyMarketPosition(atmStrategyId);
+	        if (stopTicks <= 0 || targetTicks <= 0)
+	        {
+		        DebugPrint("Long skipped: invalid bracket ticks. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
+		        return;
+	        }
 
-            if (atmPosition != MarketPosition.Flat)
-            {
-                atmPositionWasOpen = true;
-                return;
-            }
+	        SetStopLoss(LongSignal, CalculationMode.Ticks, stopTicks, false);
+	        SetProfitTarget(LongSignal, CalculationMode.Ticks, targetTicks);
 
-            if (!atmPositionWasOpen)
-                return;
+	        breakEvenMoved = false;
 
-            double realizedPnL = GetAtmStrategyRealizedProfitLoss(atmStrategyId);
+	        EnterLong(Quantity, LongSignal);
 
-            bool wasBreakEven = realizedPnL >= BreakEvenMinCurrency
-                && realizedPnL <= BreakEvenMaxCurrency;
-
-            DebugPrint("ATM completed. RealizedPnL=" + realizedPnL + " WasBreakEven=" + wasBreakEven);
-
-            atmActive = false;
-            atmPositionWasOpen = false;
-            atmStrategyId = string.Empty;
-            atmOrderId = string.Empty;
-
-            if (wasBreakEven)
-			{
-			    breakEvenTradesToday++;
-			
-			    if (tradesToday >= MaxTradesIfBreakEven)
-			    {
-			        tradingLockedForDay = true;
-			        return;
-			    }
-			
-			    ArmRetraceAfterBreakEven();
-			    return;
-			}
-
-            tradingLockedForDay = true;
+	        DebugPrint("Long submitted. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
         }
 
+        private void SubmitManagedShort()
+        {
+	        var stopTicks = CurrencyToTicks(StopLossUsd, Quantity);
+	        var targetTicks = CurrencyToTicks(ProfitTargetUsd, Quantity);
+
+	        if (stopTicks <= 0 || targetTicks <= 0)
+	        {
+		        DebugPrint("Short skipped: invalid bracket ticks. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
+		        return;
+	        }
+
+	        SetStopLoss(ShortSignal, CalculationMode.Ticks, stopTicks, false);
+	        SetProfitTarget(ShortSignal, CalculationMode.Ticks, targetTicks);
+
+	        breakEvenMoved = false;
+
+	        EnterShort(Quantity, ShortSignal);
+
+	        DebugPrint("Short submitted. StopTicks=" + stopTicks + " TargetTicks=" + targetTicks);
+        }
+
+        private int CurrencyToTicks(double currencyAmount, int quantity)
+        {
+	        var tickValue = Instrument.MasterInstrument.PointValue * TickSize;
+	        var safeQuantity = Math.Max(1, quantity);
+
+	        if (currencyAmount <= 0 || tickValue <= 0)
+		        return 0;
+
+	        return Math.Max(1, (int)Math.Round(currencyAmount / (tickValue * safeQuantity), MidpointRounding.AwayFromZero));
+        }
+        
+        private bool CanTakeNewTrade()
+        {
+	        if (tradingLockedForDay)
+		        return false;
+
+	        if (losingTradesToday >= MaxLosingTradesPerDay)
+		        return false;
+
+	        if (winningTradesToday >= MaxWinningTradesPerDay)
+		        return false;
+
+	        if (Position.MarketPosition != MarketPosition.Flat)
+		        return false;
+
+	        return true;
+        }
+        
+        private void ManageBreakEven()
+        {
+	        if (BreakEvenProfitTriggerUsd <= 0)
+		        return;
+
+	        if (breakEvenMoved)
+		        return;
+
+	        if (Position.MarketPosition == MarketPosition.Flat)
+		        return;
+
+	        var pointValue = Instrument.MasterInstrument.PointValue;
+	        var safeQuantity = Math.Max(1, Position.Quantity);
+
+	        if (pointValue <= 0)
+		        return;
+
+	        var triggerDistance = BreakEvenProfitTriggerUsd / (pointValue * safeQuantity);
+	        var plusDistance = BreakEvenPlusUsd / (pointValue * safeQuantity);
+
+	        if (Position.MarketPosition == MarketPosition.Long)
+	        {
+		        var triggerPrice = Position.AveragePrice + triggerDistance;
+
+		        if (Close[0] < triggerPrice)
+			        return;
+
+		        var newStopPrice = Instrument.MasterInstrument.RoundToTickSize(Position.AveragePrice + plusDistance);
+
+		        SetStopLoss(LongSignal, CalculationMode.Price, newStopPrice, false);
+		        breakEvenMoved = true;
+
+		        DebugPrint("Long BE moved. Stop=" + newStopPrice);
+		        return;
+	        }
+
+	        if (Position.MarketPosition == MarketPosition.Short)
+	        {
+		        var triggerPrice = Position.AveragePrice - triggerDistance;
+
+		        if (Close[0] > triggerPrice)
+			        return;
+
+		        var newStopPrice = Instrument.MasterInstrument.RoundToTickSize(Position.AveragePrice - plusDistance);
+
+		        SetStopLoss(ShortSignal, CalculationMode.Price, newStopPrice, false);
+		        breakEvenMoved = true;
+
+		        DebugPrint("Short BE moved. Stop=" + newStopPrice);
+	        }
+        }
+        
+        protected override void OnExecutionUpdate(
+	        Execution execution,
+	        string executionId,
+	        double price,
+	        int quantity,
+	        MarketPosition marketPosition,
+	        string orderId,
+	        DateTime time)
+        {
+	        if (execution == null || execution.Order == null)
+		        return;
+
+	        var order = execution.Order;
+	        var orderName = order.Name ?? string.Empty;
+
+	        if (quantity <= 0)
+		        return;
+
+	        var isLongEntry = orderName == LongSignal;
+	        var isShortEntry = orderName == ShortSignal;
+
+	        if (isLongEntry || isShortEntry)
+	        {
+		        activeTradeDirection = isLongEntry ? "LONG" : "SHORT";
+		        activeTradeEntryPrice = price;
+		        activeTradeQuantity = quantity;
+
+		        DebugPrint(
+			        "Entry fill. Direction=" + activeTradeDirection
+			                                 + " Price=" + price
+			                                 + " Qty=" + quantity);
+
+		        return;
+	        }
+
+	        if (string.IsNullOrWhiteSpace(activeTradeDirection) || double.IsNaN(activeTradeEntryPrice))
+		        return;
+
+	        var isExitAction =
+		        order.OrderAction == OrderAction.Sell ||
+		        order.OrderAction == OrderAction.BuyToCover;
+
+	        if (!isExitAction)
+		        return;
+
+	        var realizedPnl = CalculateTradePnlUsd(
+		        activeTradeDirection,
+		        activeTradeEntryPrice,
+		        price,
+		        activeTradeQuantity);
+
+	        RegisterCompletedTrade(realizedPnl);
+
+	        activeTradeDirection = string.Empty;
+	        activeTradeEntryPrice = double.NaN;
+	        activeTradeQuantity = 0;
+	        breakEvenMoved = false;
+        }
+        
+        private double CalculateTradePnlUsd(string direction, double entryPrice, double exitPrice, int quantity)
+        {
+	        var pointValue = Instrument.MasterInstrument.PointValue;
+	        var safeQuantity = Math.Max(1, quantity);
+
+	        if (direction == "LONG")
+		        return (exitPrice - entryPrice) * pointValue * safeQuantity;
+
+	        if (direction == "SHORT")
+		        return (entryPrice - exitPrice) * pointValue * safeQuantity;
+
+	        return 0;
+        }
+
+        private void RegisterCompletedTrade(double realizedPnl)
+        {
+	        var lossThreshold = -Math.Abs(StopLossUsd) * 0.75;
+	        var winThreshold = Math.Abs(ProfitTargetUsd) * 0.75;
+
+	        if (realizedPnl <= lossThreshold)
+	        {
+		        losingTradesToday++;
+
+		        if (losingTradesToday >= MaxLosingTradesPerDay)
+			        tradingLockedForDay = true;
+
+		        DebugPrint(
+			        "Losing trade registered. PnL=" + realizedPnl
+			                                        + " LossesToday=" + losingTradesToday
+			                                        + " Locked=" + tradingLockedForDay);
+
+		        return;
+	        }
+
+	        if (realizedPnl >= winThreshold)
+	        {
+		        winningTradesToday++;
+
+		        if (winningTradesToday >= MaxWinningTradesPerDay)
+			        tradingLockedForDay = true;
+
+		        DebugPrint(
+			        "Winning trade registered. PnL=" + realizedPnl
+			                                         + " WinsToday=" + winningTradesToday
+			                                         + " Locked=" + tradingLockedForDay);
+
+		        return;
+	        }
+
+	        breakEvenTradesToday++;
+
+	        DebugPrint(
+		        "Break-even trade registered. PnL=" + realizedPnl
+		                                            + " BEToday=" + breakEvenTradesToday);
+        }
+        
         private void ResetDailyStateIfNeeded()
         {
-            DateTime chartTime = Time[0];
+            var chartTime = Time[0];
 
-            DateTime checkTime = ConvertChartTimeToEastern
+            var checkTime = ConvertChartTimeToEastern
                 ? ConvertTime(chartTime, sourceTimeZone, easternTimeZone)
                 : chartTime;
 
-            DateTime tradeDate = checkTime.Date;
+            var tradeDate = checkTime.Date;
 
             if (activeTradeDate == tradeDate)
                 return;
 
             activeTradeDate = tradeDate;
-
             tradingLockedForDay = false;
 
-            tradesToday = 0;
+            winningTradesToday = 0;
+            losingTradesToday = 0;
             breakEvenTradesToday = 0;
 
-            atmCreationPending = false;
-            atmActive = false;
-            atmPositionWasOpen = false;
+            breakEvenMoved = false;
 
-           	atmStrategyId = string.Empty;
-			atmOrderId = string.Empty;
-			lastEntryDirection = 0;
+            activeTradeDirection = string.Empty;
+            activeTradeEntryPrice = double.NaN;
+            activeTradeQuantity = 0;
 
             previousPrice = double.NaN;
-			hasSeenRealtimeEligibleTick = false;
 			lastDebugPrintTime = Core.Globals.MinDate;
 
             preEntryLongSweep = false;
@@ -600,6 +727,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch
             {
+	            // ignored
             }
 
             return TimeZoneInfo.Local;
@@ -656,32 +784,41 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 200)]
         [Display(Name = "Min Retracement Ticks", Order = 13, GroupName = "Entry")]
         public int MinRetracementTicks { get; set; }
-		
-		[NinjaScriptProperty]
-		[Display(Name = "Allow Catch-Up Entry On First Realtime Tick", Order = 14, GroupName = "Entry")]
-		public bool AllowCatchUpEntryOnFirstRealtimeTick { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "ATM Template Name", Order = 20, GroupName = "ATM")]
-        public string AtmTemplateName { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100)]
-        [Display(Name = "Quantity", Order = 21, GroupName = "ATM")]
+        [Display(Name = "Quantity", Order = 19, GroupName = "Risk Management")]
         public int Quantity { get; set; }
 
         [NinjaScriptProperty]
+        [Range(1, 100000)]
+        [Display(Name = "Profit Target USD", Order = 20, GroupName = "Risk Management")]
+        public double ProfitTargetUsd { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 100000)]
+        [Display(Name = "Stop Loss USD", Order = 21, GroupName = "Risk Management")]
+        public double StopLossUsd { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 100000)]
+        [Display(Name = "BE Profit Trigger USD", Order = 22, GroupName = "Risk Management")]
+        public double BreakEvenProfitTriggerUsd { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 100000)]
+        [Display(Name = "BE Plus USD", Order = 23, GroupName = "Risk Management")]
+        public double BreakEvenPlusUsd { get; set; }
+
+        [NinjaScriptProperty]
         [Range(1, 10)]
-        [Display(Name = "Max Trades If Break Even", Order = 30, GroupName = "Trade Limits")]
-        public int MaxTradesIfBreakEven { get; set; }
+        [Display(Name = "Max Losing Trades Per Day", Order = 24, GroupName = "Risk Management")]
+        public int MaxLosingTradesPerDay { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Break Even Min Currency", Order = 31, GroupName = "Trade Limits")]
-        public double BreakEvenMinCurrency { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Break Even Max Currency", Order = 32, GroupName = "Trade Limits")]
-        public double BreakEvenMaxCurrency { get; set; }
+        [Range(1, 10)]
+        [Display(Name = "Max Winning Trades Per Day", Order = 25, GroupName = "Risk Management")]
+        public int MaxWinningTradesPerDay { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Convert Chart Time To Eastern", Order = 40, GroupName = "Time")]
