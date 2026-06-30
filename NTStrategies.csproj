@@ -116,6 +116,7 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataModels.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataWriter.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Entry.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\LegacyOnEachTickStrategy.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Profile.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Params.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
