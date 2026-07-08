@@ -43,7 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     newStop = beStop;
                     autoBreakevenApplied = true;
-                    LogDiag($"LONG auto-BE triggered. NewStop={newStop}");
+                    LogDiag($"LONG auto-BE triggered. CandidateStop={newStop}");
                 }
             }
 
@@ -54,12 +54,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             newStop = Instrument.MasterInstrument.RoundToTickSize(newStop);
 
-            if (newStop > activeStopPrice && newStop < Close[0])
+            var bid = GetCurrentBid();
+            if (bid <= 0)
+                bid = Close[0];
+
+            // For a long position, the protective sell stop must be below the bid.
+            // Keep at least 1 tick buffer to avoid NinjaTrader rejecting the change.
+            var highestValidStop = Instrument.MasterInstrument.RoundToTickSize(bid - TickSize);
+
+            if (newStop > highestValidStop)
             {
-                activeStopPrice = newStop;
-                SetStopLoss(LongEntryName, CalculationMode.Price, activeStopPrice, false);
-                LogDiag($"LONG stop moved. NewStop={activeStopPrice}");
+                LogDiag($"LONG stop move skipped: candidate stop invalid. Candidate={newStop}, Bid={bid}, HighestValid={highestValidStop}");
+                return;
             }
+
+            if (newStop <= activeStopPrice)
+                return;
+
+            activeStopPrice = newStop;
+
+            SetStopLoss(LongEntryName, CalculationMode.Price, activeStopPrice, false);
+
+            LogDiag($"LONG stop moved. NewStop={activeStopPrice}, Bid={bid}");
         }
         
         private void ManageShortBracket()
@@ -77,7 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     newStop = beStop;
                     autoBreakevenApplied = true;
-                    LogDiag($"SHORT auto-BE triggered. NewStop={newStop}");
+                    LogDiag($"SHORT auto-BE triggered. CandidateStop={newStop}");
                 }
             }
 
@@ -88,12 +104,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             newStop = Instrument.MasterInstrument.RoundToTickSize(newStop);
 
-            if (newStop < activeStopPrice && newStop > Close[0])
+            var ask = GetCurrentAsk();
+            if (ask <= 0)
+                ask = Close[0];
+
+            // For a short position, the protective buy stop must be above the ask.
+            // Keep at least 1 tick buffer to avoid NinjaTrader rejecting the change.
+            var lowestValidStop = Instrument.MasterInstrument.RoundToTickSize(ask + TickSize);
+
+            if (newStop < lowestValidStop)
             {
-                activeStopPrice = newStop;
-                SetStopLoss(ShortEntryName, CalculationMode.Price, activeStopPrice, false);
-                LogDiag($"SHORT stop moved. NewStop={activeStopPrice}");
+                LogDiag($"SHORT stop move skipped: candidate stop invalid. Candidate={newStop}, Ask={ask}, LowestValid={lowestValidStop}");
+                return;
             }
+
+            if (newStop >= activeStopPrice)
+                return;
+
+            activeStopPrice = newStop;
+
+            SetStopLoss(ShortEntryName, CalculationMode.Price, activeStopPrice, false);
+
+            LogDiag($"SHORT stop moved. NewStop={activeStopPrice}, Ask={ask}");
         }
         
         private double GetLongTrailStop(double profitTicks)
