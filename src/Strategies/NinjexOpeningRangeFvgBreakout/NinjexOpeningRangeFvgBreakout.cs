@@ -168,117 +168,93 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            var firstCloseAboveRange =
-                Close[0] > openingRangeHigh &&
-                Close[1] <= openingRangeHigh;
+            if (CurrentBar < 4)
+                return;
 
-            var firstCloseBelowRange =
-                Close[0] < openingRangeLow &&
-                Close[1] >= openingRangeLow;
+            var minGap = MinFvgGapTicks * TickSize;
 
-            var recentBullishFvg = HasRecentBullishFvg(RecentFvgLookbackBars);
-            var recentBearishFvg = HasRecentBearishFvg(RecentFvgLookbackBars);
+            // Standard bullish 3-candle FVG:
+            // Candle [2] = impulse / breakout candle
+            // Candle [0] = FVG confirmation candle
+            // Gap is between High[2] and Low[0]
+            var bullishFvg =
+                Low[0] > High[2] &&
+                (Low[0] - High[2]) >= minGap;
+
+            // Standard bearish 3-candle FVG:
+            // Candle [2] = impulse / breakout candle
+            // Candle [0] = FVG confirmation candle
+            // Gap is between Low[2] and High[0]
+            var bearishFvg =
+                High[0] < Low[2] &&
+                (Low[2] - High[0]) >= minGap;
+
+            // Long model:
+            // Candle [2] must be the first candle that closed above the opening range high.
+            // The actual FVG gap must be above / through the opening range high.
+            var breakoutCandleFirstCloseAboveRange =
+                Close[2] > openingRangeHigh &&
+                Close[3] <= openingRangeHigh;
+
+            var bullishFvgThroughOpeningHigh =
+                bullishFvg &&
+                breakoutCandleFirstCloseAboveRange &&
+                High[2] >= openingRangeHigh;
+
+            // Short model:
+            // Candle [2] must be the first candle that closed below the opening range low.
+            // The actual FVG gap must be below / through the opening range low.
+            var breakoutCandleFirstCloseBelowRange =
+                Close[2] < openingRangeLow &&
+                Close[3] >= openingRangeLow;
+
+            var bearishFvgThroughOpeningLow =
+                bearishFvg &&
+                breakoutCandleFirstCloseBelowRange &&
+                Low[2] <= openingRangeLow;
 
             LogDiag(
-                $"Check: Close={Close[0]}, ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                $"FirstCloseAbove={firstCloseAboveRange}, FirstCloseBelow={firstCloseBelowRange}, " +
-                $"RecentBullFVG={recentBullishFvg}, RecentBearFVG={recentBearishFvg}");
+                $"Check: Close0={Close[0]}, ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
+                $"BreakoutCandleAbove={breakoutCandleFirstCloseAboveRange}, " +
+                $"BreakoutCandleBelow={breakoutCandleFirstCloseBelowRange}, " +
+                $"BullThroughORH={bullishFvgThroughOpeningHigh}, BearThroughORL={bearishFvgThroughOpeningLow}");
 
-            if (firstCloseAboveRange && recentBullishFvg)
+            if (bullishFvgThroughOpeningHigh)
             {
                 pendingEntry = true;
                 pendingLong = true;
-                pendingStopPrice = Low[0];
+
+                // Stop goes at the first candle that closed outside the range.
+                pendingStopPrice = Low[2];
 
                 DrawDiag("LONG_SIGNAL", "LONG", Low[0] - 4 * TickSize);
-                LogDiag($"LONG submitted. Stop={pendingStopPrice}");
+                LogDiag($"LONG submitted. BreakoutCandle={Time[2]:HH:mm:ss}, Stop={pendingStopPrice}");
 
                 EnterLong(Quantity, LongEntryName);
                 return;
             }
 
-            if (firstCloseBelowRange && recentBearishFvg)
+            if (bearishFvgThroughOpeningLow)
             {
                 pendingEntry = true;
                 pendingLong = false;
-                pendingStopPrice = High[0];
+
+                // Stop goes at the first candle that closed outside the range.
+                pendingStopPrice = High[2];
 
                 DrawDiag("SHORT_SIGNAL", "SHORT", High[0] + 4 * TickSize);
-                LogDiag($"SHORT submitted. Stop={pendingStopPrice}");
+                LogDiag($"SHORT submitted. BreakoutCandle={Time[2]:HH:mm:ss}, Stop={pendingStopPrice}");
 
                 EnterShort(Quantity, ShortEntryName);
                 return;
             }
 
-            if (firstCloseAboveRange && !recentBullishFvg)
-                DrawDiag("BLOCK_LONG_NO_FVG", "No bull FVG", High[0] + 4 * TickSize);
+            if (Close[0] > openingRangeHigh && !bullishFvgThroughOpeningHigh)
+                DrawDiag("BLOCK_LONG_STRICT", "No strict bull FVG", High[0] + 4 * TickSize);
 
-            if (firstCloseBelowRange && !recentBearishFvg)
-                DrawDiag("BLOCK_SHORT_NO_FVG", "No bear FVG", Low[0] - 4 * TickSize);
-        }
-        
-        private bool HasRecentBullishFvg(int lookbackBars)
-        {
-            var maxBarsAgo = Math.Max(0, lookbackBars);
-
-            for (var barsAgo = 0; barsAgo <= maxBarsAgo; barsAgo++)
-            {
-                if (CurrentBar < barsAgo + 2)
-                    continue;
-
-                var gapLow = High[barsAgo + 2];
-                var gapHigh = Low[barsAgo];
-
-                var bullishFvg =
-                    gapHigh > gapLow &&
-                    (gapHigh - gapLow) >= MinFvgGapTicks * TickSize;
-
-                if (!bullishFvg)
-                    continue;
-
-                // Directional breakout filter:
-                // FVG should be near or below/through the opening high area.
-                var relevantToOpeningHigh =
-                    gapLow <= openingRangeHigh ||
-                    gapHigh >= openingRangeHigh;
-
-                if (relevantToOpeningHigh)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private bool HasRecentBearishFvg(int lookbackBars)
-        {
-            var maxBarsAgo = Math.Max(0, lookbackBars);
-
-            for (var barsAgo = 0; barsAgo <= maxBarsAgo; barsAgo++)
-            {
-                if (CurrentBar < barsAgo + 2)
-                    continue;
-
-                var gapHigh = Low[barsAgo + 2];
-                var gapLow = High[barsAgo];
-
-                var bearishFvg =
-                    gapHigh > gapLow &&
-                    (gapHigh - gapLow) >= MinFvgGapTicks * TickSize;
-
-                if (!bearishFvg)
-                    continue;
-
-                // Directional breakout filter:
-                // FVG should be near or above/through the opening low area.
-                var relevantToOpeningLow =
-                    gapHigh >= openingRangeLow ||
-                    gapLow <= openingRangeLow;
-
-                if (relevantToOpeningLow)
-                    return true;
-            }
-
-            return false;
+            if (Close[0] < openingRangeLow && !bearishFvgThroughOpeningLow)
+                DrawDiag("BLOCK_SHORT_STRICT", "No strict bear FVG", Low[0] - 4 * TickSize);
         }
 
         protected override void OnExecutionUpdate(
