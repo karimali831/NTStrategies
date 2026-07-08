@@ -31,7 +31,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool pendingEntry;
         private bool pendingLong;
         private double pendingStopPrice;
-
+        
+        private MarketPosition lastKnownMarketPosition = MarketPosition.Flat;
+        private double lastTradeEntryPrice;
+        private int tradesCompletedToday;
+        
         private const string LongEntryName = "LongFvgBreakout";
         private const string ShortEntryName = "ShortFvgBreakout";
 
@@ -107,10 +111,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (BarsInProgress != 0)
                 return;
 
+            SyncFlatState();
             ManageActiveBracket();
 
-            // Entries are evaluated once only, on the first tick of the new candle.
-            // This preserves bar-close entry logic while running management OnEachTick.
             if (!IsFirstTickOfBar)
                 return;
 
@@ -173,8 +176,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (orderName == LongEntryName)
             {
                 activeEntryPrice = price;
+                lastTradeEntryPrice = price;
+                lastKnownMarketPosition = MarketPosition.Long;
 
-                // Recalculate exact 2R bracket from actual fill.
                 var risk = activeEntryPrice - activeStopPrice;
                 if (risk > TickSize)
                 {
@@ -183,6 +187,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     SetProfitTarget(LongEntryName, CalculationMode.Price, activeTargetPrice);
                 }
 
+                pendingEntry = false;
+
                 LogDiag($"LONG filled. Entry={activeEntryPrice}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 return;
             }
@@ -190,8 +196,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (orderName == ShortEntryName)
             {
                 activeEntryPrice = price;
+                lastTradeEntryPrice = price;
+                lastKnownMarketPosition = MarketPosition.Short;
 
-                // Recalculate exact 2R bracket from actual fill.
                 var risk = activeStopPrice - activeEntryPrice;
                 if (risk > TickSize)
                 {
@@ -200,24 +207,51 @@ namespace NinjaTrader.NinjaScript.Strategies
                     SetProfitTarget(ShortEntryName, CalculationMode.Price, activeTargetPrice);
                 }
 
+                pendingEntry = false;
+
                 LogDiag($"SHORT filled. Entry={activeEntryPrice}, Stop={activeStopPrice}, Target={activeTargetPrice}");
-                return;
+            }
+        }
+        
+        private void SyncFlatState()
+        {
+            var currentPosition = Position.MarketPosition;
+
+            if (lastKnownMarketPosition != MarketPosition.Flat &&
+                currentPosition == MarketPosition.Flat)
+            {
+                var exitPrice = Close[0];
+
+                if (activeDirection == 1)
+                {
+                    if (exitPrice >= activeEntryPrice)
+                        winningTradesToday++;
+                    else
+                        losingTradesToday++;
+                }
+                else if (activeDirection == -1)
+                {
+                    if (exitPrice <= activeEntryPrice)
+                        winningTradesToday++;
+                    else
+                        losingTradesToday++;
+                }
+
+                tradesCompletedToday++;
+
+                LogDiag(
+                    $"Position flat detected. Wins={winningTradesToday}, Losses={losingTradesToday}, Completed={tradesCompletedToday}");
+
+                pendingEntry = false;
+                pendingLong = false;
+
+                longBreakoutArmed = false;
+                shortBreakoutArmed = false;
+
+                ResetActiveBracketState();
             }
 
-            if (orderName == LongTargetName || orderName == ShortTargetName)
-            {
-                winningTradesToday++;
-                pendingEntry = false;
-                ResetActiveBracketState();
-                return;
-            }
-
-            if (orderName == LongStopName || orderName == ShortStopName)
-            {
-                losingTradesToday++;
-                pendingEntry = false;
-                ResetActiveBracketState();
-            }
+            lastKnownMarketPosition = currentPosition;
         }
 
         private void LogDiag(string message)
@@ -253,6 +287,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             shortBreakoutStop = 0;
 
             printedRangeComplete = false;
+            
+            lastKnownMarketPosition = MarketPosition.Flat;
+            lastTradeEntryPrice = 0;
+            tradesCompletedToday = 0;
             
             ResetActiveBracketState();
         }
