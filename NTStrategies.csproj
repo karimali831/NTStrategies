@@ -80,6 +80,7 @@
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
+        <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
         <Compile Include="src\Indicators\NinjexOpeningVolumeProfile\NinjexOpeningVolumeProfile.cs" />
         <Content Include="src\Indicators\EMA\Templates\Default.xml" />
         <Compile Include="src\Indicators\NinjexPinBarDots\NinjexPinBarDots.cs" />
@@ -110,6 +111,7 @@
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Risk.cs" />
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Summary.cs" />
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\NinjexOpeningRangeFvgBreakout.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\BreakEven.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataAnalysis.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Core.cs" />
@@ -131,6 +133,7 @@
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Order.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Risk.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Session.cs" />
+        <Compile Include="src\Indicators\NinjexOpeningRangeLevels\NinjexOpeningRangeLevels.cs" />
         <Content Include="src\Indicators\NinjexOpeningVolumeProfile\Templates\Default.xml" />
         <Content Include="src\Indicators\NinjexPinBarDots\Templates\Default.xml" />
         <Content Include="src\Indicators\NinjexPinBarDots\Templates\t2.xml" />
