@@ -1,8 +1,13 @@
 ﻿#region Using declarations
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Windows;
+using System.Windows.Media;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.NinjaScript.DrawingTools;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -15,6 +20,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool openingRangeComplete;
         private double openingRangeHigh;
         private double openingRangeLow;
+        private bool printedRangeComplete;
 
         private int losingTradesToday;
         private int winningTradesToday;
@@ -46,13 +52,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IncludeCommission = true;
 
                 Quantity = 1;
-                MaxLosingTradesPerDay = 1;
+                MaxLosingTradesPerDay = 2;
                 MaxWinningTradesPerDay = 2;
 
                 RangeStartTime = 93000;
                 RangeMinutes = 5;
 
                 MinFvgGapTicks = 1;
+                EnableDiagnostics = true;
+                RecentFvgLookbackBars = 3;
                 ConvertChartTimeToEastern = false;
             }
             else if (State == State.Configure)
@@ -122,42 +130,43 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResetForNewDay(easternBarTime.Date);
 
             if (!openingRangeComplete)
+            {
+                LogDiag("Blocked: opening range not complete.");
                 return;
+            }
+
+            if (!printedRangeComplete)
+            {
+                printedRangeComplete = true;
+                LogDiag($"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}");
+            }
 
             if (!CanTradeToday())
+            {
+                LogDiag($"Blocked: daily limits reached. Wins={winningTradesToday}, Losses={losingTradesToday}");
                 return;
+            }
 
             if (pendingEntry)
+            {
+                LogDiag("Blocked: pending entry already active.");
                 return;
+            }
 
             if (Position.MarketPosition != MarketPosition.Flat)
+            {
+                LogDiag($"Blocked: position not flat. Position={Position.MarketPosition}");
                 return;
+            }
 
-            DateTime rangeStart = activeEasternDate.Add(ToTimeSpan(RangeStartTime));
-            DateTime rangeEnd = rangeStart.AddMinutes(RangeMinutes);
+            var rangeStart = activeEasternDate.Add(ToTimeSpan(RangeStartTime));
+            var rangeEnd = rangeStart.AddMinutes(RangeMinutes);
 
             if (easternBarTime <= rangeEnd)
+            {
+                LogDiag($"Blocked: still inside opening range window. Time={easternBarTime:HH:mm:ss}, RangeEnd={rangeEnd:HH:mm:ss}");
                 return;
-
-            var minGap = MinFvgGapTicks * TickSize;
-
-            var bullishFvg =
-                Low[0] > High[2] &&
-                (Low[0] - High[2]) >= minGap;
-
-            var bearishFvg =
-                High[0] < Low[2] &&
-                (Low[2] - High[0]) >= minGap;
-
-            var bullishFvgThroughOpeningHigh =
-                bullishFvg &&
-                High[2] < openingRangeHigh &&
-                Low[0] > openingRangeHigh;
-
-            var bearishFvgThroughOpeningLow =
-                bearishFvg &&
-                Low[2] > openingRangeLow &&
-                High[0] < openingRangeLow;
+            }
 
             var firstCloseAboveRange =
                 Close[0] > openingRangeHigh &&
@@ -167,24 +176,109 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Close[0] < openingRangeLow &&
                 Close[1] >= openingRangeLow;
 
-            if (bullishFvgThroughOpeningHigh && firstCloseAboveRange)
+            var recentBullishFvg = HasRecentBullishFvg(RecentFvgLookbackBars);
+            var recentBearishFvg = HasRecentBearishFvg(RecentFvgLookbackBars);
+
+            LogDiag(
+                $"Check: Close={Close[0]}, ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                $"FirstCloseAbove={firstCloseAboveRange}, FirstCloseBelow={firstCloseBelowRange}, " +
+                $"RecentBullFVG={recentBullishFvg}, RecentBearFVG={recentBearishFvg}");
+
+            if (firstCloseAboveRange && recentBullishFvg)
             {
                 pendingEntry = true;
                 pendingLong = true;
                 pendingStopPrice = Low[0];
 
+                DrawDiag("LONG_SIGNAL", "LONG", Low[0] - 4 * TickSize);
+                LogDiag($"LONG submitted. Stop={pendingStopPrice}");
+
                 EnterLong(Quantity, LongEntryName);
                 return;
             }
 
-            if (bearishFvgThroughOpeningLow && firstCloseBelowRange)
+            if (firstCloseBelowRange && recentBearishFvg)
             {
                 pendingEntry = true;
                 pendingLong = false;
                 pendingStopPrice = High[0];
 
+                DrawDiag("SHORT_SIGNAL", "SHORT", High[0] + 4 * TickSize);
+                LogDiag($"SHORT submitted. Stop={pendingStopPrice}");
+
                 EnterShort(Quantity, ShortEntryName);
+                return;
             }
+
+            if (firstCloseAboveRange && !recentBullishFvg)
+                DrawDiag("BLOCK_LONG_NO_FVG", "No bull FVG", High[0] + 4 * TickSize);
+
+            if (firstCloseBelowRange && !recentBearishFvg)
+                DrawDiag("BLOCK_SHORT_NO_FVG", "No bear FVG", Low[0] - 4 * TickSize);
+        }
+        
+        private bool HasRecentBullishFvg(int lookbackBars)
+        {
+            var maxBarsAgo = Math.Max(0, lookbackBars);
+
+            for (var barsAgo = 0; barsAgo <= maxBarsAgo; barsAgo++)
+            {
+                if (CurrentBar < barsAgo + 2)
+                    continue;
+
+                var gapLow = High[barsAgo + 2];
+                var gapHigh = Low[barsAgo];
+
+                var bullishFvg =
+                    gapHigh > gapLow &&
+                    (gapHigh - gapLow) >= MinFvgGapTicks * TickSize;
+
+                if (!bullishFvg)
+                    continue;
+
+                // Directional breakout filter:
+                // FVG should be near or below/through the opening high area.
+                var relevantToOpeningHigh =
+                    gapLow <= openingRangeHigh ||
+                    gapHigh >= openingRangeHigh;
+
+                if (relevantToOpeningHigh)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool HasRecentBearishFvg(int lookbackBars)
+        {
+            var maxBarsAgo = Math.Max(0, lookbackBars);
+
+            for (var barsAgo = 0; barsAgo <= maxBarsAgo; barsAgo++)
+            {
+                if (CurrentBar < barsAgo + 2)
+                    continue;
+
+                var gapHigh = Low[barsAgo + 2];
+                var gapLow = High[barsAgo];
+
+                var bearishFvg =
+                    gapHigh > gapLow &&
+                    (gapHigh - gapLow) >= MinFvgGapTicks * TickSize;
+
+                if (!bearishFvg)
+                    continue;
+
+                // Directional breakout filter:
+                // FVG should be near or above/through the opening low area.
+                var relevantToOpeningLow =
+                    gapHigh >= openingRangeLow ||
+                    gapLow <= openingRangeLow;
+
+                if (relevantToOpeningLow)
+                    return true;
+            }
+
+            return false;
         }
 
         protected override void OnExecutionUpdate(
@@ -202,7 +296,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (execution.Order.OrderState != OrderState.Filled)
                 return;
 
-            string orderName = execution.Order.Name;
+            var orderName = execution.Order.Name;
 
             if (orderName == LongEntryName)
             {
@@ -276,6 +370,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return true;
         }
+        
+        private void DrawDiag(string tag, string text, double price)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            Draw.Text(
+                this,
+                tag + "_" + CurrentBar,
+                false,
+                text,
+                0,
+                price,
+                0,
+                Brushes.Gray,
+                new SimpleFont("Arial", 10),
+                TextAlignment.Center,
+                Brushes.Transparent,
+                Brushes.Transparent,
+                0);
+        }
+        
+        private void LogDiag(string message)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
+        }
 
         private void ResetForNewDay(DateTime easternDate)
         {
@@ -292,8 +415,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             pendingEntry = false;
             pendingLong = false;
             pendingStopPrice = 0;
-        }
 
+            printedRangeComplete = false;
+        }
+        
         private DateTime ToEastern(DateTime chartTime)
         {
             if (!ConvertChartTimeToEastern)
@@ -318,7 +443,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return new TimeSpan(hours, minutes, seconds);
         }
-
+        
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Diagnostics", GroupName = "Diagnostics", Order = 100)]
+        public bool EnableDiagnostics { get; set; }
+        
         [NinjaScriptProperty]
         [Range(1, 100)]
         [Display(Name = "Quantity", GroupName = "Risk", Order = 1)]
@@ -349,6 +478,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Min FVG Gap Ticks", GroupName = "FVG", Order = 20)]
         public int MinFvgGapTicks { get; set; }
 
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(Name = "Recent FVG Lookback Bars", GroupName = "FVG", Order = 21)]
+        public int RecentFvgLookbackBars { get; set; }
+        
         [NinjaScriptProperty]
         [Display(Name = "Convert Chart Time To Eastern", GroupName = "Time", Order = 30)]
         public bool ConvertChartTimeToEastern { get; set; }
