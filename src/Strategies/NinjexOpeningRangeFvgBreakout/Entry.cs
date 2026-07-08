@@ -119,26 +119,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 shortBreakoutArmed = false;
             }
 
-            // Important:
-            // The breakout arm proves price moved through the OR level.
-            // The FVG only needs to confirm after the breakout and close on the correct side.
-            var bullishFvgAfterBreakout =
+            // Actual bullish FVG gap is between High[3] and Low[1].
+            // For a valid long, the FVG itself must clear / break through the OR high.
+            var bullishFvgClearsOpeningHigh =
                 bullishFvg &&
+                Low[1] >= openingRangeHigh - TickSize;
+
+            // Actual bearish FVG gap is between High[1] and Low[3].
+            // For a valid short, the FVG itself must clear / break through the OR low.
+            var bearishFvgClearsOpeningLow =
+                bearishFvg &&
+                High[1] <= openingRangeLow + TickSize;
+
+            var bullishFvgAfterBreakout =
                 longBreakoutArmed &&
                 longBarsSinceBreakout >= 1 &&
-                Close[1] > openingRangeHigh;
+                bullishFvgClearsOpeningHigh;
 
             var bearishFvgAfterBreakout =
-                bearishFvg &&
                 shortBreakoutArmed &&
                 shortBarsSinceBreakout >= 1 &&
-                Close[1] < openingRangeLow;
+                bearishFvgClearsOpeningLow;
 
             LogDiag(
                 $"Check: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
                 $"FirstAbove={firstCloseAboveRange}, FirstBelow={firstCloseBelowRange}, " +
                 $"LongArmed={longBreakoutArmed}, ShortArmed={shortBreakoutArmed}, " +
                 $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
+                $"BullGapBottom={Low[1]}, BullGapTop={High[3]}, " +
+                $"BearGapTop={High[1]}, BearGapBottom={Low[3]}, " +
+                $"BullClearsORH={bullishFvgClearsOpeningHigh}, BearClearsORL={bearishFvgClearsOpeningLow}, " +
                 $"BullAfterBreakout={bullishFvgAfterBreakout}, BearAfterBreakout={bearishFvgAfterBreakout}, " +
                 $"LongBarsSince={longBarsSinceBreakout}, ShortBarsSince={shortBarsSinceBreakout}");
 
