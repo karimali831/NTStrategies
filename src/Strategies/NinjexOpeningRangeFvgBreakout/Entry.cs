@@ -57,11 +57,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [1] = candle that just closed
             // [2] = candle before [1]
             // [3] = candle before [2]
-            //
-            // We now separate the model into:
-            // 1. First close outside range arms the setup.
-            // 2. FVG confirmation may happen within FvgConfirmBarsAfterBreakout bars.
-            // 3. Stop remains fixed at the first candle that closed outside the range.
 
             var firstCloseAboveRange =
                 Close[1] > openingRangeHigh &&
@@ -71,7 +66,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Close[1] < openingRangeLow &&
                 Close[2] >= openingRangeLow;
 
-            if (firstCloseAboveRange)
+            // Arm long only if there is no active long breakout already.
+            if (firstCloseAboveRange && !longBreakoutArmed)
             {
                 longBreakoutArmed = true;
                 longBreakoutBar = CurrentBar - 1;
@@ -82,7 +78,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogDiag($"LONG breakout armed. BreakoutTime={Time[1]:HH:mm:ss}, Stop={longBreakoutStop}");
             }
 
-            if (firstCloseBelowRange)
+            // Arm short only if there is no active short breakout already.
+            // This prevents later candles from overwriting the original first-close stop.
+            if (firstCloseBelowRange && !shortBreakoutArmed)
             {
                 shortBreakoutArmed = true;
                 shortBreakoutBar = CurrentBar - 1;
@@ -100,17 +98,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bearishFvg =
                 High[1] < Low[3] &&
                 (Low[3] - High[1]) >= minGap;
-
-            // Strict FVG-through-range rule.
-            // Bullish gap must straddle / clear OR high.
-            // Bearish gap must straddle / clear OR low.
-            var bullishFvgThroughOpeningHigh =
-                bullishFvg &&
-                Low[1] >= openingRangeHigh;
-
-            var bearishFvgThroughOpeningLow =
-                bearishFvg &&
-                High[1] <= openingRangeLow;
 
             var longBarsSinceBreakout = longBreakoutArmed
                 ? (CurrentBar - 1) - longBreakoutBar
@@ -132,15 +119,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                 shortBreakoutArmed = false;
             }
 
+            // Important:
+            // The breakout arm proves price moved through the OR level.
+            // The FVG only needs to confirm after the breakout and close on the correct side.
+            var bullishFvgAfterBreakout =
+                bullishFvg &&
+                longBreakoutArmed &&
+                longBarsSinceBreakout >= 1 &&
+                Close[1] > openingRangeHigh;
+
+            var bearishFvgAfterBreakout =
+                bearishFvg &&
+                shortBreakoutArmed &&
+                shortBarsSinceBreakout >= 1 &&
+                Close[1] < openingRangeLow;
+
             LogDiag(
                 $"Check: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
                 $"FirstAbove={firstCloseAboveRange}, FirstBelow={firstCloseBelowRange}, " +
                 $"LongArmed={longBreakoutArmed}, ShortArmed={shortBreakoutArmed}, " +
                 $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
-                $"BullThrough={bullishFvgThroughOpeningHigh}, BearThrough={bearishFvgThroughOpeningLow}, " +
+                $"BullAfterBreakout={bullishFvgAfterBreakout}, BearAfterBreakout={bearishFvgAfterBreakout}, " +
                 $"LongBarsSince={longBarsSinceBreakout}, ShortBarsSince={shortBarsSinceBreakout}");
 
-            if (longBreakoutArmed && bullishFvgThroughOpeningHigh)
+            if (bullishFvgAfterBreakout)
             {
                 var approximateEntry = GetCurrentAsk();
                 if (approximateEntry <= 0)
@@ -162,7 +164,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (shortBreakoutArmed && bearishFvgThroughOpeningLow)
+            if (bearishFvgAfterBreakout)
             {
                 var approximateEntry = GetCurrentBid();
                 if (approximateEntry <= 0)
