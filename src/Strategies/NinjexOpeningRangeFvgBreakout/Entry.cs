@@ -106,12 +106,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Bearish gap must straddle / clear OR low.
             var bullishFvgThroughOpeningHigh =
                 bullishFvg &&
-                High[3] <= openingRangeHigh &&
                 Low[1] >= openingRangeHigh;
 
             var bearishFvgThroughOpeningLow =
                 bearishFvg &&
-                Low[3] >= openingRangeLow &&
                 High[1] <= openingRangeLow;
 
             var longBarsSinceBreakout = longBreakoutArmed
