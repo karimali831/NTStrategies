@@ -9,6 +9,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool EnableDiagnostics { get; set; }
         
         [NinjaScriptProperty]
+        [Range(0, 235959)]
+        [Display(Name = "Entry Start Time", GroupName = "Entry Window", Order = 1)]
+        public int EntryStartTime { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 235959)]
+        [Display(Name = "Entry End Time", GroupName = "Entry Window", Order = 2)]
+        public int EntryEndTime { get; set; }
+        
+        [NinjaScriptProperty]
         [Range(1, 100)]
         [Display(Name = "Quantity", GroupName = "Risk", Order = 1)]
         public int Quantity { get; set; }

@@ -1,11 +1,7 @@
 ﻿#region Using declarations
 using System;
-using System.Windows;
-using System.Windows.Media;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.Gui.Tools;
-using NinjaTrader.NinjaScript.DrawingTools;
 
 #endregion
 
@@ -42,7 +38,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Name = "Ninjex Opening Range FVG Breakout";
                 Description = "Trades FVG breakouts through the opening range high/low.";
-                Calculate = Calculate.OnBarClose;
+                Calculate = Calculate.OnEachTick;
+
+                EnableDiagnostics = false;
+
+                EntryStartTime = 93500;
+                EntryEndTime = 110000;
+
+                MaxStopTicks = 0;
 
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -58,11 +61,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RangeMinutes = 5;
 
                 MinFvgGapTicks = 1;
-                EnableDiagnostics = true;
                 RecentFvgLookbackBars = 3;
                 
-                MaxStopTicks = 0;
-
                 AutoBreakevenProfitTriggerTicks = 0;
                 AutoBreakevenPlusTicks = 0;
 
@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < 3 || CurrentBars[1] < 1)
+            if (CurrentBars[0] < 5 || CurrentBars[1] < 1)
                 return;
 
             if (BarsInProgress == 1)
@@ -101,6 +101,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             ManageActiveBracket();
+
+            // Entries are evaluated once only, on the first tick of the new candle.
+            // This preserves bar-close entry logic while running management OnEachTick.
+            if (!IsFirstTickOfBar)
+                return;
+
             HandleOneMinuteEntryModel();
         }
 
@@ -157,6 +163,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var orderName = execution.Order.Name;
 
+            if (orderName == LongEntryName)
+            {
+                activeEntryPrice = price;
+
+                // Recalculate exact 2R bracket from actual fill.
+                var risk = activeEntryPrice - activeStopPrice;
+                if (risk > TickSize)
+                {
+                    activeTargetPrice = Instrument.MasterInstrument.RoundToTickSize(activeEntryPrice + risk * 2.0);
+                    SetStopLoss(LongEntryName, CalculationMode.Price, activeStopPrice, false);
+                    SetProfitTarget(LongEntryName, CalculationMode.Price, activeTargetPrice);
+                }
+
+                LogDiag($"LONG filled. Entry={activeEntryPrice}, Stop={activeStopPrice}, Target={activeTargetPrice}");
+                return;
+            }
+
+            if (orderName == ShortEntryName)
+            {
+                activeEntryPrice = price;
+
+                // Recalculate exact 2R bracket from actual fill.
+                var risk = activeStopPrice - activeEntryPrice;
+                if (risk > TickSize)
+                {
+                    activeTargetPrice = Instrument.MasterInstrument.RoundToTickSize(activeEntryPrice - risk * 2.0);
+                    SetStopLoss(ShortEntryName, CalculationMode.Price, activeStopPrice, false);
+                    SetProfitTarget(ShortEntryName, CalculationMode.Price, activeTargetPrice);
+                }
+
+                LogDiag($"SHORT filled. Entry={activeEntryPrice}, Stop={activeStopPrice}, Target={activeTargetPrice}");
+                return;
+            }
+
             if (orderName == LongTargetName || orderName == ShortTargetName)
             {
                 winningTradesToday++;
@@ -172,28 +212,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResetActiveBracketState();
             }
         }
-        
-        private void DrawDiag(string tag, string text, double price)
-        {
-            if (!EnableDiagnostics)
-                return;
 
-            Draw.Text(
-                this,
-                tag + "_" + CurrentBar,
-                false,
-                text,
-                0,
-                price,
-                0,
-                Brushes.Gray,
-                new SimpleFont("Arial", 10),
-                TextAlignment.Center,
-                Brushes.Transparent,
-                Brushes.Transparent,
-                0);
-        }
-        
         private void LogDiag(string message)
         {
             if (!EnableDiagnostics)

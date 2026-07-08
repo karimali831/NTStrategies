@@ -10,19 +10,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double activeTargetPrice;
         private int activeDirection; // 1 = long, -1 = short, 0 = flat
         private bool autoBreakevenApplied;
-        
-        private bool IsStopSizeAllowed(bool isLong, double approximateEntryPrice, double stopPrice)
-        {
-            if (MaxStopTicks <= 0)
-                return true;
 
-            var riskTicks = isLong
-                ? (approximateEntryPrice - stopPrice) / TickSize
-                : (stopPrice - approximateEntryPrice) / TickSize;
-
-            return riskTicks > 0 && riskTicks <= MaxStopTicks;
-        }
-        
         private void ManageActiveBracket()
         {
             if (Position.MarketPosition == MarketPosition.Flat)
@@ -69,7 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (newStop > activeStopPrice && newStop < Close[0])
             {
                 activeStopPrice = newStop;
-                ExitLongStopMarket(0, true, Position.Quantity, activeStopPrice, LongStopName, LongEntryName);
+                SetStopLoss(LongEntryName, CalculationMode.Price, activeStopPrice, false);
                 LogDiag($"LONG stop moved. NewStop={activeStopPrice}");
             }
         }
@@ -103,12 +91,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (newStop < activeStopPrice && newStop > Close[0])
             {
                 activeStopPrice = newStop;
-                ExitShortStopMarket(0, true, Position.Quantity, activeStopPrice, ShortStopName, ShortEntryName);
+                SetStopLoss(ShortEntryName, CalculationMode.Price, activeStopPrice, false);
                 LogDiag($"SHORT stop moved. NewStop={activeStopPrice}");
             }
         }
         
-                private double GetLongTrailStop(double profitTicks)
+        private double GetLongTrailStop(double profitTicks)
         {
             var step = GetActiveTrailStep(profitTicks);
 
