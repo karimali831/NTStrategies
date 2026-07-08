@@ -54,9 +54,44 @@ namespace NinjaTrader.NinjaScript.Strategies
             var minGap = MinFvgGapTicks * TickSize;
 
             // With Calculate.OnEachTick + IsFirstTickOfBar:
-            // [1] = closed FVG confirmation candle
-            // [3] = breakout candle
-            // [4] = candle before breakout candle
+            // [1] = candle that just closed
+            // [2] = candle before [1]
+            // [3] = candle before [2]
+            //
+            // We now separate the model into:
+            // 1. First close outside range arms the setup.
+            // 2. FVG confirmation may happen within FvgConfirmBarsAfterBreakout bars.
+            // 3. Stop remains fixed at the first candle that closed outside the range.
+
+            var firstCloseAboveRange =
+                Close[1] > openingRangeHigh &&
+                Close[2] <= openingRangeHigh;
+
+            var firstCloseBelowRange =
+                Close[1] < openingRangeLow &&
+                Close[2] >= openingRangeLow;
+
+            if (firstCloseAboveRange)
+            {
+                longBreakoutArmed = true;
+                longBreakoutBar = CurrentBar - 1;
+                longBreakoutStop = Low[1];
+
+                shortBreakoutArmed = false;
+
+                LogDiag($"LONG breakout armed. BreakoutTime={Time[1]:HH:mm:ss}, Stop={longBreakoutStop}");
+            }
+
+            if (firstCloseBelowRange)
+            {
+                shortBreakoutArmed = true;
+                shortBreakoutBar = CurrentBar - 1;
+                shortBreakoutStop = High[1];
+
+                longBreakoutArmed = false;
+
+                LogDiag($"SHORT breakout armed. BreakoutTime={Time[1]:HH:mm:ss}, Stop={shortBreakoutStop}");
+            }
 
             var bullishFvg =
                 Low[1] > High[3] &&
@@ -66,36 +101,54 @@ namespace NinjaTrader.NinjaScript.Strategies
                 High[1] < Low[3] &&
                 (Low[3] - High[1]) >= minGap;
 
-            var breakoutCandleFirstCloseAboveRange =
-                Close[3] > openingRangeHigh &&
-                Close[4] <= openingRangeHigh;
-
-            var breakoutCandleFirstCloseBelowRange =
-                Close[3] < openingRangeLow &&
-                Close[4] >= openingRangeLow;
-
+            // Strict FVG-through-range rule.
+            // Bullish gap must straddle / clear OR high.
+            // Bearish gap must straddle / clear OR low.
             var bullishFvgThroughOpeningHigh =
                 bullishFvg &&
-                breakoutCandleFirstCloseAboveRange &&
-                High[3] >= openingRangeHigh;
+                High[3] <= openingRangeHigh &&
+                Low[1] >= openingRangeHigh;
 
             var bearishFvgThroughOpeningLow =
                 bearishFvg &&
-                breakoutCandleFirstCloseBelowRange &&
-                Low[3] <= openingRangeLow;
+                Low[3] >= openingRangeLow &&
+                High[1] <= openingRangeLow;
+
+            var longBarsSinceBreakout = longBreakoutArmed
+                ? (CurrentBar - 1) - longBreakoutBar
+                : int.MaxValue;
+
+            var shortBarsSinceBreakout = shortBreakoutArmed
+                ? (CurrentBar - 1) - shortBreakoutBar
+                : int.MaxValue;
+
+            if (longBreakoutArmed && longBarsSinceBreakout > FvgConfirmBarsAfterBreakout)
+            {
+                LogDiag($"LONG breakout expired. BarsSince={longBarsSinceBreakout}");
+                longBreakoutArmed = false;
+            }
+
+            if (shortBreakoutArmed && shortBarsSinceBreakout > FvgConfirmBarsAfterBreakout)
+            {
+                LogDiag($"SHORT breakout expired. BarsSince={shortBarsSinceBreakout}");
+                shortBreakoutArmed = false;
+            }
 
             LogDiag(
                 $"Check: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                $"FirstAbove={firstCloseAboveRange}, FirstBelow={firstCloseBelowRange}, " +
+                $"LongArmed={longBreakoutArmed}, ShortArmed={shortBreakoutArmed}, " +
                 $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
-                $"BullThrough={bullishFvgThroughOpeningHigh}, BearThrough={bearishFvgThroughOpeningLow}");
+                $"BullThrough={bullishFvgThroughOpeningHigh}, BearThrough={bearishFvgThroughOpeningLow}, " +
+                $"LongBarsSince={longBarsSinceBreakout}, ShortBarsSince={shortBarsSinceBreakout}");
 
-            if (bullishFvgThroughOpeningHigh)
+            if (longBreakoutArmed && bullishFvgThroughOpeningHigh)
             {
                 var approximateEntry = GetCurrentAsk();
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                var candleStop = Low[3];
+                var candleStop = longBreakoutStop;
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
                     return;
@@ -103,24 +156,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pendingEntry = true;
                 pendingLong = true;
 
+                longBreakoutArmed = false;
+                shortBreakoutArmed = false;
+
                 LogDiag($"LONG submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterLong(Quantity, LongEntryName);
                 return;
             }
 
-            if (bearishFvgThroughOpeningLow)
+            if (shortBreakoutArmed && bearishFvgThroughOpeningLow)
             {
                 var approximateEntry = GetCurrentBid();
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                var candleStop = High[3];
+                var candleStop = shortBreakoutStop;
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
                     return;
 
                 pendingEntry = true;
                 pendingLong = false;
+
+                shortBreakoutArmed = false;
+                longBreakoutArmed = false;
 
                 LogDiag($"SHORT submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterShort(Quantity, ShortEntryName);
