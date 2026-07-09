@@ -42,6 +42,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 240)]
         [Display(Name = "Range Minutes", GroupName = "Opening Range", Order = 11)]
         public int RangeMinutes { get; set; }
+        
+        [NinjaScriptProperty]
+        [Range(0, 500)]
+        [Display(Name = "Min Opening Range Ticks", GroupName = "Opening Range", Order = 12)]
+        public int MinOpeningRangeTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100)]

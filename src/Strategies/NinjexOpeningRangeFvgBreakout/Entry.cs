@@ -17,6 +17,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogDiag("Blocked: opening range not complete.");
                 return;
             }
+            
+            if (!IsOpeningRangeValid())
+            {
+                LogDiag(
+                    $"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                    $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+
+                return;
+            }
+            
+            if (!IsOpeningRangeValid())
+            {
+                LogDiag($"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}");
+                return;
+            }
 
             if (!printedRangeComplete)
             {
@@ -205,6 +220,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
 
             return true;
+        }
+        
+        private bool IsOpeningRangeValid()
+        {
+            if (!openingRangeComplete)
+                return false;
+
+            if (openingRangeHigh <= openingRangeLow)
+                return false;
+
+            var rangeTicks = (openingRangeHigh - openingRangeLow) / TickSize;
+
+            return rangeTicks >= MinOpeningRangeTicks;
         }
         
         private bool IsInsideEntryWindow(DateTime easternBarTime)

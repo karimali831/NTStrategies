@@ -1,7 +1,6 @@
 ﻿#region Using declarations
 using System;
 using NinjaTrader.Cbi;
-using NinjaTrader.Data;
 
 #endregion
 
@@ -57,6 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryEndTime = 110000;
 
                 MaxStopTicks = 0;
+                MinOpeningRangeTicks = 4;
 
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -91,25 +91,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 
                 ConvertChartTimeToEastern = false;
             }
-            else if (State == State.Configure)
-            {
-                AddDataSeries(BarsPeriodType.Minute, 5);
-            }
         }
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < 5 || CurrentBars[1] < 1)
+            if (CurrentBar < 10)
                 return;
-
-            if (BarsInProgress == 1)
-            {
-                UpdateOpeningRangeFromFiveMinuteSeries();
-                return;
-            }
 
             if (BarsInProgress != 0)
                 return;
+
+            UpdateOpeningRangeFromOneMinuteSeries();
 
             SyncFlatState();
             ManageActiveBracket();
@@ -119,41 +111,60 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             HandleOneMinuteEntryModel();
         }
-
-        private void UpdateOpeningRangeFromFiveMinuteSeries()
+        
+        private void UpdateOpeningRangeFromOneMinuteSeries()
         {
-            var easternBarEnd = ToEastern(Times[1][0]);
-            var easternDate = easternBarEnd.Date;
+            var easternBarTime = ToEastern(Time[0]);
+            var easternDate = easternBarTime.Date;
 
             if (activeEasternDate != easternDate)
                 ResetForNewDay(easternDate);
 
+            if (openingRangeComplete)
+                return;
+
             var rangeStart = easternDate.Add(ToTimeSpan(RangeStartTime));
             var rangeEnd = rangeStart.AddMinutes(RangeMinutes);
 
-            var easternBarStart = easternBarEnd.AddMinutes(-5);
+            // With Calculate.OnEachTick:
+            // Only update OR using completed candles.
+            // On the first tick of a new bar, Time[1] is the candle that just closed.
+            if (!IsFirstTickOfBar)
+                return;
 
-            var overlapsOpeningRange =
-                easternBarStart < rangeEnd &&
-                easternBarEnd > rangeStart;
+            if (CurrentBar < 1)
+                return;
 
-            if (!openingRangeComplete && overlapsOpeningRange)
+            var closedBarTime = ToEastern(Time[1]);
+
+            // 1-minute chart assumption:
+            // Time[1] represents the bar that just closed.
+            // For a 09:30-09:35 OR, include closed bars from 09:30 through 09:34.
+            if (closedBarTime >= rangeStart && closedBarTime < rangeEnd)
             {
                 if (!openingRangeStarted)
                 {
                     openingRangeStarted = true;
-                    openingRangeHigh = Highs[1][0];
-                    openingRangeLow = Lows[1][0];
+                    openingRangeHigh = High[1];
+                    openingRangeLow = Low[1];
                 }
                 else
                 {
-                    openingRangeHigh = Math.Max(openingRangeHigh, Highs[1][0]);
-                    openingRangeLow = Math.Min(openingRangeLow, Lows[1][0]);
+                    openingRangeHigh = Math.Max(openingRangeHigh, High[1]);
+                    openingRangeLow = Math.Min(openingRangeLow, Low[1]);
                 }
+
+                LogDiag(
+                    $"Opening range building. Bar={closedBarTime:HH:mm:ss}, High={openingRangeHigh}, Low={openingRangeLow}");
             }
 
-            if (!openingRangeComplete && openingRangeStarted && easternBarEnd >= rangeEnd)
+            if (openingRangeStarted && closedBarTime >= rangeEnd)
+            {
                 openingRangeComplete = true;
+
+                LogDiag(
+                    $"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}, RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+            }
         }
 
         protected override void OnExecutionUpdate(
