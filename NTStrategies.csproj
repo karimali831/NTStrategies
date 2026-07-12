@@ -144,6 +144,9 @@
         <Content Include="src\Indicators\NinjexPinBarDots\Templates\t2.xml" />
         <Content Include="src\Strategies\MicroPBV1\Templates\Default.xml" />
         <Content Include="src\Strategies\MicroPBV2\Templates\Default.xml" />
+        <Content Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Templates\T1.xml" />
+        <Content Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Templates\T2.xml" />
+        <Content Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Templates\T3.xml" />
         <Content Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Templates\Data Collection.xml" />
         <Content Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Templates\Default.xml" />
         <Content Include="TemplateSync.ps1" />
