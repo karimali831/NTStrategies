@@ -54,9 +54,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MinFvgGapTicks { get; set; }
         
         [NinjaScriptProperty]
-        [Range(1, 10)]
-        [Display(Name = "FVG Confirm Bars After Breakout", GroupName = "FVG", Order = 22)]
-        public int FvgConfirmBarsAfterBreakout { get; set; }
+        [Range(0, 100)]
+        [Display(Name = "FVG Distance From Range Ticks", GroupName = "FVG", Order = 22)]
+        public int FvgDistanceFromRangeTicks { get; set; }
         
         [NinjaScriptProperty]
         [Display(Name = "Convert Chart Time To Eastern", GroupName = "Time", Order = 30)]

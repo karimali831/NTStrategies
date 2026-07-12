@@ -5,7 +5,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningRangeFvgBreakout : Strategy
     {
-        private void HandleOneMinuteEntryModel()
+       private void HandleOneMinuteEntryModel()
         {
             var easternBarTime = ToEastern(Time[0]);
 
@@ -17,19 +17,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogDiag("Blocked: opening range not complete.");
                 return;
             }
-            
+
             if (!IsOpeningRangeValid())
             {
                 LogDiag(
                     $"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
                     $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
 
-                return;
-            }
-            
-            if (!IsOpeningRangeValid())
-            {
-                LogDiag($"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}");
                 return;
             }
 
@@ -67,44 +61,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             var minGap = MinFvgGapTicks * TickSize;
+            var distance = FvgDistanceFromRangeTicks * TickSize;
 
             // With Calculate.OnEachTick + IsFirstTickOfBar:
             // [1] = candle that just closed
-            // [2] = candle before [1]
-            // [3] = candle before [2]
-
-            var firstCloseAboveRange =
-                Close[1] > openingRangeHigh &&
-                Close[2] <= openingRangeHigh;
-
-            var firstCloseBelowRange =
-                Close[1] < openingRangeLow &&
-                Close[2] >= openingRangeLow;
-
-            // Arm long only if there is no active long breakout already.
-            if (firstCloseAboveRange && !longBreakoutArmed)
-            {
-                longBreakoutArmed = true;
-                longBreakoutBar = CurrentBar - 1;
-                longBreakoutStop = Low[1];
-
-                shortBreakoutArmed = false;
-
-                LogDiag($"LONG breakout armed. BreakoutTime={Time[1]:HH:mm:ss}, Stop={longBreakoutStop}");
-            }
-
-            // Arm short only if there is no active short breakout already.
-            // This prevents later candles from overwriting the original first-close stop.
-            if (firstCloseBelowRange && !shortBreakoutArmed)
-            {
-                shortBreakoutArmed = true;
-                shortBreakoutBar = CurrentBar - 1;
-                shortBreakoutStop = High[1];
-
-                longBreakoutArmed = false;
-
-                LogDiag($"SHORT breakout armed. BreakoutTime={Time[1]:HH:mm:ss}, Stop={shortBreakoutStop}");
-            }
+            // [2] = middle candle
+            // [3] = first candle of the 3-candle FVG structure
 
             var bullishFvg =
                 Low[1] > High[3] &&
@@ -114,66 +76,71 @@ namespace NinjaTrader.NinjaScript.Strategies
                 High[1] < Low[3] &&
                 (Low[3] - High[1]) >= minGap;
 
-            var longBarsSinceBreakout = longBreakoutArmed
-                ? (CurrentBar - 1) - longBreakoutBar
-                : int.MaxValue;
+            // Bullish FVG gap:
+            // lower boundary = High[3]
+            // upper boundary = Low[1]
+            var bullGapBottom = High[3];
+            var bullGapTop = Low[1];
 
-            var shortBarsSinceBreakout = shortBreakoutArmed
-                ? (CurrentBar - 1) - shortBreakoutBar
-                : int.MaxValue;
+            // Bearish FVG gap:
+            // upper boundary = Low[3]
+            // lower boundary = High[1]
+            var bearGapTop = Low[3];
+            var bearGapBottom = High[1];
 
-            if (longBreakoutArmed && longBarsSinceBreakout > FvgConfirmBarsAfterBreakout)
-            {
-                LogDiag($"LONG breakout expired. BarsSince={longBarsSinceBreakout}");
-                longBreakoutArmed = false;
-            }
-
-            if (shortBreakoutArmed && shortBarsSinceBreakout > FvgConfirmBarsAfterBreakout)
-            {
-                LogDiag($"SHORT breakout expired. BarsSince={shortBarsSinceBreakout}");
-                shortBreakoutArmed = false;
-            }
-
-            // Actual bullish FVG gap is between High[3] and Low[1].
-            // For a valid long, the FVG itself must clear / break through the OR high.
-            var bullishFvgClearsOpeningHigh =
+            // Valid long if:
+            // 1. FVG crosses OR high: bottom <= ORH and top >= ORH
+            // OR
+            // 2. Full FVG is above OR high, within optional distance allowance.
+            var bullishFvgCrossesOpeningHigh =
                 bullishFvg &&
-                Low[1] >= openingRangeHigh - TickSize;
+                bullGapBottom <= openingRangeHigh &&
+                bullGapTop >= openingRangeHigh;
 
-            // Actual bearish FVG gap is between High[1] and Low[3].
-            // For a valid short, the FVG itself must clear / break through the OR low.
-            var bearishFvgClearsOpeningLow =
+            var bullishFvgAboveOpeningHigh =
+                bullishFvg &&
+                bullGapBottom >= openingRangeHigh - distance;
+
+            var validLongFvg =
+                bullishFvgCrossesOpeningHigh ||
+                bullishFvgAboveOpeningHigh;
+
+            // Valid short if:
+            // 1. FVG crosses OR low: top >= ORL and bottom <= ORL
+            // OR
+            // 2. Full FVG is below OR low, within optional distance allowance.
+            var bearishFvgCrossesOpeningLow =
                 bearishFvg &&
-                High[1] <= openingRangeLow + TickSize;
+                bearGapTop >= openingRangeLow &&
+                bearGapBottom <= openingRangeLow;
 
-            var bullishFvgAfterBreakout =
-                longBreakoutArmed &&
-                longBarsSinceBreakout >= 1 &&
-                bullishFvgClearsOpeningHigh;
+            var bearishFvgBelowOpeningLow =
+                bearishFvg &&
+                bearGapTop <= openingRangeLow + distance;
 
-            var bearishFvgAfterBreakout =
-                shortBreakoutArmed &&
-                shortBarsSinceBreakout >= 1 &&
-                bearishFvgClearsOpeningLow;
+            var validShortFvg =
+                bearishFvgCrossesOpeningLow ||
+                bearishFvgBelowOpeningLow;
 
             LogDiag(
                 $"Check: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                $"FirstAbove={firstCloseAboveRange}, FirstBelow={firstCloseBelowRange}, " +
-                $"LongArmed={longBreakoutArmed}, ShortArmed={shortBreakoutArmed}, " +
                 $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
-                $"BullGapBottom={Low[1]}, BullGapTop={High[3]}, " +
-                $"BearGapTop={High[1]}, BearGapBottom={Low[3]}, " +
-                $"BullClearsORH={bullishFvgClearsOpeningHigh}, BearClearsORL={bearishFvgClearsOpeningLow}, " +
-                $"BullAfterBreakout={bullishFvgAfterBreakout}, BearAfterBreakout={bearishFvgAfterBreakout}, " +
-                $"LongBarsSince={longBarsSinceBreakout}, ShortBarsSince={shortBarsSinceBreakout}");
+                $"BullGapBottom={bullGapBottom}, BullGapTop={bullGapTop}, " +
+                $"BearGapBottom={bearGapBottom}, BearGapTop={bearGapTop}, " +
+                $"BullCrossORH={bullishFvgCrossesOpeningHigh}, BullAboveORH={bullishFvgAboveOpeningHigh}, " +
+                $"BearCrossORL={bearishFvgCrossesOpeningLow}, BearBelowORL={bearishFvgBelowOpeningLow}, " +
+                $"ValidLong={validLongFvg}, ValidShort={validShortFvg}");
 
-            if (bullishFvgAfterBreakout)
+            if (validLongFvg)
             {
                 var approximateEntry = GetCurrentAsk();
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                var candleStop = longBreakoutStop;
+                // Simple stop model:
+                // If MaxStopTicks > 0, PrepareLongManagedBracket uses fixed max stop.
+                // If MaxStopTicks == 0, use the low of the FVG confirmation candle.
+                var candleStop = Low[1];
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
                     return;
@@ -181,30 +148,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pendingEntry = true;
                 pendingLong = true;
 
-                longBreakoutArmed = false;
-                shortBreakoutArmed = false;
-
                 LogDiag($"LONG submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterLong(Quantity, LongEntryName);
                 return;
             }
 
-            if (bearishFvgAfterBreakout)
+            if (validShortFvg)
             {
                 var approximateEntry = GetCurrentBid();
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                var candleStop = shortBreakoutStop;
+                // Simple stop model:
+                // If MaxStopTicks > 0, PrepareShortManagedBracket uses fixed max stop.
+                // If MaxStopTicks == 0, use the high of the FVG confirmation candle.
+                var candleStop = High[1];
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
                     return;
 
                 pendingEntry = true;
                 pendingLong = false;
-
-                shortBreakoutArmed = false;
-                longBreakoutArmed = false;
 
                 LogDiag($"SHORT submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterShort(Quantity, ShortEntryName);

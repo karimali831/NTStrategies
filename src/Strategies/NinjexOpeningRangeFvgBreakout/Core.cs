@@ -16,14 +16,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double openingRangeLow;
         private bool printedRangeComplete;
         
-        private bool shortBreakoutArmed;
-        private int shortBreakoutBar;
-        private double shortBreakoutStop;
-
-        private bool longBreakoutArmed;
-        private int longBreakoutBar;
-        private double longBreakoutStop;
-        
         private int losingTradesToday;
         private int winningTradesToday;
 
@@ -72,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RangeMinutes = 5;
 
                 MinFvgGapTicks = 1;
-                FvgConfirmBarsAfterBreakout = 3;
+                FvgDistanceFromRangeTicks = 0;
                 
                 AutoBreakevenProfitTriggerTicks = 0;
                 AutoBreakevenPlusTicks = 0;
@@ -255,10 +247,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 pendingEntry = false;
                 pendingLong = false;
-
-                longBreakoutArmed = false;
-                shortBreakoutArmed = false;
-
+                
                 ResetActiveBracketState();
             }
 
@@ -289,14 +278,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             pendingLong = false;
             pendingStopPrice = 0;
             
-            longBreakoutArmed = false;
-            longBreakoutBar = -1;
-            longBreakoutStop = 0;
-
-            shortBreakoutArmed = false;
-            shortBreakoutBar = -1;
-            shortBreakoutStop = 0;
-
             printedRangeComplete = false;
             
             lastKnownMarketPosition = MarketPosition.Flat;
