@@ -59,6 +59,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int FvgDistanceFromRangeTicks { get; set; }
         
         [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "Max FVG Distance From Range Ticks", GroupName = "FVG", Order = 23)]
+        public int MaxFvgDistanceFromRangeTicks { get; set; }
+        
+        [NinjaScriptProperty]
         [Display(Name = "Convert Chart Time To Eastern", GroupName = "Time", Order = 30)]
         public bool ConvertChartTimeToEastern { get; set; }
         

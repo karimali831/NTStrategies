@@ -65,6 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 MinFvgGapTicks = 1;
                 FvgDistanceFromRangeTicks = 0;
+                MaxFvgDistanceFromRangeTicks = 40;
                 
                 AutoBreakevenProfitTriggerTicks = 0;
                 AutoBreakevenPlusTicks = 0;
