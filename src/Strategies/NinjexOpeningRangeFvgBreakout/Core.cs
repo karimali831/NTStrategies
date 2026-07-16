@@ -88,18 +88,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < 10)
-                return;
-
             if (BarsInProgress != 0)
                 return;
 
-            UpdateOpeningRangeFromOneMinuteSeries();
+            // Build opening range as early as possible.
+            // This only needs Time[1]/High[1]/Low[1], so CurrentBar >= 1 is enough.
+            if (CurrentBar >= 1)
+                UpdateOpeningRangeFromOneMinuteSeries();
 
             SyncFlatState();
             ManageActiveBracket();
 
+            // Entry logic should only run once per completed bar.
             if (!IsFirstTickOfBar)
+                return;
+
+            // Entry/FVG logic uses [1] and [3], so protect it separately.
+            if (CurrentBar < 5)
                 return;
 
             HandleOneMinuteEntryModel();

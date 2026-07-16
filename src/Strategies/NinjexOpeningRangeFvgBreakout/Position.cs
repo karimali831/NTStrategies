@@ -32,6 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             var profitTicks = (High[0] - activeEntryPrice) / TickSize;
             var newStop = activeStopPrice;
+            var shouldMarkBreakevenApplied = false;
 
             if (AutoBreakevenProfitTriggerTicks > 0 &&
                 !autoBreakevenApplied &&
@@ -42,8 +43,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (beStop > newStop)
                 {
                     newStop = beStop;
-                    autoBreakevenApplied = true;
-                    LogDiag($"LONG auto-BE triggered. CandidateStop={newStop}");
+                    shouldMarkBreakevenApplied = true;
+                    LogDiag($"LONG auto-BE candidate. ProfitTicks={profitTicks}, CandidateStop={newStop}");
                 }
             }
 
@@ -58,13 +59,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (bid <= 0)
                 bid = Close[0];
 
-            // For a long position, the protective sell stop must be below the bid.
-            // Keep at least 1 tick buffer to avoid NinjaTrader rejecting the change.
+            // Long protective sell stop must be below current bid.
             var highestValidStop = Instrument.MasterInstrument.RoundToTickSize(bid - TickSize);
 
             if (newStop > highestValidStop)
             {
-                LogDiag($"LONG stop move skipped: candidate stop invalid. Candidate={newStop}, Bid={bid}, HighestValid={highestValidStop}");
+                LogDiag(
+                    $"LONG stop move skipped: candidate stop invalid. " +
+                    $"Candidate={newStop}, Bid={bid}, HighestValid={highestValidStop}, ProfitTicks={profitTicks}");
+
                 return;
             }
 
@@ -75,13 +78,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             SetStopLoss(LongEntryName, CalculationMode.Price, activeStopPrice, false);
 
-            LogDiag($"LONG stop moved. NewStop={activeStopPrice}, Bid={bid}");
+            if (shouldMarkBreakevenApplied)
+                autoBreakevenApplied = true;
+
+            LogDiag($"LONG stop moved. NewStop={activeStopPrice}, Bid={bid}, ProfitTicks={profitTicks}");
         }
         
         private void ManageShortBracket()
         {
             var profitTicks = (activeEntryPrice - Low[0]) / TickSize;
             var newStop = activeStopPrice;
+            var shouldMarkBreakevenApplied = false;
 
             if (AutoBreakevenProfitTriggerTicks > 0 &&
                 !autoBreakevenApplied &&
@@ -92,8 +99,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (beStop < newStop)
                 {
                     newStop = beStop;
-                    autoBreakevenApplied = true;
-                    LogDiag($"SHORT auto-BE triggered. CandidateStop={newStop}");
+                    shouldMarkBreakevenApplied = true;
+                    LogDiag($"SHORT auto-BE candidate. ProfitTicks={profitTicks}, CandidateStop={newStop}");
                 }
             }
 
@@ -108,13 +115,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ask <= 0)
                 ask = Close[0];
 
-            // For a short position, the protective buy stop must be above the ask.
-            // Keep at least 1 tick buffer to avoid NinjaTrader rejecting the change.
+            // Short protective buy stop must be above current ask.
             var lowestValidStop = Instrument.MasterInstrument.RoundToTickSize(ask + TickSize);
 
             if (newStop < lowestValidStop)
             {
-                LogDiag($"SHORT stop move skipped: candidate stop invalid. Candidate={newStop}, Ask={ask}, LowestValid={lowestValidStop}");
+                LogDiag(
+                    $"SHORT stop move skipped: candidate stop invalid. " +
+                    $"Candidate={newStop}, Ask={ask}, LowestValid={lowestValidStop}, ProfitTicks={profitTicks}");
+
                 return;
             }
 
@@ -125,7 +134,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             SetStopLoss(ShortEntryName, CalculationMode.Price, activeStopPrice, false);
 
-            LogDiag($"SHORT stop moved. NewStop={activeStopPrice}, Ask={ask}");
+            if (shouldMarkBreakevenApplied)
+                autoBreakevenApplied = true;
+
+            LogDiag($"SHORT stop moved. NewStop={activeStopPrice}, Ask={ask}, ProfitTicks={profitTicks}");
         }
         
         private double GetLongTrailStop(double profitTicks)
