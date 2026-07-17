@@ -1,7 +1,9 @@
 ﻿#region Using declarations
+
 using System.ComponentModel.DataAnnotations;
 using System.Windows.Media;
 using NinjaTrader.NinjaScript.DrawingTools;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.Indicators
@@ -14,7 +16,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 Name = "Ninjex Fair Value Gap";
                 Description = "Draws simple 3-candle fair value gaps.";
-                Calculate = Calculate.OnBarClose;
+                Calculate = Calculate.OnEachTick;
                 IsOverlay = true;
                 DisplayInDataBox = false;
                 DrawOnPricePanel = true;
@@ -22,6 +24,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 MinGapTicks = 1;
                 ShowBullishFvg = true;
                 ShowBearishFvg = true;
+                ShowLiveCurrentBarFvg = true;
             }
         }
 
@@ -32,14 +35,36 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             var minGap = MinGapTicks * TickSize;
 
-            var bullishFvg = Low[0] > High[2] && (Low[0] - High[2]) >= minGap;
-            var bearishFvg = High[0] < Low[2] && (Low[2] - High[0]) >= minGap;
+            // Current live/closed 3-candle FVG:
+            // Bullish gap = High[2] to Low[0]
+            // Bearish gap = Low[2] to High[0]
+            var bullishFvg =
+                Low[0] > High[2] &&
+                (Low[0] - High[2]) >= minGap;
+
+            var bearishFvg =
+                High[0] < Low[2] &&
+                (Low[2] - High[0]) >= minGap;
+
+            var bullTag = "BullFVG_" + CurrentBar;
+            var bearTag = "BearFVG_" + CurrentBar;
+
+            // If we are drawing live intrabar FVGs, remove the rectangle if price invalidates it.
+            // This prevents stale intrabar rectangles from staying on the chart.
+            if (ShowLiveCurrentBarFvg)
+            {
+                if (!bullishFvg)
+                    RemoveDrawObject(bullTag);
+
+                if (!bearishFvg)
+                    RemoveDrawObject(bearTag);
+            }
 
             if (ShowBullishFvg && bullishFvg)
             {
                 Draw.Rectangle(
                     this,
-                    "BullFVG_" + CurrentBar,
+                    bullTag,
                     false,
                     2,
                     High[2],
@@ -54,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 Draw.Rectangle(
                     this,
-                    "BearFVG_" + CurrentBar,
+                    bearTag,
                     false,
                     2,
                     Low[2],
@@ -78,5 +103,9 @@ namespace NinjaTrader.NinjaScript.Indicators
         [NinjaScriptProperty]
         [Display(Name = "Show Bearish FVG", GroupName = "FVG", Order = 3)]
         public bool ShowBearishFvg { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Show Live Current Bar FVG", GroupName = "FVG", Order = 4)]
+        public bool ShowLiveCurrentBarFvg { get; set; }
     }
 }
