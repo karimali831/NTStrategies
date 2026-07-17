@@ -70,18 +70,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [3] = first candle of the 3-candle FVG structure
 
             var bullishFvg =
-                Low[0] > High[2] &&
-                (Low[0] - High[2]) >= minGap;
+                Low[1] > High[3] &&
+                (Low[1] - High[3]) >= minGap;
 
             var bearishFvg =
-                High[0] < Low[2] &&
-                (Low[2] - High[0]) >= minGap;
+                High[1] < Low[3] &&
+                (Low[3] - High[1]) >= minGap;
 
-            var bullGapBottom = High[2];
-            var bullGapTop = Low[0];
+            // Bullish FVG gap:
+            // lower boundary = High[3]
+            // upper boundary = Low[1]
+            var bullGapBottom = High[3];
+            var bullGapTop = Low[1];
 
-            var bearGapTop = Low[2];
-            var bearGapBottom = High[0];
+            // Bearish FVG gap:
+            // upper boundary = Low[3]
+            // lower boundary = High[1]
+            var bearGapTop = Low[3];
+            var bearGapBottom = High[1];
             
             var bullishFvgDistanceFromOpeningHigh = Math.Max(0, bullGapBottom - openingRangeHigh);
             var bearishFvgDistanceFromOpeningLow = Math.Max(0, openingRangeLow - bearGapTop);
@@ -149,7 +155,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Simple stop model:
                 // If MaxStopTicks > 0, PrepareLongManagedBracket uses fixed max stop.
                 // If MaxStopTicks == 0, use the low of the FVG confirmation candle.
-                var candleStop = Low[0];
+                var candleStop = Low[1];
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
                     return;
@@ -171,7 +177,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Simple stop model:
                 // If MaxStopTicks > 0, PrepareShortManagedBracket uses fixed max stop.
                 // If MaxStopTicks == 0, use the high of the FVG confirmation candle.
-                var candleStop = High[0];
+                var candleStop = High[1];
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
                     return;
