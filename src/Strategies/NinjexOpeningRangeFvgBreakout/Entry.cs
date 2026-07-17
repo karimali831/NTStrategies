@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!CanTradeToday())
             {
-                LogDiag($"Blocked: daily limits reached. Wins={winningTradesToday}, Losses={losingTradesToday}");
+                LogDiag($"Blocked: daily PnL limit reached. DailyPnL={GetDailyTotalPnl():0.00}");
                 return;
             }
 
@@ -192,13 +192,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private bool CanTradeToday()
         {
-            if (MaxLosingTradesPerDay > 0 && losingTradesToday >= MaxLosingTradesPerDay)
-                return false;
-
-            if (MaxWinningTradesPerDay > 0 && winningTradesToday >= MaxWinningTradesPerDay)
-                return false;
-
-            return true;
+            return !dailyPnlLimitHit;
         }
         
         private bool IsOpeningRangeValid()

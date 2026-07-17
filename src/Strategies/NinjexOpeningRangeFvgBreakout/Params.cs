@@ -24,15 +24,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int Quantity { get; set; }
 
         [NinjaScriptProperty]
-        [Range(0, 100)]
-        [Display(Name = "Max Losing Trades Per Day", GroupName = "Risk", Order = 2)]
-        public int MaxLosingTradesPerDay { get; set; }
+        [Range(0, 100000)]
+        [Display(Name = "Max Daily Profit", GroupName = "Risk", Order = 2)]
+        public double MaxDailyProfit { get; set; }
 
         [NinjaScriptProperty]
-        [Range(0, 100)]
-        [Display(Name = "Max Winning Trades Per Day", GroupName = "Risk", Order = 3)]
-        public int MaxWinningTradesPerDay { get; set; }
-
+        [Range(0, 100000)]
+        [Display(Name = "Max Daily Loss", GroupName = "Risk", Order = 3)]
+        public double MaxDailyLoss { get; set; }
+        
         [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(Name = "Range Start Time", GroupName = "Opening Range", Order = 10)]

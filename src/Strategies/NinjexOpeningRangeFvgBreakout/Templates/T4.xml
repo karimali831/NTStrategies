@@ -73,20 +73,20 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">2</Max>
-        <Min xsi:type="xsd:int">2</Min>
-        <Name>MaxLosingTradesPerDay</Name>
-        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>2</ValueSerializable>
+        <Max xsi:type="xsd:double">1000</Max>
+        <Min xsi:type="xsd:double">1000</Min>
+        <Name>MaxDailyProfit</Name>
+        <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>1000</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">2</Max>
-        <Min xsi:type="xsd:int">2</Min>
-        <Name>MaxWinningTradesPerDay</Name>
-        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>2</ValueSerializable>
+        <Max xsi:type="xsd:double">500</Max>
+        <Min xsi:type="xsd:double">500</Min>
+        <Name>MaxDailyLoss</Name>
+        <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>500</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -127,11 +127,20 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">3</Max>
-        <Min xsi:type="xsd:int">3</Min>
-        <Name>FvgConfirmBarsAfterBreakout</Name>
+        <Max xsi:type="xsd:int">0</Max>
+        <Min xsi:type="xsd:int">0</Min>
+        <Name>FvgDistanceFromRangeTicks</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>3</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:int">40</Max>
+        <Min xsi:type="xsd:int">40</Min>
+        <Name>MaxFvgDistanceFromRangeTicks</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>40</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -255,7 +264,7 @@
   <Strategy>
     <NinjexOpeningRangeFvgBreakout xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <IsVisible>true</IsVisible>
-      <calculate2>OnBarClose</calculate2>
+      <calculate2>OnEachTick</calculate2>
       <AreLinesConfigurable>true</AreLinesConfigurable>
       <ArePlotsConfigurable>true</ArePlotsConfigurable>
       <BarsPeriodSerializable>
@@ -270,10 +279,10 @@
         <Value2>1</Value2>
       </BarsPeriodSerializable>
       <BarsToLoad>0</BarsToLoad>
-      <Calculate>OnBarClose</Calculate>
+      <Calculate>OnEachTick</Calculate>
       <Displacement>0</Displacement>
       <DisplayInDataBox>true</DisplayInDataBox>
-      <From>2026-07-09T00:00:00</From>
+      <From>2026-07-13T00:00:00</From>
       <IsAutoScale>true</IsAutoScale>
       <Lines />
       <MaximumBarsLookBack>TwoHundredFiftySix</MaximumBarsLookBack>
@@ -282,7 +291,7 @@
       <Plots />
       <ScaleJustification>Right</ScaleJustification>
       <ShowTransparentPlotsInDataBox>false</ShowTransparentPlotsInDataBox>
-      <To>2026-07-11T00:00:00</To>
+      <To>2026-07-16T00:00:00</To>
       <IsDataSeriesRequired>true</IsDataSeriesRequired>
       <IsOverlay>true</IsOverlay>
       <SelectedValueSeries>0</SelectedValueSeries>
@@ -302,12 +311,12 @@
       <ConnectionLossHandling>KeepRunning</ConnectionLossHandling>
       <DaysToLoad>5</DaysToLoad>
       <DefaultQuantity>1</DefaultQuantity>
-      <DisconnectDelaySeconds>60</DisconnectDelaySeconds>
+      <DisconnectDelaySeconds>10</DisconnectDelaySeconds>
       <EntriesPerDirection>1</EntriesPerDirection>
       <EntryHandling>AllEntries</EntryHandling>
       <ExitOnSessionCloseSeconds>30</ExitOnSessionCloseSeconds>
       <IncludeCommission>true</IncludeCommission>
-      <InstrumentOrInstrumentList>NQ 06-26</InstrumentOrInstrumentList>
+      <InstrumentOrInstrumentList>NQ 09-26</InstrumentOrInstrumentList>
       <IsAggregated>false</IsAggregated>
       <IsExitOnSessionCloseStrategy>true</IsExitOnSessionCloseStrategy>
       <IsFillLimitOnTouch>false</IsFillLimitOnTouch>
@@ -316,7 +325,7 @@
       <IsTickReplay>false</IsTickReplay>
       <IsTradingHoursBreakLineVisible>true</IsTradingHoursBreakLineVisible>
       <IsWaitUntilFlat>false</IsWaitUntilFlat>
-      <NumberRestartAttempts>10</NumberRestartAttempts>
+      <NumberRestartAttempts>4</NumberRestartAttempts>
       <OptimizationPeriod>10</OptimizationPeriod>
       <OrderFillResolution>Standard</OrderFillResolution>
       <OrderFillResolutionType>Minute</OrderFillResolutionType>
@@ -335,13 +344,14 @@
       <EntryStartTime>93500</EntryStartTime>
       <EntryEndTime>110000</EntryEndTime>
       <Quantity>1</Quantity>
-      <MaxLosingTradesPerDay>1</MaxLosingTradesPerDay>
-      <MaxWinningTradesPerDay>1</MaxWinningTradesPerDay>
+      <MaxDailyProfit>800</MaxDailyProfit>
+      <MaxDailyLoss>400</MaxDailyLoss>
       <RangeStartTime>93000</RangeStartTime>
       <RangeMinutes>5</RangeMinutes>
       <MinOpeningRangeTicks>4</MinOpeningRangeTicks>
-      <MinFvgGapTicks>1</MinFvgGapTicks>
-      <FvgConfirmBarsAfterBreakout>4</FvgConfirmBarsAfterBreakout>
+      <MinFvgGapTicks>20</MinFvgGapTicks>
+      <FvgDistanceFromRangeTicks>0</FvgDistanceFromRangeTicks>
+      <MaxFvgDistanceFromRangeTicks>80</MaxFvgDistanceFromRangeTicks>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>
       <MaxStopTicks>0</MaxStopTicks>
       <AutoBreakevenProfitTriggerTicks>80</AutoBreakevenProfitTriggerTicks>

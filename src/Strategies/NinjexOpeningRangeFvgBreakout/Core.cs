@@ -1,4 +1,5 @@
 ﻿#region Using declarations
+
 using System;
 using NinjaTrader.Cbi;
 
@@ -15,25 +16,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double openingRangeHigh;
         private double openingRangeLow;
         private bool printedRangeComplete;
-        
-        private int losingTradesToday;
-        private int winningTradesToday;
 
         private bool pendingEntry;
         private bool pendingLong;
         private double pendingStopPrice;
-        
+
         private MarketPosition lastKnownMarketPosition = MarketPosition.Flat;
-        private double lastTradeEntryPrice;
-        private int tradesCompletedToday;
-        
+
         private const string LongEntryName = "LongFvgBreakout";
         private const string ShortEntryName = "ShortFvgBreakout";
 
-        private const string LongStopName = "LongStop";
-        private const string LongTargetName = "LongTarget";
-        private const string ShortStopName = "ShortStop";
-        private const string ShortTargetName = "ShortTarget";
+        private double lastTradeEntryPrice;
+
+        private bool dailyPnlLimitHit;
+        private double dailyStartCumProfit;
 
         protected override void OnStateChange()
         {
@@ -57,8 +53,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IncludeCommission = true;
 
                 Quantity = 1;
-                MaxLosingTradesPerDay = 2;
-                MaxWinningTradesPerDay = 2;
+
+                // 0 = disabled
+                MaxDailyProfit = 1000;
+                MaxDailyLoss = 500;
 
                 RangeStartTime = 93000;
                 RangeMinutes = 5;
@@ -66,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinFvgGapTicks = 1;
                 FvgDistanceFromRangeTicks = 0;
                 MaxFvgDistanceFromRangeTicks = 40;
-                
+
                 AutoBreakevenProfitTriggerTicks = 0;
                 AutoBreakevenPlusTicks = 0;
 
@@ -81,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Trail3ProfitTriggerTicks = 0;
                 Trail3StopLossTicks = 0;
                 Trail3FrequencyTicks = 1;
-                
+
                 ConvertChartTimeToEastern = false;
             }
         }
@@ -91,25 +89,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (BarsInProgress != 0)
                 return;
 
-            // Build opening range as early as possible.
-            // This only needs Time[1]/High[1]/Low[1], so CurrentBar >= 1 is enough.
             if (CurrentBar >= 1)
                 UpdateOpeningRangeFromOneMinuteSeries();
 
             SyncFlatState();
             ManageActiveBracket();
 
-            // Entry logic should only run once per completed bar.
+            EnforceDailyPnlLimits();
+
             if (!IsFirstTickOfBar)
                 return;
 
-            // Entry/FVG logic uses [1] and [3], so protect it separately.
             if (CurrentBar < 5)
                 return;
 
             HandleOneMinuteEntryModel();
         }
-        
+
         private void UpdateOpeningRangeFromOneMinuteSeries()
         {
             var easternBarTime = ToEastern(Time[0]);
@@ -221,7 +217,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogDiag($"SHORT filled. Entry={activeEntryPrice}, Stop={activeStopPrice}, Target={activeTargetPrice}");
             }
         }
-        
+
         private void SyncFlatState()
         {
             var currentPosition = Position.MarketPosition;
@@ -229,35 +225,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (lastKnownMarketPosition != MarketPosition.Flat &&
                 currentPosition == MarketPosition.Flat)
             {
-                var exitPrice = Close[0];
-
-                if (activeDirection == 1)
-                {
-                    if (exitPrice >= activeEntryPrice)
-                        winningTradesToday++;
-                    else
-                        losingTradesToday++;
-                }
-                else if (activeDirection == -1)
-                {
-                    if (exitPrice <= activeEntryPrice)
-                        winningTradesToday++;
-                    else
-                        losingTradesToday++;
-                }
-
-                tradesCompletedToday++;
-
                 LogDiag(
-                    $"Position flat detected. Wins={winningTradesToday}, Losses={losingTradesToday}, Completed={tradesCompletedToday}");
+                    $"Position flat detected. DailyPnL={GetDailyTotalPnl():0.00}");
 
                 pendingEntry = false;
                 pendingLong = false;
-                
+                lastTradeEntryPrice = 0;
+
                 ResetActiveBracketState();
             }
 
             lastKnownMarketPosition = currentPosition;
+        }
+
+        private double GetDailyRealizedPnl()
+        {
+            var currentCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+            return currentCumProfit - dailyStartCumProfit;
         }
 
         private void LogDiag(string message)
@@ -277,20 +261,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             openingRangeHigh = double.MinValue;
             openingRangeLow = double.MaxValue;
 
-            losingTradesToday = 0;
-            winningTradesToday = 0;
-
             pendingEntry = false;
             pendingLong = false;
             pendingStopPrice = 0;
-            
+
             printedRangeComplete = false;
-            
+
             lastKnownMarketPosition = MarketPosition.Flat;
             lastTradeEntryPrice = 0;
-            tradesCompletedToday = 0;
-            
+
+            dailyPnlLimitHit = false;
+            dailyStartCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+
             ResetActiveBracketState();
+
+            LogDiag(
+                $"New trading day reset. Date={easternDate:yyyy-MM-dd}, DailyStartCumProfit={dailyStartCumProfit:0.00}");
         }
     }
 }

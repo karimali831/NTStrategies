@@ -117,6 +117,7 @@
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Entry.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Params.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Position.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\PnLRisk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\BreakEven.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\DataAnalysis.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Core.cs" />

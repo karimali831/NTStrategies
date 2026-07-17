@@ -127,6 +127,15 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
+        <Max xsi:type="xsd:int">3</Max>
+        <Min xsi:type="xsd:int">3</Min>
+        <Name>FvgConfirmBarsAfterBreakout</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>3</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
         <Max xsi:type="xsd:boolean">false</Max>
         <Min xsi:type="xsd:boolean">false</Min>
         <Name>ConvertChartTimeToEastern</Name>
@@ -332,6 +341,7 @@
       <RangeMinutes>5</RangeMinutes>
       <MinOpeningRangeTicks>4</MinOpeningRangeTicks>
       <MinFvgGapTicks>1</MinFvgGapTicks>
+      <FvgConfirmBarsAfterBreakout>4</FvgConfirmBarsAfterBreakout>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>
       <MaxStopTicks>0</MaxStopTicks>
       <AutoBreakevenProfitTriggerTicks>50</AutoBreakevenProfitTriggerTicks>
