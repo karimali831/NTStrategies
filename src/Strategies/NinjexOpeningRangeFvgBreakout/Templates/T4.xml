@@ -282,7 +282,7 @@
       <Calculate>OnEachTick</Calculate>
       <Displacement>0</Displacement>
       <DisplayInDataBox>true</DisplayInDataBox>
-      <From>2026-07-13T00:00:00</From>
+      <From>2026-07-14T00:00:00</From>
       <IsAutoScale>true</IsAutoScale>
       <Lines />
       <MaximumBarsLookBack>TwoHundredFiftySix</MaximumBarsLookBack>
@@ -291,7 +291,7 @@
       <Plots />
       <ScaleJustification>Right</ScaleJustification>
       <ShowTransparentPlotsInDataBox>false</ShowTransparentPlotsInDataBox>
-      <To>2026-07-16T00:00:00</To>
+      <To>2026-07-17T00:00:00</To>
       <IsDataSeriesRequired>true</IsDataSeriesRequired>
       <IsOverlay>true</IsOverlay>
       <SelectedValueSeries>0</SelectedValueSeries>
@@ -341,7 +341,7 @@
       <DrawOnPricePanel>false</DrawOnPricePanel>
       <ZOrder>-2147483648</ZOrder>
       <EnableDiagnostics>true</EnableDiagnostics>
-      <EntryStartTime>93500</EntryStartTime>
+      <EntryStartTime>95000</EntryStartTime>
       <EntryEndTime>110000</EntryEndTime>
       <Quantity>1</Quantity>
       <MaxDailyProfit>800</MaxDailyProfit>
@@ -353,7 +353,7 @@
       <FvgDistanceFromRangeTicks>0</FvgDistanceFromRangeTicks>
       <MaxFvgDistanceFromRangeTicks>80</MaxFvgDistanceFromRangeTicks>
       <ConvertChartTimeToEastern>false</ConvertChartTimeToEastern>
-      <MaxStopTicks>0</MaxStopTicks>
+      <MaxStopTicks>80</MaxStopTicks>
       <AutoBreakevenProfitTriggerTicks>80</AutoBreakevenProfitTriggerTicks>
       <AutoBreakevenPlusTicks>20</AutoBreakevenPlusTicks>
       <Trail1ProfitTriggerTicks>120</Trail1ProfitTriggerTicks>
