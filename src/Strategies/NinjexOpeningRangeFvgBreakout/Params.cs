@@ -54,9 +54,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int MinFvgGapTicks { get; set; }
         
         [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "Max FVG Gap Ticks", GroupName = "FVG", Order = 21)]
+        public int MaxFvgGapTicks { get; set; }
+
+        [NinjaScriptProperty]
         [Range(0, 100)]
-        [Display(Name = "FVG Distance From Range Ticks", GroupName = "FVG", Order = 22)]
-        public int FvgDistanceFromRangeTicks { get; set; }
+        [Display(Name = "Min FVG Distance From Range Ticks", GroupName = "FVG", Order = 22)]
+        public int MinFvgDistanceFromRangeTicks { get; set; }
         
         [NinjaScriptProperty]
         [Range(0, 1000)]

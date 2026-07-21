@@ -61,7 +61,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             var minGap = MinFvgGapTicks * TickSize;
-            var distance = FvgDistanceFromRangeTicks * TickSize;
+            var maxGap = MaxFvgGapTicks * TickSize;
+
+            var minDistance = MinFvgDistanceFromRangeTicks * TickSize;
             var maxDistance = MaxFvgDistanceFromRangeTicks * TickSize;
 
             // With Calculate.OnEachTick + IsFirstTickOfBar:
@@ -89,6 +91,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bearGapTop = Low[3];
             var bearGapBottom = High[1];
             
+            var bullGapSize = bullGapTop - bullGapBottom;
+            var bearGapSize = bearGapTop - bearGapBottom;
+
+            var bullishFvgWithinGapSize =
+                bullishFvg &&
+                (MaxFvgGapTicks <= 0 || bullGapSize <= maxGap);
+
+            var bearishFvgWithinGapSize =
+                bearishFvg &&
+                (MaxFvgGapTicks <= 0 || bearGapSize <= maxGap);
+            
             var bullishFvgDistanceFromOpeningHigh = Math.Max(0, bullGapBottom - openingRangeHigh);
             var bearishFvgDistanceFromOpeningLow = Math.Max(0, openingRangeLow - bearGapTop);
 
@@ -111,10 +124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var bullishFvgAboveOpeningHigh =
                 bullishFvg &&
-                bullGapBottom >= openingRangeHigh - distance;
+                bullGapBottom >= openingRangeHigh + minDistance;
 
             var validLongFvg =
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
+                bullishFvgWithinGapSize &&
                 bullishFvgWithinMaxDistance;
 
             // Valid short if:
@@ -128,10 +142,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var bearishFvgBelowOpeningLow =
                 bearishFvg &&
-                bearGapTop <= openingRangeLow + distance;
+                bearGapTop <= openingRangeLow - minDistance;
 
             var validShortFvg =
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
+                bearishFvgWithinGapSize &&
                 bearishFvgWithinMaxDistance;
 
             LogDiag(
@@ -144,6 +159,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 $"BullDistTicks={bullishFvgDistanceFromOpeningHigh / TickSize}, " +
                 $"BearDistTicks={bearishFvgDistanceFromOpeningLow / TickSize}, " +
                 $"BullWithinMax={bullishFvgWithinMaxDistance}, BearWithinMax={bearishFvgWithinMaxDistance}, " +
+                $"BullGapTicks={bullGapSize / TickSize}, BearGapTicks={bearGapSize / TickSize}, " +
+                $"BullGapWithinMax={bullishFvgWithinGapSize}, BearGapWithinMax={bearishFvgWithinGapSize}, " +
                 $"ValidLong={validLongFvg}, ValidShort={validShortFvg}");
 
             if (validLongFvg)

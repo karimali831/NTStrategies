@@ -38,6 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Name = "Ninjex Opening Range FVG Breakout";
                 Description = "Trades FVG breakouts through the opening range high/low.";
                 Calculate = Calculate.OnEachTick;
+                BarsRequiredToTrade = 5;
 
                 EnableDiagnostics = false;
                 EntryStartTime = 93500;
@@ -61,8 +62,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RangeStartTime = 93000;
                 RangeMinutes = 5;
 
-                MinFvgGapTicks = 1;
-                FvgDistanceFromRangeTicks = 0;
+                MinFvgGapTicks = 20;
+                MaxFvgGapTicks = 80;
+
+                MinFvgDistanceFromRangeTicks = 0;
                 MaxFvgDistanceFromRangeTicks = 40;
 
                 AutoBreakevenProfitTriggerTicks = 0;
