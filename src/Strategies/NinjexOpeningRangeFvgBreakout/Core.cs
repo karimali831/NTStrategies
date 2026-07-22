@@ -27,6 +27,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const string ShortEntryName = "ShortFvgBreakout";
 
         private double lastTradeEntryPrice;
+        private int lastEntrySignalBar = -1;
 
         private bool dailyPnlLimitHit;
         private double dailyStartCumProfit;
@@ -100,12 +101,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             EnforceDailyPnlLimits();
 
-            if (!IsFirstTickOfBar)
-                return;
-
             if (CurrentBar < 5)
                 return;
 
+            // Live FVG entry model must run on each tick.
             HandleOneMinuteEntryModel();
         }
 
@@ -272,6 +271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             lastKnownMarketPosition = MarketPosition.Flat;
             lastTradeEntryPrice = 0;
+            lastEntrySignalBar = -1;
 
             dailyPnlLimitHit = false;
             dailyStartCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;

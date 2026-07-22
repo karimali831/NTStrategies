@@ -5,7 +5,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningRangeFvgBreakout : Strategy
     {
-       private void HandleOneMinuteEntryModel()
+        private void HandleOneMinuteEntryModel()
         {
             var easternBarTime = ToEastern(Time[0]);
 
@@ -60,37 +60,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 5)
                 return;
 
+            // Prevent duplicate entries on the same live/forming candle.
+            if (CurrentBar == lastEntrySignalBar)
+                return;
+
             var minGap = MinFvgGapTicks * TickSize;
             var maxGap = MaxFvgGapTicks * TickSize;
 
             var minDistance = MinFvgDistanceFromRangeTicks * TickSize;
             var maxDistance = MaxFvgDistanceFromRangeTicks * TickSize;
 
-            // With Calculate.OnEachTick + IsFirstTickOfBar:
-            // [1] = candle that just closed
-            // [2] = middle candle
-            // [3] = first candle of the 3-candle FVG structure
+            // LIVE FVG MODEL:
+            // [0] = current forming FVG candle
+            // [1] = middle candle
+            // [2] = first candle of the 3-candle FVG structure
+            //
+            // This enters one bar earlier than the confirmed [1]/[3] model.
 
             var bullishFvg =
-                Low[1] > High[3] &&
-                (Low[1] - High[3]) >= minGap;
+                Low[0] > High[2] &&
+                (Low[0] - High[2]) >= minGap;
 
             var bearishFvg =
-                High[1] < Low[3] &&
-                (Low[3] - High[1]) >= minGap;
+                High[0] < Low[2] &&
+                (Low[2] - High[0]) >= minGap;
 
             // Bullish FVG gap:
-            // lower boundary = High[3]
-            // upper boundary = Low[1]
-            var bullGapBottom = High[3];
-            var bullGapTop = Low[1];
+            // lower boundary = High[2]
+            // upper boundary = Low[0]
+            var bullGapBottom = High[2];
+            var bullGapTop = Low[0];
 
             // Bearish FVG gap:
-            // upper boundary = Low[3]
-            // lower boundary = High[1]
-            var bearGapTop = Low[3];
-            var bearGapBottom = High[1];
-            
+            // upper boundary = Low[2]
+            // lower boundary = High[0]
+            var bearGapTop = Low[2];
+            var bearGapBottom = High[0];
+
             var bullGapSize = bullGapTop - bullGapBottom;
             var bearGapSize = bearGapTop - bearGapBottom;
 
@@ -101,7 +107,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bearishFvgWithinGapSize =
                 bearishFvg &&
                 (MaxFvgGapTicks <= 0 || bearGapSize <= maxGap);
-            
+
             var bullishFvgDistanceFromOpeningHigh = Math.Max(0, bullGapBottom - openingRangeHigh);
             var bearishFvgDistanceFromOpeningLow = Math.Max(0, openingRangeLow - bearGapTop);
 
@@ -116,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Valid long if:
             // 1. FVG crosses OR high: bottom <= ORH and top >= ORH
             // OR
-            // 2. Full FVG is above OR high, within optional distance allowance.
+            // 2. Full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
             var bullishFvgCrossesOpeningHigh =
                 bullishFvg &&
                 bullGapBottom <= openingRangeHigh &&
@@ -134,7 +140,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Valid short if:
             // 1. FVG crosses OR low: top >= ORL and bottom <= ORL
             // OR
-            // 2. Full FVG is below OR low, within optional distance allowance.
+            // 2. Full FVG is below OR low, respecting MinFvgDistanceFromRangeTicks.
             var bearishFvgCrossesOpeningLow =
                 bearishFvg &&
                 bearGapTop >= openingRangeLow &&
@@ -169,16 +175,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Simple stop model:
+                // Live model:
                 // If MaxStopTicks > 0, PrepareLongManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the low of the FVG confirmation candle.
-                var candleStop = Low[1];
+                // If MaxStopTicks == 0, use the low of the current/live FVG candle.
+                var candleStop = Low[0];
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
                     return;
 
                 pendingEntry = true;
                 pendingLong = true;
+                lastEntrySignalBar = CurrentBar;
 
                 LogDiag($"LONG submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterLong(Quantity, LongEntryName);
@@ -191,27 +198,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Simple stop model:
+                // Live model:
                 // If MaxStopTicks > 0, PrepareShortManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the high of the FVG confirmation candle.
-                var candleStop = High[1];
+                // If MaxStopTicks == 0, use the high of the current/live FVG candle.
+                var candleStop = High[0];
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
                     return;
 
                 pendingEntry = true;
                 pendingLong = false;
+                lastEntrySignalBar = CurrentBar;
 
                 LogDiag($"SHORT submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
                 EnterShort(Quantity, ShortEntryName);
             }
         }
-        
+
         private bool CanTradeToday()
         {
             return !dailyPnlLimitHit;
         }
-        
+
         private bool IsOpeningRangeValid()
         {
             if (!openingRangeComplete)
@@ -224,7 +232,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return rangeTicks >= MinOpeningRangeTicks;
         }
-        
+
         private bool IsInsideEntryWindow(DateTime easternBarTime)
         {
             var start = activeEasternDate.Add(ToTimeSpan(EntryStartTime));
