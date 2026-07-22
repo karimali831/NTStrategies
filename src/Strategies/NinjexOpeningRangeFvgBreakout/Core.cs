@@ -31,6 +31,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool dailyPnlLimitHit;
         private double dailyStartCumProfit;
+        
+        private int lastDiagnosticBar = -1;
 
         protected override void OnStateChange()
         {
@@ -280,6 +282,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             LogDiag(
                 $"New trading day reset. Date={easternDate:yyyy-MM-dd}, DailyStartCumProfit={dailyStartCumProfit:0.00}");
+            
+            lastDiagnosticBar = -1;
         }
     }
 }

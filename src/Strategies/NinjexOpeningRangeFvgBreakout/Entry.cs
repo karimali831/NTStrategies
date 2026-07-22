@@ -120,9 +120,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bearishFvgDistanceFromOpeningLow <= maxDistance;
 
             // Valid long if:
-            // 1. FVG crosses OR high: bottom <= ORH and top >= ORH
-            // OR
-            // 2. Full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
+            // 1. Current price is above OR high.
+            // AND
+            // 2. FVG crosses OR high: bottom <= ORH and top >= ORH
+            // OR full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
             var bullishFvgCrossesOpeningHigh =
                 bullishFvg &&
                 bullGapBottom <= openingRangeHigh &&
@@ -132,15 +133,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bullishFvg &&
                 bullGapBottom >= openingRangeHigh + minDistance;
 
+            // Directional price gates.
+            // These force the live entry to respect the opening range boundary.
+            var currentLongPrice = GetCurrentAsk();
+            if (currentLongPrice <= 0)
+                currentLongPrice = Close[0];
+
+            var currentShortPrice = GetCurrentBid();
+            if (currentShortPrice <= 0)
+                currentShortPrice = Close[0];
+
+            var priceAboveOpeningHigh = currentLongPrice > openingRangeHigh;
+            var priceBelowOpeningLow = currentShortPrice < openingRangeLow;
+
             var validLongFvg =
+                priceAboveOpeningHigh &&
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
                 bullishFvgWithinGapSize &&
                 bullishFvgWithinMaxDistance;
-
+            
             // Valid short if:
             // 1. FVG crosses OR low: top >= ORL and bottom <= ORL
             // OR
             // 2. Full FVG is below OR low, respecting MinFvgDistanceFromRangeTicks.
+            // AND current price is below OR low.
             var bearishFvgCrossesOpeningLow =
                 bearishFvg &&
                 bearGapTop >= openingRangeLow &&
@@ -151,23 +167,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bearGapTop <= openingRangeLow - minDistance;
 
             var validShortFvg =
+                priceBelowOpeningLow &&
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
                 bearishFvgWithinGapSize &&
                 bearishFvgWithinMaxDistance;
 
-            LogDiag(
-                $"Check: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
-                $"BullGapBottom={bullGapBottom}, BullGapTop={bullGapTop}, " +
-                $"BearGapBottom={bearGapBottom}, BearGapTop={bearGapTop}, " +
-                $"BullCrossORH={bullishFvgCrossesOpeningHigh}, BullAboveORH={bullishFvgAboveOpeningHigh}, " +
-                $"BearCrossORL={bearishFvgCrossesOpeningLow}, BearBelowORL={bearishFvgBelowOpeningLow}, " +
-                $"BullDistTicks={bullishFvgDistanceFromOpeningHigh / TickSize}, " +
-                $"BearDistTicks={bearishFvgDistanceFromOpeningLow / TickSize}, " +
-                $"BullWithinMax={bullishFvgWithinMaxDistance}, BearWithinMax={bearishFvgWithinMaxDistance}, " +
-                $"BullGapTicks={bullGapSize / TickSize}, BearGapTicks={bearGapSize / TickSize}, " +
-                $"BullGapWithinMax={bullishFvgWithinGapSize}, BearGapWithinMax={bearishFvgWithinGapSize}, " +
-                $"ValidLong={validLongFvg}, ValidShort={validShortFvg}");
+            if (validLongFvg || validShortFvg)
+            {
+                LogDiag(
+                    $"SIGNAL: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                    $"PriceAboveORH={priceAboveOpeningHigh}, PriceBelowORL={priceBelowOpeningLow}, " +
+                    $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
+                    $"BullGapTicks={bullGapSize / TickSize}, BearGapTicks={bearGapSize / TickSize}, " +
+                    $"BullDistTicks={bullishFvgDistanceFromOpeningHigh / TickSize}, " +
+                    $"BearDistTicks={bearishFvgDistanceFromOpeningLow / TickSize}, " +
+                    $"ValidLong={validLongFvg}, ValidShort={validShortFvg}");
+            }
 
             if (validLongFvg)
             {
