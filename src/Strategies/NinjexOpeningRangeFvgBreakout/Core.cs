@@ -123,6 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 1)
                 return;
 
+            var includedBars = string.Empty;
             var rangeStart = easternDate.Add(ToTimeSpan(RangeStartTime));
             var rangeEnd = rangeStart.AddMinutes(RangeMinutes);
 
@@ -151,15 +152,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (barTime.Date != easternDate)
                     break;
 
-                if (barTime >= rangeStart && barTime < rangeEnd)
+                // NinjaTrader minute bars are being treated here as completed-bar timestamps.
+                // For a 09:30-09:35 opening range, include bars stamped:
+                // 09:31, 09:32, 09:33, 09:34, 09:35.
+                if (barTime > rangeStart && barTime <= rangeEnd)
                 {
                     foundBars++;
                     high = Math.Max(high, High[barsAgo]);
                     low = Math.Min(low, Low[barsAgo]);
+                    includedBars += $"{barTime:HH:mm:ss}(H={High[barsAgo]},L={Low[barsAgo]}) ";
                 }
 
-                // Once we have moved before the range start, no need to continue.
-                if (barTime < rangeStart)
+                // Once we have moved to/before the range start, no need to continue.
+                if (barTime <= rangeStart)
                     break;
             }
 
@@ -179,7 +184,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             LogDiag(
                 $"Opening range complete. BarsFound={foundBars}, High={openingRangeHigh}, Low={openingRangeLow}, " +
-                $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+                $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}, Bars={includedBars}");
         }
         protected override void OnExecutionUpdate(
             Execution execution,
