@@ -1,8 +1,6 @@
 ﻿#region Using declarations
-
 using System;
 using NinjaTrader.Cbi;
-
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -247,15 +245,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             var currentCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
             return currentCumProfit - dailyStartCumProfit;
         }
-
-        private void LogDiag(string message)
-        {
-            if (!EnableDiagnostics)
-                return;
-
-            Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
-        }
-
         private void ResetForNewDay(DateTime easternDate)
         {
             activeEasternDate = easternDate;

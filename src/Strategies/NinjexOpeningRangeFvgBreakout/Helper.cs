@@ -28,5 +28,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return new TimeSpan(hours, minutes, seconds);
         }
+        
+        private string OkIcon(bool ok)
+        {
+            return ok ? "✔" : "✖";
+        }
+
+        private string EnabledText(bool enabled)
+        {
+            return enabled ? "ON" : "OFF";
+        }
+
+        private string TicksText(double ticks)
+        {
+            return $"{ticks:0.##}t";
+        }
+
+        private string MoneyText(double value)
+        {
+            return $"{value:0.00}";
+        }
     }
 }

@@ -145,9 +145,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var priceAboveOpeningHigh = currentLongPrice > openingRangeHigh;
             var priceBelowOpeningLow = currentShortPrice < openingRangeLow;
+            
+            var liveLongCandleOutsideRange =
+                Low[0] > openingRangeHigh;
+
+            var liveShortCandleOutsideRange =
+                High[0] < openingRangeLow;
 
             var validLongFvg =
                 priceAboveOpeningHigh &&
+                liveLongCandleOutsideRange &&
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
                 bullishFvgWithinGapSize &&
                 bullishFvgWithinMaxDistance;
@@ -168,20 +175,137 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var validShortFvg =
                 priceBelowOpeningLow &&
+                liveShortCandleOutsideRange &&
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
                 bearishFvgWithinGapSize &&
                 bearishFvgWithinMaxDistance;
 
-            if (validLongFvg || validShortFvg)
+            var bullGapTicks = bullGapSize / TickSize;
+            var bearGapTicks = bearGapSize / TickSize;
+
+            var bullDistanceTicks = bullishFvgDistanceFromOpeningHigh / TickSize;
+            var bearDistanceTicks = bearishFvgDistanceFromOpeningLow / TickSize;
+
+            var maxGapTicks = MaxFvgGapTicks;
+            var maxDistanceTicks = MaxFvgDistanceFromRangeTicks;
+
+            var longFailReason = BuildFvgFailReason(
+                priceAboveOpeningHigh,
+                liveLongCandleOutsideRange,
+                bullishFvg,
+                bullishFvgCrossesOpeningHigh,
+                bullishFvgAboveOpeningHigh,
+                bullishFvgWithinGapSize,
+                bullishFvgWithinMaxDistance,
+                bullGapTicks,
+                maxGapTicks,
+                bullDistanceTicks,
+                maxDistanceTicks);
+
+            var shortFailReason = BuildFvgFailReason(
+                priceBelowOpeningLow,
+                liveShortCandleOutsideRange,
+                bearishFvg,
+                bearishFvgCrossesOpeningLow,
+                bearishFvgBelowOpeningLow,
+                bearishFvgWithinGapSize,
+                bearishFvgWithinMaxDistance,
+                bearGapTicks,
+                maxGapTicks,
+                bearDistanceTicks,
+                maxDistanceTicks);
+
+            if (validLongFvg)
             {
-                LogDiag(
-                    $"SIGNAL: ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                    $"PriceAboveORH={priceAboveOpeningHigh}, PriceBelowORL={priceBelowOpeningLow}, " +
-                    $"BullFVG={bullishFvg}, BearFVG={bearishFvg}, " +
-                    $"BullGapTicks={bullGapSize / TickSize}, BearGapTicks={bearGapSize / TickSize}, " +
-                    $"BullDistTicks={bullishFvgDistanceFromOpeningHigh / TickSize}, " +
-                    $"BearDistTicks={bearishFvgDistanceFromOpeningLow / TickSize}, " +
-                    $"ValidLong={validLongFvg}, ValidShort={validShortFvg}");
+                LogEntryDiagnostic(
+                    "LONG",
+                    true,
+                    "VALID ENTRY",
+                    longFailReason,
+                    currentLongPrice,
+                    priceAboveOpeningHigh,
+                    liveLongCandleOutsideRange,
+                    bullishFvg,
+                    bullishFvgCrossesOpeningHigh,
+                    bullishFvgAboveOpeningHigh,
+                    bullishFvgWithinGapSize,
+                    bullishFvgWithinMaxDistance,
+                    bullGapTicks,
+                    MinFvgGapTicks,
+                    maxGapTicks,
+                    bullDistanceTicks,
+                    maxDistanceTicks,
+                    Low[0],
+                    GetDailyTotalPnl());
+            }
+            else if (validShortFvg)
+            {
+                LogEntryDiagnostic(
+                    "SHORT",
+                    true,
+                    "VALID ENTRY",
+                    shortFailReason,
+                    currentShortPrice,
+                    priceBelowOpeningLow,
+                    liveShortCandleOutsideRange,
+                    bearishFvg,
+                    bearishFvgCrossesOpeningLow,
+                    bearishFvgBelowOpeningLow,
+                    bearishFvgWithinGapSize,
+                    bearishFvgWithinMaxDistance,
+                    bearGapTicks,
+                    MinFvgGapTicks,
+                    maxGapTicks,
+                    bearDistanceTicks,
+                    maxDistanceTicks,
+                    High[0],
+                    GetDailyTotalPnl());
+            }
+            else if (priceAboveOpeningHigh || bullishFvg)
+            {
+                LogEntryDiagnostic(
+                    "LONG",
+                    false,
+                    "NO ENTRY",
+                    longFailReason,
+                    currentLongPrice,
+                    priceAboveOpeningHigh,
+                    liveLongCandleOutsideRange,
+                    bullishFvg,
+                    bullishFvgCrossesOpeningHigh,
+                    bullishFvgAboveOpeningHigh,
+                    bullishFvgWithinGapSize,
+                    bullishFvgWithinMaxDistance,
+                    bullGapTicks,
+                    MinFvgGapTicks,
+                    maxGapTicks,
+                    bullDistanceTicks,
+                    maxDistanceTicks,
+                    Low[0],
+                    GetDailyTotalPnl());
+            }
+            else if (priceBelowOpeningLow || bearishFvg)
+            {
+                LogEntryDiagnostic(
+                    "SHORT",
+                    false,
+                    "NO ENTRY",
+                    shortFailReason,
+                    currentShortPrice,
+                    priceBelowOpeningLow,
+                    liveShortCandleOutsideRange,
+                    bearishFvg,
+                    bearishFvgCrossesOpeningLow,
+                    bearishFvgBelowOpeningLow,
+                    bearishFvgWithinGapSize,
+                    bearishFvgWithinMaxDistance,
+                    bearGapTicks,
+                    MinFvgGapTicks,
+                    maxGapTicks,
+                    bearDistanceTicks,
+                    maxDistanceTicks,
+                    High[0],
+                    GetDailyTotalPnl());
             }
 
             if (validLongFvg)
