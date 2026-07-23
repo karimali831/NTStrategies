@@ -4,10 +4,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningRangeFvgBreakout : Strategy
     {
+        private int lastDiagnosticBar = -1;
+        private int lastBlockDiagnosticBar = -1;
+        private string lastBlockDiagnosticKey = string.Empty;
+        
         private void LogDiag(string message)
         {
             if (!EnableDiagnostics)
                 return;
+
+            Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
+        }
+        
+        private void LogDiagOncePerBar(string key, string message)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            if (lastBlockDiagnosticBar == CurrentBar && lastBlockDiagnosticKey == key)
+                return;
+
+            lastBlockDiagnosticBar = CurrentBar;
+            lastBlockDiagnosticKey = key;
 
             Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
         }

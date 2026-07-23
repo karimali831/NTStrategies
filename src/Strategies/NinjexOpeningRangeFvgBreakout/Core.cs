@@ -29,8 +29,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool dailyPnlLimitHit;
         private double dailyStartCumProfit;
-        
-        private int lastDiagnosticBar = -1;
 
         protected override void OnStateChange()
         {
@@ -119,50 +117,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (openingRangeComplete)
                 return;
 
-            var rangeStart = easternDate.Add(ToTimeSpan(RangeStartTime));
-            var rangeEnd = rangeStart.AddMinutes(RangeMinutes);
-
-            // With Calculate.OnEachTick:
-            // Only update OR using completed candles.
-            // On the first tick of a new bar, Time[1] is the candle that just closed.
             if (!IsFirstTickOfBar)
                 return;
 
             if (CurrentBar < 1)
                 return;
 
+            var rangeStart = easternDate.Add(ToTimeSpan(RangeStartTime));
+            var rangeEnd = rangeStart.AddMinutes(RangeMinutes);
+
+            // Do not complete OR until the range window has finished.
             var closedBarTime = ToEastern(Time[1]);
 
-            // 1-minute chart assumption:
-            // Time[1] represents the bar that just closed.
-            // For a 09:30-09:35 OR, include closed bars from 09:30 through 09:34.
-            if (closedBarTime >= rangeStart && closedBarTime < rangeEnd)
+            if (closedBarTime < rangeEnd)
             {
-                if (!openingRangeStarted)
-                {
-                    openingRangeStarted = true;
-                    openingRangeHigh = High[1];
-                    openingRangeLow = Low[1];
-                }
-                else
-                {
-                    openingRangeHigh = Math.Max(openingRangeHigh, High[1]);
-                    openingRangeLow = Math.Min(openingRangeLow, Low[1]);
-                }
+                LogDiagOncePerBar(
+                    "OR_NOT_READY",
+                    $"Opening range waiting. ClosedBar={closedBarTime:HH:mm:ss}, RangeEnd={rangeEnd:HH:mm:ss}");
 
-                LogDiag(
-                    $"Opening range building. Bar={closedBarTime:HH:mm:ss}, High={openingRangeHigh}, Low={openingRangeLow}");
+                return;
             }
 
-            if (openingRangeStarted && closedBarTime >= rangeEnd)
-            {
-                openingRangeComplete = true;
+            var foundBars = 0;
+            var high = double.MinValue;
+            var low = double.MaxValue;
 
-                LogDiag(
-                    $"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}, RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+            // Scan completed bars only.
+            // barsAgo=1 is the candle that just closed.
+            for (var barsAgo = 1; barsAgo <= CurrentBar; barsAgo++)
+            {
+                var barTime = ToEastern(Time[barsAgo]);
+
+                if (barTime.Date != easternDate)
+                    break;
+
+                if (barTime >= rangeStart && barTime < rangeEnd)
+                {
+                    foundBars++;
+                    high = Math.Max(high, High[barsAgo]);
+                    low = Math.Min(low, Low[barsAgo]);
+                }
+
+                // Once we have moved before the range start, no need to continue.
+                if (barTime < rangeStart)
+                    break;
             }
+
+            if (foundBars <= 0)
+            {
+                LogDiagOncePerBar(
+                    "OR_NO_BARS_FOUND",
+                    $"Blocked: no opening range bars found. Range={rangeStart:HH:mm:ss}-{rangeEnd:HH:mm:ss}");
+
+                return;
+            }
+
+            openingRangeStarted = true;
+            openingRangeComplete = true;
+            openingRangeHigh = high;
+            openingRangeLow = low;
+
+            LogDiag(
+                $"Opening range complete. BarsFound={foundBars}, High={openingRangeHigh}, Low={openingRangeLow}, " +
+                $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
         }
-
         protected override void OnExecutionUpdate(
             Execution execution,
             string executionId,
@@ -273,6 +291,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 $"New trading day reset. Date={easternDate:yyyy-MM-dd}, DailyStartCumProfit={dailyStartCumProfit:0.00}");
             
             lastDiagnosticBar = -1;
+            lastBlockDiagnosticBar = -1;
+            lastBlockDiagnosticKey = string.Empty;
         }
     }
 }

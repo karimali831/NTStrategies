@@ -14,7 +14,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!openingRangeComplete)
             {
-                LogDiag("Blocked: opening range not complete.");
+                LogDiagOncePerBar("OR_NOT_COMPLETE", "Blocked: opening range not complete.");
                 return;
             }
 
@@ -35,25 +35,34 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!IsInsideEntryWindow(easternBarTime))
             {
-                LogDiag($"Blocked: outside entry window. Time={easternBarTime:HH:mm:ss}");
+                LogDiagOncePerBar(
+                    "OUTSIDE_ENTRY_WINDOW",
+                    $"Blocked: outside entry window. Time={easternBarTime:HH:mm:ss}");
+
                 return;
             }
 
             if (!CanTradeToday())
             {
-                LogDiag($"Blocked: daily PnL limit reached. DailyPnL={GetDailyTotalPnl():0.00}");
+                LogDiagOncePerBar(
+                    "DAILY_PNL_LIMIT",
+                    $"Blocked: daily PnL limit reached. DailyPnL={GetDailyTotalPnl():0.00}");
+
                 return;
             }
 
             if (pendingEntry)
             {
-                LogDiag("Blocked: pending entry already active.");
+                LogDiagOncePerBar("PENDING_ENTRY", "Blocked: pending entry already active.");
                 return;
             }
 
             if (Position.MarketPosition != MarketPosition.Flat)
             {
-                LogDiag($"Blocked: position not flat. Position={Position.MarketPosition}");
+                LogDiagOncePerBar(
+                    "POSITION_NOT_FLAT",
+                    $"Blocked: position not flat. Position={Position.MarketPosition}");
+
                 return;
             }
 
