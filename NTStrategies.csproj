@@ -113,6 +113,7 @@
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Bracket.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Core.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Diag.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Helper.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Entry.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Params.cs" />

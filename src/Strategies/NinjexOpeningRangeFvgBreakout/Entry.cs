@@ -7,31 +7,32 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         private void HandleOneMinuteEntryModel()
         {
+            if (EnableRangeFilter)
+            {
+                if (!openingRangeComplete)
+                {
+                    LogDiagOncePerBar("OR_NOT_COMPLETE", "Blocked: opening range not complete.");
+                    return;
+                }
+
+                if (!IsOpeningRangeValid())
+                {
+                    LogDiagOncePerBar(
+                        "INVALID_OR",
+                        $"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
+                        $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+
+                    return;
+                }
+
+                if (!printedRangeComplete)
+                {
+                    printedRangeComplete = true;
+                    LogDiag($"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}");
+                }
+            }
+            
             var easternBarTime = ToEastern(Time[0]);
-
-            if (activeEasternDate != easternBarTime.Date)
-                ResetForNewDay(easternBarTime.Date);
-
-            if (!openingRangeComplete)
-            {
-                LogDiagOncePerBar("OR_NOT_COMPLETE", "Blocked: opening range not complete.");
-                return;
-            }
-
-            if (!IsOpeningRangeValid())
-            {
-                LogDiag(
-                    $"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                    $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
-
-                return;
-            }
-
-            if (!printedRangeComplete)
-            {
-                printedRangeComplete = true;
-                LogDiag($"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}");
-            }
 
             if (!IsInsideEntryWindow(easternBarTime))
             {
@@ -117,14 +118,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bearishFvg &&
                 (MaxFvgGapTicks <= 0 || bearGapSize <= maxGap);
 
-            var bullishFvgDistanceFromOpeningHigh = Math.Max(0, bullGapBottom - openingRangeHigh);
-            var bearishFvgDistanceFromOpeningLow = Math.Max(0, openingRangeLow - bearGapTop);
+            var bullishFvgDistanceFromOpeningHigh = EnableRangeFilter
+                ? Math.Max(0, bullGapBottom - openingRangeHigh)
+                : 0;
+
+            var bearishFvgDistanceFromOpeningLow = EnableRangeFilter
+                ? Math.Max(0, openingRangeLow - bearGapTop)
+                : 0;
 
             var bullishFvgWithinMaxDistance =
+                !EnableRangeFilter ||
                 MaxFvgDistanceFromRangeTicks <= 0 ||
                 bullishFvgDistanceFromOpeningHigh <= maxDistance;
 
             var bearishFvgWithinMaxDistance =
+                !EnableRangeFilter ||
                 MaxFvgDistanceFromRangeTicks <= 0 ||
                 bearishFvgDistanceFromOpeningLow <= maxDistance;
 
@@ -134,11 +142,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             // 2. FVG crosses OR high: bottom <= ORH and top >= ORH
             // OR full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
             var bullishFvgCrossesOpeningHigh =
+                !EnableRangeFilter ||
                 bullishFvg &&
                 bullGapBottom <= openingRangeHigh &&
                 bullGapTop >= openingRangeHigh;
 
             var bullishFvgAboveOpeningHigh =
+                !EnableRangeFilter ||
                 bullishFvg &&
                 bullGapBottom >= openingRangeHigh + minDistance;
 
@@ -152,16 +162,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (currentShortPrice <= 0)
                 currentShortPrice = Close[0];
 
-            var priceAboveOpeningHigh = currentLongPrice > openingRangeHigh;
-            var priceBelowOpeningLow = currentShortPrice < openingRangeLow;
-            
+            var priceAboveOpeningHigh =
+                !EnableRangeFilter || currentLongPrice > openingRangeHigh;
+
+            var priceBelowOpeningLow =
+                !EnableRangeFilter || currentShortPrice < openingRangeLow;
+
             var liveLongCandleOutsideRange =
-                Low[0] > openingRangeHigh;
+                !EnableRangeFilter || Low[0] > openingRangeHigh;
 
             var liveShortCandleOutsideRange =
-                High[0] < openingRangeLow;
+                !EnableRangeFilter || High[0] < openingRangeLow;
 
             var validLongFvg =
+                bullishFvg &&
                 priceAboveOpeningHigh &&
                 liveLongCandleOutsideRange &&
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
@@ -174,15 +188,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             // 2. Full FVG is below OR low, respecting MinFvgDistanceFromRangeTicks.
             // AND current price is below OR low.
             var bearishFvgCrossesOpeningLow =
+                !EnableRangeFilter ||
                 bearishFvg &&
                 bearGapTop >= openingRangeLow &&
                 bearGapBottom <= openingRangeLow;
 
             var bearishFvgBelowOpeningLow =
+                !EnableRangeFilter ||
                 bearishFvg &&
                 bearGapTop <= openingRangeLow - minDistance;
 
             var validShortFvg =
+                bearishFvg &&
                 priceBelowOpeningLow &&
                 liveShortCandleOutsideRange &&
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&

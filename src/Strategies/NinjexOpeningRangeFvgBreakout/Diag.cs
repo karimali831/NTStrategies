@@ -67,12 +67,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine($"[FVG DIAG] {Time[0]:yyyy-MM-dd HH:mm:ss} | {side} | {decision}");
             sb.AppendLine($"  Reason: {failReason}");
             sb.AppendLine($"  a) Opening Range");
-            sb.AppendLine($"     OR High = {openingRangeHigh:0.00}");
-            sb.AppendLine($"     OR Low  = {openingRangeLow:0.00}");
-            sb.AppendLine($"     Current = {currentPrice:0.00}");
-            sb.AppendLine($"     Price outside range = {OkIcon(priceOutsideRange)}");
-            sb.AppendLine($"     Live candle outside = {OkIcon(liveCandleOutsideRange)}");
+            sb.AppendLine($"     Range filter = {EnabledText(EnableRangeFilter)}");
 
+            if (EnableRangeFilter)
+            {
+                sb.AppendLine($"     OR High = {openingRangeHigh:0.00}");
+                sb.AppendLine($"     OR Low  = {openingRangeLow:0.00}");
+                sb.AppendLine($"     Current = {currentPrice:0.00}");
+                sb.AppendLine($"     Price outside range = {OkIcon(priceOutsideRange)}");
+                sb.AppendLine($"     Live candle outside = {OkIcon(liveCandleOutsideRange)}");
+            }
+            else
+            {
+                sb.AppendLine($"     Opening range checks bypassed.");
+                sb.AppendLine($"     Current = {currentPrice:0.00}");
+            }
+            
             sb.AppendLine($"  b) FVG Structure");
             sb.AppendLine($"     FVG exists          = {OkIcon(fvgExists)}");
             sb.AppendLine($"     FVG crosses level   = {OkIcon(fvgCrossesRange)}");
