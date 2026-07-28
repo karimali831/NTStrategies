@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string failReason,
             double currentPrice,
             bool priceOutsideRange,
-            bool liveCandleOutsideRange,
+            bool fvgCandleOutsideRange,
             bool fvgExists,
             bool fvgCrossesRange,
             bool fvgBeyondRange,
@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 sb.AppendLine($"     OR Low  = {openingRangeLow:0.00}");
                 sb.AppendLine($"     Current = {currentPrice:0.00}");
                 sb.AppendLine($"     Price outside range = {OkIcon(priceOutsideRange)}");
-                sb.AppendLine($"     Live candle outside = {OkIcon(liveCandleOutsideRange)}");
+                sb.AppendLine($"     FVG candle outside = {OkIcon(fvgCandleOutsideRange)}");
             }
             else
             {
@@ -110,7 +110,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private string BuildFvgFailReason(
             bool priceOutsideRange,
-            bool liveCandleOutsideRange,
+            bool fvgCandleOutsideRange,
             bool fvgExists,
             bool fvgCrossesRange,
             bool fvgBeyondRange,
@@ -124,8 +124,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!priceOutsideRange)
                 return "Price has not moved outside the opening range.";
 
-            if (!liveCandleOutsideRange)
-                return "Live FVG candle is still inside the opening range.";
+            if (!fvgCandleOutsideRange)
+                return "Confirmed FVG candle is still inside the opening range.";
 
             if (!fvgExists)
                 return "No valid 3-candle FVG exists.";

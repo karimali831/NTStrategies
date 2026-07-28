@@ -108,7 +108,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 5)
                 return;
 
-            HandleOneMinuteEntryModel();
+            if (IsFirstTickOfBar)
+                HandleOneMinuteEntryModel();
         }
 
         private void UpdateOpeningRangeFromOneMinuteSeries()

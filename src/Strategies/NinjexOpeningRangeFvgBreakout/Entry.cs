@@ -70,42 +70,38 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 5)
                 return;
 
-            // Prevent duplicate entries on the same live/forming candle.
-            if (CurrentBar == lastEntrySignalBar)
-                return;
-
             var minGap = MinFvgGapTicks * TickSize;
             var maxGap = MaxFvgGapTicks * TickSize;
 
             var minDistance = MinFvgDistanceFromRangeTicks * TickSize;
             var maxDistance = MaxFvgDistanceFromRangeTicks * TickSize;
 
-            // LIVE FVG MODEL:
-            // [0] = current forming FVG candle
-            // [1] = middle candle
-            // [2] = first candle of the 3-candle FVG structure
+            // CONFIRMED FVG MODEL:
+            // This method is called on IsFirstTickOfBar.
+            // [1] = candle that just closed and confirmed the FVG
+            // [2] = middle candle
+            // [3] = first candle of the 3-candle FVG structure
             //
-            // This enters one bar earlier than the confirmed [1]/[3] model.
-
+            // Entry is submitted immediately on the next candle after the FVG confirms.
             var bullishFvg =
-                Low[0] > High[2] &&
-                (Low[0] - High[2]) >= minGap;
+                Low[1] > High[3] &&
+                (Low[1] - High[3]) >= minGap;
 
             var bearishFvg =
-                High[0] < Low[2] &&
-                (Low[2] - High[0]) >= minGap;
+                High[1] < Low[3] &&
+                (Low[3] - High[1]) >= minGap;
 
             // Bullish FVG gap:
-            // lower boundary = High[2]
-            // upper boundary = Low[0]
-            var bullGapBottom = High[2];
-            var bullGapTop = Low[0];
+            // lower boundary = High[3]
+            // upper boundary = Low[1]
+            var bullGapBottom = High[3];
+            var bullGapTop = Low[1];
 
             // Bearish FVG gap:
-            // upper boundary = Low[2]
-            // lower boundary = High[0]
-            var bearGapTop = Low[2];
-            var bearGapBottom = High[0];
+            // upper boundary = Low[3]
+            // lower boundary = High[1]
+            var bearGapTop = Low[3];
+            var bearGapBottom = High[1];
 
             var bullGapSize = bullGapTop - bullGapBottom;
             var bearGapSize = bearGapTop - bearGapBottom;
@@ -143,14 +139,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             // OR full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
             var bullishFvgCrossesOpeningHigh =
                 !EnableRangeFilter ||
-                bullishFvg &&
-                bullGapBottom <= openingRangeHigh &&
-                bullGapTop >= openingRangeHigh;
+                (bullishFvg &&
+                 bullGapBottom <= openingRangeHigh &&
+                 bullGapTop >= openingRangeHigh);
 
             var bullishFvgAboveOpeningHigh =
                 !EnableRangeFilter ||
-                bullishFvg &&
-                bullGapBottom >= openingRangeHigh + minDistance;
+                (bullishFvg &&
+                bullGapBottom >= openingRangeHigh + minDistance);
 
             // Directional price gates.
             // These force the live entry to respect the opening range boundary.
@@ -168,16 +164,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             var priceBelowOpeningLow =
                 !EnableRangeFilter || currentShortPrice < openingRangeLow;
 
-            var liveLongCandleOutsideRange =
-                !EnableRangeFilter || Low[0] > openingRangeHigh;
+            var fvgCandleLongOutsideRange =
+                !EnableRangeFilter || Low[1] > openingRangeHigh;
 
-            var liveShortCandleOutsideRange =
-                !EnableRangeFilter || High[0] < openingRangeLow;
+            var fvgCandleShortOutsideRange =
+                !EnableRangeFilter || High[1] < openingRangeLow;
 
             var validLongFvg =
                 bullishFvg &&
                 priceAboveOpeningHigh &&
-                liveLongCandleOutsideRange &&
+                fvgCandleLongOutsideRange &&
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
                 bullishFvgWithinGapSize &&
                 bullishFvgWithinMaxDistance;
@@ -189,19 +185,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             // AND current price is below OR low.
             var bearishFvgCrossesOpeningLow =
                 !EnableRangeFilter ||
-                bearishFvg &&
+                (bearishFvg &&
                 bearGapTop >= openingRangeLow &&
-                bearGapBottom <= openingRangeLow;
+                bearGapBottom <= openingRangeLow);
 
             var bearishFvgBelowOpeningLow =
                 !EnableRangeFilter ||
-                bearishFvg &&
-                bearGapTop <= openingRangeLow - minDistance;
+                (bearishFvg &&
+                bearGapTop <= openingRangeLow - minDistance);
 
             var validShortFvg =
                 bearishFvg &&
                 priceBelowOpeningLow &&
-                liveShortCandleOutsideRange &&
+                fvgCandleShortOutsideRange &&
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
                 bearishFvgWithinGapSize &&
                 bearishFvgWithinMaxDistance;
@@ -217,7 +213,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var longFailReason = BuildFvgFailReason(
                 priceAboveOpeningHigh,
-                liveLongCandleOutsideRange,
+                fvgCandleLongOutsideRange,
                 bullishFvg,
                 bullishFvgCrossesOpeningHigh,
                 bullishFvgAboveOpeningHigh,
@@ -230,7 +226,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var shortFailReason = BuildFvgFailReason(
                 priceBelowOpeningLow,
-                liveShortCandleOutsideRange,
+                fvgCandleShortOutsideRange,
                 bearishFvg,
                 bearishFvgCrossesOpeningLow,
                 bearishFvgBelowOpeningLow,
@@ -250,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     longFailReason,
                     currentLongPrice,
                     priceAboveOpeningHigh,
-                    liveLongCandleOutsideRange,
+                    fvgCandleLongOutsideRange,
                     bullishFvg,
                     bullishFvgCrossesOpeningHigh,
                     bullishFvgAboveOpeningHigh,
@@ -261,7 +257,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     maxGapTicks,
                     bullDistanceTicks,
                     maxDistanceTicks,
-                    Low[0],
+                    Low[1],
                     GetDailyTotalPnl());
             }
             else if (validShortFvg)
@@ -273,7 +269,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     shortFailReason,
                     currentShortPrice,
                     priceBelowOpeningLow,
-                    liveShortCandleOutsideRange,
+                    fvgCandleShortOutsideRange,
                     bearishFvg,
                     bearishFvgCrossesOpeningLow,
                     bearishFvgBelowOpeningLow,
@@ -284,7 +280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     maxGapTicks,
                     bearDistanceTicks,
                     maxDistanceTicks,
-                    High[0],
+                    High[1],
                     GetDailyTotalPnl());
             }
             else if (priceAboveOpeningHigh || bullishFvg)
@@ -296,7 +292,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     longFailReason,
                     currentLongPrice,
                     priceAboveOpeningHigh,
-                    liveLongCandleOutsideRange,
+                    fvgCandleLongOutsideRange,
                     bullishFvg,
                     bullishFvgCrossesOpeningHigh,
                     bullishFvgAboveOpeningHigh,
@@ -307,7 +303,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     maxGapTicks,
                     bullDistanceTicks,
                     maxDistanceTicks,
-                    Low[0],
+                    Low[1],
                     GetDailyTotalPnl());
             }
             else if (priceBelowOpeningLow || bearishFvg)
@@ -319,7 +315,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     shortFailReason,
                     currentShortPrice,
                     priceBelowOpeningLow,
-                    liveShortCandleOutsideRange,
+                    fvgCandleShortOutsideRange,
                     bearishFvg,
                     bearishFvgCrossesOpeningLow,
                     bearishFvgBelowOpeningLow,
@@ -330,7 +326,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     maxGapTicks,
                     bearDistanceTicks,
                     maxDistanceTicks,
-                    High[0],
+                    High[1],
                     GetDailyTotalPnl());
             }
 
@@ -340,10 +336,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Live model:
+                // Confirmed model:
                 // If MaxStopTicks > 0, PrepareLongManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the low of the current/live FVG candle.
-                var candleStop = Low[0];
+                // If MaxStopTicks == 0, use the low of the confirmed FVG candle.
+                var candleStop = Low[1];
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
                     return;
@@ -363,10 +359,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Live model:
+                // Confirmed model:
                 // If MaxStopTicks > 0, PrepareShortManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the high of the current/live FVG candle.
-                var candleStop = High[0];
+                // If MaxStopTicks == 0, use the high of the confirmed FVG candle.
+                var candleStop = High[1];
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
                     return;
