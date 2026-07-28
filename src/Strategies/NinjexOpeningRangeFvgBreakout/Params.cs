@@ -34,6 +34,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double MaxDailyLoss { get; set; }
         
         [NinjaScriptProperty]
+        [Display(Name = "Enable Range Filter", GroupName = "Opening Range", Order = 9)]
+        public bool EnableRangeFilter { get; set; }
+        
+        [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(Name = "Range Start Time", GroupName = "Opening Range", Order = 10)]
         public int RangeStartTime { get; set; }
@@ -47,6 +51,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 500)]
         [Display(Name = "Min Opening Range Ticks", GroupName = "Opening Range", Order = 12)]
         public int MinOpeningRangeTicks { get; set; }
+        
+        
+        [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "Max Entry Distance From Range Ticks", GroupName = "Opening Range", Order = 13)]
+        public int MaxEntryDistanceFromRangeTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100)]

@@ -38,11 +38,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Description = "Trades FVG breakouts through the opening range high/low.";
                 Calculate = Calculate.OnEachTick;
                 BarsRequiredToTrade = 5;
-
+                
+                EnableRangeFilter = true;
                 EnableDiagnostics = false;
                 EntryStartTime = 93500;
                 EntryEndTime = 110000;
-
+                MaxEntryDistanceFromRangeTicks = 50;
+                
                 MaxStopTicks = 0;
                 MinOpeningRangeTicks = 4;
 
@@ -91,7 +93,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (BarsInProgress != 0)
                 return;
 
-            if (CurrentBar >= 1)
+            var easternBarTime = ToEastern(Time[0]);
+
+            if (activeEasternDate != easternBarTime.Date)
+                ResetForNewDay(easternBarTime.Date);
+
+            if (EnableRangeFilter && CurrentBar >= 1)
                 UpdateOpeningRangeFromOneMinuteSeries();
 
             SyncFlatState();
@@ -102,8 +109,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 5)
                 return;
 
-            // Live FVG entry model must run on each tick.
-            HandleOneMinuteEntryModel();
+            if (IsFirstTickOfBar)
+                HandleOneMinuteEntryModel();
         }
 
         private void UpdateOpeningRangeFromOneMinuteSeries()
