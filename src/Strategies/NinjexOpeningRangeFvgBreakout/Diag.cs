@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -43,13 +44,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool fvgBeyondRange,
             bool fvgWithinGapSize,
             bool fvgWithinMaxDistance,
+            bool entryWithinMaxDistance,
             double gapTicks,
             double minGapTicks,
             double maxGapTicks,
-            double distanceTicks,
-            double maxDistanceTicks,
+            double fvgDistanceTicks,
+            double maxFvgDistanceTicks,
+            double entryDistanceTicks,
+            double maxEntryDistanceTicks,
             double stopPrice,
-            double dailyPnl)
+            double dailyPnl,
+            DateTime signalBarTime,
+            DateTime decisionBarTime)
         {
             if (!EnableDiagnostics)
                 return;
@@ -64,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var sb = new StringBuilder(768);
 
             sb.AppendLine(new string('-', 92));
-            sb.AppendLine($"[FVG DIAG] {Time[0]:yyyy-MM-dd HH:mm:ss} | {side} | {decision}");
+            sb.AppendLine($"[FVG DIAG] Signal={signalBarTime:HH:mm:ss} | Decision={decisionBarTime:HH:mm:ss} | {side} | {decision}");
             sb.AppendLine($"  Reason: {failReason}");
             sb.AppendLine($"  a) Opening Range");
             sb.AppendLine($"     Range filter = {EnabledText(EnableRangeFilter)}");
@@ -89,13 +95,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine($"     FVG beyond level    = {OkIcon(fvgBeyondRange)}");
 
             sb.AppendLine($"  c) FVG Filters");
-            sb.AppendLine($"     Gap size            = {TicksText(gapTicks)}");
+            sb.AppendLine($"     Gap size            = {(fvgExists ? TicksText(gapTicks) : "N/A - no FVG")}");
             sb.AppendLine($"     Min gap             = {TicksText(minGapTicks)}");
             sb.AppendLine($"     Max gap             = {(MaxFvgGapTicks <= 0 ? "OFF" : TicksText(maxGapTicks))}");
             sb.AppendLine($"     Gap within max      = {OkIcon(fvgWithinGapSize)}");
-            sb.AppendLine($"     Distance from range = {TicksText(distanceTicks)}");
-            sb.AppendLine($"     Max distance        = {(MaxFvgDistanceFromRangeTicks <= 0 ? "OFF" : TicksText(maxDistanceTicks))}");
-            sb.AppendLine($"     Distance ok         = {OkIcon(fvgWithinMaxDistance)}");
+            sb.AppendLine($"     FVG distance from range   = {TicksText(fvgDistanceTicks)}");
+            sb.AppendLine($"     Max FVG distance          = {(MaxFvgDistanceFromRangeTicks <= 0 ? "OFF" : TicksText(maxFvgDistanceTicks))}");
+            sb.AppendLine($"     FVG distance ok           = {OkIcon(fvgWithinMaxDistance)}");
+
+            sb.AppendLine($"     Entry distance from range = {TicksText(entryDistanceTicks)}");
+            sb.AppendLine($"     Max entry distance        = {(MaxEntryDistanceFromRangeTicks <= 0 ? "OFF" : TicksText(maxEntryDistanceTicks))}");
+            sb.AppendLine($"     Entry distance ok         = {OkIcon(entryWithinMaxDistance)}");
 
             sb.AppendLine($"  d) Risk / State");
             sb.AppendLine($"     Stop candidate      = {stopPrice:0.00}");
@@ -118,8 +128,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool fvgWithinMaxDistance,
             double gapTicks,
             double maxGapTicks,
-            double distanceTicks,
-            double maxDistanceTicks)
+            double fvgDistanceTicks,
+            double maxFvgDistanceTicks,
+            bool entryWithinMaxDistance,
+            double entryDistanceTicks,
+            double maxEntryDistanceTicks)
         {
             if (!priceOutsideRange)
                 return "Price has not moved outside the opening range.";
@@ -143,10 +156,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!fvgWithinMaxDistance)
             {
-                if (MaxFvgDistanceFromRangeTicks > 0 && distanceTicks > maxDistanceTicks)
-                    return $"FVG is too far from opening range: {distanceTicks:0.##} ticks exceeds MaxFvgDistanceFromRangeTicks {maxDistanceTicks:0.##}.";
+                if (MaxFvgDistanceFromRangeTicks > 0 && fvgDistanceTicks > maxFvgDistanceTicks)
+                    return $"FVG is too far from opening range: {fvgDistanceTicks:0.##} ticks exceeds MaxFvgDistanceFromRangeTicks {maxFvgDistanceTicks:0.##}.";
 
                 return "FVG distance failed max-distance filter.";
+            }
+            
+            if (!entryWithinMaxDistance)
+            {
+                if (MaxEntryDistanceFromRangeTicks > 0 && entryDistanceTicks > maxEntryDistanceTicks)
+                    return $"Entry is too far from opening range: {entryDistanceTicks:0.##} ticks exceeds MaxEntryDistanceFromRangeTicks {maxEntryDistanceTicks:0.##}.";
+
+                return "Entry distance failed max-entry-distance filter.";
             }
 
             return "All filters passed.";

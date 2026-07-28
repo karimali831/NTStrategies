@@ -230,6 +230,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var maxGapTicks = MaxFvgGapTicks;
             var maxDistanceTicks = MaxFvgDistanceFromRangeTicks;
+            var maxEntryDistanceTicks = MaxEntryDistanceFromRangeTicks;
+
+            var signalBarTime = ToEastern(Time[1]);
+            var decisionBarTime = ToEastern(Time[0]);
 
             var longFailReason = BuildFvgFailReason(
                 priceAboveOpeningHigh,
@@ -242,7 +246,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bullGapTicks,
                 maxGapTicks,
                 bullDistanceTicks,
-                maxDistanceTicks);
+                maxDistanceTicks,
+                longEntryWithinMaxDistance,
+                longEntryDistanceFromRangeTicks,
+                maxEntryDistanceTicks);
 
             var shortFailReason = BuildFvgFailReason(
                 priceBelowOpeningLow,
@@ -255,7 +262,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bearGapTicks,
                 maxGapTicks,
                 bearDistanceTicks,
-                maxDistanceTicks);
+                maxDistanceTicks,
+                shortEntryWithinMaxDistance,
+                shortEntryDistanceFromRangeTicks,
+                maxEntryDistanceTicks);
 
             if (validLongFvg)
             {
@@ -272,13 +282,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bullishFvgAboveOpeningHigh,
                     bullishFvgWithinGapSize,
                     bullishFvgWithinMaxDistance,
+                    longEntryWithinMaxDistance,
                     bullGapTicks,
                     MinFvgGapTicks,
                     maxGapTicks,
                     bullDistanceTicks,
                     maxDistanceTicks,
+                    longEntryDistanceFromRangeTicks,
+                    maxEntryDistanceTicks,
                     Low[1],
-                    GetDailyTotalPnl());
+                    GetDailyTotalPnl(),
+                    signalBarTime,
+                    decisionBarTime);
             }
             else if (validShortFvg)
             {
@@ -295,13 +310,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bearishFvgBelowOpeningLow,
                     bearishFvgWithinGapSize,
                     bearishFvgWithinMaxDistance,
+                    shortEntryWithinMaxDistance,
                     bearGapTicks,
                     MinFvgGapTicks,
                     maxGapTicks,
                     bearDistanceTicks,
                     maxDistanceTicks,
+                    shortEntryDistanceFromRangeTicks,
+                    maxEntryDistanceTicks,
                     High[1],
-                    GetDailyTotalPnl());
+                    GetDailyTotalPnl(),
+                    signalBarTime,
+                    decisionBarTime);
             }
             else if (priceAboveOpeningHigh || bullishFvg)
             {
@@ -318,13 +338,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bullishFvgAboveOpeningHigh,
                     bullishFvgWithinGapSize,
                     bullishFvgWithinMaxDistance,
+                    longEntryWithinMaxDistance,
                     bullGapTicks,
                     MinFvgGapTicks,
                     maxGapTicks,
                     bullDistanceTicks,
                     maxDistanceTicks,
+                    longEntryDistanceFromRangeTicks,
+                    maxEntryDistanceTicks,
                     Low[1],
-                    GetDailyTotalPnl());
+                    GetDailyTotalPnl(),
+                    signalBarTime,
+                    decisionBarTime);
             }
             else if (priceBelowOpeningLow || bearishFvg)
             {
@@ -341,13 +366,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bearishFvgBelowOpeningLow,
                     bearishFvgWithinGapSize,
                     bearishFvgWithinMaxDistance,
+                    shortEntryWithinMaxDistance,
                     bearGapTicks,
                     MinFvgGapTicks,
                     maxGapTicks,
                     bearDistanceTicks,
                     maxDistanceTicks,
+                    shortEntryDistanceFromRangeTicks,
+                    maxEntryDistanceTicks,
                     High[1],
-                    GetDailyTotalPnl());
+                    GetDailyTotalPnl(),
+                    signalBarTime,
+                    decisionBarTime);
             }
 
             if (validLongFvg)
