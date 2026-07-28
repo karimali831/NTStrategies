@@ -43,7 +43,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableDiagnostics = false;
                 EntryStartTime = 93500;
                 EntryEndTime = 110000;
-
+                MaxEntryDistanceFromRangeTicks = 50;
+                
                 MaxStopTicks = 0;
                 MinOpeningRangeTicks = 4;
 

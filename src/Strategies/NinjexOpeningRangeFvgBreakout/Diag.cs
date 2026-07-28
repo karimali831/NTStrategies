@@ -124,11 +124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!priceOutsideRange)
                 return "Price has not moved outside the opening range.";
 
-            if (!fvgCandleOutsideRange)
-                return "Confirmed FVG candle is still inside the opening range.";
-
             if (!fvgExists)
                 return "No valid 3-candle FVG exists.";
+
+            if (!fvgCandleOutsideRange)
+                return "Confirmed FVG candle is still inside the opening range.";
 
             if (!fvgCrossesRange && !fvgBeyondRange)
                 return "FVG does not cross or sit beyond the opening-range level.";

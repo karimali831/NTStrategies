@@ -51,6 +51,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 500)]
         [Display(Name = "Min Opening Range Ticks", GroupName = "Opening Range", Order = 12)]
         public int MinOpeningRangeTicks { get; set; }
+        
+        
+        [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "Max Entry Distance From Range Ticks", GroupName = "Opening Range", Order = 13)]
+        public int MaxEntryDistanceFromRangeTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100)]

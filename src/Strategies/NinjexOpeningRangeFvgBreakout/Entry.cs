@@ -157,6 +157,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             var currentShortPrice = GetCurrentBid();
             if (currentShortPrice <= 0)
                 currentShortPrice = Close[0];
+            
+            var longEntryDistanceFromRangeTicks = EnableRangeFilter
+                ? Math.Max(0, (currentLongPrice - openingRangeHigh) / TickSize)
+                : 0;
+
+            var shortEntryDistanceFromRangeTicks = EnableRangeFilter
+                ? Math.Max(0, (openingRangeLow - currentShortPrice) / TickSize)
+                : 0;
+
+            var longEntryWithinMaxDistance =
+                !EnableRangeFilter ||
+                MaxEntryDistanceFromRangeTicks <= 0 ||
+                longEntryDistanceFromRangeTicks <= MaxEntryDistanceFromRangeTicks;
+
+            var shortEntryWithinMaxDistance =
+                !EnableRangeFilter ||
+                MaxEntryDistanceFromRangeTicks <= 0 ||
+                shortEntryDistanceFromRangeTicks <= MaxEntryDistanceFromRangeTicks;
 
             var priceAboveOpeningHigh =
                 !EnableRangeFilter || currentLongPrice > openingRangeHigh;
@@ -176,7 +194,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fvgCandleLongOutsideRange &&
                 (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
                 bullishFvgWithinGapSize &&
-                bullishFvgWithinMaxDistance;
+                bullishFvgWithinMaxDistance &&
+                longEntryWithinMaxDistance;
             
             // Valid short if:
             // 1. FVG crosses OR low: top >= ORL and bottom <= ORL
@@ -200,7 +219,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fvgCandleShortOutsideRange &&
                 (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
                 bearishFvgWithinGapSize &&
-                bearishFvgWithinMaxDistance;
+                bearishFvgWithinMaxDistance &&
+                shortEntryWithinMaxDistance;
 
             var bullGapTicks = bullGapSize / TickSize;
             var bearGapTicks = bearGapSize / TickSize;
