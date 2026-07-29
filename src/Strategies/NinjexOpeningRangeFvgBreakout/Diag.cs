@@ -1,11 +1,9 @@
 using System;
-using System.Text;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOpeningRangeFvgBreakout : Strategy
     {
-        private int lastDiagnosticBar = -1;
         private int lastBlockDiagnosticBar = -1;
         private string lastBlockDiagnosticKey = string.Empty;
         
@@ -17,37 +15,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
         }
         
-        private void LogEntryModelDecision(
+       private void LogEntryModelDecision(
             DateTime signalBarTime,
             DateTime decisionBarTime,
-            bool directBullishFvg,
-            bool directBearishFvg,
-            bool priorBullishFvg,
-            bool priorBearishFvg,
-            bool directLongPattern,
-            bool directShortPattern,
-            bool continuationLongPattern,
-            bool continuationShortPattern,
-            double longDistanceTicks,
-            double shortDistanceTicks,
+            bool bullishFvg,
+            bool bearishFvg,
+            bool closesAboveRange,
+            bool closesBelowRange,
+            bool bullCrossesOrh,
+            bool bearCrossesOrl,
+            bool bullEntirelyAboveOrh,
+            bool bearEntirelyBelowOrl,
+            bool bullWithinDistance,
+            bool bearWithinDistance,
+            double bullDistanceTicks,
+            double bearDistanceTicks,
             bool validLong,
             bool validShort)
         {
             if (!EnableDiagnostics)
                 return;
 
-            var hasRelevantFvg =
-                directBullishFvg ||
-                directBearishFvg ||
-                priorBullishFvg ||
-                priorBearishFvg;
-
             var hasBreakout =
-                Close[1] > openingRangeHigh ||
-                Close[1] < openingRangeLow;
+                closesAboveRange ||
+                closesBelowRange;
 
-            // Avoid printing an irrelevant entry-model line on every bar.
-            if (!hasRelevantFvg && !hasBreakout)
+            if (!bullishFvg && !bearishFvg && !hasBreakout)
                 return;
 
             string result;
@@ -56,63 +49,73 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (validLong)
             {
                 result = "VALID LONG";
-
-                reason = directLongPattern
-                    ? "The completed FVG candle closed above the opening-range high."
-                    : "The candle immediately after an inside-range FVG closed above the opening-range high.";
+                reason = bullCrossesOrh
+                    ? "Bullish FVG crosses the opening-range high."
+                    : $"Bullish FVG is above ORH and within the maximum distance " +
+                      $"({bullDistanceTicks:0.##} ticks).";
             }
             else if (validShort)
             {
                 result = "VALID SHORT";
-
-                reason = directShortPattern
-                    ? "The completed FVG candle closed below the opening-range low."
-                    : "The candle immediately after an inside-range FVG closed below the opening-range low.";
+                reason = bearCrossesOrl
+                    ? "Bearish FVG crosses the opening-range low."
+                    : $"Bearish FVG is below ORL and within the maximum distance " +
+                      $"({bearDistanceTicks:0.##} ticks).";
             }
-            else if (directBullishFvg && Close[1] <= openingRangeHigh)
+            else if (bullishFvg && !closesAboveRange)
             {
                 result = "NO ENTRY";
-                reason = "Bullish FVG confirmed, but its candle did not close above the opening-range high.";
+                reason = "Bullish FVG exists, but its candle did not close above ORH.";
             }
-            else if (directBearishFvg && Close[1] >= openingRangeLow)
+            else if (bearishFvg && !closesBelowRange)
             {
                 result = "NO ENTRY";
-                reason = "Bearish FVG confirmed, but its candle did not close below the opening-range low.";
+                reason = "Bearish FVG exists, but its candle did not close below ORL.";
             }
-            else if ((directLongPattern || continuationLongPattern) &&
-                     MaxEntryDistanceFromRangeTicks > 0 &&
-                     longDistanceTicks > MaxEntryDistanceFromRangeTicks)
+            else if (bullishFvg &&
+                     !bullCrossesOrh &&
+                     !bullEntirelyAboveOrh)
             {
                 result = "NO ENTRY";
-
+                reason = "Bullish FVG formed inside the opening range.";
+            }
+            else if (bearishFvg &&
+                     !bearCrossesOrl &&
+                     !bearEntirelyBelowOrl)
+            {
+                result = "NO ENTRY";
+                reason = "Bearish FVG formed inside the opening range.";
+            }
+            else if (bullishFvg && !bullWithinDistance)
+            {
+                result = "NO ENTRY";
                 reason =
-                    $"Long breakout closed {longDistanceTicks:0.##} ticks above the range; " +
-                    $"maximum allowed is {MaxEntryDistanceFromRangeTicks} ticks.";
+                    $"Bullish FVG is too far above ORH: " +
+                    $"{bullDistanceTicks:0.##} ticks exceeds " +
+                    $"{MaxEntryDistanceFromRangeTicks} ticks.";
             }
-            else if ((directShortPattern || continuationShortPattern) &&
-                     MaxEntryDistanceFromRangeTicks > 0 &&
-                     shortDistanceTicks > MaxEntryDistanceFromRangeTicks)
+            else if (bearishFvg && !bearWithinDistance)
             {
                 result = "NO ENTRY";
-
                 reason =
-                    $"Short breakout closed {shortDistanceTicks:0.##} ticks below the range; " +
-                    $"maximum allowed is {MaxEntryDistanceFromRangeTicks} ticks.";
+                    $"Bearish FVG is too far below ORL: " +
+                    $"{bearDistanceTicks:0.##} ticks exceeds " +
+                    $"{MaxEntryDistanceFromRangeTicks} ticks.";
             }
-            else if (Close[1] > openingRangeHigh)
+            else if (!bullishFvg && closesAboveRange)
             {
                 result = "NO ENTRY";
-                reason = "The candle closed above the range, but no eligible bullish FVG pattern was present.";
+                reason = "Candle closed above ORH, but no eligible bullish FVG exists.";
             }
-            else if (Close[1] < openingRangeLow)
+            else if (!bearishFvg && closesBelowRange)
             {
                 result = "NO ENTRY";
-                reason = "The candle closed below the range, but no eligible bearish FVG pattern was present.";
+                reason = "Candle closed below ORL, but no eligible bearish FVG exists.";
             }
             else
             {
                 result = "NO ENTRY";
-                reason = "No completed FVG breakout was present.";
+                reason = "No eligible FVG breakout exists.";
             }
 
             LogDiag(
@@ -120,10 +123,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 $"Signal={signalBarTime:HH:mm:ss} | " +
                 $"EntryBar={decisionBarTime:HH:mm:ss} | " +
                 $"Close={Close[1]} | ORH={openingRangeHigh} | ORL={openingRangeLow} | " +
-                $"DirectBullFVG={directBullishFvg} | DirectBearFVG={directBearishFvg} | " +
-                $"PriorBullFVG={priorBullishFvg} | PriorBearFVG={priorBearishFvg} | " +
-                $"LongDistance={longDistanceTicks:0.##} ticks | " +
-                $"ShortDistance={shortDistanceTicks:0.##} ticks | " +
+                $"BullFVG={bullishFvg} | BearFVG={bearishFvg} | " +
+                $"BullDistance={bullDistanceTicks:0.##} ticks | " +
+                $"BearDistance={bearDistanceTicks:0.##} ticks | " +
                 $"Reason={reason}");
         }
         
@@ -139,136 +141,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastBlockDiagnosticKey = key;
 
             Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
-        }
-
-        private void LogEntryDiagnostic(
-            string side,
-            bool isSignal,
-            string decision,
-            string failReason,
-            double currentPrice,
-            bool priceOutsideRange,
-            bool fvgCandleOutsideRange,
-            bool fvgExists,
-            bool fvgCrossesRange,
-            bool fvgBeyondRange,
-            bool fvgWithinGapSize,
-            bool fvgWithinMaxDistance,
-            bool entryWithinMaxDistance,
-            double gapTicks,
-            double minGapTicks,
-            double maxGapTicks,
-            double fvgDistanceTicks,
-            double maxFvgDistanceTicks,
-            double entryDistanceTicks,
-            double maxEntryDistanceTicks,
-            double stopPrice,
-            double dailyPnl,
-            DateTime signalBarTime,
-            DateTime decisionBarTime)
-        {
-            if (!EnableDiagnostics)
-                return;
-
-            // Avoid tick-by-tick spam.
-            // Always print valid signals, otherwise print only once per bar.
-            if (!isSignal && lastDiagnosticBar == CurrentBar)
-                return;
-
-            lastDiagnosticBar = CurrentBar;
-
-            var sb = new StringBuilder(768);
-
-            sb.AppendLine(new string('-', 92));
-            sb.AppendLine($"[FVG DIAG] Signal={signalBarTime:HH:mm:ss} | Decision={decisionBarTime:HH:mm:ss} | {side} | {decision}");
-            sb.AppendLine($"  Reason: {failReason}");
-            sb.AppendLine($"  a) Opening Range");
-            sb.AppendLine($"     Range filter = {EnabledText(EnableRangeFilter)}");
-
-            if (EnableRangeFilter)
-            {
-                sb.AppendLine($"     OR High = {openingRangeHigh:0.00}");
-                sb.AppendLine($"     OR Low  = {openingRangeLow:0.00}");
-                sb.AppendLine($"     Current = {currentPrice:0.00}");
-                sb.AppendLine($"     Price outside range = {OkIcon(priceOutsideRange)}");
-                sb.AppendLine($"     FVG candle outside = {OkIcon(fvgCandleOutsideRange)}");
-            }
-            else
-            {
-                sb.AppendLine($"     Opening range checks bypassed.");
-                sb.AppendLine($"     Current = {currentPrice:0.00}");
-            }
-            
-            sb.AppendLine($"  b) FVG Structure");
-            sb.AppendLine($"     FVG exists          = {OkIcon(fvgExists)}");
-            sb.AppendLine($"     FVG crosses level   = {OkIcon(fvgCrossesRange)}");
-            sb.AppendLine($"     FVG beyond level    = {OkIcon(fvgBeyondRange)}");
-
-            sb.AppendLine($"  c) FVG Filters");
-            sb.AppendLine($"     Gap size            = {(fvgExists ? TicksText(gapTicks) : "N/A - no FVG")}");
-            sb.AppendLine($"     Min gap             = {TicksText(minGapTicks)}");
-            sb.AppendLine($"     Max gap             = {(MaxFvgGapTicks <= 0 ? "OFF" : TicksText(maxGapTicks))}");
-            sb.AppendLine($"     Gap within max      = {OkIcon(fvgWithinGapSize)}");
-            sb.AppendLine($"     FVG distance from range   = {TicksText(fvgDistanceTicks)}");
-            sb.AppendLine($"     FVG distance ok           = {OkIcon(fvgWithinMaxDistance)}");
-
-            sb.AppendLine($"     Entry distance from range = {TicksText(entryDistanceTicks)}");
-            sb.AppendLine($"     Max entry distance        = {(MaxEntryDistanceFromRangeTicks <= 0 ? "OFF" : TicksText(maxEntryDistanceTicks))}");
-            sb.AppendLine($"     Entry distance ok         = {OkIcon(entryWithinMaxDistance)}");
-
-            sb.AppendLine($"  d) Risk / State");
-            sb.AppendLine($"     Stop candidate      = {stopPrice:0.00}");
-            sb.AppendLine($"     Daily PnL           = {MoneyText(dailyPnl)}");
-            sb.AppendLine($"     Pending entry       = {pendingEntry}");
-            sb.AppendLine($"     Position            = {Position.MarketPosition}");
-
-            sb.AppendLine(new string('-', 92));
-
-            Print(sb.ToString());
-        }
-
-        private string BuildFvgFailReason(
-            bool priceOutsideRange,
-            bool fvgCandleOutsideRange,
-            bool fvgExists,
-            bool fvgCrossesRange,
-            bool fvgBeyondRange,
-            bool fvgWithinGapSize,
-            double gapTicks,
-            double maxGapTicks,
-            bool entryWithinMaxDistance,
-            double entryDistanceTicks,
-            double maxEntryDistanceTicks)
-        {
-            if (!priceOutsideRange)
-                return "Price has not moved outside the opening range.";
-
-            if (!fvgExists)
-                return "No valid 3-candle FVG exists.";
-
-            if (!fvgCandleOutsideRange)
-                return "Confirmed FVG candle is still inside the opening range.";
-
-            if (!fvgCrossesRange && !fvgBeyondRange)
-                return "FVG does not cross or sit beyond the opening-range level.";
-
-            if (!fvgWithinGapSize)
-            {
-                if (MaxFvgGapTicks > 0 && gapTicks > maxGapTicks)
-                    return $"FVG gap is too large: {gapTicks:0.##} ticks exceeds MaxFvgGapTicks {maxGapTicks:0.##}.";
-
-                return "FVG gap size failed min/max gap filter.";
-            }
-            
-            if (!entryWithinMaxDistance)
-            {
-                if (MaxEntryDistanceFromRangeTicks > 0 && entryDistanceTicks > maxEntryDistanceTicks)
-                    return $"Entry is too far from opening range: {entryDistanceTicks:0.##} ticks exceeds MaxEntryDistanceFromRangeTicks {maxEntryDistanceTicks:0.##}.";
-
-                return "Entry distance failed max-entry-distance filter.";
-            }
-
-            return "All filters passed.";
         }
     }
 }

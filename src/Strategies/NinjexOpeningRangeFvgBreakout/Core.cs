@@ -299,7 +299,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             LogDiag(
                 $"New trading day reset. Date={easternDate:yyyy-MM-dd}, DailyStartCumProfit={dailyStartCumProfit:0.00}");
             
-            lastDiagnosticBar = -1;
             lastBlockDiagnosticBar = -1;
             lastBlockDiagnosticKey = string.Empty;
         }

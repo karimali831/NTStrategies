@@ -85,13 +85,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // We need [4] to detect an FVG confirmed on candle [2].
-            if (CurrentBar < 5)
+            // [1] is the completed FVG candle and [3] is its reference candle.
+            if (CurrentBar < 3)
                 return;
-
-            var minGapPrice = MinFvgGapTicks * TickSize;
-            var maxGapPrice = MaxFvgGapTicks * TickSize;
-
+            
             /*
              * DIRECT FVG:
              *
@@ -144,25 +141,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 directBearMinGapPassed &&
                 directBearMaxGapPassed;
 
-            /*
-             * PRIOR-CANDLE FVG:
-             *
-             * This detects an FVG that completed on candle [2].
-             * Candle [1] is then allowed to be the one immediate breakout candle.
-             */
-            var priorBullGapPrice = Low[2] - High[4];
-            var priorBearGapPrice = Low[4] - High[2];
-
-            var priorBullishFvg =
-                Low[2] > High[4] &&
-                priorBullGapPrice >= minGapPrice &&
-                (MaxFvgGapTicks <= 0 || priorBullGapPrice <= maxGapPrice);
-
-            var priorBearishFvg =
-                High[2] < Low[4] &&
-                priorBearGapPrice >= minGapPrice &&
-                (MaxFvgGapTicks <= 0 || priorBearGapPrice <= maxGapPrice);
-
             // A breakout requires a close outside the range.
             var signalClosesAboveRange =
                 !EnableRangeFilter ||
@@ -171,85 +149,140 @@ namespace NinjaTrader.NinjaScript.Strategies
             var signalClosesBelowRange =
                 !EnableRangeFilter ||
                 Close[1] < openingRangeLow;
+            
+            // Bullish FVG boundaries:
+            // bottom = High[3]
+            // top    = Low[1]
+            var directBullGapBottom = High[3];
+            var directBullGapTop = Low[1];
 
-            // A continuation setup is only needed when the original FVG candle
-            // closed inside the opening range.
-            var priorBullFvgClosedInsideRange =
-                EnableRangeFilter &&
-                Close[2] <= openingRangeHigh;
+            // Bearish FVG boundaries:
+            // top    = Low[3]
+            // bottom = High[1]
+            var directBearGapTop = Low[3];
+            var directBearGapBottom = High[1];
 
-            var priorBearFvgClosedInsideRange =
-                EnableRangeFilter &&
-                Close[2] >= openingRangeLow;
+            // LONG FVG LOCATION
+            // Valid when the gap crosses ORH or is entirely above ORH.
+            var directBullFvgCrossesOpeningHigh =
+                !EnableRangeFilter ||
+                (directBullGapBottom <= openingRangeHigh &&
+                 directBullGapTop > openingRangeHigh);
 
+            var directBullFvgEntirelyAboveOpeningHigh =
+                !EnableRangeFilter ||
+                directBullGapBottom > openingRangeHigh;
+
+            // If the full gap is above ORH, measure from ORH to its nearest edge.
+            var directBullFvgDistanceTicks =
+                !EnableRangeFilter
+                    ? 0
+                    : Math.Max(
+                        0,
+                        (directBullGapBottom - openingRangeHigh) / TickSize);
+
+            var directBullFvgWithinMaxDistance =
+                !EnableRangeFilter ||
+                directBullFvgCrossesOpeningHigh ||
+                MaxEntryDistanceFromRangeTicks <= 0 ||
+                directBullFvgDistanceTicks <= MaxEntryDistanceFromRangeTicks;
+
+            var directBullFvgValidLocation =
+                !EnableRangeFilter ||
+                directBullFvgCrossesOpeningHigh ||
+                (directBullFvgEntirelyAboveOpeningHigh &&
+                 directBullFvgWithinMaxDistance);
+
+
+            // SHORT FVG LOCATION
+            // Valid when the gap crosses ORL or is entirely below ORL.
+            var directBearFvgCrossesOpeningLow =
+                !EnableRangeFilter ||
+                (directBearGapTop >= openingRangeLow &&
+                 directBearGapBottom < openingRangeLow);
+
+            var directBearFvgEntirelyBelowOpeningLow =
+                !EnableRangeFilter ||
+                directBearGapTop < openingRangeLow;
+
+            // If the full gap is below ORL, measure from ORL to its nearest edge.
+            var directBearFvgDistanceTicks =
+                !EnableRangeFilter
+                    ? 0
+                    : Math.Max(
+                        0,
+                        (openingRangeLow - directBearGapTop) / TickSize);
+
+            var directBearFvgWithinMaxDistance =
+                !EnableRangeFilter ||
+                directBearFvgCrossesOpeningLow ||
+                MaxEntryDistanceFromRangeTicks <= 0 ||
+                directBearFvgDistanceTicks <= MaxEntryDistanceFromRangeTicks;
+
+            var directBearFvgValidLocation =
+                !EnableRangeFilter ||
+                directBearFvgCrossesOpeningLow ||
+                (directBearFvgEntirelyBelowOpeningLow &&
+                 directBearFvgWithinMaxDistance);
+
+
+            // FINAL DIRECT PATTERNS
             var directLongPattern =
                 directBullishFvg &&
-                signalClosesAboveRange;
+                signalClosesAboveRange &&
+                directBullFvgValidLocation;
 
             var directShortPattern =
                 directBearishFvg &&
-                signalClosesBelowRange;
-
-            var continuationLongPattern =
-                priorBullishFvg &&
-                priorBullFvgClosedInsideRange &&
-                signalClosesAboveRange;
-
-            var continuationShortPattern =
-                priorBearishFvg &&
-                priorBearFvgClosedInsideRange &&
-                signalClosesBelowRange;
-
-            /*
-             * Distance is measured from the completed breakout candle's close.
-             * This makes the eligibility result stable and prevents the new
-             * candle's bid/ask movement from changing a confirmed signal.
-             */
-            var longDistanceTicks =
-                EnableRangeFilter
-                    ? Math.Max(0, (Close[1] - openingRangeHigh) / TickSize)
-                    : 0;
-
-            var shortDistanceTicks =
-                EnableRangeFilter
-                    ? Math.Max(0, (openingRangeLow - Close[1]) / TickSize)
-                    : 0;
-
-            var longWithinEntryDistance =
-                !EnableRangeFilter ||
-                MaxEntryDistanceFromRangeTicks <= 0 ||
-                longDistanceTicks <= MaxEntryDistanceFromRangeTicks;
-
-            var shortWithinEntryDistance =
-                !EnableRangeFilter ||
-                MaxEntryDistanceFromRangeTicks <= 0 ||
-                shortDistanceTicks <= MaxEntryDistanceFromRangeTicks;
-
-            var validLongFvg =
-                (directLongPattern || continuationLongPattern) &&
-                longWithinEntryDistance;
-
-            var validShortFvg =
-                (directShortPattern || continuationShortPattern) &&
-                shortWithinEntryDistance;
+                signalClosesBelowRange &&
+                directBearFvgValidLocation;
 
             var signalBarTime = ToEastern(Time[1]);
             
-            if (EnableDiagnostics)
+            if (EnableDiagnostics &&
+                (directBullishFvgExists || directBearishFvgExists))
             {
-                LogDiag(
-                    $"RAW FVG CHECK | " +
-                    $"Signal={signalBarTime:HH:mm:ss} | " +
-                    $"BearHigh[1]={High[1]} | " +
-                    $"BearReferenceLow[3]={Low[3]} | " +
-                    $"BearExists={directBearishFvgExists} | " +
-                    $"BearGap={directBearGapTicks:0.##} ticks | " +
-                    $"MinRequired={MinFvgGapTicks} | " +
-                    $"MinPassed={directBearMinGapPassed} | " +
-                    $"MaxAllowed={MaxFvgGapTicks} | " +
-                    $"MaxPassed={directBearMaxGapPassed} | " +
-                    $"BearEligible={directBearishFvg} | " +
-                    $"Close={Close[1]} | ORL={openingRangeLow}");
+                if (directBearishFvgExists)
+                {
+                    var bearLocation =
+                        directBearFvgCrossesOpeningLow
+                            ? "crosses ORL"
+                            : directBearFvgEntirelyBelowOpeningLow
+                                ? "below ORL"
+                                : "inside opening range";
+
+                    LogDiag(
+                        $"BEAR FVG LOCATION | " +
+                        $"Signal={signalBarTime:HH:mm:ss} | " +
+                        $"GapTop={directBearGapTop} | " +
+                        $"GapBottom={directBearGapBottom} | " +
+                        $"ORL={openingRangeLow} | " +
+                        $"Location={bearLocation} | " +
+                        $"Distance={directBearFvgDistanceTicks:0.##} ticks | " +
+                        $"MaxDistance={MaxEntryDistanceFromRangeTicks} | " +
+                        $"LocationEligible={directBearFvgValidLocation}");
+                }
+
+                if (directBullishFvgExists)
+                {
+                    var bullLocation =
+                        directBullFvgCrossesOpeningHigh
+                            ? "crosses ORH"
+                            : directBullFvgEntirelyAboveOpeningHigh
+                                ? "above ORH"
+                                : "inside opening range";
+
+                    LogDiag(
+                        $"BULL FVG LOCATION | " +
+                        $"Signal={signalBarTime:HH:mm:ss} | " +
+                        $"GapBottom={directBullGapBottom} | " +
+                        $"GapTop={directBullGapTop} | " +
+                        $"ORH={openingRangeHigh} | " +
+                        $"Location={bullLocation} | " +
+                        $"Distance={directBullFvgDistanceTicks:0.##} ticks | " +
+                        $"MaxDistance={MaxEntryDistanceFromRangeTicks} | " +
+                        $"LocationEligible={directBullFvgValidLocation}");
+                }
             }
 
             LogEntryModelDecision(
@@ -257,18 +290,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 decisionBarTime,
                 directBullishFvg,
                 directBearishFvg,
-                priorBullishFvg,
-                priorBearishFvg,
+                signalClosesAboveRange,
+                signalClosesBelowRange,
+                directBullFvgCrossesOpeningHigh,
+                directBearFvgCrossesOpeningLow,
+                directBullFvgEntirelyAboveOpeningHigh,
+                directBearFvgEntirelyBelowOpeningLow,
+                directBullFvgWithinMaxDistance,
+                directBearFvgWithinMaxDistance,
+                directBullFvgDistanceTicks,
+                directBearFvgDistanceTicks,
                 directLongPattern,
-                directShortPattern,
-                continuationLongPattern,
-                continuationShortPattern,
-                longDistanceTicks,
-                shortDistanceTicks,
-                validLongFvg,
-                validShortFvg);
+                directShortPattern);
 
-            if (validLongFvg)
+            if (directLongPattern)
             {
                 var approximateEntry = GetCurrentAsk();
 
@@ -291,19 +326,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pendingLong = true;
                 pendingStopPrice = activeStopPrice;
                 lastEntrySignalBar = CurrentBar;
-
-                var setupType =
-                    directLongPattern
-                        ? "direct FVG breakout"
-                        : "one-candle continuation breakout";
-
+                
                 LogDiag(
-                    $"LONG ENTRY SUBMITTED | Setup={setupType} | " +
+                    "LONG ENTRY SUBMITTED | " +
                     $"Signal={signalBarTime:HH:mm:ss} | " +
                     $"EntryBar={decisionBarTime:HH:mm:ss} | " +
                     $"SignalClose={Close[1]} | ORH={openingRangeHigh} | " +
-                    $"Distance={longDistanceTicks:0.##} ticks | " +
-                    $"Gap={(directLongPattern ? directBullGapPrice : priorBullGapPrice) / TickSize:0.##} ticks | " +
+                    $"Distance={directBullFvgDistanceTicks:0.##} ticks | " +
+                    $"Gap={directBullGapPrice / TickSize:0.##} ticks | " +
                     $"ApproxEntry={approximateEntry} | Stop={activeStopPrice} | " +
                     $"Target={activeTargetPrice}.");
 
@@ -311,7 +341,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (validShortFvg)
+            if (directShortPattern)
             {
                 var approximateEntry = GetCurrentBid();
 
@@ -334,19 +364,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pendingLong = false;
                 pendingStopPrice = activeStopPrice;
                 lastEntrySignalBar = CurrentBar;
-
-                var setupType =
-                    directShortPattern
-                        ? "direct FVG breakout"
-                        : "one-candle continuation breakout";
-
+                
                 LogDiag(
-                    $"SHORT ENTRY SUBMITTED | Setup={setupType} | " +
+                    "SHORT ENTRY SUBMITTED | " +
                     $"Signal={signalBarTime:HH:mm:ss} | " +
                     $"EntryBar={decisionBarTime:HH:mm:ss} | " +
                     $"SignalClose={Close[1]} | ORL={openingRangeLow} | " +
-                    $"Distance={shortDistanceTicks:0.##} ticks | " +
-                    $"Gap={(directShortPattern ? directBearGapPrice : priorBearGapPrice) / TickSize:0.##} ticks | " +
+                    $"Distance={directBearFvgDistanceTicks:0.##} ticks | " +
+                    $"Gap={directBearGapPrice / TickSize:0.##} ticks | " +
                     $"ApproxEntry={approximateEntry} | Stop={activeStopPrice} | " +
                     $"Target={activeTargetPrice}.");
 
