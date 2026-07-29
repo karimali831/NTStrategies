@@ -106,15 +106,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             var directBullGapPrice = Low[1] - High[3];
             var directBearGapPrice = Low[3] - High[1];
 
+            var directBullGapTicks = directBullGapPrice / TickSize;
+            var directBearGapTicks = directBearGapPrice / TickSize;
+
+            // Match the indicator's structural tests exactly.
+            var directBullishFvgExists =
+                Low[1] > High[3];
+
+            var directBearishFvgExists =
+                High[1] < Low[3];
+
+            var directBullMinGapPassed =
+                directBullishFvgExists &&
+                directBullGapTicks >= MinFvgGapTicks;
+
+            var directBearMinGapPassed =
+                directBearishFvgExists &&
+                directBearGapTicks >= MinFvgGapTicks;
+
+            var directBullMaxGapPassed =
+                directBullishFvgExists &&
+                (MaxFvgGapTicks <= 0 ||
+                 directBullGapTicks <= MaxFvgGapTicks);
+
+            var directBearMaxGapPassed =
+                directBearishFvgExists &&
+                (MaxFvgGapTicks <= 0 ||
+                 directBearGapTicks <= MaxFvgGapTicks);
+
             var directBullishFvg =
-                Low[1] > High[3] &&
-                directBullGapPrice >= minGapPrice &&
-                (MaxFvgGapTicks <= 0 || directBullGapPrice <= maxGapPrice);
+                directBullishFvgExists &&
+                directBullMinGapPassed &&
+                directBullMaxGapPassed;
 
             var directBearishFvg =
-                High[1] < Low[3] &&
-                directBearGapPrice >= minGapPrice &&
-                (MaxFvgGapTicks <= 0 || directBearGapPrice <= maxGapPrice);
+                directBearishFvgExists &&
+                directBearMinGapPassed &&
+                directBearMaxGapPassed;
 
             /*
              * PRIOR-CANDLE FVG:
@@ -206,6 +234,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 shortWithinEntryDistance;
 
             var signalBarTime = ToEastern(Time[1]);
+            
+            if (EnableDiagnostics)
+            {
+                LogDiag(
+                    $"RAW FVG CHECK | " +
+                    $"Signal={signalBarTime:HH:mm:ss} | " +
+                    $"BearHigh[1]={High[1]} | " +
+                    $"BearReferenceLow[3]={Low[3]} | " +
+                    $"BearExists={directBearishFvgExists} | " +
+                    $"BearGap={directBearGapTicks:0.##} ticks | " +
+                    $"MinRequired={MinFvgGapTicks} | " +
+                    $"MinPassed={directBearMinGapPassed} | " +
+                    $"MaxAllowed={MaxFvgGapTicks} | " +
+                    $"MaxPassed={directBearMaxGapPassed} | " +
+                    $"BearEligible={directBearishFvg} | " +
+                    $"Close={Close[1]} | ORL={openingRangeLow}");
+            }
 
             LogEntryModelDecision(
                 signalBarTime,
