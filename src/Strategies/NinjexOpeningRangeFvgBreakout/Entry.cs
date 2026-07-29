@@ -11,16 +11,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (!openingRangeComplete)
                 {
-                    LogDiagOncePerBar("OR_NOT_COMPLETE", "Blocked: opening range not complete.");
+                    LogDiagOncePerBar(
+                        "OR_NOT_COMPLETE",
+                        "Entry blocked: the opening range is not complete.");
+
                     return;
                 }
 
                 if (!IsOpeningRangeValid())
                 {
+                    var rangeTicks =
+                        openingRangeHigh > openingRangeLow
+                            ? (openingRangeHigh - openingRangeLow) / TickSize
+                            : 0;
+
                     LogDiagOncePerBar(
                         "INVALID_OR",
-                        $"Blocked: invalid opening range. ORH={openingRangeHigh}, ORL={openingRangeLow}, " +
-                        $"RangeTicks={(openingRangeHigh - openingRangeLow) / TickSize}");
+                        $"Entry blocked: opening range is invalid. " +
+                        $"High={openingRangeHigh}, Low={openingRangeLow}, " +
+                        $"Size={rangeTicks:0.##} ticks, Minimum={MinOpeningRangeTicks} ticks.");
 
                     return;
                 }
@@ -28,17 +37,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!printedRangeComplete)
                 {
                     printedRangeComplete = true;
-                    LogDiag($"Opening range complete. High={openingRangeHigh}, Low={openingRangeLow}");
+
+                    LogDiag(
+                        $"Opening range ready. " +
+                        $"High={openingRangeHigh}, Low={openingRangeLow}, " +
+                        $"Size={(openingRangeHigh - openingRangeLow) / TickSize:0.##} ticks.");
                 }
             }
-            
-            var easternBarTime = ToEastern(Time[0]);
 
-            if (!IsInsideEntryWindow(easternBarTime))
+            var decisionBarTime = ToEastern(Time[0]);
+
+            if (!IsInsideEntryWindow(decisionBarTime))
             {
                 LogDiagOncePerBar(
                     "OUTSIDE_ENTRY_WINDOW",
-                    $"Blocked: outside entry window. Time={easternBarTime:HH:mm:ss}");
+                    $"No entry check: {decisionBarTime:HH:mm:ss} is outside the " +
+                    $"{EntryStartTime:000000}-{EntryEndTime:000000} entry window.");
 
                 return;
             }
@@ -47,14 +61,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 LogDiagOncePerBar(
                     "DAILY_PNL_LIMIT",
-                    $"Blocked: daily PnL limit reached. DailyPnL={GetDailyTotalPnl():0.00}");
+                    $"Entry blocked: daily PnL limit reached. " +
+                    $"DailyPnL={GetDailyTotalPnl():0.00}.");
 
                 return;
             }
 
             if (pendingEntry)
             {
-                LogDiagOncePerBar("PENDING_ENTRY", "Blocked: pending entry already active.");
+                LogDiagOncePerBar(
+                    "PENDING_ENTRY",
+                    "Entry blocked: an entry order is already pending.");
+
                 return;
             }
 
@@ -62,343 +80,188 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 LogDiagOncePerBar(
                     "POSITION_NOT_FLAT",
-                    $"Blocked: position not flat. Position={Position.MarketPosition}");
+                    $"Entry blocked: strategy position is {Position.MarketPosition}.");
 
                 return;
             }
 
+            // We need [4] to detect an FVG confirmed on candle [2].
             if (CurrentBar < 5)
                 return;
 
-            var minGap = MinFvgGapTicks * TickSize;
-            var maxGap = MaxFvgGapTicks * TickSize;
+            var minGapPrice = MinFvgGapTicks * TickSize;
+            var maxGapPrice = MaxFvgGapTicks * TickSize;
 
-            var minDistance = MinFvgDistanceFromRangeTicks * TickSize;
-            var maxDistance = MaxFvgDistanceFromRangeTicks * TickSize;
+            /*
+             * DIRECT FVG:
+             *
+             * The indicator detects a completed FVG using:
+             *   Bullish: Low[0] > High[2]
+             *   Bearish: High[0] < Low[2]
+             *
+             * Because this method runs on IsFirstTickOfBar:
+             *   [1] is the candle that just closed.
+             *   [3] is the first candle of its three-candle FVG structure.
+             */
+            var directBullGapPrice = Low[1] - High[3];
+            var directBearGapPrice = Low[3] - High[1];
 
-            // CONFIRMED FVG MODEL:
-            // This method is called on IsFirstTickOfBar.
-            // [1] = candle that just closed and confirmed the FVG
-            // [2] = middle candle
-            // [3] = first candle of the 3-candle FVG structure
-            //
-            // Entry is submitted immediately on the next candle after the FVG confirms.
-            var bullishFvg =
+            var directBullishFvg =
                 Low[1] > High[3] &&
-                (Low[1] - High[3]) >= minGap;
+                directBullGapPrice >= minGapPrice &&
+                (MaxFvgGapTicks <= 0 || directBullGapPrice <= maxGapPrice);
 
-            var bearishFvg =
+            var directBearishFvg =
                 High[1] < Low[3] &&
-                (Low[3] - High[1]) >= minGap;
+                directBearGapPrice >= minGapPrice &&
+                (MaxFvgGapTicks <= 0 || directBearGapPrice <= maxGapPrice);
 
-            // Bullish FVG gap:
-            // lower boundary = High[3]
-            // upper boundary = Low[1]
-            var bullGapBottom = High[3];
-            var bullGapTop = Low[1];
+            /*
+             * PRIOR-CANDLE FVG:
+             *
+             * This detects an FVG that completed on candle [2].
+             * Candle [1] is then allowed to be the one immediate breakout candle.
+             */
+            var priorBullGapPrice = Low[2] - High[4];
+            var priorBearGapPrice = Low[4] - High[2];
 
-            // Bearish FVG gap:
-            // upper boundary = Low[3]
-            // lower boundary = High[1]
-            var bearGapTop = Low[3];
-            var bearGapBottom = High[1];
+            var priorBullishFvg =
+                Low[2] > High[4] &&
+                priorBullGapPrice >= minGapPrice &&
+                (MaxFvgGapTicks <= 0 || priorBullGapPrice <= maxGapPrice);
 
-            var bullGapSize = bullGapTop - bullGapBottom;
-            var bearGapSize = bearGapTop - bearGapBottom;
+            var priorBearishFvg =
+                High[2] < Low[4] &&
+                priorBearGapPrice >= minGapPrice &&
+                (MaxFvgGapTicks <= 0 || priorBearGapPrice <= maxGapPrice);
 
-            var bullishFvgWithinGapSize =
-                bullishFvg &&
-                (MaxFvgGapTicks <= 0 || bullGapSize <= maxGap);
-
-            var bearishFvgWithinGapSize =
-                bearishFvg &&
-                (MaxFvgGapTicks <= 0 || bearGapSize <= maxGap);
-
-            var bullishFvgDistanceFromOpeningHigh = EnableRangeFilter
-                ? Math.Max(0, bullGapBottom - openingRangeHigh)
-                : 0;
-
-            var bearishFvgDistanceFromOpeningLow = EnableRangeFilter
-                ? Math.Max(0, openingRangeLow - bearGapTop)
-                : 0;
-
-            var bullishFvgWithinMaxDistance =
+            // A breakout requires a close outside the range.
+            var signalClosesAboveRange =
                 !EnableRangeFilter ||
-                MaxFvgDistanceFromRangeTicks <= 0 ||
-                bullishFvgDistanceFromOpeningHigh <= maxDistance;
+                Close[1] > openingRangeHigh;
 
-            var bearishFvgWithinMaxDistance =
+            var signalClosesBelowRange =
                 !EnableRangeFilter ||
-                MaxFvgDistanceFromRangeTicks <= 0 ||
-                bearishFvgDistanceFromOpeningLow <= maxDistance;
+                Close[1] < openingRangeLow;
 
-            // Valid long if:
-            // 1. Current price is above OR high.
-            // AND
-            // 2. FVG crosses OR high: bottom <= ORH and top >= ORH
-            // OR full FVG is above OR high, respecting MinFvgDistanceFromRangeTicks.
-            var bullishFvgCrossesOpeningHigh =
-                !EnableRangeFilter ||
-                (bullishFvg &&
-                 bullGapBottom <= openingRangeHigh &&
-                 bullGapTop >= openingRangeHigh);
+            // A continuation setup is only needed when the original FVG candle
+            // closed inside the opening range.
+            var priorBullFvgClosedInsideRange =
+                EnableRangeFilter &&
+                Close[2] <= openingRangeHigh;
 
-            var bullishFvgAboveOpeningHigh =
-                !EnableRangeFilter ||
-                (bullishFvg &&
-                bullGapBottom >= openingRangeHigh + minDistance);
+            var priorBearFvgClosedInsideRange =
+                EnableRangeFilter &&
+                Close[2] >= openingRangeLow;
 
-            // Directional price gates.
-            // These force the live entry to respect the opening range boundary.
-            var currentLongPrice = GetCurrentAsk();
-            if (currentLongPrice <= 0)
-                currentLongPrice = Close[0];
+            var directLongPattern =
+                directBullishFvg &&
+                signalClosesAboveRange;
 
-            var currentShortPrice = GetCurrentBid();
-            if (currentShortPrice <= 0)
-                currentShortPrice = Close[0];
-            
-            var longEntryDistanceFromRangeTicks = EnableRangeFilter
-                ? Math.Max(0, (currentLongPrice - openingRangeHigh) / TickSize)
-                : 0;
+            var directShortPattern =
+                directBearishFvg &&
+                signalClosesBelowRange;
 
-            var shortEntryDistanceFromRangeTicks = EnableRangeFilter
-                ? Math.Max(0, (openingRangeLow - currentShortPrice) / TickSize)
-                : 0;
+            var continuationLongPattern =
+                priorBullishFvg &&
+                priorBullFvgClosedInsideRange &&
+                signalClosesAboveRange;
 
-            var longEntryWithinMaxDistance =
+            var continuationShortPattern =
+                priorBearishFvg &&
+                priorBearFvgClosedInsideRange &&
+                signalClosesBelowRange;
+
+            /*
+             * Distance is measured from the completed breakout candle's close.
+             * This makes the eligibility result stable and prevents the new
+             * candle's bid/ask movement from changing a confirmed signal.
+             */
+            var longDistanceTicks =
+                EnableRangeFilter
+                    ? Math.Max(0, (Close[1] - openingRangeHigh) / TickSize)
+                    : 0;
+
+            var shortDistanceTicks =
+                EnableRangeFilter
+                    ? Math.Max(0, (openingRangeLow - Close[1]) / TickSize)
+                    : 0;
+
+            var longWithinEntryDistance =
                 !EnableRangeFilter ||
                 MaxEntryDistanceFromRangeTicks <= 0 ||
-                longEntryDistanceFromRangeTicks <= MaxEntryDistanceFromRangeTicks;
+                longDistanceTicks <= MaxEntryDistanceFromRangeTicks;
 
-            var shortEntryWithinMaxDistance =
+            var shortWithinEntryDistance =
                 !EnableRangeFilter ||
                 MaxEntryDistanceFromRangeTicks <= 0 ||
-                shortEntryDistanceFromRangeTicks <= MaxEntryDistanceFromRangeTicks;
-
-            var priceAboveOpeningHigh =
-                !EnableRangeFilter || currentLongPrice > openingRangeHigh;
-
-            var priceBelowOpeningLow =
-                !EnableRangeFilter || currentShortPrice < openingRangeLow;
-
-            var fvgCandleLongOutsideRange =
-                !EnableRangeFilter || Low[1] > openingRangeHigh;
-
-            var fvgCandleShortOutsideRange =
-                !EnableRangeFilter || High[1] < openingRangeLow;
+                shortDistanceTicks <= MaxEntryDistanceFromRangeTicks;
 
             var validLongFvg =
-                bullishFvg &&
-                priceAboveOpeningHigh &&
-                fvgCandleLongOutsideRange &&
-                (bullishFvgCrossesOpeningHigh || bullishFvgAboveOpeningHigh) &&
-                bullishFvgWithinGapSize &&
-                bullishFvgWithinMaxDistance &&
-                longEntryWithinMaxDistance;
-            
-            // Valid short if:
-            // 1. FVG crosses OR low: top >= ORL and bottom <= ORL
-            // OR
-            // 2. Full FVG is below OR low, respecting MinFvgDistanceFromRangeTicks.
-            // AND current price is below OR low.
-            var bearishFvgCrossesOpeningLow =
-                !EnableRangeFilter ||
-                (bearishFvg &&
-                bearGapTop >= openingRangeLow &&
-                bearGapBottom <= openingRangeLow);
-
-            var bearishFvgBelowOpeningLow =
-                !EnableRangeFilter ||
-                (bearishFvg &&
-                bearGapTop <= openingRangeLow - minDistance);
+                (directLongPattern || continuationLongPattern) &&
+                longWithinEntryDistance;
 
             var validShortFvg =
-                bearishFvg &&
-                priceBelowOpeningLow &&
-                fvgCandleShortOutsideRange &&
-                (bearishFvgCrossesOpeningLow || bearishFvgBelowOpeningLow) &&
-                bearishFvgWithinGapSize &&
-                bearishFvgWithinMaxDistance &&
-                shortEntryWithinMaxDistance;
-
-            var bullGapTicks = bullGapSize / TickSize;
-            var bearGapTicks = bearGapSize / TickSize;
-
-            var bullDistanceTicks = bullishFvgDistanceFromOpeningHigh / TickSize;
-            var bearDistanceTicks = bearishFvgDistanceFromOpeningLow / TickSize;
-
-            var maxGapTicks = MaxFvgGapTicks;
-            var maxDistanceTicks = MaxFvgDistanceFromRangeTicks;
-            var maxEntryDistanceTicks = MaxEntryDistanceFromRangeTicks;
+                (directShortPattern || continuationShortPattern) &&
+                shortWithinEntryDistance;
 
             var signalBarTime = ToEastern(Time[1]);
-            var decisionBarTime = ToEastern(Time[0]);
 
-            var longFailReason = BuildFvgFailReason(
-                priceAboveOpeningHigh,
-                fvgCandleLongOutsideRange,
-                bullishFvg,
-                bullishFvgCrossesOpeningHigh,
-                bullishFvgAboveOpeningHigh,
-                bullishFvgWithinGapSize,
-                bullishFvgWithinMaxDistance,
-                bullGapTicks,
-                maxGapTicks,
-                bullDistanceTicks,
-                maxDistanceTicks,
-                longEntryWithinMaxDistance,
-                longEntryDistanceFromRangeTicks,
-                maxEntryDistanceTicks);
-
-            var shortFailReason = BuildFvgFailReason(
-                priceBelowOpeningLow,
-                fvgCandleShortOutsideRange,
-                bearishFvg,
-                bearishFvgCrossesOpeningLow,
-                bearishFvgBelowOpeningLow,
-                bearishFvgWithinGapSize,
-                bearishFvgWithinMaxDistance,
-                bearGapTicks,
-                maxGapTicks,
-                bearDistanceTicks,
-                maxDistanceTicks,
-                shortEntryWithinMaxDistance,
-                shortEntryDistanceFromRangeTicks,
-                maxEntryDistanceTicks);
-
-            if (validLongFvg)
-            {
-                LogEntryDiagnostic(
-                    "LONG",
-                    true,
-                    "VALID ENTRY",
-                    longFailReason,
-                    currentLongPrice,
-                    priceAboveOpeningHigh,
-                    fvgCandleLongOutsideRange,
-                    bullishFvg,
-                    bullishFvgCrossesOpeningHigh,
-                    bullishFvgAboveOpeningHigh,
-                    bullishFvgWithinGapSize,
-                    bullishFvgWithinMaxDistance,
-                    longEntryWithinMaxDistance,
-                    bullGapTicks,
-                    MinFvgGapTicks,
-                    maxGapTicks,
-                    bullDistanceTicks,
-                    maxDistanceTicks,
-                    longEntryDistanceFromRangeTicks,
-                    maxEntryDistanceTicks,
-                    Low[1],
-                    GetDailyTotalPnl(),
-                    signalBarTime,
-                    decisionBarTime);
-            }
-            else if (validShortFvg)
-            {
-                LogEntryDiagnostic(
-                    "SHORT",
-                    true,
-                    "VALID ENTRY",
-                    shortFailReason,
-                    currentShortPrice,
-                    priceBelowOpeningLow,
-                    fvgCandleShortOutsideRange,
-                    bearishFvg,
-                    bearishFvgCrossesOpeningLow,
-                    bearishFvgBelowOpeningLow,
-                    bearishFvgWithinGapSize,
-                    bearishFvgWithinMaxDistance,
-                    shortEntryWithinMaxDistance,
-                    bearGapTicks,
-                    MinFvgGapTicks,
-                    maxGapTicks,
-                    bearDistanceTicks,
-                    maxDistanceTicks,
-                    shortEntryDistanceFromRangeTicks,
-                    maxEntryDistanceTicks,
-                    High[1],
-                    GetDailyTotalPnl(),
-                    signalBarTime,
-                    decisionBarTime);
-            }
-            else if (priceAboveOpeningHigh || bullishFvg)
-            {
-                LogEntryDiagnostic(
-                    "LONG",
-                    false,
-                    "NO ENTRY",
-                    longFailReason,
-                    currentLongPrice,
-                    priceAboveOpeningHigh,
-                    fvgCandleLongOutsideRange,
-                    bullishFvg,
-                    bullishFvgCrossesOpeningHigh,
-                    bullishFvgAboveOpeningHigh,
-                    bullishFvgWithinGapSize,
-                    bullishFvgWithinMaxDistance,
-                    longEntryWithinMaxDistance,
-                    bullGapTicks,
-                    MinFvgGapTicks,
-                    maxGapTicks,
-                    bullDistanceTicks,
-                    maxDistanceTicks,
-                    longEntryDistanceFromRangeTicks,
-                    maxEntryDistanceTicks,
-                    Low[1],
-                    GetDailyTotalPnl(),
-                    signalBarTime,
-                    decisionBarTime);
-            }
-            else if (priceBelowOpeningLow || bearishFvg)
-            {
-                LogEntryDiagnostic(
-                    "SHORT",
-                    false,
-                    "NO ENTRY",
-                    shortFailReason,
-                    currentShortPrice,
-                    priceBelowOpeningLow,
-                    fvgCandleShortOutsideRange,
-                    bearishFvg,
-                    bearishFvgCrossesOpeningLow,
-                    bearishFvgBelowOpeningLow,
-                    bearishFvgWithinGapSize,
-                    bearishFvgWithinMaxDistance,
-                    shortEntryWithinMaxDistance,
-                    bearGapTicks,
-                    MinFvgGapTicks,
-                    maxGapTicks,
-                    bearDistanceTicks,
-                    maxDistanceTicks,
-                    shortEntryDistanceFromRangeTicks,
-                    maxEntryDistanceTicks,
-                    High[1],
-                    GetDailyTotalPnl(),
-                    signalBarTime,
-                    decisionBarTime);
-            }
+            LogEntryModelDecision(
+                signalBarTime,
+                decisionBarTime,
+                directBullishFvg,
+                directBearishFvg,
+                priorBullishFvg,
+                priorBearishFvg,
+                directLongPattern,
+                directShortPattern,
+                continuationLongPattern,
+                continuationShortPattern,
+                longDistanceTicks,
+                shortDistanceTicks,
+                validLongFvg,
+                validShortFvg);
 
             if (validLongFvg)
             {
                 var approximateEntry = GetCurrentAsk();
+
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Confirmed model:
-                // If MaxStopTicks > 0, PrepareLongManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the low of the confirmed FVG candle.
+                // Stop belongs to the completed breakout/signal candle.
                 var candleStop = Low[1];
 
                 if (!PrepareLongManagedBracket(approximateEntry, candleStop))
+                {
+                    LogDiag(
+                        $"LONG entry rejected by bracket validation. " +
+                        $"ApproxEntry={approximateEntry}, SignalLow={candleStop}.");
+
                     return;
+                }
 
                 pendingEntry = true;
                 pendingLong = true;
+                pendingStopPrice = activeStopPrice;
                 lastEntrySignalBar = CurrentBar;
 
-                LogDiag($"LONG submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
+                var setupType =
+                    directLongPattern
+                        ? "direct FVG breakout"
+                        : "one-candle continuation breakout";
+
+                LogDiag(
+                    $"LONG ENTRY SUBMITTED | Setup={setupType} | " +
+                    $"Signal={signalBarTime:HH:mm:ss} | " +
+                    $"EntryBar={decisionBarTime:HH:mm:ss} | " +
+                    $"SignalClose={Close[1]} | ORH={openingRangeHigh} | " +
+                    $"Distance={longDistanceTicks:0.##} ticks | " +
+                    $"Gap={(directLongPattern ? directBullGapPrice : priorBullGapPrice) / TickSize:0.##} ticks | " +
+                    $"ApproxEntry={approximateEntry} | Stop={activeStopPrice} | " +
+                    $"Target={activeTargetPrice}.");
+
                 EnterLong(Quantity, LongEntryName);
                 return;
             }
@@ -406,26 +269,46 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (validShortFvg)
             {
                 var approximateEntry = GetCurrentBid();
+
                 if (approximateEntry <= 0)
                     approximateEntry = Close[0];
 
-                // Confirmed model:
-                // If MaxStopTicks > 0, PrepareShortManagedBracket uses fixed max stop.
-                // If MaxStopTicks == 0, use the high of the confirmed FVG candle.
+                // Stop belongs to the completed breakout/signal candle.
                 var candleStop = High[1];
 
                 if (!PrepareShortManagedBracket(approximateEntry, candleStop))
+                {
+                    LogDiag(
+                        $"SHORT entry rejected by bracket validation. " +
+                        $"ApproxEntry={approximateEntry}, SignalHigh={candleStop}.");
+
                     return;
+                }
 
                 pendingEntry = true;
                 pendingLong = false;
+                pendingStopPrice = activeStopPrice;
                 lastEntrySignalBar = CurrentBar;
 
-                LogDiag($"SHORT submitted. ApproxEntry={approximateEntry}, Stop={activeStopPrice}, Target={activeTargetPrice}");
+                var setupType =
+                    directShortPattern
+                        ? "direct FVG breakout"
+                        : "one-candle continuation breakout";
+
+                LogDiag(
+                    $"SHORT ENTRY SUBMITTED | Setup={setupType} | " +
+                    $"Signal={signalBarTime:HH:mm:ss} | " +
+                    $"EntryBar={decisionBarTime:HH:mm:ss} | " +
+                    $"SignalClose={Close[1]} | ORL={openingRangeLow} | " +
+                    $"Distance={shortDistanceTicks:0.##} ticks | " +
+                    $"Gap={(directShortPattern ? directBearGapPrice : priorBearGapPrice) / TickSize:0.##} ticks | " +
+                    $"ApproxEntry={approximateEntry} | Stop={activeStopPrice} | " +
+                    $"Target={activeTargetPrice}.");
+
                 EnterShort(Quantity, ShortEntryName);
             }
         }
-
+       
         private bool CanTradeToday()
         {
             return !dailyPnlLimitHit;

@@ -67,16 +67,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 1000)]
         [Display(Name = "Max FVG Gap Ticks", GroupName = "FVG", Order = 21)]
         public int MaxFvgGapTicks { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, 100)]
-        [Display(Name = "Min FVG Distance From Range Ticks", GroupName = "FVG", Order = 22)]
-        public int MinFvgDistanceFromRangeTicks { get; set; }
-        
-        [NinjaScriptProperty]
-        [Range(0, 1000)]
-        [Display(Name = "Max FVG Distance From Range Ticks", GroupName = "FVG", Order = 23)]
-        public int MaxFvgDistanceFromRangeTicks { get; set; }
         
         [NinjaScriptProperty]
         [Display(Name = "Convert Chart Time To Eastern", GroupName = "Time", Order = 30)]

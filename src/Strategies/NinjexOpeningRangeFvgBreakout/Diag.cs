@@ -17,6 +17,116 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print($"{Time[0]:yyyy-MM-dd HH:mm:ss} | {Name} | {message}");
         }
         
+        private void LogEntryModelDecision(
+            DateTime signalBarTime,
+            DateTime decisionBarTime,
+            bool directBullishFvg,
+            bool directBearishFvg,
+            bool priorBullishFvg,
+            bool priorBearishFvg,
+            bool directLongPattern,
+            bool directShortPattern,
+            bool continuationLongPattern,
+            bool continuationShortPattern,
+            double longDistanceTicks,
+            double shortDistanceTicks,
+            bool validLong,
+            bool validShort)
+        {
+            if (!EnableDiagnostics)
+                return;
+
+            var hasRelevantFvg =
+                directBullishFvg ||
+                directBearishFvg ||
+                priorBullishFvg ||
+                priorBearishFvg;
+
+            var hasBreakout =
+                Close[1] > openingRangeHigh ||
+                Close[1] < openingRangeLow;
+
+            // Avoid printing an irrelevant entry-model line on every bar.
+            if (!hasRelevantFvg && !hasBreakout)
+                return;
+
+            string result;
+            string reason;
+
+            if (validLong)
+            {
+                result = "VALID LONG";
+
+                reason = directLongPattern
+                    ? "The completed FVG candle closed above the opening-range high."
+                    : "The candle immediately after an inside-range FVG closed above the opening-range high.";
+            }
+            else if (validShort)
+            {
+                result = "VALID SHORT";
+
+                reason = directShortPattern
+                    ? "The completed FVG candle closed below the opening-range low."
+                    : "The candle immediately after an inside-range FVG closed below the opening-range low.";
+            }
+            else if (directBullishFvg && Close[1] <= openingRangeHigh)
+            {
+                result = "NO ENTRY";
+                reason = "Bullish FVG confirmed, but its candle did not close above the opening-range high.";
+            }
+            else if (directBearishFvg && Close[1] >= openingRangeLow)
+            {
+                result = "NO ENTRY";
+                reason = "Bearish FVG confirmed, but its candle did not close below the opening-range low.";
+            }
+            else if ((directLongPattern || continuationLongPattern) &&
+                     MaxEntryDistanceFromRangeTicks > 0 &&
+                     longDistanceTicks > MaxEntryDistanceFromRangeTicks)
+            {
+                result = "NO ENTRY";
+
+                reason =
+                    $"Long breakout closed {longDistanceTicks:0.##} ticks above the range; " +
+                    $"maximum allowed is {MaxEntryDistanceFromRangeTicks} ticks.";
+            }
+            else if ((directShortPattern || continuationShortPattern) &&
+                     MaxEntryDistanceFromRangeTicks > 0 &&
+                     shortDistanceTicks > MaxEntryDistanceFromRangeTicks)
+            {
+                result = "NO ENTRY";
+
+                reason =
+                    $"Short breakout closed {shortDistanceTicks:0.##} ticks below the range; " +
+                    $"maximum allowed is {MaxEntryDistanceFromRangeTicks} ticks.";
+            }
+            else if (Close[1] > openingRangeHigh)
+            {
+                result = "NO ENTRY";
+                reason = "The candle closed above the range, but no eligible bullish FVG pattern was present.";
+            }
+            else if (Close[1] < openingRangeLow)
+            {
+                result = "NO ENTRY";
+                reason = "The candle closed below the range, but no eligible bearish FVG pattern was present.";
+            }
+            else
+            {
+                result = "NO ENTRY";
+                reason = "No completed FVG breakout was present.";
+            }
+
+            LogDiag(
+                $"ENTRY CHECK | Result={result} | " +
+                $"Signal={signalBarTime:HH:mm:ss} | " +
+                $"EntryBar={decisionBarTime:HH:mm:ss} | " +
+                $"Close={Close[1]} | ORH={openingRangeHigh} | ORL={openingRangeLow} | " +
+                $"DirectBullFVG={directBullishFvg} | DirectBearFVG={directBearishFvg} | " +
+                $"PriorBullFVG={priorBullishFvg} | PriorBearFVG={priorBearishFvg} | " +
+                $"LongDistance={longDistanceTicks:0.##} ticks | " +
+                $"ShortDistance={shortDistanceTicks:0.##} ticks | " +
+                $"Reason={reason}");
+        }
+        
         private void LogDiagOncePerBar(string key, string message)
         {
             if (!EnableDiagnostics)
@@ -100,7 +210,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine($"     Max gap             = {(MaxFvgGapTicks <= 0 ? "OFF" : TicksText(maxGapTicks))}");
             sb.AppendLine($"     Gap within max      = {OkIcon(fvgWithinGapSize)}");
             sb.AppendLine($"     FVG distance from range   = {TicksText(fvgDistanceTicks)}");
-            sb.AppendLine($"     Max FVG distance          = {(MaxFvgDistanceFromRangeTicks <= 0 ? "OFF" : TicksText(maxFvgDistanceTicks))}");
             sb.AppendLine($"     FVG distance ok           = {OkIcon(fvgWithinMaxDistance)}");
 
             sb.AppendLine($"     Entry distance from range = {TicksText(entryDistanceTicks)}");
@@ -125,11 +234,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool fvgCrossesRange,
             bool fvgBeyondRange,
             bool fvgWithinGapSize,
-            bool fvgWithinMaxDistance,
             double gapTicks,
             double maxGapTicks,
-            double fvgDistanceTicks,
-            double maxFvgDistanceTicks,
             bool entryWithinMaxDistance,
             double entryDistanceTicks,
             double maxEntryDistanceTicks)
@@ -152,14 +258,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return $"FVG gap is too large: {gapTicks:0.##} ticks exceeds MaxFvgGapTicks {maxGapTicks:0.##}.";
 
                 return "FVG gap size failed min/max gap filter.";
-            }
-
-            if (!fvgWithinMaxDistance)
-            {
-                if (MaxFvgDistanceFromRangeTicks > 0 && fvgDistanceTicks > maxFvgDistanceTicks)
-                    return $"FVG is too far from opening range: {fvgDistanceTicks:0.##} ticks exceeds MaxFvgDistanceFromRangeTicks {maxFvgDistanceTicks:0.##}.";
-
-                return "FVG distance failed max-distance filter.";
             }
             
             if (!entryWithinMaxDistance)
