@@ -11,10 +11,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             EnableDiagnostics = true;
             EnableDataAnalysis = false;
+            EnablePrecisionTickAnalysis = true;
+            DataSourceLabel = "Historical";
 
             EnableRetestModel = true;
             EnableBreakoutModel = true;
 
+            RangeStartTime = 30000;
+            MarketOpenTime = 93000;
             EntryStartTime = 93500;
             EntryEndTime = 165500;
             FlattenTime = 165500;
@@ -66,9 +70,27 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Enable Data Analysis", Order = 2, GroupName = "Analysis")]
         public bool EnableDataAnalysis { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Enable Precision Tick Analysis", Order = 3, GroupName = "Analysis")]
+        public bool EnablePrecisionTickAnalysis { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Data Source Label", Order = 4, GroupName = "Analysis")]
+        public string DataSourceLabel { get; set; }
+
         #endregion
 
         #region Entries
+
+        [NinjaScriptProperty]
+        [Range(0, 235959)]
+        [Display(Name = "Range Start Time", Order = 8, GroupName = "Entries")]
+        public int RangeStartTime { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 235959)]
+        [Display(Name = "Market Open Time", Order = 9, GroupName = "Entries")]
+        public int MarketOpenTime { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Enable Re-test Model", Order = 10, GroupName = "Entries")]

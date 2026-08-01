@@ -13,93 +13,90 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
+        private const string ResearchVersion = "2.0.0";
+        private const int ContextSeriesIndex = 0;
+        private const int EntrySeriesIndex = 1;
+        private const int TickSeriesIndex = 2;
+
         private NinjexPremarketRangeEngine premarketRangeEngine;
-
-        private readonly List<IEntryModel> entryModels =
-            new List<IEntryModel>();
-
-        private readonly List<CandleSnapshot> candleHistory =
-            new List<CandleSnapshot>();
-
-        private readonly List<BreakoutEvent> breakoutEvents =
-            new List<BreakoutEvent>();
-
-        private readonly List<EntryCandidate> entryCandidates =
-            new List<EntryCandidate>();
-
-        private readonly List<HypotheticalTrade> activeTrades =
-            new List<HypotheticalTrade>();
-
-        private readonly BreakoutEventDetector breakoutDetector =
-            new BreakoutEventDetector();
-
-        private readonly CandleMetricsCalculator metricsCalculator =
-            new CandleMetricsCalculator();
+        private readonly List<IEntryModel> entryModels = new List<IEntryModel>();
+        private readonly List<CandleSnapshot> entryCandleHistory = new List<CandleSnapshot>();
+        private readonly List<BreakoutEvent> breakoutEvents = new List<BreakoutEvent>();
+        private readonly List<EntryCandidate> entryCandidates = new List<EntryCandidate>();
+        private readonly List<HypotheticalTrade> activeTrades = new List<HypotheticalTrade>();
+        private readonly BreakoutEventDetector breakoutDetector = new BreakoutEventDetector();
+        private readonly CandleMetricsCalculator metricsCalculator = new CandleMetricsCalculator();
 
         private RangeSessionContext sessionContext;
+        private SessionDataQuality sessionQuality;
         private DateTime activeTradingDate = Core.Globals.MinDate;
-        private int lastProcessedPrimaryBar = -1;
+        private DateTime lastMarketTime = Core.Globals.MinDate;
+        private int lastProcessedContextBar = -1;
+        private int lastProcessedEntryBar = -1;
         private double lastKnownTickPrice = double.NaN;
+        private string runId;
+        private string strategyInstanceId;
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
                 Name = "Ninjex Premarket Range Research";
-                Description = "Research-only premarket range breakout and retest analyser. This strategy never submits orders.";
-
+                Description = "Research-only 5-minute context, 1-minute entries and optional tick-precision management analyser.";
                 Calculate = Calculate.OnEachTick;
                 IsOverlay = true;
                 IsUnmanaged = false;
                 BarsRequiredToTrade = 20;
                 IsExitOnSessionCloseStrategy = false;
-                                StartBehavior = StartBehavior.WaitUntilFlat;
+                StartBehavior = StartBehavior.WaitUntilFlat;
                 RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
-
                 ApplyPropertyDefaults();
             }
             else if (State == State.Configure)
             {
-                // The 1-tick series drives deterministic hypothetical fills,
-                // MFE/MAE, stop, target, break-even and trailing simulations.
+                AddDataSeries(BarsPeriodType.Minute, 1);
                 AddDataSeries(BarsPeriodType.Tick, 1);
             }
             else if (State == State.DataLoaded)
             {
+                runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                strategyInstanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
                 premarketRangeEngine = new NinjexPremarketRangeEngine();
-
                 ConfigureModels();
                 InitializeExport();
+                ExportManifest();
             }
             else if (State == State.Terminated)
             {
-                ForceCloseAllHypotheticalTrades(
-                    DateTime.Now,
-                    lastKnownTickPrice,
-                    "StrategyTerminated");
-
+                DateTime time = lastMarketTime != Core.Globals.MinDate ? lastMarketTime : DateTime.Now;
+                FinalizeOpenBreakoutEvents(time, "StrategyTerminated");
+                ForceCloseAllHypotheticalTrades(time, lastKnownTickPrice, "StrategyTerminated");
+                FinalizeSessionDataQuality(time, "StrategyTerminated");
                 FlushAndDisposeExport();
             }
         }
 
         protected override void OnBarUpdate()
         {
-            if (BarsInProgress == 1)
+            if (BarsInProgress == TickSeriesIndex)
             {
                 ProcessTickSeries();
                 return;
             }
 
-            if (BarsInProgress != 0 || CurrentBar < BarsRequiredToTrade)
+            if (BarsInProgress == EntrySeriesIndex)
+            {
+                ProcessOneMinuteEntrySeries();
                 return;
+            }
 
-            ProcessPrimarySeries();
+            if (BarsInProgress == ContextSeriesIndex)
+                ProcessFiveMinuteContextSeries();
         }
 
         private void ConfigureModels()
         {
             entryModels.Clear();
-
             entryModels.Add(new BreakoutConfirmationModel
             {
                 IsEnabled = EnableBreakoutModel,
@@ -107,84 +104,90 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinimumCloseLocationPercent = MinimumCloseLocationPercent,
                 MinimumRelativeBodyMultiple = MinimumRelativeBodyMultiple
             });
-
             entryModels.Add(new RetestEntryModel
             {
                 IsEnabled = EnableRetestModel,
                 MaximumBarsAfterBreakout = MaximumRetestBars,
                 OutsideDistanceTicks = RetestOutsideDistanceTicks,
                 InsideDistanceTicks = RetestInsideDistanceTicks,
-                MinimumConfirmationBodyPercent =
-                    MinimumRetestConfirmationBodyPercent
+                MinimumConfirmationBodyPercent = MinimumRetestConfirmationBodyPercent
             });
         }
 
-       private void ProcessPrimarySeries()
+        private void ProcessFiveMinuteContextSeries()
         {
-            if (lastProcessedPrimaryBar == CurrentBar)
+            if (CurrentBars[ContextSeriesIndex] < 2 || lastProcessedContextBar == CurrentBars[ContextSeriesIndex])
                 return;
 
-            lastProcessedPrimaryBar = CurrentBar;
+            lastProcessedContextBar = CurrentBars[ContextSeriesIndex];
+            DateTime barTime = Times[ContextSeriesIndex][1];
+            DateTime tradingDate = barTime.Date;
+            lastMarketTime = barTime;
 
-            var barTime = Time[1];
-            var tradingDate = barTime.Date;
+            EnsureResearchDay(tradingDate, barTime);
+            TrackFiveMinuteData(barTime);
 
-            var isRangeCompleteNow =
-                premarketRangeEngine.ProcessCompletedBar(
-                    barTime,
-                    High[1],
-                    Low[1],
-                    30000,
-                    93000);
+            bool finalizedNow = premarketRangeEngine.ProcessCompletedBar(
+                barTime,
+                Highs[ContextSeriesIndex][1],
+                Lows[ContextSeriesIndex][1],
+                RangeStartTime,
+                MarketOpenTime);
 
-            if (activeTradingDate != tradingDate)
-                StartResearchDay(tradingDate);
-
-            var bar = CapturePrimaryBar(1);
-
-            var previousBar =
-                candleHistory.Count > 0
-                    ? candleHistory[candleHistory.Count - 1]
-                    : null;
-
-            var metrics =
-                metricsCalculator.Calculate(
-                    bar,
-                    candleHistory,
-                    RelativeBodyLookback,
-                    TickSize);
-
-            candleHistory.Add(bar);
-            TrimHistory();
-
-            if (isRangeCompleteNow)
+            if (finalizedNow)
             {
-                Diagnostic(
-                    barTime,
-                    "Premarket range finalized. " +
-                    "Date={0:yyyy-MM-dd}, High={1}, Low={2}, " +
-                    "HighTime={3:HH:mm}, LowTime={4:HH:mm}",
+                EnsureSessionContext(tradingDate, barTime);
+                Diagnostic(barTime,
+                    "Premarket range finalized. Date={0:yyyy-MM-dd}, High={1}, Low={2}, HighTime={3:HH:mm}, LowTime={4:HH:mm}, Bars={5}",
                     premarketRangeEngine.LatestRangeDate,
                     premarketRangeEngine.LatestHigh,
                     premarketRangeEngine.LatestLow,
                     premarketRangeEngine.HighBarTime,
-                    premarketRangeEngine.LowBarTime);
+                    premarketRangeEngine.LowBarTime,
+                    premarketRangeEngine.RangeBarCount);
             }
+        }
+
+        private void ProcessOneMinuteEntrySeries()
+        {
+            if (CurrentBars[EntrySeriesIndex] < Math.Max(BarsRequiredToTrade, 2)
+                || lastProcessedEntryBar == CurrentBars[EntrySeriesIndex])
+                return;
+
+            lastProcessedEntryBar = CurrentBars[EntrySeriesIndex];
+            DateTime barTime = Times[EntrySeriesIndex][1];
+            DateTime tradingDate = barTime.Date;
+            lastMarketTime = barTime;
+
+            EnsureResearchDay(tradingDate, barTime);
+            TrackOneMinuteData(barTime);
+
+            CandleSnapshot bar = CaptureBar(EntrySeriesIndex, 1);
+            CandleSnapshot previousBar = entryCandleHistory.Count > 0
+                ? entryCandleHistory[entryCandleHistory.Count - 1]
+                : null;
+
+            CandleMetrics metrics = metricsCalculator.Calculate(
+                bar,
+                entryCandleHistory,
+                RelativeBodyLookback,
+                TickSize);
+
+            entryCandleHistory.Add(bar);
+            TrimEntryHistory();
 
             if (ToTime(barTime) >= FlattenTime)
             {
-                ForceCloseAllHypotheticalTrades(
-                    barTime,
-                    Close[0],
-                    "FlattenTime");
-            }
-
-            if (!premarketRangeEngine.IsRangeComplete
-                || premarketRangeEngine.LatestRangeDate.Date
-                    != tradingDate)
-            {
+                FinalizeOpenBreakoutEvents(barTime, "FlattenTime");
+                ForceCloseAllHypotheticalTrades(barTime, Closes[EntrySeriesIndex][1], "FlattenTime");
+                FinalizeSessionDataQuality(barTime, "FlattenTime");
                 return;
             }
+
+            if (premarketRangeEngine == null
+                || !premarketRangeEngine.IsRangeComplete
+                || premarketRangeEngine.LatestRangeDate.Date != tradingDate)
+                return;
 
             EnsureSessionContext(tradingDate, barTime);
 
@@ -197,65 +200,55 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Bar = bar,
                 PreviousBar = previousBar,
                 Metrics = metrics,
-                History = candleHistory
+                History = entryCandleHistory
             };
 
-            var newBreakouts = breakoutDetector.Detect(
-                context,
-                MinimumBreakoutDistanceTicks);
-
+            IList<BreakoutEvent> newBreakouts = breakoutDetector.Detect(context, MinimumBreakoutDistanceTicks);
             foreach (BreakoutEvent breakout in newBreakouts)
-            {
-                breakoutEvents.Add(breakout);
-                ExportBreakout(breakout);
-
-                Diagnostic(
-                    breakout.BreakoutTime,
-                    "BREAKOUT {0} {1} Level={2} Close={3} " +
-                    "Distance={4:0.0} ticks",
-                    breakout.EventId,
-                    breakout.Direction,
-                    breakout.RangeLevel,
-                    breakout.BreakoutClose,
-                    breakout.DistanceOutsideTicks);
-
-                foreach (IEntryModel model in entryModels)
-                    model.OnBreakout(breakout);
-            }
+                RegisterBreakout(breakout);
 
             foreach (var model in entryModels)
             {
-                var generated =
-                    model.Evaluate(context);
-
+                var generated = model.Evaluate(context);
                 foreach (var candidate in generated)
                     RegisterCandidate(candidate);
             }
 
+            UpdateBreakoutExcursionsFromBar(bar);
+            UpdateRawRetestObservations(context);
             UpdateBreakoutReturnInside(bar);
-        }
 
+            // OnEachTick means this method is running at the first tick of the new
+            // 1-minute bar; Open[0] is therefore the requested next-bar-open entry.
+            FillPendingCandidates(
+                Times[EntrySeriesIndex][0],
+                Opens[EntrySeriesIndex][0]);
+        }
+        
         private void ProcessTickSeries()
         {
-            if (CurrentBars[1] < 0)
+            if (CurrentBars[TickSeriesIndex] < 0)
                 return;
 
-            var tickTime = Times[1][0];
-            var tickPrice = Closes[1][0];
+            var tickTime = Times[TickSeriesIndex][0];
+            var tickPrice = Closes[TickSeriesIndex][0];
+            lastMarketTime = tickTime;
             lastKnownTickPrice = tickPrice;
 
-            if (activeTradingDate == Core.Globals.MinDate)
-                return;
+            EnsureResearchDay(tickTime.Date, tickTime);
+            TrackTickData(tickTime);
 
-            FillPendingCandidates(tickTime, tickPrice);
+            if (!EnablePrecisionTickAnalysis || !RequiresTickProcessing())
+                return;
 
             foreach (var trade in activeTrades.ToList())
             {
                 trade.ProcessTick(tickTime, tickPrice);
-
                 if (trade.IsClosed)
                 {
                     ExportTrade(trade);
+                    FlushExportWriters();
+                    
                     activeTrades.Remove(trade);
                 }
             }
@@ -263,331 +256,92 @@ namespace NinjaTrader.NinjaScript.Strategies
             UpdateBreakoutExcursions(tickTime, tickPrice);
 
             if (ToTime(tickTime) >= FlattenTime)
-                ForceCloseAllHypotheticalTrades(
-                    tickTime,
-                    tickPrice,
-                    "FlattenTime");
+            {
+                FinalizeOpenBreakoutEvents(tickTime, "FlattenTime");
+                ForceCloseAllHypotheticalTrades(tickTime, tickPrice, "FlattenTime");
+                FinalizeSessionDataQuality(tickTime, "FlattenTime");
+            }
         }
 
-        private void StartResearchDay(DateTime tradingDate)
+        private bool RequiresTickProcessing()
         {
-            if (activeTradingDate != Core.Globals.MinDate)
-                ExportDailySummary(activeTradingDate);
+            return activeTrades.Count > 0 || breakoutEvents.Any(x => !x.IsResolved);
+        }
 
-            ForceCloseAllHypotheticalTrades(
-                tradingDate,
-                lastKnownTickPrice,
-                "NewTradingDate");
+        private void EnsureResearchDay(DateTime tradingDate, DateTime eventTime)
+        {
+            if (activeTradingDate == tradingDate)
+                return;
+
+            if (activeTradingDate != Core.Globals.MinDate)
+            {
+                FinalizeOpenBreakoutEvents(eventTime, "NewTradingDate");
+                ForceCloseAllHypotheticalTrades(eventTime, lastKnownTickPrice, "NewTradingDate");
+                FinalizeSessionDataQuality(eventTime, "NewTradingDate");
+                ExportDailySummary(activeTradingDate);
+                FlushExportWriters();
+            }
 
             activeTradingDate = tradingDate;
-            candleHistory.Clear();
+            entryCandleHistory.Clear();
             breakoutEvents.Clear();
             entryCandidates.Clear();
-
             breakoutDetector.Reset(tradingDate);
             sessionContext = null;
+            sessionQuality = new SessionDataQuality { TradingDate = tradingDate };
 
-            foreach (var model in entryModels)
+            foreach (IEntryModel model in entryModels)
                 model.Reset(null);
 
-            Diagnostic(
-                tradingDate,
-                "New research day: {0:yyyy-MM-dd}",
-                tradingDate);
+            Diagnostic(eventTime, "New research day: {0:yyyy-MM-dd}", tradingDate);
         }
 
         private void EnsureSessionContext(DateTime tradingDate, DateTime eventTime)
         {
-            var high = premarketRangeEngine.LatestHigh;
-            var low = premarketRangeEngine.LatestLow;
-
-            if (sessionContext != null
-                && sessionContext.TradingDate == tradingDate
-                && Math.Abs(sessionContext.PremarketHigh - high) < TickSize / 2.0
-                && Math.Abs(sessionContext.PremarketLow - low) < TickSize / 2.0)
+            if (sessionContext != null && sessionContext.TradingDate == tradingDate)
                 return;
 
             sessionContext = new RangeSessionContext
             {
                 TradingDate = tradingDate,
-                PremarketHigh = high,
-                PremarketLow = low,
+                Instrument = Instrument.MasterInstrument.Name,
+                Contract = Instrument.FullName,
+                PremarketHigh = premarketRangeEngine.LatestHigh,
+                PremarketLow = premarketRangeEngine.LatestLow,
+                HighFormationTime = premarketRangeEngine.HighBarTime,
+                LowFormationTime = premarketRangeEngine.LowBarTime,
                 TickSize = TickSize,
                 PointValue = Instrument.MasterInstrument.PointValue
             };
 
-            foreach (var model in entryModels)
+            foreach (IEntryModel model in entryModels)
                 model.Reset(sessionContext);
 
-            ExportSession(sessionContext);
-
-            Diagnostic(
-                eventTime,
-                "Range ready. Date={0:yyyy-MM-dd}, " +
-                "High={1}, Low={2}, Width={3:0.0} ticks",
+            ExportSession("Created", sessionContext, sessionQuality);
+            Diagnostic(eventTime,
+                "Range ready. Contract={0}, Date={1:yyyy-MM-dd}, High={2}, Low={3}, Width={4:0.0} ticks",
+                Instrument.FullName,
                 tradingDate,
-                high,
-                low,
+                sessionContext.PremarketHigh,
+                sessionContext.PremarketLow,
                 sessionContext.RangeTicks);
         }
 
-        private CandleSnapshot CapturePrimaryBar(int barsAgo)
+        private CandleSnapshot CaptureBar(int seriesIndex, int barsAgo)
         {
             return new CandleSnapshot
             {
-                Time = Time[barsAgo],
-                BarIndex = CurrentBar - barsAgo,
-                Open = Open[barsAgo],
-                High = High[barsAgo],
-                Low = Low[barsAgo],
-                Close = Close[barsAgo],
-                Volume = Volume[barsAgo]
+                Time = Times[seriesIndex][barsAgo],
+                BarIndex = CurrentBars[seriesIndex] - barsAgo,
+                Open = Opens[seriesIndex][barsAgo],
+                High = Highs[seriesIndex][barsAgo],
+                Low = Lows[seriesIndex][barsAgo],
+                Close = Closes[seriesIndex][barsAgo],
+                Volume = Volumes[seriesIndex][barsAgo]
             };
         }
-
-        private void RegisterCandidate(EntryCandidate candidate)
-        {
-            if (candidate == null)
-                return;
-
-            entryCandidates.Add(candidate);
-            ExportCandidate(candidate);
-
-            Diagnostic(
-                candidate.SignalTime,
-                "CANDIDATE {0} Qualified={1} Reason={2}",
-                candidate.CandidateId,
-                candidate.StrongCandleQualified,
-                candidate.QualificationReason);
-        }
-
-        private void FillPendingCandidates(DateTime tickTime, double tickPrice)
-        {
-            if (sessionContext == null || double.IsNaN(tickPrice))
-                return;
-
-            foreach (var candidate in entryCandidates.ToList())
-            {
-                if (!candidate.StrongCandleQualified)
-                    continue;
-
-                if (candidate.PlannedEntryPrice > 0)
-                    continue;
-
-                if (tickTime <= candidate.SignalTime)
-                    continue;
-
-                if (ToTime(tickTime) >= FlattenTime)
-                    continue;
-
-                var entryDistanceTicks = candidate.Direction == TradeDirection.Long
-                    ? (tickPrice - candidate.RangeLevel) / TickSize
-                    : (candidate.RangeLevel - tickPrice) / TickSize;
-
-                if (entryDistanceTicks < EntryMinimumDistanceTicksFromRange
-                    || entryDistanceTicks > EntryMaximumDistanceTicksFromRange)
-                {
-                    candidate.StrongCandleQualified = false;
-                    candidate.QualificationReason += string.Format(
-                        " Entry rejected at next tick because distance from range was {0:0.0} ticks; permitted range is {1}-{2} ticks.",
-                        entryDistanceTicks,
-                        EntryMinimumDistanceTicksFromRange,
-                        EntryMaximumDistanceTicksFromRange);
-                    ExportCandidateUpdate(candidate);
-                    continue;
-                }
-
-                PrepareCandidateRisk(candidate, tickPrice);
-
-                if (candidate.ActualRiskTicks <= 0)
-                {
-                    candidate.QualificationReason += " Rejected because calculated risk was zero or negative.";
-                    ExportCandidateUpdate(candidate);
-                    continue;
-                }
-
-                CreateTradeVariants(candidate, tickTime, tickPrice);
-                ExportCandidateUpdate(candidate);
-            }
-        }
-
-        private void PrepareCandidateRisk(
-            EntryCandidate candidate,
-            double entryPrice)
-        {
-            candidate.PlannedEntryPrice = entryPrice;
-
-            var structuralRiskTicks =
-                candidate.Direction == TradeDirection.Long
-                    ? (entryPrice - candidate.StructuralStopPrice) / TickSize
-                    : (candidate.StructuralStopPrice - entryPrice) / TickSize;
-
-            structuralRiskTicks = Math.Max(0, structuralRiskTicks);
-
-            candidate.StructuralRiskTicks = structuralRiskTicks;
-            candidate.ActualRiskTicks =
-                Math.Min(MaximumInitialStopTicks, structuralRiskTicks);
-
-            candidate.StopWasCapped =
-                structuralRiskTicks > MaximumInitialStopTicks;
-
-            candidate.PlannedStopPrice =
-                candidate.Direction == TradeDirection.Long
-                    ? entryPrice - candidate.ActualRiskTicks * TickSize
-                    : entryPrice + candidate.ActualRiskTicks * TickSize;
-        }
-
-        private void CreateTradeVariants(
-            EntryCandidate candidate,
-            DateTime entryTime,
-            double entryPrice)
-        {
-            var settings =
-                BuildTradeManagementSettings();
-
-            activeTrades.Add(new HypotheticalTrade(
-                candidate,
-                entryTime,
-                entryPrice,
-                settings,
-                "FixedTarget",
-                false,
-                false));
-
-            if (BEProfitTriggerTicks > 0)
-            {
-                activeTrades.Add(new HypotheticalTrade(
-                    candidate,
-                    entryTime,
-                    entryPrice,
-                    settings,
-                    "BreakEven",
-                    true,
-                    false));
-            }
-
-            if (IsAnyTrailStepEnabled())
-            {
-                activeTrades.Add(new HypotheticalTrade(
-                    candidate,
-                    entryTime,
-                    entryPrice,
-                    settings,
-                    "ThreeStepTrail",
-                    false,
-                    true));
-            }
-
-            if (BEProfitTriggerTicks > 0 && IsAnyTrailStepEnabled())
-            {
-                activeTrades.Add(new HypotheticalTrade(
-                    candidate,
-                    entryTime,
-                    entryPrice,
-                    settings,
-                    "BreakEvenPlusTrail",
-                    true,
-                    true));
-            }
-        }
-
-        private TradeManagementSettings BuildTradeManagementSettings()
-        {
-            return new TradeManagementSettings
-            {
-                TickSize = TickSize,
-                PointValue = Instrument.MasterInstrument.PointValue,
-                Quantity = Quantity,
-                RiskRewardRatio = RiskRewardRatio,
-                BreakEvenTriggerTicks = BEProfitTriggerTicks,
-                BreakEvenPlusTicks = BEPlusTicks,
-                Step1 = new TrailStepSettings
-                {
-                    ProfitTriggerTicks = Step1ProfitTriggerTicks,
-                    StopLossTicks = Step1StopLossTicks,
-                    FrequencyTicks = Step1FrequencyTicks
-                },
-                Step2 = new TrailStepSettings
-                {
-                    ProfitTriggerTicks = Step2ProfitTriggerTicks,
-                    StopLossTicks = Step2StopLossTicks,
-                    FrequencyTicks = Step2FrequencyTicks
-                },
-                Step3 = new TrailStepSettings
-                {
-                    ProfitTriggerTicks = Step3ProfitTriggerTicks,
-                    StopLossTicks = Step3StopLossTicks,
-                    FrequencyTicks = Step3FrequencyTicks
-                }
-            };
-        }
-
-        private bool IsAnyTrailStepEnabled()
-        {
-            return Step1ProfitTriggerTicks > 0
-                || Step2ProfitTriggerTicks > 0
-                || Step3ProfitTriggerTicks > 0;
-        }
-
-        private void UpdateBreakoutExcursions(
-            DateTime tickTime,
-            double tickPrice)
-        {
-            if (sessionContext == null)
-                return;
-
-            foreach (var breakout in breakoutEvents)
-            {
-                if (breakout.IsResolved)
-                    continue;
-
-                var favorable = breakout.Direction == TradeDirection.Long
-                    ? (tickPrice - breakout.RangeLevel) / TickSize
-                    : (breakout.RangeLevel - tickPrice) / TickSize;
-
-                var adverse = breakout.Direction == TradeDirection.Long
-                    ? (breakout.RangeLevel - tickPrice) / TickSize
-                    : (tickPrice - breakout.RangeLevel) / TickSize;
-
-                breakout.MfeTicks = Math.Max(breakout.MfeTicks, favorable);
-                breakout.MaeTicks = Math.Max(breakout.MaeTicks, adverse);
-
-                breakout.Reached10Ticks |= breakout.MfeTicks >= 10;
-                breakout.Reached20Ticks |= breakout.MfeTicks >= 20;
-                breakout.Reached30Ticks |= breakout.MfeTicks >= 30;
-                breakout.Reached40Ticks |= breakout.MfeTicks >= 40;
-                breakout.Reached60Ticks |= breakout.MfeTicks >= 60;
-                breakout.Reached100Ticks |= breakout.MfeTicks >= 100;
-            }
-        }
-
-        private void UpdateBreakoutReturnInside(CandleSnapshot bar)
-        {
-            foreach (var breakout in breakoutEvents)
-            {
-                if (breakout.ReturnedInside)
-                    continue;
-
-                var returned = breakout.Direction == TradeDirection.Long
-                    ? bar.Close < breakout.RangeLevel
-                    : bar.Close > breakout.RangeLevel;
-
-                if (!returned)
-                    continue;
-
-                breakout.ReturnedInside = true;
-                breakout.ReturnedInsideTime = bar.Time;
-                breakout.BarsUntilReturnInside =
-                    bar.BarIndex - breakout.BreakoutBarIndex;
-
-                ExportBreakoutUpdate(breakout);
-            }
-        }
-
-        private void ForceCloseAllHypotheticalTrades(
-            DateTime time,
-            double price,
-            string reason)
+        
+        private void ForceCloseAllHypotheticalTrades(DateTime time, double price, string reason)
         {
             if (double.IsNaN(price) || price <= 0)
                 return;
@@ -595,27 +349,63 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var trade in activeTrades.ToList())
             {
                 trade.ForceClose(time, price, reason);
+                
                 ExportTrade(trade);
+                FlushExportWriters();
+                
                 activeTrades.Remove(trade);
             }
+        }
+       
+        private void FinalizeSessionDataQuality(DateTime time, string reason)
+        {
+            if (sessionQuality == null || sessionQuality.IsFinalized)
+                return;
+
+            var rangeComplete = premarketRangeEngine != null
+                                && premarketRangeEngine.IsRangeComplete
+                                && premarketRangeEngine.LatestRangeDate.Date == sessionQuality.TradingDate;
+
+            var tickOkay = !EnablePrecisionTickAnalysis || sessionQuality.HasTickData;
+            sessionQuality.Status = rangeComplete
+                && sessionQuality.HasFiveMinuteData
+                && sessionQuality.HasOneMinuteData
+                && tickOkay
+                    ? "Complete"
+                    : "Incomplete";
+            sessionQuality.IsFinalized = true;
+
+            if (sessionContext != null)
+            {
+                ExportSession(
+                    "Final",
+                    sessionContext,
+                    sessionQuality);
+
+                FlushExportWriters();
+            }
+
+            Diagnostic(time,
+                "DATA QUALITY Date={0:yyyy-MM-dd} Status={1} 5mBars={2} 1mBars={3} Ticks={4} Reason={5}",
+                sessionQuality.TradingDate,
+                sessionQuality.Status,
+                sessionQuality.FiveMinuteRangeBarCount,
+                sessionQuality.OneMinuteEntryWindowBarCount,
+                sessionQuality.TickCount,
+                reason);
         }
 
         private bool IsInsideEntryWindow(DateTime time)
         {
             var value = ToTime(time);
-            return value >= EntryStartTime
-                   && value < EntryEndTime
-                   && value < FlattenTime;
+            return value >= EntryStartTime && value < EntryEndTime && value < FlattenTime;
         }
 
-        private void TrimHistory()
+        private void TrimEntryHistory()
         {
-            const int maximumHistory = 500;
-
-            if (candleHistory.Count > maximumHistory)
-                candleHistory.RemoveRange(
-                    0,
-                    candleHistory.Count - maximumHistory);
+            const int maximumHistory = 1000;
+            if (entryCandleHistory.Count > maximumHistory)
+                entryCandleHistory.RemoveRange(0, entryCandleHistory.Count - maximumHistory);
         }
     }
 }

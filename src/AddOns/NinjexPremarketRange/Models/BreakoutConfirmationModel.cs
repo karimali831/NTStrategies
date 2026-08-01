@@ -107,7 +107,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 Metrics = metrics,
                 BarsAfterBreakout = 0,
                 StrongCandleQualified = qualified,
+                DirectionPassed = directionOk,
+                BodyPassed = bodyOk,
+                CloseLocationPassed = closeOk,
+                RelativeBodyPassed = relativeBodyOk,
                 QualificationReason = reason,
+                FinalStatus = qualified ? "SignalQualified" : "SignalRejected",
                 StructuralStopPrice = breakout.Direction == TradeDirection.Long
                     ? context.Bar.Low
                     : context.Bar.High

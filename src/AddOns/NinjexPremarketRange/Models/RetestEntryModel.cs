@@ -21,10 +21,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         private readonly List<RetestState> states =
             new List<RetestState>();
 
-        public string Name
-        {
-            get { return "Retest"; }
-        }
+        public string Name => "Retest";
 
         public bool IsEnabled { get; set; }
         public int MaximumBarsAfterBreakout { get; set; }
@@ -57,12 +54,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             if (!IsEnabled || context == null || context.Bar == null)
                 return candidates;
 
-            double tickSize = context.Session.TickSize;
+            var tickSize = context.Session.TickSize;
 
-            for (int i = states.Count - 1; i >= 0; i--)
+            for (var i = states.Count - 1; i >= 0; i--)
             {
-                RetestState state = states[i];
-                int barsAfter =
+                var state = states[i];
+                var barsAfter =
                     context.Bar.BarIndex - state.Breakout.BreakoutBarIndex;
 
                 if (barsAfter <= 0)
@@ -85,7 +82,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 if (!state.ZoneTouched)
                     continue;
 
-                bool confirmed = IsConfirmation(context, state.Breakout.Direction);
+                var confirmed = IsConfirmation(context, state.Breakout.Direction);
                 if (!confirmed)
                     continue;
 
@@ -95,29 +92,29 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 
             return candidates;
         }
-
+        
         private void UpdateRetestState(
             RetestState state,
             CandleSnapshot bar,
             double tickSize)
         {
-            double level = state.Breakout.RangeLevel;
+            var level = state.Breakout.RangeLevel;
 
             if (state.Breakout.Direction == TradeDirection.Long)
             {
-                double zoneTop = level + OutsideDistanceTicks * tickSize;
-                double zoneBottom = level - InsideDistanceTicks * tickSize;
+                var zoneTop = level + OutsideDistanceTicks * tickSize;
+                var zoneBottom = level - InsideDistanceTicks * tickSize;
 
-                bool touched = bar.Low <= zoneTop && bar.High >= zoneBottom;
+                var touched = bar.Low <= zoneTop && bar.High >= zoneBottom;
                 if (touched)
                 {
                     state.ZoneTouched = true;
                     if (state.ZoneTouchBarIndex < 0)
                         state.ZoneTouchBarIndex = bar.BarIndex;
 
-                    double insideDepth =
+                    var insideDepth =
                         Math.Max(0, (level - bar.Low) / tickSize);
-                    double outsideDistance =
+                    var outsideDistance =
                         Math.Max(0, (bar.Low - level) / tickSize);
 
                     state.MaximumInsideDepthTicks =
@@ -131,19 +128,19 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             }
             else
             {
-                double zoneTop = level + InsideDistanceTicks * tickSize;
-                double zoneBottom = level - OutsideDistanceTicks * tickSize;
+                var zoneTop = level + InsideDistanceTicks * tickSize;
+                var zoneBottom = level - OutsideDistanceTicks * tickSize;
 
-                bool touched = bar.High >= zoneBottom && bar.Low <= zoneTop;
+                var touched = bar.High >= zoneBottom && bar.Low <= zoneTop;
                 if (touched)
                 {
                     state.ZoneTouched = true;
                     if (state.ZoneTouchBarIndex < 0)
                         state.ZoneTouchBarIndex = bar.BarIndex;
 
-                    double insideDepth =
+                    var insideDepth =
                         Math.Max(0, (bar.High - level) / tickSize);
-                    double outsideDistance =
+                    var outsideDistance =
                         Math.Max(0, (level - bar.High) / tickSize);
 
                     state.MaximumInsideDepthTicks =
@@ -164,11 +161,11 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             if (context.Metrics == null)
                 return false;
 
-            bool directionOk = direction == TradeDirection.Long
+            var directionOk = direction == TradeDirection.Long
                 ? context.Bar.IsBullish
                 : context.Bar.IsBearish;
 
-            bool closesReclaimed = direction == TradeDirection.Long
+            var closesReclaimed = direction == TradeDirection.Long
                 ? context.Bar.Close > context.Session.PremarketHigh
                 : context.Bar.Close < context.Session.PremarketLow;
 
@@ -182,7 +179,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             RetestState state,
             int barsAfter)
         {
-            BreakoutEvent breakout = state.Breakout;
+            var breakout = state.Breakout;
 
             return new EntryCandidate
             {
@@ -202,6 +199,11 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                         ? 0
                         : state.MinimumOutsideDistanceTicks,
                 StrongCandleQualified = true,
+                DirectionPassed = true,
+                BodyPassed = true,
+                CloseLocationPassed = true,
+                RelativeBodyPassed = true,
+                FinalStatus = "SignalQualified",
                 QualificationReason = "Retest zone touched and directional confirmation candle closed beyond the broken level.",
                 StructuralStopPrice = breakout.Direction == TradeDirection.Long
                     ? context.Bar.Low

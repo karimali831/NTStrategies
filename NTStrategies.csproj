@@ -80,6 +80,7 @@
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\BreakoutEventDetector.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\CandleMetricsCalculator.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\NinjexPremarketRangeEngine.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\ResearchTypes.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\BreakoutConfirmationModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\IEntryModel.cs" />
@@ -95,7 +96,6 @@
         <Compile Include="src\Indicators\NinjexPremarketRange\NinjexPremarketRange.cs" />
         <Compile Include="src\Indicators\NinjexVolumetricFVG\NinjexVolumetricFVG.cs" />
         <Compile Include="src\Shared\NinjexOpeningVolumeProfileEngine.cs" />
-        <Compile Include="src\Shared\NinjexPremarketRangeEngine.cs" />
         <Compile Include="src\Strategies\ApexMicroPBLiveV3\ApexMicroPBLiveV3.cs" />
         <Compile Include="src\Strategies\BaselineTrendPullback\Features.cs" />
         <Compile Include="src\Strategies\BaselineTrendPullback\Base.cs" />
@@ -141,10 +141,14 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Research\Breakout.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Research\TradeCandidates.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Core.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Diagnostics.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Export.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Properties.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Research\RetestObserveation.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Research\TrackData.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Core.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Diag.cs" />
         <Compile Include="src\Strategies\OrbMomentum\OrbMomentum.Drawing.cs" />
@@ -165,13 +169,11 @@
         <Content Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Templates\T3.xml" />
         <Content Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Templates\Data Collection.xml" />
         <Content Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Templates\Default.xml" />
+        <Content Include="src\Tools\Merge-NinjexPremarketRangeResearch.ps1" />
         <Content Include="TemplateSync.ps1" />
     </ItemGroup>
     <ItemGroup>
       <None Include="packages.config" />
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="src\AddOns\" />
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <PropertyGroup>

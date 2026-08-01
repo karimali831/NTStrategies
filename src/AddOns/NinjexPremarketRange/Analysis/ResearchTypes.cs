@@ -14,8 +14,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
     public sealed class RangeSessionContext
     {
         public DateTime TradingDate { get; set; }
+        public string Instrument { get; set; }
+        public string Contract { get; set; }
         public double PremarketHigh { get; set; }
         public double PremarketLow { get; set; }
+        public DateTime HighFormationTime { get; set; }
+        public DateTime LowFormationTime { get; set; }
         public double TickSize { get; set; }
         public double PointValue { get; set; }
 
@@ -31,6 +35,25 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         }
     }
 
+    public sealed class SessionDataQuality
+    {
+        public DateTime TradingDate { get; set; }
+        public int FiveMinuteRangeBarCount { get; set; }
+        public int OneMinuteEntryWindowBarCount { get; set; }
+        public long TickCount { get; set; }
+        public DateTime FirstFiveMinuteBarTime { get; set; }
+        public DateTime LastFiveMinuteBarTime { get; set; }
+        public DateTime FirstOneMinuteBarTime { get; set; }
+        public DateTime LastOneMinuteBarTime { get; set; }
+        public DateTime FirstTickTime { get; set; }
+        public DateTime LastTickTime { get; set; }
+        public bool HasFiveMinuteData { get; set; }
+        public bool HasOneMinuteData { get; set; }
+        public bool HasTickData { get; set; }
+        public bool IsFinalized { get; set; }
+        public string Status { get; set; }
+    }
+
     public sealed class CandleSnapshot
     {
         public DateTime Time { get; set; }
@@ -41,35 +64,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double Close { get; set; }
         public double Volume { get; set; }
 
-        public double Range
-        {
-            get { return Math.Max(0, High - Low); }
-        }
-
-        public double Body
-        {
-            get { return Math.Abs(Close - Open); }
-        }
-
-        public double UpperWick
-        {
-            get { return Math.Max(0, High - Math.Max(Open, Close)); }
-        }
-
-        public double LowerWick
-        {
-            get { return Math.Max(0, Math.Min(Open, Close) - Low); }
-        }
-
-        public bool IsBullish
-        {
-            get { return Close > Open; }
-        }
-
-        public bool IsBearish
-        {
-            get { return Close < Open; }
-        }
+        public double Range => Math.Max(0, High - Low);
+        public double Body => Math.Abs(Close - Open);
+        public double UpperWick => Math.Max(0, High - Math.Max(Open, Close));
+        public double LowerWick => Math.Max(0, Math.Min(Open, Close) - Low);
+        public bool IsBullish => Close > Open;
+        public bool IsBearish => Close < Open;
     }
 
     public sealed class CandleMetrics
@@ -99,6 +99,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
     {
         public string EventId { get; set; }
         public DateTime TradingDate { get; set; }
+        public string Contract { get; set; }
         public TradeDirection Direction { get; set; }
         public int AttemptNumber { get; set; }
         public DateTime BreakoutTime { get; set; }
@@ -114,13 +115,73 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public bool ReturnedInside { get; set; }
         public DateTime ReturnedInsideTime { get; set; }
         public int BarsUntilReturnInside { get; set; }
+        public double MfeBeforeReturnTicks { get; set; }
+        public bool IsFakeout20Ticks { get; set; }
+
         public bool Reached10Ticks { get; set; }
         public bool Reached20Ticks { get; set; }
         public bool Reached30Ticks { get; set; }
         public bool Reached40Ticks { get; set; }
         public bool Reached60Ticks { get; set; }
         public bool Reached100Ticks { get; set; }
+        public DateTime TimeTo10Ticks { get; set; }
+        public DateTime TimeTo20Ticks { get; set; }
+        public DateTime TimeTo30Ticks { get; set; }
+        public DateTime TimeTo40Ticks { get; set; }
+        public DateTime TimeTo60Ticks { get; set; }
+        public DateTime TimeTo100Ticks { get; set; }
+
+        public double Mfe1Minute { get; set; }
+        public double Mae1Minute { get; set; }
+        public double Mfe2Minutes { get; set; }
+        public double Mae2Minutes { get; set; }
+        public double Mfe3Minutes { get; set; }
+        public double Mae3Minutes { get; set; }
+        public double Mfe5Minutes { get; set; }
+        public double Mae5Minutes { get; set; }
+        public double Mfe10Minutes { get; set; }
+        public double Mae10Minutes { get; set; }
+        public double Mfe15Minutes { get; set; }
+        public double Mae15Minutes { get; set; }
+        public double Mfe30Minutes { get; set; }
+        public double Mae30Minutes { get; set; }
+        public double Mfe60Minutes { get; set; }
+        public double Mae60Minutes { get; set; }
+
         public bool IsResolved { get; set; }
+        public DateTime ResolutionTime { get; set; }
+        public string ResolutionReason { get; set; }
+        public bool RawRetestObserved { get; set; }
+
+        public DateTime FirstRawRetestTime { get; set; }
+
+        public int FirstRawRetestBarsAfterBreakout { get; set; }
+
+        public double FirstRawRetestMinutesAfterBreakout { get; set; }
+
+        public double RawRetestMaximumInsideDepthTicks { get; set; }
+        public bool RawRetestWithinDepthTolerance { get; set; }
+
+        public double RawRetestMinimumOutsideDistanceTicks { get; set; }
+
+        public bool RawRetestTouchedExactLevel { get; set; }
+
+        public bool RawRetestWasWithinModelBarWindow { get; set; }
+
+        public bool RawRetestConfirmed { get; set; }
+
+        public DateTime RawRetestConfirmationTime { get; set; }
+
+        public double MfeBeforeRawRetestTicks { get; set; }
+
+        public double MfeAfterRawRetestTicks { get; set; }
+
+        public string RawRetestStatus { get; set; }
+        public bool RawRetestArmed { get; set; }
+        public int RawRetestArmedBarIndex { get; set; }
+        public double FurthestExcursionBeforeRawRetestTicks { get; set; }
+        public int FirstRawRetestBarIndex { get; set; }
+        public double FirstRawRetestReferencePrice { get; set; }
     }
 
     public sealed class EntryCandidate
@@ -140,14 +201,21 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double RetestOutsideDistanceTicks { get; set; }
 
         public bool StrongCandleQualified { get; set; }
+        public bool DirectionPassed { get; set; }
+        public bool BodyPassed { get; set; }
+        public bool CloseLocationPassed { get; set; }
+        public bool RelativeBodyPassed { get; set; }
         public string QualificationReason { get; set; }
+        public string FinalStatus { get; set; }
 
         public double StructuralStopPrice { get; set; }
         public double PlannedEntryPrice { get; set; }
+        public DateTime PlannedEntryTime { get; set; }
         public double PlannedStopPrice { get; set; }
         public double StructuralRiskTicks { get; set; }
         public double ActualRiskTicks { get; set; }
         public bool StopWasCapped { get; set; }
+        public double EntryDistanceTicks { get; set; }
     }
 
     public sealed class ManagementOutcome

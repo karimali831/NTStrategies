@@ -13,11 +13,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch
     {
+        private StreamWriter manifestWriter;
         private StreamWriter sessionWriter;
-        private StreamWriter breakoutWriter;
+        private StreamWriter breakoutAuditWriter;
+        private StreamWriter breakoutFinalWriter;
         private StreamWriter candidateWriter;
         private StreamWriter tradeWriter;
         private StreamWriter dailyWriter;
+        private string exportBaseName;
 
         private void InitializeExport()
         {
@@ -26,43 +29,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
-                string folder = Path.Combine(
-                    Globals.UserDataDir,
-                    string.IsNullOrWhiteSpace(OutputFolderName)
-                        ? "NinjexData"
-                        : OutputFolderName.Trim());
-
+                var folder = Path.Combine(Globals.UserDataDir,
+                    string.IsNullOrWhiteSpace(OutputFolderName) ? "NinjexData" : OutputFolderName.Trim());
                 Directory.CreateDirectory(folder);
 
-                string runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string prefix = string.IsNullOrWhiteSpace(OutputFilePrefix)
+                var prefix = string.IsNullOrWhiteSpace(OutputFilePrefix)
                     ? "premarket_range_research"
                     : OutputFilePrefix.Trim();
+                var contract = SanitizeFileName(Instrument.FullName);
+                exportBaseName = $"{prefix}_{runId}_{contract}_{strategyInstanceId}";
 
-                sessionWriter = CreateWriter(
-                    folder,
-                    prefix + "_" + runId + "_sessions.csv",
-                    "TradingDate,Instrument,PremarketHigh,PremarketLow,RangeTicks,TickSize,PointValue");
+                manifestWriter = CreateWriter(folder, exportBaseName + "_manifest.csv",
+                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
 
-                breakoutWriter = CreateWriter(
-                    folder,
-                    prefix + "_" + runId + "_breakouts.csv",
-                    "RecordType,EventId,TradingDate,Direction,Attempt,BreakoutTime,RangeLevel,BreakoutClose,DistanceOutsideTicks,Open,High,Low,Close,Volume,RangeTicks,BodyTicks,BodyPercent,CloseLocationPercent,RelativeBodyMultiple,RelativeVolumeMultiple,MfeTicks,MaeTicks,ReturnedInside,ReturnedInsideTime,BarsUntilReturnInside,Reached10,Reached20,Reached30,Reached40,Reached60,Reached100");
+                sessionWriter = CreateWriter(folder, exportBaseName + "_sessions.csv",
+                    "RecordType,RunId,Version,Instrument,Contract,TradingDate,PremarketHigh,PremarketLow,RangeTicks,HighFormationTime,LowFormationTime,TickSize,PointValue,FiveMinuteRangeBarCount,OneMinuteEntryWindowBarCount,TickCount,HasFiveMinuteData,HasOneMinuteData,HasTickData,FirstFiveMinuteBarTime,LastFiveMinuteBarTime,FirstOneMinuteBarTime,LastOneMinuteBarTime,FirstTickTime,LastTickTime,DataQualityStatus");
 
-                candidateWriter = CreateWriter(
-                    folder,
-                    prefix + "_" + runId + "_candidates.csv",
-                    "RecordType,CandidateId,BreakoutEventId,Model,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,CloseLocationPercent,RelativeBodyMultiple,RelativeVolumeMultiple,StructuralStopPrice,EntryPrice,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
+                breakoutAuditWriter = CreateWriter(folder, exportBaseName + "_breakouts_audit.csv", BreakoutHeader("RecordType"));
+                breakoutFinalWriter = CreateWriter(folder, exportBaseName + "_breakouts_final.csv", BreakoutHeader(null));
 
-                tradeWriter = CreateWriter(
-                    folder,
-                    prefix + "_" + runId + "_trades.csv",
-                    "CandidateId,BreakoutEventId,Model,Direction,Policy,EntryTime,EntryPrice,StopPrice,InitialRiskTicks,ExitTime,ExitPrice,ExitReason,RealizedTicks,RealizedUsd,MfeTicks,MaeTicks,BreakEvenActivated,HighestTrailStepActivated");
+                candidateWriter = CreateWriter(folder, exportBaseName + "_candidates.csv",
+                    "RecordType,RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,DirectionPassed,BodyPassed,CloseLocationPassed,RelativeBodyPassed,FinalStatus,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,UpperWickTicks,LowerWickTicks,CloseLocationPercent,AverageBodyTicks,RelativeBodyMultiple,AverageVolume,RelativeVolumeMultiple,StructuralStopPrice,EntryTime,EntryPrice,EntryDistanceTicks,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
 
-                dailyWriter = CreateWriter(
-                    folder,
-                    prefix + "_" + runId + "_daily.csv",
-                    "TradingDate,Instrument,BreakoutCount,LongBreakouts,ShortBreakouts,ReturnedInsideCount,QualifiedCandidates,RejectedCandidates,OpenHypotheticalVariants");
+                tradeWriter = CreateWriter(folder, exportBaseName + "_trades.csv",
+                    "RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,Policy,EntryTime,EntryPrice,StopPrice,InitialRiskTicks,ExitTime,ExitPrice,ExitReason,RealizedTicks,RealizedUsd,MfeTicks,MaeTicks,BreakEvenActivated,HighestTrailStepActivated");
+
+                dailyWriter = CreateWriter(folder, exportBaseName + "_daily.csv",
+                    "RunId,Version,Instrument,Contract,TradingDate,BreakoutCount,LongBreakouts,ShortBreakouts,Fakeout20Count,QualifiedCandidates,RejectedCandidates,CompletedTrades");
             }
             catch (Exception ex)
             {
@@ -71,234 +64,238 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private StreamWriter CreateWriter(
-            string folder,
-            string fileName,
-            string header)
+        private static string BreakoutHeader(
+            string firstColumn)
         {
-            var writer = new StreamWriter(
-                Path.Combine(folder, fileName),
-                false,
-                new UTF8Encoding(false));
+            var prefix =
+                string.IsNullOrEmpty(firstColumn)
+                    ? ""
+                    : firstColumn + ",";
 
-            writer.AutoFlush = true;
+            return prefix +
+                   "RunId,Version,Instrument,Contract," +
+                   "EventId,TradingDate,Direction,Attempt," +
+                   "BreakoutTime,RangeLevel,BreakoutClose," +
+                   "DistanceOutsideTicks,Open,High,Low,Close," +
+                   "Volume,RangeTicks,BodyTicks,BodyPercent," +
+                   "UpperWickTicks,LowerWickTicks," +
+                   "CloseLocationPercent,AverageBodyTicks," +
+                   "RelativeBodyMultiple,AverageVolume," +
+                   "RelativeVolumeMultiple,MfeTicks,MaeTicks," +
+                   "ReturnedInside,ReturnedInsideTime," +
+                   "BarsUntilReturnInside,MfeBeforeReturnTicks," +
+                   "IsFakeout20Ticks,Reached10,TimeTo10," +
+                   "Reached20,TimeTo20,Reached30,TimeTo30," +
+                   "Reached40,TimeTo40,Reached60,TimeTo60," +
+                   "Reached100,TimeTo100,Mfe1m,Mae1m," +
+                   "Mfe2m,Mae2m,Mfe3m,Mae3m,Mfe5m,Mae5m," +
+                   "Mfe10m,Mae10m,Mfe15m,Mae15m," +
+                   "Mfe30m,Mae30m,Mfe60m,Mae60m," +
+                   "RawRetestArmed," +
+                   "RawRetestArmedBarIndex," +
+                   "FurthestExcursionBeforeRawRetestTicks," +
+                   "FirstRawRetestBarIndex," +
+                   "FirstRawRetestReferencePrice," +
+                   "RawRetestObserved,FirstRawRetestTime," +
+                   "FirstRawRetestBarsAfterBreakout," +
+                   "FirstRawRetestMinutesAfterBreakout," +
+                   "RawRetestMaximumInsideDepthTicks," +
+                   "RawRetestWithinDepthTolerance," +
+                   "RawRetestMinimumOutsideDistanceTicks," +
+                   "RawRetestTouchedExactLevel," +
+                   "RawRetestWasWithinModelBarWindow," +
+                   "RawRetestConfirmed," +
+                   "RawRetestConfirmationTime," +
+                   "MfeBeforeRawRetestTicks," +
+                   "MfeAfterRawRetestTicks," +
+                   "RawRetestStatus," +
+                   "ResolutionTime,ResolutionReason";
+        }
+
+        private StreamWriter CreateWriter(string folder, string fileName, string header)
+        {
+            var writer = new StreamWriter(Path.Combine(folder, fileName), false, new UTF8Encoding(false));
+            writer.AutoFlush = false;
             writer.WriteLine(header);
             return writer;
         }
 
-        private void ExportSession(RangeSessionContext session)
+        private void ExportManifest()
         {
-            if (sessionWriter == null || session == null)
+            if (manifestWriter == null)
                 return;
 
+            manifestWriter.WriteLine(string.Join(",",
+                Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(DataSourceLabel),
+                Csv("5 Minute"), Csv("1 Minute"), Bool(EnablePrecisionTickAnalysis), Csv(Bars?.TradingHours?.Name ?? ""),
+                RangeStartTime, MarketOpenTime, EntryStartTime, EntryEndTime, FlattenTime,
+                MinimumBreakoutDistanceTicks, EntryMinimumDistanceTicksFromRange, EntryMaximumDistanceTicksFromRange,
+                MaximumRetestBars, RetestOutsideDistanceTicks, RetestInsideDistanceTicks,
+                Num(MinimumStrongBodyPercent), Num(MinimumCloseLocationPercent), RelativeBodyLookback,
+                Num(MinimumRelativeBodyMultiple), Num(MinimumRetestConfirmationBodyPercent), MaximumInitialStopTicks,
+                Num(RiskRewardRatio), Quantity, BEProfitTriggerTicks, BEPlusTicks, Csv(DateTime.Now.ToString("O"))));
+            manifestWriter.Flush();
+        }
+
+        private void ExportSession(string recordType, RangeSessionContext s, SessionDataQuality q)
+        {
+            if (sessionWriter == null || s == null)
+                return;
+            q = q ?? new SessionDataQuality();
             sessionWriter.WriteLine(string.Join(",",
-                Csv(session.TradingDate.ToString("yyyy-MM-dd")),
-                Csv(Instrument.FullName),
-                Num(session.PremarketHigh),
-                Num(session.PremarketLow),
-                Num(session.RangeTicks),
-                Num(session.TickSize),
-                Num(session.PointValue)));
+                Csv(recordType), Csv(runId), Csv(ResearchVersion), Csv(s.Instrument), Csv(s.Contract), Csv(s.TradingDate.ToString("yyyy-MM-dd")),
+                Num(s.PremarketHigh), Num(s.PremarketLow), Num(s.RangeTicks), Dt(s.HighFormationTime), Dt(s.LowFormationTime), Num(s.TickSize), Num(s.PointValue),
+                q.FiveMinuteRangeBarCount, q.OneMinuteEntryWindowBarCount, q.TickCount, Bool(q.HasFiveMinuteData), Bool(q.HasOneMinuteData), Bool(q.HasTickData),
+                Dt(q.FirstFiveMinuteBarTime), Dt(q.LastFiveMinuteBarTime), Dt(q.FirstOneMinuteBarTime), Dt(q.LastOneMinuteBarTime), Dt(q.FirstTickTime), Dt(q.LastTickTime), Csv(q.Status)));
         }
 
-        private void ExportBreakout(BreakoutEvent breakout)
+        private void ExportBreakoutAudit(string recordType, BreakoutEvent x)
         {
-            WriteBreakout("Created", breakout);
+            breakoutAuditWriter?.WriteLine(BreakoutRow(x, recordType));
         }
 
-        private void ExportBreakoutUpdate(BreakoutEvent breakout)
+        private void ExportBreakoutFinal(BreakoutEvent x)
         {
-            WriteBreakout("Updated", breakout);
+            if (breakoutFinalWriter != null)
+            {
+                breakoutFinalWriter.WriteLine(BreakoutRow(x, null));
+                breakoutFinalWriter.Flush();
+            }
         }
 
-        private void WriteBreakout(string recordType, BreakoutEvent x)
+        private string BreakoutRow(BreakoutEvent x, string recordType)
         {
-            if (breakoutWriter == null || x == null)
-                return;
-
-            CandleSnapshot c = x.Candle ?? new CandleSnapshot();
-            CandleMetrics m = x.Metrics ?? new CandleMetrics();
-
-            breakoutWriter.WriteLine(string.Join(",",
-                Csv(recordType),
-                Csv(x.EventId),
-                Csv(x.TradingDate.ToString("yyyy-MM-dd")),
-                Csv(x.Direction.ToString()),
-                x.AttemptNumber.ToString(CultureInfo.InvariantCulture),
-                Csv(x.BreakoutTime.ToString("O")),
-                Num(x.RangeLevel),
-                Num(x.BreakoutClose),
-                Num(x.DistanceOutsideTicks),
-                Num(c.Open),
-                Num(c.High),
-                Num(c.Low),
-                Num(c.Close),
-                Num(c.Volume),
-                Num(m.RangeTicks),
-                Num(m.BodyTicks),
-                Num(m.BodyPercent),
-                Num(m.CloseLocationPercent),
-                Num(m.RelativeBodyMultiple),
+            var c = x.Candle ?? new CandleSnapshot();
+            var m = x.Metrics ?? new CandleMetrics();
+            var prefix = recordType == null ? "" : Csv(recordType) + ",";
+            return prefix + string.Join(",",
+                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(x.Contract),
+                Csv(x.EventId), Csv(x.TradingDate.ToString("yyyy-MM-dd")), Csv(x.Direction.ToString()), x.AttemptNumber,
+                Dt(x.BreakoutTime), Num(x.RangeLevel), Num(x.BreakoutClose), Num(x.DistanceOutsideTicks), Num(c.Open),
+                Num(c.High), Num(c.Low), Num(c.Close), Num(c.Volume),
+                Num(m.RangeTicks), Num(m.BodyTicks), Num(m.BodyPercent), Num(m.UpperWickTicks), Num(m.LowerWickTicks),
+                Num(m.CloseLocationPercent), Num(m.AverageBodyTicks), Num(m.RelativeBodyMultiple), Num(m.AverageVolume),
                 Num(m.RelativeVolumeMultiple),
-                Num(x.MfeTicks),
-                Num(x.MaeTicks),
-                Bool(x.ReturnedInside),
-                Csv(x.ReturnedInsideTime == DateTime.MinValue ? "" : x.ReturnedInsideTime.ToString("O")),
-                x.BarsUntilReturnInside.ToString(CultureInfo.InvariantCulture),
-                Bool(x.Reached10Ticks),
-                Bool(x.Reached20Ticks),
-                Bool(x.Reached30Ticks),
-                Bool(x.Reached40Ticks),
-                Bool(x.Reached60Ticks),
-                Bool(x.Reached100Ticks)));
+                Num(x.MfeTicks), Num(x.MaeTicks), Bool(x.ReturnedInside), Dt(x.ReturnedInsideTime),
+                x.BarsUntilReturnInside, Num(x.MfeBeforeReturnTicks), Bool(x.IsFakeout20Ticks),
+                Bool(x.Reached10Ticks), Dt(x.TimeTo10Ticks), Bool(x.Reached20Ticks), Dt(x.TimeTo20Ticks),
+                Bool(x.Reached30Ticks), Dt(x.TimeTo30Ticks), Bool(x.Reached40Ticks), Dt(x.TimeTo40Ticks),
+                Bool(x.Reached60Ticks), Dt(x.TimeTo60Ticks), Bool(x.Reached100Ticks), Dt(x.TimeTo100Ticks),
+                Num(x.Mfe1Minute), Num(x.Mae1Minute), Num(x.Mfe2Minutes), Num(x.Mae2Minutes), Num(x.Mfe3Minutes),
+                Num(x.Mae3Minutes), Num(x.Mfe5Minutes), Num(x.Mae5Minutes), Num(x.Mfe10Minutes), Num(x.Mae10Minutes),
+                Num(x.Mfe15Minutes), Num(x.Mae15Minutes), Num(x.Mfe30Minutes), Num(x.Mae30Minutes), Num(x.Mfe60Minutes),
+                Num(x.Mae60Minutes),
+                Bool(x.RawRetestArmed),
+                x.RawRetestArmedBarIndex,
+                Num(x.FurthestExcursionBeforeRawRetestTicks),
+                x.FirstRawRetestBarIndex,
+                Num(x.FirstRawRetestReferencePrice),
+                Bool(x.RawRetestObserved),
+                Dt(x.FirstRawRetestTime),
+                x.FirstRawRetestBarsAfterBreakout,
+                Num(x.FirstRawRetestMinutesAfterBreakout),
+                Num(x.RawRetestMaximumInsideDepthTicks),
+                Bool(x.RawRetestWithinDepthTolerance),
+                Num(
+                    x.RawRetestMinimumOutsideDistanceTicks
+                    == double.MaxValue
+                        ? 0
+                        : x.RawRetestMinimumOutsideDistanceTicks),
+                Bool(x.RawRetestTouchedExactLevel),
+                Bool(x.RawRetestWasWithinModelBarWindow),
+                Bool(x.RawRetestConfirmed),
+                Dt(x.RawRetestConfirmationTime),
+                Num(x.MfeBeforeRawRetestTicks),
+                Num(x.MfeAfterRawRetestTicks),
+                Csv(x.RawRetestStatus),
+                Dt(x.ResolutionTime),
+                Csv(x.ResolutionReason));
         }
 
-        private void ExportCandidate(EntryCandidate candidate)
-        {
-            WriteCandidate("Created", candidate);
-        }
-
-        private void ExportCandidateUpdate(EntryCandidate candidate)
-        {
-            WriteCandidate("Filled", candidate);
-        }
-
-        private void WriteCandidate(string recordType, EntryCandidate x)
+        private void ExportCandidate(string recordType, EntryCandidate x)
         {
             if (candidateWriter == null || x == null)
                 return;
-
-            CandleSnapshot c = x.ConfirmationCandle ?? new CandleSnapshot();
-            CandleMetrics m = x.Metrics ?? new CandleMetrics();
-
+            var c = x.ConfirmationCandle ?? new CandleSnapshot();
+            var m = x.Metrics ?? new CandleMetrics();
+            
             candidateWriter.WriteLine(string.Join(",",
-                Csv(recordType),
-                Csv(x.CandidateId),
-                Csv(x.BreakoutEventId),
-                Csv(x.ModelName),
-                Csv(x.Direction.ToString()),
-                Csv(x.SignalTime.ToString("O")),
-                x.SignalBarIndex.ToString(CultureInfo.InvariantCulture),
-                Num(x.RangeLevel),
-                Bool(x.StrongCandleQualified),
-                Csv(x.QualificationReason),
-                x.BarsAfterBreakout.ToString(CultureInfo.InvariantCulture),
-                Num(x.RetestInsideDepthTicks),
-                Num(x.RetestOutsideDistanceTicks),
-                Num(c.Open),
-                Num(c.High),
-                Num(c.Low),
-                Num(c.Close),
-                Num(m.RangeTicks),
-                Num(m.BodyTicks),
-                Num(m.BodyPercent),
-                Num(m.CloseLocationPercent),
-                Num(m.RelativeBodyMultiple),
-                Num(m.RelativeVolumeMultiple),
-                Num(x.StructuralStopPrice),
-                Num(x.PlannedEntryPrice),
-                Num(x.PlannedStopPrice),
-                Num(x.StructuralRiskTicks),
-                Num(x.ActualRiskTicks),
-                Bool(x.StopWasCapped)));
+                Csv(recordType), Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(x.CandidateId), Csv(x.BreakoutEventId), Csv(x.ModelName), Csv(x.Direction.ToString()), Dt(x.SignalTime), x.SignalBarIndex, Num(x.RangeLevel), Bool(x.StrongCandleQualified),
+                Bool(x.DirectionPassed), Bool(x.BodyPassed), Bool(x.CloseLocationPassed), Bool(x.RelativeBodyPassed), Csv(x.FinalStatus), Csv(x.QualificationReason), x.BarsAfterBreakout, Num(x.RetestInsideDepthTicks), Num(x.RetestOutsideDistanceTicks),
+                Num(c.Open), Num(c.High), Num(c.Low), Num(c.Close), Num(m.RangeTicks), Num(m.BodyTicks), Num(m.BodyPercent), Num(m.UpperWickTicks), Num(m.LowerWickTicks), Num(m.CloseLocationPercent), Num(m.AverageBodyTicks), Num(m.RelativeBodyMultiple), Num(m.AverageVolume), Num(m.RelativeVolumeMultiple),
+                Num(x.StructuralStopPrice), Dt(x.PlannedEntryTime), Num(x.PlannedEntryPrice), Num(x.EntryDistanceTicks), Num(x.PlannedStopPrice), Num(x.StructuralRiskTicks), Num(x.ActualRiskTicks), Bool(x.StopWasCapped)));
         }
 
-        private void ExportTrade(HypotheticalTrade trade)
+        private void ExportTrade(HypotheticalTrade t)
         {
-            if (tradeWriter == null || trade == null)
+            if (tradeWriter == null || t == null)
                 return;
-
-            EntryCandidate c = trade.Candidate;
-            ManagementOutcome o = trade.Outcome;
-
+            
+            var c = t.Candidate;
+            var o = t.Outcome;
+            
             tradeWriter.WriteLine(string.Join(",",
-                Csv(c.CandidateId),
-                Csv(c.BreakoutEventId),
-                Csv(c.ModelName),
-                Csv(c.Direction.ToString()),
-                Csv(trade.PolicyName),
-                Csv(trade.EntryTime.ToString("O")),
-                Num(trade.EntryPrice),
-                Num(c.PlannedStopPrice),
-                Num(c.ActualRiskTicks),
-                Csv(o.ExitTime.ToString("O")),
-                Num(o.ExitPrice),
-                Csv(o.ExitReason),
-                Num(o.RealizedTicks),
-                Num(o.RealizedUsd),
-                Num(o.MfeTicks),
-                Num(o.MaeTicks),
-                Bool(o.BreakEvenActivated),
-                o.HighestTrailStepActivated.ToString(CultureInfo.InvariantCulture)));
+                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(c.CandidateId), Csv(c.BreakoutEventId), Csv(c.ModelName), Csv(c.Direction.ToString()), Csv(t.PolicyName), Dt(t.EntryTime), Num(t.EntryPrice), Num(c.PlannedStopPrice), Num(c.ActualRiskTicks), Dt(o.ExitTime), Num(o.ExitPrice), Csv(o.ExitReason), Num(o.RealizedTicks), Num(o.RealizedUsd), Num(o.MfeTicks), Num(o.MaeTicks), Bool(o.BreakEvenActivated), o.HighestTrailStepActivated));
         }
 
         private void ExportDailySummary(DateTime date)
         {
             if (dailyWriter == null)
                 return;
-
             dailyWriter.WriteLine(string.Join(",",
-                Csv(date.ToString("yyyy-MM-dd")),
-                Csv(Instrument.FullName),
-                breakoutEvents.Count.ToString(CultureInfo.InvariantCulture),
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Long).ToString(CultureInfo.InvariantCulture),
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Short).ToString(CultureInfo.InvariantCulture),
-                breakoutEvents.Count(x => x.ReturnedInside).ToString(CultureInfo.InvariantCulture),
-                entryCandidates.Count(x => x.StrongCandleQualified).ToString(CultureInfo.InvariantCulture),
-                entryCandidates.Count(x => !x.StrongCandleQualified).ToString(CultureInfo.InvariantCulture),
-                activeTrades.Count.ToString(CultureInfo.InvariantCulture)));
+                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(date.ToString("yyyy-MM-dd")), breakoutEvents.Count,
+                breakoutEvents.Count(x => x.Direction == TradeDirection.Long), breakoutEvents.Count(x => x.Direction == TradeDirection.Short), breakoutEvents.Count(x => x.IsFakeout20Ticks),
+                entryCandidates.Count(x => x.StrongCandleQualified), entryCandidates.Count(x => !x.StrongCandleQualified), 0));
         }
 
         private void FlushAndDisposeExport()
         {
-            if (activeTradingDate != Core.Globals.MinDate)
+            if (activeTradingDate != Globals.MinDate)
                 ExportDailySummary(activeTradingDate);
-
             CloseWriters();
         }
 
         private void CloseWriters()
         {
-            CloseWriter(ref sessionWriter);
-            CloseWriter(ref breakoutWriter);
-            CloseWriter(ref candidateWriter);
-            CloseWriter(ref tradeWriter);
-            CloseWriter(ref dailyWriter);
+            CloseWriter(ref manifestWriter); CloseWriter(ref sessionWriter); CloseWriter(ref breakoutAuditWriter); CloseWriter(ref breakoutFinalWriter);
+            CloseWriter(ref candidateWriter); CloseWriter(ref tradeWriter); CloseWriter(ref dailyWriter);
         }
 
         private static void CloseWriter(ref StreamWriter writer)
         {
-            if (writer == null)
-                return;
-
-            try
-            {
-                writer.Flush();
-                writer.Dispose();
-            }
+            if (writer == null) return;
+            try { writer.Flush(); writer.Dispose(); }
             catch
             {
+                // ignored
             }
-            finally
-            {
-                writer = null;
-            }
+            finally { writer = null; }
         }
 
-        private static string Csv(string value)
+        private static string SanitizeFileName(string value)
         {
-            string text = value ?? "";
-            return "\"" + text.Replace("\"", "\"\"") + "\"";
+            var result = value ?? "unknown";
+            
+            result = Path.GetInvalidFileNameChars()
+                .Aggregate(result, (current, c) => current.Replace(c, '_'));
+            
+            return result.Replace(' ', '_');
+        }
+        
+        private void FlushExportWriters()
+        {
+            sessionWriter?.Flush();
+            breakoutAuditWriter?.Flush();
+            breakoutFinalWriter?.Flush();
+            candidateWriter?.Flush();
+            tradeWriter?.Flush();
+            dailyWriter?.Flush();
+            manifestWriter?.Flush();
         }
 
-        private static string Num(double value)
-        {
-            return value.ToString("0.########", CultureInfo.InvariantCulture);
-        }
-
-        private static string Bool(bool value)
-        {
-            return value ? "1" : "0";
-        }
+        private static string Csv(string value) => "\"" + (value ?? "").Replace("\"", "\"\"") + "\"";
+        private static string Num(double value) => value.ToString("0.########", CultureInfo.InvariantCulture);
+        private static string Bool(bool value) => value ? "1" : "0";
+        private static string Dt(DateTime value) => Csv(value == DateTime.MinValue || value == Core.Globals.MinDate ? "" : value.ToString("O"));
     }
 }
