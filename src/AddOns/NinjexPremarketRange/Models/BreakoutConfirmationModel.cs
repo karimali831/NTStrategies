@@ -40,15 +40,15 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             if (!IsEnabled || context == null || context.Bar == null)
                 return candidates;
 
-            for (int i = pendingBreakouts.Count - 1; i >= 0; i--)
+            for (var i = pendingBreakouts.Count - 1; i >= 0; i--)
             {
-                BreakoutEvent breakout = pendingBreakouts[i];
+                var breakout = pendingBreakouts[i];
 
                 // The breakout candle itself is the confirmation candle.
                 if (breakout.BreakoutBarIndex != context.Bar.BarIndex)
                     continue;
 
-                EntryCandidate candidate = BuildCandidate(context, breakout);
+                var candidate = BuildCandidate(context, breakout);
                 candidates.Add(candidate);
                 pendingBreakouts.RemoveAt(i);
             }
@@ -60,8 +60,8 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             ModelBarContext context,
             BreakoutEvent breakout)
         {
-            CandleMetrics metrics = context.Metrics ?? new CandleMetrics();
-            bool directionOk = breakout.Direction == TradeDirection.Long
+            var metrics = context.Metrics ?? new CandleMetrics();
+            var directionOk = breakout.Direction == TradeDirection.Long
                 ? context.Bar.IsBullish
                 : context.Bar.IsBearish;
 

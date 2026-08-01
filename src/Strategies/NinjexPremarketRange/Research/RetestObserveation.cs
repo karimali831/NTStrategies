@@ -181,7 +181,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!zoneTouched)
                 return;
-
+            
             breakout.RawRetestMaximumInsideDepthTicks =
                 Math.Max(
                     breakout.RawRetestMaximumInsideDepthTicks,
@@ -209,6 +209,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!breakout.RawRetestObserved)
             {
                 breakout.RawRetestObserved = true;
+                
+                breakout.FirstRawRetestInsideDepthTicks =
+                    insideDepthTicks;
+
+                breakout.FirstRawRetestOutsideDistanceTicks =
+                    outsideDistanceTicks;
+
+                breakout.FirstRawRetestWithinDepthTolerance =
+                    insideDepthTicks <= RetestInsideDistanceTicks;
 
                 breakout.FirstRawRetestTime =
                     bar.Time;
@@ -234,19 +243,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ? bar.Low
                         : bar.High;
 
-                if (!breakout.RawRetestWithinDepthTolerance)
+                if (!breakout.FirstRawRetestWithinDepthTolerance)
                 {
                     breakout.RawRetestStatus =
-                        "ObservedBeyondInsideTolerance";
+                        "FirstRetestBeyondInsideTolerance";
                 }
                 else
                 {
                     breakout.RawRetestStatus =
                         breakout.RawRetestWasWithinModelBarWindow
-                            ? "ObservedWithinModelWindow"
-                            : "ObservedOutsideModelWindow";
+                            ? "FirstRetestWithinModelWindow"
+                            : "FirstRetestOutsideModelWindow";
                 }
-
+                
                 ExportBreakoutAudit(
                     "RawRetestObserved",
                     breakout);

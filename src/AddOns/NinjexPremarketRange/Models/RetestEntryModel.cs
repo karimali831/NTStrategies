@@ -11,10 +11,22 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         private sealed class RetestState
         {
             public BreakoutEvent Breakout { get; set; }
+
+            public bool Armed { get; set; }
+
+            public int ArmedBarIndex { get; set; }
+            
+            public int ExpiryBarIndex { get; set; }
+            public double FurthestExcursionTicks { get; set; }
+
             public bool ZoneTouched { get; set; }
-            public bool Invalidated { get; set; }
+
             public int ZoneTouchBarIndex { get; set; }
+
+            public bool Invalidated { get; set; }
+
             public double MaximumInsideDepthTicks { get; set; }
+
             public double MinimumOutsideDistanceTicks { get; set; }
         }
 
@@ -24,9 +36,13 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         public string Name => "Retest";
 
         public bool IsEnabled { get; set; }
+
         public int MaximumBarsAfterBreakout { get; set; }
+
         public int OutsideDistanceTicks { get; set; }
+
         public int InsideDistanceTicks { get; set; }
+
         public double MinimumConfirmationBodyPercent { get; set; }
 
         public void Reset(RangeSessionContext session)
@@ -36,42 +52,84 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 
         public void OnBreakout(BreakoutEvent breakoutEvent)
         {
-            if (breakoutEvent == null)
+            if (!IsEnabled
+                || breakoutEvent == null)
+            {
                 return;
+            }
 
             states.Add(new RetestState
             {
                 Breakout = breakoutEvent,
+
+                ExpiryBarIndex =
+                    breakoutEvent.BreakoutBarIndex
+                    + Math.Max(0, MaximumBarsAfterBreakout),
+
+                ArmedBarIndex = -1,
                 ZoneTouchBarIndex = -1,
-                MinimumOutsideDistanceTicks = double.MaxValue
+
+                MinimumOutsideDistanceTicks =
+                    double.MaxValue
             });
         }
 
-        public IEnumerable<EntryCandidate> Evaluate(ModelBarContext context)
+        public IEnumerable<EntryCandidate> Evaluate(
+            ModelBarContext context)
         {
-            var candidates = new List<EntryCandidate>();
+            var candidates =
+                new List<EntryCandidate>();
 
-            if (!IsEnabled || context == null || context.Bar == null)
+            if (!IsEnabled
+                || context?.Session == null
+                || context.Bar == null)
+            {
                 return candidates;
+            }
 
-            var tickSize = context.Session.TickSize;
+            var tickSize =
+                context.Session.TickSize;
+
+            if (tickSize <= 0)
+                return candidates;
 
             for (var i = states.Count - 1; i >= 0; i--)
             {
                 var state = states[i];
-                var barsAfter =
-                    context.Bar.BarIndex - state.Breakout.BreakoutBarIndex;
 
-                if (barsAfter <= 0)
-                    continue;
-
-                if (barsAfter > MaximumBarsAfterBreakout)
+                if (state.Breakout == null
+                    || state.Breakout.IsResolved)
                 {
                     states.RemoveAt(i);
                     continue;
                 }
 
-                UpdateRetestState(state, context.Bar, tickSize);
+                if (context.Bar.BarIndex > state.ExpiryBarIndex)
+                {
+                    states.RemoveAt(i);
+                    continue;
+                }
+
+                var barsAfter =
+                    context.Bar.BarIndex
+                    - state.Breakout.BreakoutBarIndex;
+
+                UpdateArmState(
+                    state,
+                    context.Bar,
+                    tickSize);
+
+                if (!state.Armed
+                    || context.Bar.BarIndex
+                    <= state.ArmedBarIndex)
+                {
+                    continue;
+                }
+
+                UpdateRetestState(
+                    state,
+                    context.Bar,
+                    tickSize);
 
                 if (state.Invalidated)
                 {
@@ -82,17 +140,72 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 if (!state.ZoneTouched)
                     continue;
 
-                var confirmed = IsConfirmation(context, state.Breakout.Direction);
-                if (!confirmed)
+                // Confirmation must occur after the first retest bar.
+                if (context.Bar.BarIndex
+                    <= state.ZoneTouchBarIndex)
+                {
                     continue;
+                }
 
-                candidates.Add(BuildCandidate(context, state, barsAfter));
+                if (!IsConfirmation(
+                        context,
+                        state.Breakout.Direction))
+                {
+                    continue;
+                }
+
+                if (barsAfter > MaximumBarsAfterBreakout)
+                {
+                    states.RemoveAt(i);
+                    continue;
+                }
+
+                candidates.Add(
+                    BuildCandidate(
+                        context,
+                        state,
+                        barsAfter));
+
                 states.RemoveAt(i);
+                
             }
 
             return candidates;
         }
-        
+
+        private void UpdateArmState(
+            RetestState state,
+            CandleSnapshot bar,
+            double tickSize)
+        {
+            if (state.Armed)
+                return;
+
+            var excursionTicks =
+                state.Breakout.Direction
+                == TradeDirection.Long
+                    ? (bar.High
+                       - state.Breakout.RangeLevel)
+                      / tickSize
+                    : (state.Breakout.RangeLevel
+                       - bar.Low)
+                      / tickSize;
+
+            state.FurthestExcursionTicks =
+                Math.Max(
+                    state.FurthestExcursionTicks,
+                    excursionTicks);
+
+            if (state.FurthestExcursionTicks
+                <= OutsideDistanceTicks)
+            {
+                return;
+            }
+
+            state.Armed = true;
+            state.ArmedBarIndex = bar.BarIndex;
+        }
+
         private void UpdateRetestState(
             RetestState state,
             CandleSnapshot bar,
@@ -100,57 +213,96 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         {
             var level = state.Breakout.RangeLevel;
 
-            if (state.Breakout.Direction == TradeDirection.Long)
+            double insideDepthTicks;
+            double outsideDistanceTicks;
+            bool zoneTouched;
+            bool exceededInsideBoundary;
+
+            if (state.Breakout.Direction
+                == TradeDirection.Long)
             {
-                var zoneTop = level + OutsideDistanceTicks * tickSize;
-                var zoneBottom = level - InsideDistanceTicks * tickSize;
+                var zoneTop =
+                    level
+                    + OutsideDistanceTicks * tickSize;
 
-                var touched = bar.Low <= zoneTop && bar.High >= zoneBottom;
-                if (touched)
-                {
-                    state.ZoneTouched = true;
-                    if (state.ZoneTouchBarIndex < 0)
-                        state.ZoneTouchBarIndex = bar.BarIndex;
+                var zoneBottom =
+                    level
+                    - InsideDistanceTicks * tickSize;
 
-                    var insideDepth =
-                        Math.Max(0, (level - bar.Low) / tickSize);
-                    var outsideDistance =
-                        Math.Max(0, (bar.Low - level) / tickSize);
+                zoneTouched =
+                    bar.Low <= zoneTop
+                    && bar.High >= zoneBottom;
 
-                    state.MaximumInsideDepthTicks =
-                        Math.Max(state.MaximumInsideDepthTicks, insideDepth);
-                    state.MinimumOutsideDistanceTicks =
-                        Math.Min(state.MinimumOutsideDistanceTicks, outsideDistance);
-                }
+                exceededInsideBoundary =
+                    bar.Low < zoneBottom;
 
-                if (bar.Low < zoneBottom)
-                    state.Invalidated = true;
+                insideDepthTicks =
+                    Math.Max(
+                        0,
+                        (level - bar.Low) / tickSize);
+
+                outsideDistanceTicks =
+                    Math.Max(
+                        0,
+                        (bar.Low - level) / tickSize);
             }
             else
             {
-                var zoneTop = level + InsideDistanceTicks * tickSize;
-                var zoneBottom = level - OutsideDistanceTicks * tickSize;
+                var zoneTop =
+                    level
+                    + InsideDistanceTicks * tickSize;
 
-                var touched = bar.High >= zoneBottom && bar.Low <= zoneTop;
-                if (touched)
-                {
-                    state.ZoneTouched = true;
-                    if (state.ZoneTouchBarIndex < 0)
-                        state.ZoneTouchBarIndex = bar.BarIndex;
+                var zoneBottom =
+                    level
+                    - OutsideDistanceTicks * tickSize;
 
-                    var insideDepth =
-                        Math.Max(0, (bar.High - level) / tickSize);
-                    var outsideDistance =
-                        Math.Max(0, (level - bar.High) / tickSize);
+                zoneTouched =
+                    bar.High >= zoneBottom
+                    && bar.Low <= zoneTop;
 
-                    state.MaximumInsideDepthTicks =
-                        Math.Max(state.MaximumInsideDepthTicks, insideDepth);
-                    state.MinimumOutsideDistanceTicks =
-                        Math.Min(state.MinimumOutsideDistanceTicks, outsideDistance);
-                }
+                exceededInsideBoundary =
+                    bar.High > zoneTop;
 
-                if (bar.High > zoneTop)
-                    state.Invalidated = true;
+                insideDepthTicks =
+                    Math.Max(
+                        0,
+                        (bar.High - level) / tickSize);
+
+                outsideDistanceTicks =
+                    Math.Max(
+                        0,
+                        (level - bar.High) / tickSize);
+            }
+
+            if (exceededInsideBoundary)
+            {
+                state.MaximumInsideDepthTicks =
+                    Math.Max(
+                        state.MaximumInsideDepthTicks,
+                        insideDepthTicks);
+
+                state.Invalidated = true;
+                return;
+            }
+
+            if (!zoneTouched)
+                return;
+
+            state.MaximumInsideDepthTicks =
+                Math.Max(
+                    state.MaximumInsideDepthTicks,
+                    insideDepthTicks);
+
+            state.MinimumOutsideDistanceTicks =
+                Math.Min(
+                    state.MinimumOutsideDistanceTicks,
+                    outsideDistanceTicks);
+
+            if (!state.ZoneTouched)
+            {
+                state.ZoneTouched = true;
+                state.ZoneTouchBarIndex =
+                    bar.BarIndex;
             }
         }
 
@@ -161,17 +313,22 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             if (context.Metrics == null)
                 return false;
 
-            var directionOk = direction == TradeDirection.Long
-                ? context.Bar.IsBullish
-                : context.Bar.IsBearish;
+            var directionOk =
+                direction == TradeDirection.Long
+                    ? context.Bar.IsBullish
+                    : context.Bar.IsBearish;
 
-            var closesReclaimed = direction == TradeDirection.Long
-                ? context.Bar.Close > context.Session.PremarketHigh
-                : context.Bar.Close < context.Session.PremarketLow;
+            var closesReclaimed =
+                direction == TradeDirection.Long
+                    ? context.Bar.Close
+                      > context.Session.PremarketHigh
+                    : context.Bar.Close
+                      < context.Session.PremarketLow;
 
             return directionOk
                    && closesReclaimed
-                   && context.Metrics.BodyPercent >= MinimumConfirmationBodyPercent;
+                   && context.Metrics.BodyPercent
+                   >= MinimumConfirmationBodyPercent;
         }
 
         private EntryCandidate BuildCandidate(
@@ -179,35 +336,67 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             RetestState state,
             int barsAfter)
         {
-            var breakout = state.Breakout;
+            var breakout =
+                state.Breakout;
 
             return new EntryCandidate
             {
-                CandidateId = breakout.EventId + "-RETEST",
-                BreakoutEventId = breakout.EventId,
+                CandidateId =
+                    breakout.EventId + "-RETEST",
+
+                BreakoutEventId =
+                    breakout.EventId,
+
                 ModelName = Name,
-                Direction = breakout.Direction,
-                SignalTime = context.Bar.Time,
-                SignalBarIndex = context.Bar.BarIndex,
-                RangeLevel = breakout.RangeLevel,
-                ConfirmationCandle = context.Bar,
-                Metrics = context.Metrics,
-                BarsAfterBreakout = barsAfter,
-                RetestInsideDepthTicks = state.MaximumInsideDepthTicks,
+
+                Direction =
+                    breakout.Direction,
+
+                SignalTime =
+                    context.Bar.Time,
+
+                SignalBarIndex =
+                    context.Bar.BarIndex,
+
+                RangeLevel =
+                    breakout.RangeLevel,
+
+                ConfirmationCandle =
+                    context.Bar,
+
+                Metrics =
+                    context.Metrics,
+
+                BarsAfterBreakout =
+                    barsAfter,
+
+                RetestInsideDepthTicks =
+                    state.MaximumInsideDepthTicks,
+
                 RetestOutsideDistanceTicks =
-                    state.MinimumOutsideDistanceTicks == double.MaxValue
+                    state.MinimumOutsideDistanceTicks
+                    == double.MaxValue
                         ? 0
                         : state.MinimumOutsideDistanceTicks,
+
                 StrongCandleQualified = true,
+
                 DirectionPassed = true,
                 BodyPassed = true,
                 CloseLocationPassed = true,
                 RelativeBodyPassed = true,
-                FinalStatus = "SignalQualified",
-                QualificationReason = "Retest zone touched and directional confirmation candle closed beyond the broken level.",
-                StructuralStopPrice = breakout.Direction == TradeDirection.Long
-                    ? context.Bar.Low
-                    : context.Bar.High
+
+                FinalStatus =
+                    "SignalQualified",
+
+                QualificationReason =
+                    "Breakout moved away from the range, a later bar retested the configured zone, and a subsequent directional confirmation candle closed beyond the broken level.",
+
+                StructuralStopPrice =
+                    breakout.Direction
+                    == TradeDirection.Long
+                        ? context.Bar.Low
+                        : context.Bar.High
             };
         }
     }

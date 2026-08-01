@@ -182,6 +182,11 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double FurthestExcursionBeforeRawRetestTicks { get; set; }
         public int FirstRawRetestBarIndex { get; set; }
         public double FirstRawRetestReferencePrice { get; set; }
+        public double FirstRawRetestInsideDepthTicks { get; set; }
+
+        public double FirstRawRetestOutsideDistanceTicks { get; set; }
+
+        public bool FirstRawRetestWithinDepthTolerance { get; set; }
     }
 
     public sealed class EntryCandidate

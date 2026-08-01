@@ -99,6 +99,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                    "RawRetestObserved,FirstRawRetestTime," +
                    "FirstRawRetestBarsAfterBreakout," +
                    "FirstRawRetestMinutesAfterBreakout," +
+                   "FirstRawRetestInsideDepthTicks," +
+                   "FirstRawRetestOutsideDistanceTicks," +
+                   "FirstRawRetestWithinDepthTolerance," +
                    "RawRetestMaximumInsideDepthTicks," +
                    "RawRetestWithinDepthTolerance," +
                    "RawRetestMinimumOutsideDistanceTicks," +
@@ -194,6 +197,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Dt(x.FirstRawRetestTime),
                 x.FirstRawRetestBarsAfterBreakout,
                 Num(x.FirstRawRetestMinutesAfterBreakout),
+                Num(x.FirstRawRetestInsideDepthTicks),
+                Num(x.FirstRawRetestOutsideDistanceTicks),
+                Bool(x.FirstRawRetestWithinDepthTolerance),
                 Num(x.RawRetestMaximumInsideDepthTicks),
                 Bool(x.RawRetestWithinDepthTolerance),
                 Num(
@@ -236,16 +242,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             tradeWriter.WriteLine(string.Join(",",
                 Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(c.CandidateId), Csv(c.BreakoutEventId), Csv(c.ModelName), Csv(c.Direction.ToString()), Csv(t.PolicyName), Dt(t.EntryTime), Num(t.EntryPrice), Num(c.PlannedStopPrice), Num(c.ActualRiskTicks), Dt(o.ExitTime), Num(o.ExitPrice), Csv(o.ExitReason), Num(o.RealizedTicks), Num(o.RealizedUsd), Num(o.MfeTicks), Num(o.MaeTicks), Bool(o.BreakEvenActivated), o.HighestTrailStepActivated));
+            
+            completedTradeCount++;
         }
 
         private void ExportDailySummary(DateTime date)
         {
-            if (dailyWriter == null)
+            date = date.Date;
+
+            if (dailyWriter == null
+                || date == Globals.MinDate.Date
+                || !exportedDailySummaryDates.Add(date))
+            {
                 return;
+            }
+
             dailyWriter.WriteLine(string.Join(",",
-                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(date.ToString("yyyy-MM-dd")), breakoutEvents.Count,
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Long), breakoutEvents.Count(x => x.Direction == TradeDirection.Short), breakoutEvents.Count(x => x.IsFakeout20Ticks),
-                entryCandidates.Count(x => x.StrongCandleQualified), entryCandidates.Count(x => !x.StrongCandleQualified), 0));
+                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), 
+                Csv(Instrument.FullName), 
+                Csv(date.ToString("yyyy-MM-dd")), breakoutEvents.Count,
+                breakoutEvents.Count(x => x.Direction == TradeDirection.Long), 
+                breakoutEvents.Count(x => x.Direction == TradeDirection.Short), 
+                breakoutEvents.Count(x => x.IsFakeout20Ticks),
+                entryCandidates.Count(x => x.StrongCandleQualified), 
+                entryCandidates.Count(
+                    x => x.FinalStatus != null
+                         && x.FinalStatus.StartsWith(
+                             "Rejected",
+                             StringComparison.Ordinal)),
+
+                completedTradeCount));
         }
 
         private void FlushAndDisposeExport()

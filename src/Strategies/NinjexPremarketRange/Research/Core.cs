@@ -13,7 +13,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.0.0";
+        private const string ResearchVersion = "2.1.0";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
@@ -37,6 +37,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string runId;
         private string strategyInstanceId;
 
+        private readonly HashSet<DateTime>
+            exportedDailySummaryDates =
+                new HashSet<DateTime>();
+
+        private int completedTradeCount;
+        
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -112,6 +118,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 InsideDistanceTicks = RetestInsideDistanceTicks,
                 MinimumConfirmationBodyPercent = MinimumRetestConfirmationBodyPercent
             });
+            
+            Diagnostic(
+                lastMarketTime != Core.Globals.MinDate
+                    ? lastMarketTime
+                    : DateTime.Now,
+                "MODELS CONFIGURED MaximumRetestBars={0} " +
+                "OutsideTicks={1} InsideTicks={2}",
+                MaximumRetestBars,
+                RetestOutsideDistanceTicks,
+                RetestInsideDistanceTicks);
         }
 
         private void ProcessFiveMinuteContextSeries()
@@ -120,14 +136,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             lastProcessedContextBar = CurrentBars[ContextSeriesIndex];
-            DateTime barTime = Times[ContextSeriesIndex][1];
-            DateTime tradingDate = barTime.Date;
+            var barTime = Times[ContextSeriesIndex][1];
+            var tradingDate = barTime.Date;
             lastMarketTime = barTime;
 
             EnsureResearchDay(tradingDate, barTime);
             TrackFiveMinuteData(barTime);
 
-            bool finalizedNow = premarketRangeEngine.ProcessCompletedBar(
+            var finalizedNow = premarketRangeEngine.ProcessCompletedBar(
                 barTime,
                 Highs[ContextSeriesIndex][1],
                 Lows[ContextSeriesIndex][1],
@@ -155,19 +171,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             lastProcessedEntryBar = CurrentBars[EntrySeriesIndex];
-            DateTime barTime = Times[EntrySeriesIndex][1];
-            DateTime tradingDate = barTime.Date;
+            var barTime = Times[EntrySeriesIndex][1];
+            var tradingDate = barTime.Date;
             lastMarketTime = barTime;
 
             EnsureResearchDay(tradingDate, barTime);
             TrackOneMinuteData(barTime);
 
-            CandleSnapshot bar = CaptureBar(EntrySeriesIndex, 1);
-            CandleSnapshot previousBar = entryCandleHistory.Count > 0
+            var bar = CaptureBar(EntrySeriesIndex, 1);
+            var previousBar = entryCandleHistory.Count > 0
                 ? entryCandleHistory[entryCandleHistory.Count - 1]
                 : null;
 
-            CandleMetrics metrics = metricsCalculator.Calculate(
+            var metrics = metricsCalculator.Calculate(
                 bar,
                 entryCandleHistory,
                 RelativeBodyLookback,
@@ -178,9 +194,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(barTime) >= FlattenTime)
             {
-                FinalizeOpenBreakoutEvents(barTime, "FlattenTime");
-                ForceCloseAllHypotheticalTrades(barTime, Closes[EntrySeriesIndex][1], "FlattenTime");
-                FinalizeSessionDataQuality(barTime, "FlattenTime");
+                FinalizeOpenBreakoutEvents(
+                    barTime,
+                    "FlattenTime");
+
+                ForceCloseAllHypotheticalTrades(
+                    barTime,
+                    Closes[EntrySeriesIndex][1],
+                    "FlattenTime");
+
+                FinalizeSessionDataQuality(
+                    barTime,
+                    "FlattenTime");
+
+                ExportDailySummary(
+                    tradingDate);
+
+                FlushExportWriters();
                 return;
             }
 
@@ -203,8 +233,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 History = entryCandleHistory
             };
 
-            IList<BreakoutEvent> newBreakouts = breakoutDetector.Detect(context, MinimumBreakoutDistanceTicks);
-            foreach (BreakoutEvent breakout in newBreakouts)
+            var newBreakouts = breakoutDetector.Detect(context, MinimumBreakoutDistanceTicks);
+            foreach (var breakout in newBreakouts)
                 RegisterBreakout(breakout);
 
             foreach (var model in entryModels)
@@ -260,6 +290,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FinalizeOpenBreakoutEvents(tickTime, "FlattenTime");
                 ForceCloseAllHypotheticalTrades(tickTime, tickPrice, "FlattenTime");
                 FinalizeSessionDataQuality(tickTime, "FlattenTime");
+                
+                ExportDailySummary(
+                    tickTime.Date);
+
+                FlushExportWriters();
             }
         }
 
@@ -286,11 +321,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryCandleHistory.Clear();
             breakoutEvents.Clear();
             entryCandidates.Clear();
+            completedTradeCount = 0;
             breakoutDetector.Reset(tradingDate);
             sessionContext = null;
             sessionQuality = new SessionDataQuality { TradingDate = tradingDate };
 
-            foreach (IEntryModel model in entryModels)
+            foreach (var model in entryModels)
                 model.Reset(null);
 
             Diagnostic(eventTime, "New research day: {0:yyyy-MM-dd}", tradingDate);
