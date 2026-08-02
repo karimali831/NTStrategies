@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         {
             var candidates = new List<EntryCandidate>();
 
-            if (!IsEnabled || context == null || context.Bar == null)
+            if (!IsEnabled || context?.Bar == null)
                 return candidates;
 
             for (var i = pendingBreakouts.Count - 1; i >= 0; i--)
