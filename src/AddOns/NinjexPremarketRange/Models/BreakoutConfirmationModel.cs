@@ -1,5 +1,5 @@
 #region Using declarations
-using System;
+
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 #endregion

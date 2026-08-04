@@ -15,7 +15,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             try { message = string.Format(format, args); }
             catch { message = format; }
 
-            Print(string.Format("{0:yyyy-MM-dd HH:mm:ss.fff} | {1} | {2}", eventTime, Name, message));
+            Print($"{eventTime:yyyy-MM-dd HH:mm:ss.fff} | {Name} | {message}");
         }
     }
 }

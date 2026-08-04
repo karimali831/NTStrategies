@@ -135,8 +135,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 adverse,
                 breakout.Mfe5Minutes,
                 breakout.Mae5Minutes,
-                out double mfe5,
-                out double mae5);
+                out var mfe5,
+                out var mae5);
 
             breakout.Mfe5Minutes = mfe5;
             breakout.Mae5Minutes = mae5;
@@ -148,8 +148,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 adverse,
                 breakout.Mfe10Minutes,
                 breakout.Mae10Minutes,
-                out double mfe10,
-                out double mae10);
+                out var mfe10,
+                out var mae10);
 
             breakout.Mfe10Minutes = mfe10;
             breakout.Mae10Minutes = mae10;
@@ -161,8 +161,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 adverse,
                 breakout.Mfe15Minutes,
                 breakout.Mae15Minutes,
-                out double mfe15,
-                out double mae15);
+                out var mfe15,
+                out var mae15);
 
             breakout.Mfe15Minutes = mfe15;
             breakout.Mae15Minutes = mae15;

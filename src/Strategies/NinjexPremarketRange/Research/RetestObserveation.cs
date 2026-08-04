@@ -19,7 +19,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            double excursionTicks =
+            var excursionTicks =
                 breakout.Direction == TradeDirection.Long
                     ? (bar.High - breakout.RangeLevel) / tickSize
                     : (breakout.RangeLevel - bar.Low) / tickSize;
@@ -124,11 +124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (breakout.Direction == TradeDirection.Long)
             {
-                double zoneTop =
+                var zoneTop =
                     level
                     + RetestOutsideDistanceTicks * tickSize;
 
-                double zoneBottom =
+                var zoneBottom =
                     level
                     - RetestInsideDistanceTicks * tickSize;
 
@@ -152,11 +152,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                double zoneTop =
+                var zoneTop =
                     level
                     + RetestInsideDistanceTicks * tickSize;
 
-                double zoneBottom =
+                var zoneBottom =
                     level
                     - RetestOutsideDistanceTicks * tickSize;
 
@@ -298,7 +298,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            double favorableTicks =
+            var favorableTicks =
                 breakout.Direction == TradeDirection.Long
                     ? (bar.High
                        - breakout.FirstRawRetestReferencePrice)
@@ -346,7 +346,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     : context.Bar.Close
                       < breakout.RangeLevel;
 
-            bool bodyQualified =
+            var bodyQualified =
                 context.Metrics != null
                 && context.Metrics.BodyPercent
                 >= MinimumRetestConfirmationBodyPercent;
