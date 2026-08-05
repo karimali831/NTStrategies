@@ -287,6 +287,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 structuralRiskTicks
                 > MaximumInitialStopTicks;
 
+            var atr1MinuteTicks = candidate.Features?.Atr1MinuteTicks ?? 0;
+            if (candidate.Features != null)
+            {
+                candidate.Features = candidate.Features.WithStructuralRisk(
+                    atr1MinuteTicks > 0
+                        ? structuralRiskTicks / atr1MinuteTicks
+                        : 0);
+            }
+
             candidate.PlannedStopPrice =
                 candidate.Direction
                 == TradeDirection.Long

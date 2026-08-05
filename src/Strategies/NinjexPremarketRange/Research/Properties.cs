@@ -16,6 +16,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             EnableRetestModel = true;
             EnableBreakoutModel = true;
+            EnableAcceptanceModel = true;
+
+            Atr1MinutePeriod = 14;
+            Atr5MinutePeriod = 14;
+            Adx5MinutePeriod = 14;
+
+            MinimumAcceptanceClosesOutside = 2;
+            MaximumAcceptanceBars = 5;
+            MinimumAcceptanceExcursionTicks = 40;
+            MinimumAcceptanceCloseDistanceTicks = 1;
+            AllowAcceptanceLaterAttempts = true;
+            MinimumAcceptancePriorFailedAttempts = 0;
 
             RangeStartTime = 30000;
             MarketOpenTime = 93000;
@@ -101,6 +113,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool EnableBreakoutModel { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Enable Acceptance Model", Order = 12, GroupName = "Entries")]
+        public bool EnableAcceptanceModel { get; set; }
+
+        [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(Name = "Entry Start Time", Order = 12, GroupName = "Entries")]
         public int EntryStartTime { get; set; }
@@ -169,6 +185,50 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 100)]
         [Display(Name = "Minimum Retest Confirmation Body %", Order = 34, GroupName = "Entries")]
         public double MinimumRetestConfirmationBodyPercent { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(Name = "ATR 1 Minute Period", Order = 35, GroupName = "Research Features")]
+        public int Atr1MinutePeriod { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(Name = "ATR 5 Minute Period", Order = 36, GroupName = "Research Features")]
+        public int Atr5MinutePeriod { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(Name = "ADX 5 Minute Period", Order = 37, GroupName = "Research Features")]
+        public int Adx5MinutePeriod { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 20)]
+        [Display(Name = "Acceptance Minimum Closes Outside", Order = 38, GroupName = "Acceptance Model")]
+        public int MinimumAcceptanceClosesOutside { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(Name = "Acceptance Maximum Bars", Order = 39, GroupName = "Acceptance Model")]
+        public int MaximumAcceptanceBars { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(Name = "Acceptance Minimum Excursion Ticks", Order = 40, GroupName = "Acceptance Model")]
+        public double MinimumAcceptanceExcursionTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(Name = "Acceptance Minimum Close Distance Ticks", Order = 41, GroupName = "Acceptance Model")]
+        public double MinimumAcceptanceCloseDistanceTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Acceptance Allow Later Attempts", Order = 42, GroupName = "Acceptance Model")]
+        public bool AllowAcceptanceLaterAttempts { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 100)]
+        [Display(Name = "Acceptance Minimum Prior Failed Attempts", Order = 43, GroupName = "Acceptance Model")]
+        public int MinimumAcceptancePriorFailedAttempts { get; set; }
 
         #endregion
 

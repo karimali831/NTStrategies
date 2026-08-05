@@ -111,6 +111,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double DistanceOutsideTicks { get; set; }
         public CandleSnapshot Candle { get; set; }
         public CandleMetrics Metrics { get; set; }
+        public CandidateFeatureSnapshot FeatureSnapshot { get; set; }
 
         public double MfeTicks { get; set; }
         public double MaeTicks { get; set; }

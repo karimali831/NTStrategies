@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Interfaces;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 {
@@ -183,7 +184,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 structuralStop,
                 context.Bar,
                 metrics,
-                context.Features,
+                context.CaptureFeatures(breakout),
                 new CandidateQualificationSnapshot(
                     directionOk,
                     bodyOk,

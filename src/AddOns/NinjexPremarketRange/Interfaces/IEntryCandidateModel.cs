@@ -1,11 +1,10 @@
 #region Using declarations
 using System.Collections.Generic;
-using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
-
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models;
 #endregion
 
-namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
+namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Interfaces
 {
     public interface IEntryCandidateModel
     {
