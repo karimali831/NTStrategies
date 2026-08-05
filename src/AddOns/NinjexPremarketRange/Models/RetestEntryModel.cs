@@ -85,8 +85,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 new List<CandidateSignal>();
 
             if (!IsEnabled
-                || context == null
-                || context.Session == null
+                || context?.Session == null
                 || context.Bar == null)
             {
                 return candidates.AsReadOnly();
@@ -104,8 +103,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             {
                 var state = states[i];
 
-                if (state == null
-                    || state.Breakout == null)
+                if (state?.Breakout == null)
                 {
                     states.RemoveAt(i);
                     continue;
@@ -122,15 +120,15 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                     context.Bar.BarIndex
                     - state.Breakout.BreakoutBarIndex;
 
-                if (barsAfter <= 0)
-                    continue;
-
+                // The breakout candle can arm the model when its high/low
+                // already exceeds the configured move-away threshold.
                 UpdateArmState(
                     state,
                     context.Bar,
                     tickSize);
 
-                if (!state.Armed
+                if (barsAfter < 0
+                    || !state.Armed
                     || context.Bar.BarIndex
                     <= state.ArmedBarIndex)
                 {
@@ -151,7 +149,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 if (!state.ZoneTouched)
                     continue;
 
-                // Confirmation must follow the retest bar.
+                // Confirmation must occur after the retest bar.
                 if (context.Bar.BarIndex
                     <= state.ZoneTouchBarIndex)
                 {
@@ -165,7 +163,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                     continue;
                 }
 
-                // Defensive guard retained from corrected v2.1.
                 if (barsAfter
                     > MaximumBarsAfterBreakout)
                 {
