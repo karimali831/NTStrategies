@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NinjaTrader.Data;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
 using NinjaTrader.NinjaScript.Ninjex;
@@ -13,13 +15,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.1.0";
+        private const string ResearchVersion = "2.2.0";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
+        
+        private CandidateModelCoordinator candidateCoordinator;
+
+        private RangeSessionSnapshot sessionSnapshot;
 
         private NinjexPremarketRangeEngine premarketRangeEngine;
-        private readonly List<IEntryModel> entryModels = new List<IEntryModel>();
+        private readonly List<IEntryCandidateModel> entryModels = new List<IEntryCandidateModel>();
         private readonly List<CandleSnapshot> entryCandleHistory = new List<CandleSnapshot>();
         private readonly List<BreakoutEvent> breakoutEvents = new List<BreakoutEvent>();
         private readonly List<EntryCandidate> entryCandidates = new List<EntryCandidate>();
@@ -103,22 +109,36 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ConfigureModels()
         {
             entryModels.Clear();
-            entryModels.Add(new BreakoutConfirmationModel
-            {
-                IsEnabled = EnableBreakoutModel,
-                MinimumBodyPercent = MinimumStrongBodyPercent,
-                MinimumCloseLocationPercent = MinimumCloseLocationPercent,
-                MinimumRelativeBodyMultiple = MinimumRelativeBodyMultiple
-            });
-            entryModels.Add(new RetestEntryModel
-            {
-                IsEnabled = EnableRetestModel,
-                MaximumBarsAfterBreakout = MaximumRetestBars,
-                OutsideDistanceTicks = RetestOutsideDistanceTicks,
-                InsideDistanceTicks = RetestInsideDistanceTicks,
-                MinimumConfirmationBodyPercent = MinimumRetestConfirmationBodyPercent
-            });
-            
+
+            entryModels.Add(
+                new BreakoutConfirmationModel
+                {
+                    IsEnabled = EnableBreakoutModel,
+                    MinimumBodyPercent =
+                        MinimumStrongBodyPercent,
+                    MinimumCloseLocationPercent =
+                        MinimumCloseLocationPercent,
+                    MinimumRelativeBodyMultiple =
+                        MinimumRelativeBodyMultiple
+                });
+
+            entryModels.Add(
+                new RetestEntryModel
+                {
+                    IsEnabled = EnableRetestModel,
+                    MaximumBarsAfterBreakout =
+                        MaximumRetestBars,
+                    OutsideDistanceTicks =
+                        RetestOutsideDistanceTicks,
+                    InsideDistanceTicks =
+                        RetestInsideDistanceTicks,
+                    MinimumConfirmationBodyPercent =
+                        MinimumRetestConfirmationBodyPercent
+                });
+
+            candidateCoordinator =
+                new CandidateModelCoordinator(entryModels);
+
             Diagnostic(
                 lastMarketTime != Core.Globals.MinDate
                     ? lastMarketTime
@@ -224,28 +244,51 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!IsInsideEntryWindow(barTime))
                 return;
 
-            var context = new ModelBarContext
-            {
-                Session = sessionContext,
-                Bar = bar,
-                PreviousBar = previousBar,
-                Metrics = metrics,
-                History = entryCandleHistory
-            };
+            var detectionContext =
+                new ModelBarContext
+                {
+                    Session = sessionContext,
+                    Bar = bar,
+                    PreviousBar = previousBar,
+                    Metrics = metrics,
+                    History = entryCandleHistory
+                };
 
-            var newBreakouts = breakoutDetector.Detect(context, MinimumBreakoutDistanceTicks);
+            var candidateContext =
+                new CandidateModelContext(
+                    sessionSnapshot,
+                    bar,
+                    previousBar,
+                    metrics,
+                    entryCandleHistory,
+                    CandidateFeatureSnapshot.Empty);
+
+            var newBreakouts =
+                breakoutDetector.Detect(
+                    detectionContext,
+                    MinimumBreakoutDistanceTicks);
+
             foreach (var breakout in newBreakouts)
                 RegisterBreakout(breakout);
 
-            foreach (var model in entryModels)
+            var generatedSignals =
+                candidateCoordinator != null
+                    ? candidateCoordinator.Evaluate(
+                        candidateContext)
+                    : new List<CandidateSignal>()
+                        .AsReadOnly();
+
+            foreach (var signal in generatedSignals)
             {
-                var generated = model.Evaluate(context);
-                foreach (var candidate in generated)
-                    RegisterCandidate(candidate);
+                var candidate =
+                    CandidateSignalAdapter
+                        .ToEntryCandidate(signal);
+
+                RegisterCandidate(candidate);
             }
 
             UpdateBreakoutExcursionsFromBar(bar);
-            UpdateRawRetestObservations(context);
+            UpdateRawRetestObservations(detectionContext);
             UpdateBreakoutReturnInside(bar);
 
             // OnEachTick means this method is running at the first tick of the new
@@ -326,8 +369,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             sessionContext = null;
             sessionQuality = new SessionDataQuality { TradingDate = tradingDate };
 
-            foreach (var model in entryModels)
-                model.Reset(null);
+            sessionSnapshot = null;
+
+            candidateCoordinator?.Reset(null);
 
             Diagnostic(eventTime, "New research day: {0:yyyy-MM-dd}", tradingDate);
         }
@@ -337,23 +381,37 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (sessionContext != null && sessionContext.TradingDate == tradingDate)
                 return;
 
-            sessionContext = new RangeSessionContext
-            {
-                TradingDate = tradingDate,
-                Instrument = Instrument.MasterInstrument.Name,
-                Contract = Instrument.FullName,
-                PremarketHigh = premarketRangeEngine.LatestHigh,
-                PremarketLow = premarketRangeEngine.LatestLow,
-                HighFormationTime = premarketRangeEngine.HighBarTime,
-                LowFormationTime = premarketRangeEngine.LowBarTime,
-                TickSize = TickSize,
-                PointValue = Instrument.MasterInstrument.PointValue
-            };
+            sessionContext =
+                new RangeSessionContext
+                {
+                    TradingDate = tradingDate,
+                    Instrument =
+                        Instrument.MasterInstrument.Name,
+                    Contract = Instrument.FullName,
+                    PremarketHigh =
+                        premarketRangeEngine.LatestHigh,
+                    PremarketLow =
+                        premarketRangeEngine.LatestLow,
+                    HighFormationTime =
+                        premarketRangeEngine.HighBarTime,
+                    LowFormationTime =
+                        premarketRangeEngine.LowBarTime,
+                    TickSize = TickSize,
+                    PointValue =
+                        Instrument.MasterInstrument.PointValue
+                };
 
-            foreach (IEntryModel model in entryModels)
-                model.Reset(sessionContext);
+            sessionSnapshot =
+                RangeSessionSnapshot.From(
+                    sessionContext);
 
-            ExportSession("Created", sessionContext, sessionQuality);
+            candidateCoordinator?.Reset(
+                sessionSnapshot);
+
+            ExportSession(
+                "Created",
+                sessionContext,
+                sessionQuality);
             Diagnostic(eventTime,
                 "Range ready. Contract={0}, Date={1:yyyy-MM-dd}, High={2}, Low={3}, Width={4:0.0} ticks",
                 Instrument.FullName,

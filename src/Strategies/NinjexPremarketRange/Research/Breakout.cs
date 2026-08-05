@@ -1,26 +1,45 @@
 using System;
 using System.Linq;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private void RegisterBreakout(BreakoutEvent breakout)
+        private void RegisterBreakout(
+            BreakoutEvent breakout)
         {
+            if (breakout == null)
+                return;
+
             breakoutEvents.Add(breakout);
-            ExportBreakoutAudit("Created", breakout);
+
+            ExportBreakoutAudit(
+                "Created",
+                breakout);
+
             FlushExportWriters();
-            Diagnostic(breakout.BreakoutTime,
-                "BREAKOUT {0} {1} Level={2} Close={3} Distance={4:0.0} ticks",
+
+            Diagnostic(
+                breakout.BreakoutTime,
+                "BREAKOUT {0} {1} Level={2} " +
+                "Close={3} Distance={4:0.0} ticks",
                 breakout.EventId,
                 breakout.Direction,
                 breakout.RangeLevel,
                 breakout.BreakoutClose,
                 breakout.DistanceOutsideTicks);
 
-            foreach (var model in entryModels)
-                model.OnBreakout(breakout);
+            var snapshot =
+                BreakoutSignalSnapshot.From(
+                    breakout);
+
+            if (snapshot != null)
+            {
+                candidateCoordinator?.OnBreakout(
+                    snapshot);
+            }
         }
         
         private void UpdateBreakoutExcursions(DateTime time, double price)
@@ -297,18 +316,38 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void ResolveBreakout(BreakoutEvent breakout, DateTime time, string reason)
+        private void ResolveBreakout(
+            BreakoutEvent breakout,
+            DateTime time,
+            string reason)
         {
+            if (breakout == null
+                || breakout.IsResolved)
+            {
+                return;
+            }
+
             breakout.IsResolved = true;
             breakout.ResolutionTime = time;
             breakout.ResolutionReason = reason;
-            
-            ExportBreakoutAudit("Resolved", breakout);
-            ExportBreakoutFinal(breakout);
+
+            candidateCoordinator?.OnBreakoutResolved(
+                breakout.EventId);
+
+            ExportBreakoutAudit(
+                "Resolved",
+                breakout);
+
+            ExportBreakoutFinal(
+                breakout);
+
             FlushExportWriters();
-            
-            Diagnostic(time,
-                "BREAKOUT FINAL {0} Reason={1} MFE={2:0.0} MAE={3:0.0} ReturnedInside={4} Fakeout20={5}",
+
+            Diagnostic(
+                time,
+                "BREAKOUT FINAL {0} Reason={1} " +
+                "MFE={2:0.0} MAE={3:0.0} " +
+                "ReturnedInside={4} Fakeout20={5}",
                 breakout.EventId,
                 reason,
                 breakout.MfeTicks,

@@ -1,31 +1,38 @@
-#region Using declarations
 using System.Collections.Generic;
-using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
-#endregion
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 {
     // Deliberately not registered by the research strategy yet.
-    public sealed class LiquiditySweepModel : IEntryModel
+    public sealed class LiquiditySweepModel
+        : IEntryCandidateModel
     {
-        public string Name
-        {
-            get { return "LiquiditySweep"; }
-        }
+        public string ModelId => "LiquiditySweep";
+
+        public string ModelVersion => "0.1.0";
 
         public bool IsEnabled { get; set; }
 
-        public void Reset(RangeSessionContext session)
+        public void Reset(
+            RangeSessionSnapshot session)
         {
         }
 
-        public void OnBreakout(BreakoutEvent breakoutEvent)
+        public void OnBreakout(
+            BreakoutSignalSnapshot breakout)
         {
         }
 
-        public IEnumerable<EntryCandidate> Evaluate(ModelBarContext context)
+        public IReadOnlyList<CandidateSignal> Evaluate(
+            CandidateModelContext context)
         {
-            yield break;
+            return new List<CandidateSignal>()
+                .AsReadOnly();
+        }
+
+        public void OnBreakoutResolved(
+            string breakoutEventId)
+        {
         }
     }
 }

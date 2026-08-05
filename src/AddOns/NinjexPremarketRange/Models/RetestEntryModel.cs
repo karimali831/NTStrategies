@@ -1,22 +1,23 @@
-#region Using declarations
 using System;
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
-#endregion
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 {
-    public sealed class RetestEntryModel : IEntryModel
+    public sealed class RetestEntryModel
+        : IEntryCandidateModel
     {
         private sealed class RetestState
         {
-            public BreakoutEvent Breakout { get; set; }
+            public BreakoutSignalSnapshot Breakout { get; set; }
 
             public bool Armed { get; set; }
 
             public int ArmedBarIndex { get; set; }
-            
+
             public int ExpiryBarIndex { get; set; }
+
             public double FurthestExcursionTicks { get; set; }
 
             public bool ZoneTouched { get; set; }
@@ -33,7 +34,9 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         private readonly List<RetestState> states =
             new List<RetestState>();
 
-        public string Name => "Retest";
+        public string ModelId => "Retest";
+
+        public string ModelVersion => "1.0.0";
 
         public bool IsEnabled { get; set; }
 
@@ -45,66 +48,71 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 
         public double MinimumConfirmationBodyPercent { get; set; }
 
-        public void Reset(RangeSessionContext session)
+        public void Reset(RangeSessionSnapshot session)
         {
             states.Clear();
         }
 
-        public void OnBreakout(BreakoutEvent breakoutEvent)
+        public void OnBreakout(
+            BreakoutSignalSnapshot breakout)
         {
-            if (!IsEnabled
-                || breakoutEvent == null)
-            {
+            if (!IsEnabled || breakout == null)
                 return;
-            }
 
-            states.Add(new RetestState
-            {
-                Breakout = breakoutEvent,
+            states.Add(
+                new RetestState
+                {
+                    Breakout = breakout,
 
-                ExpiryBarIndex =
-                    breakoutEvent.BreakoutBarIndex
-                    + Math.Max(0, MaximumBarsAfterBreakout),
+                    ExpiryBarIndex =
+                        breakout.BreakoutBarIndex
+                        + Math.Max(
+                            0,
+                            MaximumBarsAfterBreakout),
 
-                ArmedBarIndex = -1,
-                ZoneTouchBarIndex = -1,
+                    ArmedBarIndex = -1,
+                    ZoneTouchBarIndex = -1,
 
-                MinimumOutsideDistanceTicks =
-                    double.MaxValue
-            });
+                    MinimumOutsideDistanceTicks =
+                        double.MaxValue
+                });
         }
 
-        public IEnumerable<EntryCandidate> Evaluate(
-            ModelBarContext context)
+        public IReadOnlyList<CandidateSignal> Evaluate(
+            CandidateModelContext context)
         {
             var candidates =
-                new List<EntryCandidate>();
+                new List<CandidateSignal>();
 
             if (!IsEnabled
-                || context?.Session == null
+                || context == null
+                || context.Session == null
                 || context.Bar == null)
             {
-                return candidates;
+                return candidates.AsReadOnly();
             }
 
             var tickSize =
                 context.Session.TickSize;
 
             if (tickSize <= 0)
-                return candidates;
+                return candidates.AsReadOnly();
 
-            for (var i = states.Count - 1; i >= 0; i--)
+            for (var i = states.Count - 1;
+                 i >= 0;
+                 i--)
             {
                 var state = states[i];
 
-                if (state.Breakout == null
-                    || state.Breakout.IsResolved)
+                if (state == null
+                    || state.Breakout == null)
                 {
                     states.RemoveAt(i);
                     continue;
                 }
 
-                if (context.Bar.BarIndex > state.ExpiryBarIndex)
+                if (context.Bar.BarIndex
+                    > state.ExpiryBarIndex)
                 {
                     states.RemoveAt(i);
                     continue;
@@ -113,6 +121,9 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 var barsAfter =
                     context.Bar.BarIndex
                     - state.Breakout.BreakoutBarIndex;
+
+                if (barsAfter <= 0)
+                    continue;
 
                 UpdateArmState(
                     state,
@@ -140,7 +151,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 if (!state.ZoneTouched)
                     continue;
 
-                // Confirmation must occur after the first retest bar.
+                // Confirmation must follow the retest bar.
                 if (context.Bar.BarIndex
                     <= state.ZoneTouchBarIndex)
                 {
@@ -154,23 +165,51 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                     continue;
                 }
 
-                if (barsAfter > MaximumBarsAfterBreakout)
+                // Defensive guard retained from corrected v2.1.
+                if (barsAfter
+                    > MaximumBarsAfterBreakout)
                 {
                     states.RemoveAt(i);
                     continue;
                 }
 
                 candidates.Add(
-                    BuildCandidate(
+                    BuildSignal(
                         context,
                         state,
                         barsAfter));
 
                 states.RemoveAt(i);
-                
             }
 
-            return candidates;
+            return candidates.AsReadOnly();
+        }
+
+        public void OnBreakoutResolved(
+            string breakoutEventId)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    breakoutEventId))
+            {
+                return;
+            }
+
+            for (var i = states.Count - 1;
+                 i >= 0;
+                 i--)
+            {
+                var breakout =
+                    states[i]?.Breakout;
+
+                if (breakout != null
+                    && string.Equals(
+                        breakout.EventId,
+                        breakoutEventId,
+                        StringComparison.Ordinal))
+                {
+                    states.RemoveAt(i);
+                }
+            }
         }
 
         private void UpdateArmState(
@@ -211,7 +250,8 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             CandleSnapshot bar,
             double tickSize)
         {
-            var level = state.Breakout.RangeLevel;
+            var level =
+                state.Breakout.RangeLevel;
 
             double insideDepthTicks;
             double outsideDistanceTicks;
@@ -223,11 +263,13 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
             {
                 var zoneTop =
                     level
-                    + OutsideDistanceTicks * tickSize;
+                    + OutsideDistanceTicks
+                    * tickSize;
 
                 var zoneBottom =
                     level
-                    - InsideDistanceTicks * tickSize;
+                    - InsideDistanceTicks
+                    * tickSize;
 
                 zoneTouched =
                     bar.Low <= zoneTop
@@ -239,22 +281,26 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 insideDepthTicks =
                     Math.Max(
                         0,
-                        (level - bar.Low) / tickSize);
+                        (level - bar.Low)
+                        / tickSize);
 
                 outsideDistanceTicks =
                     Math.Max(
                         0,
-                        (bar.Low - level) / tickSize);
+                        (bar.Low - level)
+                        / tickSize);
             }
             else
             {
                 var zoneTop =
                     level
-                    + InsideDistanceTicks * tickSize;
+                    + InsideDistanceTicks
+                    * tickSize;
 
                 var zoneBottom =
                     level
-                    - OutsideDistanceTicks * tickSize;
+                    - OutsideDistanceTicks
+                    * tickSize;
 
                 zoneTouched =
                     bar.High >= zoneBottom
@@ -266,12 +312,14 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                 insideDepthTicks =
                     Math.Max(
                         0,
-                        (bar.High - level) / tickSize);
+                        (bar.High - level)
+                        / tickSize);
 
                 outsideDistanceTicks =
                     Math.Max(
                         0,
-                        (level - bar.High) / tickSize);
+                        (level - bar.High)
+                        / tickSize);
             }
 
             if (exceededInsideBoundary)
@@ -307,7 +355,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
         }
 
         private bool IsConfirmation(
-            ModelBarContext context,
+            CandidateModelContext context,
             TradeDirection direction)
         {
             if (context.Metrics == null)
@@ -331,73 +379,66 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
                    >= MinimumConfirmationBodyPercent;
         }
 
-        private EntryCandidate BuildCandidate(
-            ModelBarContext context,
+        private CandidateSignal BuildSignal(
+            CandidateModelContext context,
             RetestState state,
             int barsAfter)
         {
-            var breakout =
-                state.Breakout;
+            var breakout = state.Breakout;
 
-            return new EntryCandidate
-            {
-                CandidateId =
-                    breakout.EventId + "-RETEST",
+            var minimumOutsideDistance =
+                state.MinimumOutsideDistanceTicks
+                == double.MaxValue
+                    ? 0
+                    : state.MinimumOutsideDistanceTicks;
 
-                BreakoutEventId =
-                    breakout.EventId,
+            var structuralStop =
+                breakout.Direction == TradeDirection.Long
+                    ? context.Bar.Low
+                    : context.Bar.High;
 
-                ModelName = Name,
-
-                Direction =
-                    breakout.Direction,
-
-                SignalTime =
-                    context.Bar.Time,
-
-                SignalBarIndex =
-                    context.Bar.BarIndex,
-
-                RangeLevel =
-                    breakout.RangeLevel,
-
-                ConfirmationCandle =
-                    context.Bar,
-
-                Metrics =
-                    context.Metrics,
-
-                BarsAfterBreakout =
+            return new CandidateSignal(
+                breakout.EventId + "-RETEST",
+                breakout.EventId,
+                ModelId,
+                ModelVersion,
+                breakout.Direction,
+                context.Bar.Time,
+                context.Bar.BarIndex,
+                breakout.RangeLevel,
+                structuralStop,
+                context.Bar,
+                context.Metrics,
+                context.Features,
+                CandidateQualificationSnapshot.Passed,
+                new CandidateModelDetails(
                     barsAfter,
-
-                RetestInsideDepthTicks =
                     state.MaximumInsideDepthTicks,
+                    minimumOutsideDistance),
+                true,
+                CandidateQualificationCodes.RetestQualified,
+                "Breakout moved away from the range, " +
+                "a later bar retested the configured zone, " +
+                "and a subsequent directional confirmation " +
+                "candle closed beyond the broken level.");
+        }
 
-                RetestOutsideDistanceTicks =
-                    state.MinimumOutsideDistanceTicks
-                    == double.MaxValue
-                        ? 0
-                        : state.MinimumOutsideDistanceTicks,
-
-                StrongCandleQualified = true,
-
-                DirectionPassed = true,
-                BodyPassed = true,
-                CloseLocationPassed = true,
-                RelativeBodyPassed = true,
-
-                FinalStatus =
-                    "SignalQualified",
-
-                QualificationReason =
-                    "Breakout moved away from the range, a later bar retested the configured zone, and a subsequent directional confirmation candle closed beyond the broken level.",
-
-                StructuralStopPrice =
-                    breakout.Direction
-                    == TradeDirection.Long
-                        ? context.Bar.Low
-                        : context.Bar.High
-            };
+        private static CandidateFeatureSnapshot
+            MergeRetestFeatures(
+                CandidateFeatureSnapshot source,
+                int barsAfter,
+                double insideDepthTicks,
+                double outsideDistanceTicks)
+        {
+            // Retest-specific values are not yet first-class
+            // CandidateFeatureSnapshot properties. Preserve the
+            // common decision-point snapshot unchanged for parity.
+            //
+            // barsAfter/insideDepth/outsideDistance should remain
+            // fields on CandidateResearchRecord or CandidateSignal
+            // in the next wiring step.
+            return source
+                   ?? CandidateFeatureSnapshot.Empty;
         }
     }
 }

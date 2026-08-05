@@ -11,10 +11,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
         public int StopLossTicks { get; set; }
         public int FrequencyTicks { get; set; }
 
-        public bool IsEnabled
-        {
-            get { return ProfitTriggerTicks > 0; }
-        }
+        public bool IsEnabled => ProfitTriggerTicks > 0;
     }
 
     public sealed class TradeManagementSettings
@@ -62,7 +59,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             highestPrice = entryPrice;
             lowestPrice = entryPrice;
 
-            double riskPrice =
+            var riskPrice =
                 candidate.ActualRiskTicks * settings.TickSize;
 
             targetPrice = candidate.Direction == TradeDirection.Long
@@ -86,10 +83,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
         public TradeManagementSettings Settings { get; private set; }
         public ManagementOutcome Outcome { get; private set; }
 
-        public bool IsClosed
-        {
-            get { return Outcome.IsClosed; }
-        }
+        public bool IsClosed => Outcome.IsClosed;
 
         public void ProcessTick(DateTime time, double price)
         {
@@ -114,7 +108,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
                 if (price >= targetPrice)
                 {
                     Close(time, targetPrice, "Target");
-                    return;
                 }
             }
             else
@@ -128,7 +121,6 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
                 if (price <= targetPrice)
                 {
                     Close(time, targetPrice, "Target");
-                    return;
                 }
             }
         }
@@ -146,14 +138,14 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
                 || Settings.BreakEvenTriggerTicks <= 0)
                 return;
 
-            double favorableTicks = Candidate.Direction == TradeDirection.Long
+            var favorableTicks = Candidate.Direction == TradeDirection.Long
                 ? (price - EntryPrice) / Settings.TickSize
                 : (EntryPrice - price) / Settings.TickSize;
 
             if (favorableTicks < Settings.BreakEvenTriggerTicks)
                 return;
 
-            double breakEvenStop = Candidate.Direction == TradeDirection.Long
+            var breakEvenStop = Candidate.Direction == TradeDirection.Long
                 ? EntryPrice + Settings.BreakEvenPlusTicks * Settings.TickSize
                 : EntryPrice - Settings.BreakEvenPlusTicks * Settings.TickSize;
 
@@ -170,15 +162,15 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             if (!UseTrail)
                 return;
 
-            double favorableTicks = Candidate.Direction == TradeDirection.Long
+            var favorableTicks = Candidate.Direction == TradeDirection.Long
                 ? (price - EntryPrice) / Settings.TickSize
                 : (EntryPrice - price) / Settings.TickSize;
 
-            TrailStepSettings step = ResolveTrailStep(favorableTicks);
+            var step = ResolveTrailStep(favorableTicks);
             if (step == null)
                 return;
 
-            int stepNumber = step == Settings.Step3 ? 3
+            var stepNumber = step == Settings.Step3 ? 3
                 : step == Settings.Step2 ? 2
                 : 1;
 
@@ -186,16 +178,16 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             Outcome.HighestTrailStepActivated = highestTrailStep;
 
             double frequencyTicks = Math.Max(1, step.FrequencyTicks);
-            double movesBeyondTrigger =
+            var movesBeyondTrigger =
                 Math.Max(0, favorableTicks - step.ProfitTriggerTicks);
 
-            double completedMoves =
+            var completedMoves =
                 Math.Floor(movesBeyondTrigger / frequencyTicks);
 
-            double lockedTicks =
+            var lockedTicks =
                 step.StopLossTicks + completedMoves * frequencyTicks;
 
-            double desiredStop = Candidate.Direction == TradeDirection.Long
+            var desiredStop = Candidate.Direction == TradeDirection.Long
                 ? EntryPrice + lockedTicks * Settings.TickSize
                 : EntryPrice - lockedTicks * Settings.TickSize;
 
@@ -255,7 +247,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             Outcome.ExitPrice = exitPrice;
             Outcome.ExitReason = reason;
 
-            double signedTicks = Candidate.Direction == TradeDirection.Long
+            var signedTicks = Candidate.Direction == TradeDirection.Long
                 ? (exitPrice - EntryPrice) / Settings.TickSize
                 : (EntryPrice - exitPrice) / Settings.TickSize;
 

@@ -1,122 +1,254 @@
-#region Using declarations
-
+using System;
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
-#endregion
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 {
-    public sealed class BreakoutConfirmationModel : IEntryModel
+    public sealed class BreakoutConfirmationModel
+        : IEntryCandidateModel
     {
-        private readonly List<BreakoutEvent> pendingBreakouts =
-            new List<BreakoutEvent>();
+        private readonly List<BreakoutSignalSnapshot>
+            pendingBreakouts =
+                new List<BreakoutSignalSnapshot>();
 
-        public string Name
-        {
-            get { return "BreakoutConfirmation"; }
-        }
+        public string ModelId => "BreakoutConfirmation";
+
+        public string ModelVersion => "1.0.0";
 
         public bool IsEnabled { get; set; }
 
         public double MinimumBodyPercent { get; set; }
+
         public double MinimumCloseLocationPercent { get; set; }
+
         public double MinimumRelativeBodyMultiple { get; set; }
 
-        public void Reset(RangeSessionContext session)
+        public void Reset(RangeSessionSnapshot session)
         {
             pendingBreakouts.Clear();
         }
 
-        public void OnBreakout(BreakoutEvent breakoutEvent)
+        public void OnBreakout(
+            BreakoutSignalSnapshot breakout)
         {
-            if (breakoutEvent != null)
-                pendingBreakouts.Add(breakoutEvent);
+            if (!IsEnabled || breakout == null)
+                return;
+
+            pendingBreakouts.Add(breakout);
         }
 
-        public IEnumerable<EntryCandidate> Evaluate(ModelBarContext context)
+        public IReadOnlyList<CandidateSignal> Evaluate(
+            CandidateModelContext context)
         {
-            var candidates = new List<EntryCandidate>();
+            var candidates =
+                new List<CandidateSignal>();
 
-            if (!IsEnabled || context?.Bar == null)
-                return candidates;
+            if (!IsEnabled
+                || context == null
+                || context.Bar == null)
+            {
+                return candidates.AsReadOnly();
+            }
 
-            for (var i = pendingBreakouts.Count - 1; i >= 0; i--)
+            for (var i = pendingBreakouts.Count - 1;
+                 i >= 0;
+                 i--)
             {
                 var breakout = pendingBreakouts[i];
 
-                // The breakout candle itself is the confirmation candle.
-                if (breakout.BreakoutBarIndex != context.Bar.BarIndex)
+                if (breakout == null)
+                {
+                    pendingBreakouts.RemoveAt(i);
                     continue;
+                }
 
-                var candidate = BuildCandidate(context, breakout);
-                candidates.Add(candidate);
+                // Preserve v2.1 behavior exactly:
+                // the breakout candle is the confirmation candle.
+                if (breakout.BreakoutBarIndex
+                    != context.Bar.BarIndex)
+                {
+                    // A pending event older than the current completed
+                    // bar can no longer be evaluated by this model.
+                    if (breakout.BreakoutBarIndex
+                        < context.Bar.BarIndex)
+                    {
+                        pendingBreakouts.RemoveAt(i);
+                    }
+
+                    continue;
+                }
+
+                candidates.Add(
+                    BuildSignal(
+                        context,
+                        breakout));
+
                 pendingBreakouts.RemoveAt(i);
             }
 
-            return candidates;
+            return candidates.AsReadOnly();
         }
 
-        private EntryCandidate BuildCandidate(
-            ModelBarContext context,
-            BreakoutEvent breakout)
+        public void OnBreakoutResolved(
+            string breakoutEventId)
         {
-            var metrics = context.Metrics ?? new CandleMetrics();
-            var directionOk = breakout.Direction == TradeDirection.Long
-                ? context.Bar.IsBullish
-                : context.Bar.IsBearish;
+            if (string.IsNullOrWhiteSpace(
+                    breakoutEventId))
+            {
+                return;
+            }
 
-            double directionalCloseLocation =
+            for (var i = pendingBreakouts.Count - 1;
+                 i >= 0;
+                 i--)
+            {
+                var breakout = pendingBreakouts[i];
+
+                if (breakout != null
+                    && string.Equals(
+                        breakout.EventId,
+                        breakoutEventId,
+                        StringComparison.Ordinal))
+                {
+                    pendingBreakouts.RemoveAt(i);
+                }
+            }
+        }
+
+        private CandidateSignal BuildSignal(
+            CandidateModelContext context,
+            BreakoutSignalSnapshot breakout)
+        {
+            var metrics =
+                context.Metrics ?? new CandleMetrics();
+
+            var directionOk =
+                breakout.Direction == TradeDirection.Long
+                    ? context.Bar.IsBullish
+                    : context.Bar.IsBearish;
+
+            var directionalCloseLocation =
                 breakout.Direction == TradeDirection.Long
                     ? metrics.CloseLocationPercent
-                    : 100.0 - metrics.CloseLocationPercent;
+                    : 100.0
+                      - metrics.CloseLocationPercent;
 
-            bool bodyOk = metrics.BodyPercent >= MinimumBodyPercent;
-            bool closeOk =
-                directionalCloseLocation >= MinimumCloseLocationPercent;
-            bool relativeBodyOk =
-                metrics.RelativeBodyMultiple >= MinimumRelativeBodyMultiple;
+            var bodyOk =
+                metrics.BodyPercent
+                >= MinimumBodyPercent;
 
-            bool qualified =
+            var closeOk =
+                directionalCloseLocation
+                >= MinimumCloseLocationPercent;
+
+            var relativeBodyOk =
+                metrics.RelativeBodyMultiple
+                >= MinimumRelativeBodyMultiple;
+
+            var qualified =
                 directionOk
                 && bodyOk
                 && closeOk
                 && relativeBodyOk;
 
-            string reason = qualified
-                ? "Strong breakout candle qualified."
-                : string.Format(
-                    "Rejected: Direction={0}, Body={1:0.0}%/{2:0.0}%, CloseLocation={3:0.0}%/{4:0.0}%, RelativeBody={5:0.00}x/{6:0.00}x.",
+            var qualificationCode =
+                ResolveQualificationCode(
                     directionOk,
-                    metrics.BodyPercent,
-                    MinimumBodyPercent,
-                    directionalCloseLocation,
-                    MinimumCloseLocationPercent,
-                    metrics.RelativeBodyMultiple,
-                    MinimumRelativeBodyMultiple);
+                    bodyOk,
+                    closeOk,
+                    relativeBodyOk);
 
-            return new EntryCandidate
-            {
-                CandidateId = breakout.EventId + "-BREAKOUT",
-                BreakoutEventId = breakout.EventId,
-                ModelName = Name,
-                Direction = breakout.Direction,
-                SignalTime = context.Bar.Time,
-                SignalBarIndex = context.Bar.BarIndex,
-                RangeLevel = breakout.RangeLevel,
-                ConfirmationCandle = context.Bar,
-                Metrics = metrics,
-                BarsAfterBreakout = 0,
-                StrongCandleQualified = qualified,
-                DirectionPassed = directionOk,
-                BodyPassed = bodyOk,
-                CloseLocationPassed = closeOk,
-                RelativeBodyPassed = relativeBodyOk,
-                QualificationReason = reason,
-                FinalStatus = qualified ? "SignalQualified" : "SignalRejected",
-                StructuralStopPrice = breakout.Direction == TradeDirection.Long
+            var reason = qualified
+                ? "Strong breakout candle qualified."
+                : $"Rejected: Direction={directionOk}, " +
+                  $"Body={metrics.BodyPercent:0.0}%/{MinimumBodyPercent:0.0}%, " +
+                  $"CloseLocation={directionalCloseLocation:0.0}%/{MinimumCloseLocationPercent:0.0}%, " +
+                  $"RelativeBody={metrics.RelativeBodyMultiple:0.00}x/{MinimumRelativeBodyMultiple:0.00}x.";
+
+            var structuralStop =
+                breakout.Direction == TradeDirection.Long
                     ? context.Bar.Low
-                    : context.Bar.High
-            };
+                    : context.Bar.High;
+
+            return new CandidateSignal(
+                breakout.EventId + "-BREAKOUT",
+                breakout.EventId,
+                ModelId,
+                ModelVersion,
+                breakout.Direction,
+                context.Bar.Time,
+                context.Bar.BarIndex,
+                breakout.RangeLevel,
+                structuralStop,
+                context.Bar,
+                metrics,
+                context.Features,
+                new CandidateQualificationSnapshot(
+                    directionOk,
+                    bodyOk,
+                    closeOk,
+                    relativeBodyOk),
+                CandidateModelDetails.Empty,
+                qualified,
+                qualificationCode,
+                reason);
+        }
+
+        private static string ResolveQualificationCode(
+            bool directionOk,
+            bool bodyOk,
+            bool closeOk,
+            bool relativeBodyOk)
+        {
+            if (directionOk
+                && bodyOk
+                && closeOk
+                && relativeBodyOk)
+            {
+                return CandidateQualificationCodes.Qualified;
+            }
+
+            var failureCount = 0;
+
+            if (!directionOk)
+                failureCount++;
+
+            if (!bodyOk)
+                failureCount++;
+
+            if (!closeOk)
+                failureCount++;
+
+            if (!relativeBodyOk)
+                failureCount++;
+
+            if (failureCount > 1)
+            {
+                return CandidateQualificationCodes
+                    .MultipleConditionsRejected;
+            }
+
+            if (!directionOk)
+            {
+                return CandidateQualificationCodes
+                    .DirectionRejected;
+            }
+
+            if (!bodyOk)
+            {
+                return CandidateQualificationCodes
+                    .BodyRejected;
+            }
+
+            if (!closeOk)
+            {
+                return CandidateQualificationCodes
+                    .CloseLocationRejected;
+            }
+
+            return CandidateQualificationCodes
+                .RelativeBodyRejected;
         }
     }
 }

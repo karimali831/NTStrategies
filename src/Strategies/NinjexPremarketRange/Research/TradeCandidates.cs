@@ -57,9 +57,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Diagnostic(
                 candidate.SignalTime,
-                "CANDIDATE {0} Qualified={1} Reason={2}",
+                "CANDIDATE {0} Model={1} " +
+                "Qualified={2} Code={3} Reason={4}",
                 candidate.CandidateId,
+                candidate.ModelName,
                 candidate.StrongCandleQualified,
+                candidate.QualificationCode,
                 candidate.QualificationReason);
         }
 

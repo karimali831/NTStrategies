@@ -1,6 +1,8 @@
 #region Using declarations
 using System;
 using System.Collections.Generic;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
@@ -200,7 +202,11 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double RangeLevel { get; set; }
         public CandleSnapshot ConfirmationCandle { get; set; }
         public CandleMetrics Metrics { get; set; }
+        public string ModelVersion { get; set; }
 
+        public string QualificationCode { get; set; }
+
+        public CandidateFeatureSnapshot Features { get; set; }
         public int BarsAfterBreakout { get; set; }
         public double RetestInsideDepthTicks { get; set; }
         public double RetestOutsideDistanceTicks { get; set; }
