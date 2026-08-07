@@ -64,6 +64,73 @@ namespace NinjaTrader.NinjaScript.Strategies
                 candidate.StrongCandleQualified,
                 candidate.QualificationCode,
                 candidate.QualificationReason);
+
+            // v2.2.1:
+            // Model-rejected candidates are already terminal.
+            // Every CandidateId must receive exactly one Final row.
+            if (!candidate.StrongCandleQualified)
+            {
+                FinalizeCandidate(
+                    candidate,
+                    "SignalRejected",
+                    candidate.SignalTime);
+            }
+        }
+        
+        private void FinalizeCandidate(
+            EntryCandidate candidate,
+            string finalStatus,
+            DateTime finalizedAt,
+            string reasonSuffix = null)
+        {
+            if (candidate == null
+                || candidate.IsFinalized)
+            {
+                return;
+            }
+
+            candidate.FinalStatus =
+                string.IsNullOrWhiteSpace(finalStatus)
+                    ? "FinalizedUnknown"
+                    : finalStatus;
+
+            candidate.FinalizedAt = finalizedAt;
+            candidate.IsFinalized = true;
+
+            if (!string.IsNullOrWhiteSpace(reasonSuffix))
+            {
+                if (!string.IsNullOrWhiteSpace(
+                        candidate.QualificationReason))
+                {
+                    candidate.QualificationReason += " ";
+                }
+
+                candidate.QualificationReason += reasonSuffix;
+            }
+
+            ExportCandidate(
+                "Final",
+                candidate);
+
+            FlushExportWriters();
+
+            Diagnostic(
+                finalizedAt,
+                "CANDIDATE FINAL {0} Model={1} Status={2}",
+                candidate.CandidateId,
+                candidate.ModelName,
+                candidate.FinalStatus);
+        }
+        
+        private bool HasPrecisionTickAtOrAfter(
+            DateTime entryTime)
+        {
+            return sessionQuality != null
+                   && sessionQuality.HasTickData
+                   && sessionQuality.LastTickTime
+                   != DateTime.MinValue
+                   && sessionQuality.LastTickTime
+                   >= entryTime;
         }
 
         private void CreateTradeVariants(
@@ -127,6 +194,117 @@ namespace NinjaTrader.NinjaScript.Strategies
                         true));
             }
         }
+        
+        private void ActivatePendingPrecisionCandidates(
+            DateTime tickTime)
+        {
+            if (!EnablePrecisionTickAnalysis)
+                return;
+
+            foreach (var candidate
+                     in entryCandidates.ToList())
+            {
+                if (candidate == null
+                    || candidate.IsFinalized
+                    || !candidate.StrongCandleQualified
+                    || candidate.PlannedEntryPrice <= 0
+                    || candidate.PlannedEntryTime
+                    == DateTime.MinValue
+                    || !string.Equals(
+                        candidate.FinalStatus,
+                        "AwaitingPrecisionTick",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (tickTime.Date
+                    != candidate.PlannedEntryTime.Date)
+                {
+                    continue;
+                }
+
+                if (tickTime
+                    < candidate.PlannedEntryTime)
+                {
+                    continue;
+                }
+
+                CreateTradeVariants(
+                    candidate,
+                    candidate.PlannedEntryTime,
+                    candidate.PlannedEntryPrice);
+
+                FinalizeCandidate(
+                    candidate,
+                    "FilledPrecision",
+                    tickTime,
+                    "Precision simulation activated when tick data reached the planned entry timestamp.");
+            }
+        }
+        
+        private void FinalizePendingCandidates(
+            DateTime time,
+            string reason)
+        {
+            foreach (var candidate
+                     in entryCandidates.ToList())
+            {
+                if (candidate == null
+                    || candidate.IsFinalized)
+                {
+                    continue;
+                }
+
+                // Model-rejected candidates should already have been
+                // finalized immediately in RegisterCandidate().
+                if (!candidate.StrongCandleQualified)
+                {
+                    FinalizeCandidate(
+                        candidate,
+                        "SignalRejected",
+                        time);
+
+                    continue;
+                }
+
+                if (string.Equals(
+                        candidate.FinalStatus,
+                        "AwaitingPrecisionTick",
+                        StringComparison.Ordinal))
+                {
+                    FinalizeCandidate(
+                        candidate,
+                        "SkippedNoTickData",
+                        time,
+                        "Precision trade simulation could not begin because the tick stream did not reach the planned entry timestamp before the candidate lifecycle ended.");
+
+                    continue;
+                }
+
+                string status;
+
+                if (string.Equals(
+                        reason,
+                        "FlattenTime",
+                        StringComparison.Ordinal))
+                {
+                    status =
+                        "RejectedNoEntryBeforeFlatten";
+                }
+                else
+                {
+                    status =
+                        "RejectedSessionEnded";
+                }
+
+                FinalizeCandidate(
+                    candidate,
+                    status,
+                    time,
+                    $"Candidate ended without a valid next-bar entry. Lifecycle reason={reason}.");
+            }
+        }
 
         private void FillPendingCandidates(
             DateTime entryTime,
@@ -140,28 +318,47 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            foreach (var candidate in entryCandidates.ToList())
+            foreach (var candidate
+                     in entryCandidates.ToList())
             {
-                if (candidate == null)
-                    continue;
-
-                if (!candidate.StrongCandleQualified
-                    || candidate.PlannedEntryPrice > 0)
+                if (candidate == null
+                    || candidate.IsFinalized)
                 {
                     continue;
                 }
 
-                if (entryTime <= candidate.SignalTime
-                    || ToTime(entryTime) >= FlattenTime)
+                if (!candidate.StrongCandleQualified)
+                    continue;
+
+                // Already assessed at its requested next-bar open.
+                // It may now simply be awaiting the precision tick stream.
+                if (candidate.PlannedEntryPrice > 0)
+                    continue;
+
+                if (entryTime <= candidate.SignalTime)
+                    continue;
+
+                // This should normally be handled by the explicit
+                // session-finalization path, but retain the guard.
+                if (ToTime(entryTime) >= FlattenTime)
                 {
+                    FinalizeCandidate(
+                        candidate,
+                        "RejectedNoEntryBeforeFlatten",
+                        entryTime,
+                        "No valid next-bar entry was available before flatten time.");
+
                     continue;
                 }
 
                 var entryDistanceTicks =
-                    candidate.Direction == TradeDirection.Long
-                        ? (entryPrice - candidate.RangeLevel)
+                    candidate.Direction
+                    == TradeDirection.Long
+                        ? (entryPrice
+                           - candidate.RangeLevel)
                           / TickSize
-                        : (candidate.RangeLevel - entryPrice)
+                        : (candidate.RangeLevel
+                           - entryPrice)
                           / TickSize;
 
                 candidate.PlannedEntryTime =
@@ -178,17 +375,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     || entryDistanceTicks
                         > EntryMaximumDistanceTicksFromRange)
                 {
-                    candidate.FinalStatus =
-                        "RejectedEntryDistance";
+                    FinalizeCandidate(
+                        candidate,
+                        "RejectedEntryDistance",
+                        entryTime,
+                        $"Entry rejected at next 1-minute bar open because distance was {entryDistanceTicks:0.0} ticks; permitted range is {EntryMinimumDistanceTicksFromRange}-{EntryMaximumDistanceTicksFromRange} ticks.");
 
-                    candidate.QualificationReason +=
-                        $" Entry rejected at next 1-minute bar open because distance was {entryDistanceTicks:0.0} ticks; permitted range is {EntryMinimumDistanceTicksFromRange}-{EntryMaximumDistanceTicksFromRange} ticks.";
-
-                    ExportCandidate(
-                        "Final",
-                        candidate);
-
-                    FlushExportWriters();
                     continue;
                 }
 
@@ -198,56 +390,57 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (candidate.ActualRiskTicks <= 0)
                 {
-                    candidate.FinalStatus =
-                        "RejectedInvalidRisk";
+                    FinalizeCandidate(
+                        candidate,
+                        "RejectedInvalidRisk",
+                        entryTime,
+                        "Rejected because calculated risk was zero or negative.");
 
-                    candidate.QualificationReason +=
-                        " Rejected because calculated risk was zero or negative.";
-
-                    ExportCandidate(
-                        "Final",
-                        candidate);
-
-                    FlushExportWriters();
                     continue;
                 }
 
-                if (EnablePrecisionTickAnalysis
-                    && (sessionQuality == null
-                        || !sessionQuality.HasTickData))
+                if (!EnablePrecisionTickAnalysis)
                 {
-                    candidate.FinalStatus =
-                        "SkippedNoTickData";
+                    FinalizeCandidate(
+                        candidate,
+                        "FilledNoPrecisionManagement",
+                        entryTime);
 
-                    candidate.QualificationReason +=
-                        " Precision trade simulation skipped because no tick data was available for the session.";
-
-                    ExportCandidate(
-                        "Final",
-                        candidate);
-
-                    FlushExportWriters();
                     continue;
                 }
 
-                candidate.FinalStatus =
-                    EnablePrecisionTickAnalysis
-                        ? "FilledPrecision"
-                        : "FilledNoPrecisionManagement";
-
-                if (EnablePrecisionTickAnalysis)
+                // v2.2.1:
+                //
+                // Do not reject simply because the tick BIP has not yet
+                // executed for this timestamp. The one-minute series may
+                // be processed first.
+                //
+                // If the precision stream has already reached this entry
+                // timestamp, activate immediately. Otherwise leave the
+                // candidate awaiting the first tick at/after entry.
+                if (HasPrecisionTickAtOrAfter(entryTime))
                 {
                     CreateTradeVariants(
                         candidate,
                         entryTime,
                         entryPrice);
+
+                    FinalizeCandidate(
+                        candidate,
+                        "FilledPrecision",
+                        entryTime);
                 }
+                else
+                {
+                    candidate.FinalStatus =
+                        "AwaitingPrecisionTick";
 
-                ExportCandidate(
-                    "Final",
-                    candidate);
-
-                FlushExportWriters();
+                    Diagnostic(
+                        entryTime,
+                        "CANDIDATE {0} awaiting precision tick at/after {1:HH:mm:ss.fff}",
+                        candidate.CandidateId,
+                        entryTime);
+                }
             }
         }
 

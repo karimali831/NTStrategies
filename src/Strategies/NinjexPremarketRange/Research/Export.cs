@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 exportBaseName = $"{prefix}_{runId}_{contract}_{strategyInstanceId}";
 
                 manifestWriter = CreateWriter(folder, exportBaseName + "_manifest.csv",
-                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,Atr1MinutePeriod,Atr5MinutePeriod,Adx5MinutePeriod,FeatureSchemaVersion,EnableAcceptanceModel,MinimumAcceptanceClosesOutside,MaximumAcceptanceBars,MinimumAcceptanceExcursionTicks,MinimumAcceptanceCloseDistanceTicks,AllowAcceptanceLaterAttempts,MinimumAcceptancePriorFailedAttempts,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
+                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,Atr1MinutePeriod,Atr5MinutePeriod,Adx5MinutePeriod,FeatureSchemaVersion,DataLifecycleVersion,EnableAcceptanceModel,MinimumAcceptanceClosesOutside,MaximumAcceptanceBars,MinimumAcceptanceExcursionTicks,MinimumAcceptanceCloseDistanceTicks,AllowAcceptanceLaterAttempts,MinimumAcceptancePriorFailedAttempts,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
 
                 sessionWriter = CreateWriter(folder, exportBaseName + "_sessions.csv",
                     "RecordType,RunId,Version,Instrument,Contract,TradingDate,PremarketHigh,PremarketLow,RangeTicks,HighFormationTime,LowFormationTime,TickSize,PointValue,FiveMinuteRangeBarCount,OneMinuteEntryWindowBarCount,TickCount,HasFiveMinuteData,HasOneMinuteData,HasTickData,FirstFiveMinuteBarTime,LastFiveMinuteBarTime,FirstOneMinuteBarTime,LastOneMinuteBarTime,FirstTickTime,LastTickTime,DataQualityStatus");
@@ -50,13 +50,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 breakoutFinalWriter = CreateWriter(folder, exportBaseName + "_breakouts_final.csv", BreakoutHeader(null));
 
                 candidateWriter = CreateWriter(folder, exportBaseName + "_candidates.csv",
-                    "RecordType,RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,ModelVersion,QualificationCode,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,DirectionPassed,BodyPassed,CloseLocationPassed,RelativeBodyPassed,FinalStatus,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,UpperWickTicks,LowerWickTicks,CloseLocationPercent,AverageBodyTicks,RelativeBodyMultiple,AverageVolume,RelativeVolumeMultiple,FeatureCapturedAt,Atr1MinuteTicks,Atr5MinuteTicks,Adx5Minute,PremarketRangeToAtr5Minute,BreakoutDistanceToAtr1Minute,StructuralRiskToAtr1Minute,ConsecutiveClosesOutside,BarsContinuouslyOutside,MinimumCloseDistanceOutsideTicks,MaximumExcursionSinceBreakoutTicks,AttemptNumber,PriorSameDirectionAttempts,PriorOppositeDirectionAttempts,PriorReturnsInside15Minutes,PriorReturnsInside30Minutes,PriorReturnsInside60Minutes,MinutesSincePreviousAttempt,PreviousAttemptMfeTicks,PreviousAttemptBarsUntilReturnInside,BothRangeSidesBroken,StructuralStopPrice,EntryTime,EntryPrice,EntryDistanceTicks,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
+                    "RecordType,RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,ModelVersion,QualificationCode,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,DirectionPassed,BodyPassed,CloseLocationPassed,RelativeBodyPassed,FinalStatus,IsFinalized,FinalizedAt,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,UpperWickTicks,LowerWickTicks,CloseLocationPercent,AverageBodyTicks,RelativeBodyMultiple,AverageVolume,RelativeVolumeMultiple,FeatureCapturedAt,Atr1MinuteTicks,Atr5MinuteTicks,Adx5Minute,PremarketRangeToAtr5Minute,BreakoutDistanceToAtr1Minute,StructuralRiskToAtr1Minute,ConsecutiveClosesOutside,BarsContinuouslyOutside,MinimumCloseDistanceOutsideTicks,MaximumExcursionSinceBreakoutTicks,AttemptNumber,PriorSameDirectionAttempts,PriorOppositeDirectionAttempts,PriorReturnsInside15Minutes,PriorReturnsInside30Minutes,PriorReturnsInside60Minutes,MinutesSincePreviousAttempt,PreviousAttemptMfeTicks,PreviousAttemptBarsUntilReturnInside,BothRangeSidesBroken,StructuralStopPrice,EntryTime,EntryPrice,EntryDistanceTicks,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
 
                 tradeWriter = CreateWriter(folder, exportBaseName + "_trades.csv",
                     "RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,Policy,EntryTime,EntryPrice,StopPrice,InitialRiskTicks,ExitTime,ExitPrice,ExitReason,RealizedTicks,RealizedUsd,MfeTicks,MaeTicks,BreakEvenActivated,HighestTrailStepActivated");
 
-                dailyWriter = CreateWriter(folder, exportBaseName + "_daily.csv",
-                    "RunId,Version,Instrument,Contract,TradingDate,BreakoutCount,LongBreakouts,ShortBreakouts,Fakeout20Count,QualifiedCandidates,RejectedCandidates,CompletedTrades");
+                dailyWriter =
+                    CreateWriter(
+                        folder,
+                        exportBaseName + "_daily.csv",
+                        "RunId,Version,Instrument,Contract,TradingDate," +
+                        "BreakoutCount,LongBreakouts,ShortBreakouts," +
+                        "Fakeout20Count,QualifiedCandidates,RejectedCandidates," +
+                        "CompletedTrades,CandidatesCreated,CandidatesFinalized," +
+                        "CandidatesUnresolved");
             }
             catch (Exception ex)
             {
@@ -145,7 +152,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaximumRetestBars, RetestOutsideDistanceTicks, RetestInsideDistanceTicks,
                 Num(MinimumStrongBodyPercent), Num(MinimumCloseLocationPercent), RelativeBodyLookback,
                 Num(MinimumRelativeBodyMultiple), Num(MinimumRetestConfirmationBodyPercent),
-                Atr1MinutePeriod, Atr5MinutePeriod, Adx5MinutePeriod, Csv("2.2.0"),
+                Atr1MinutePeriod,
+                Atr5MinutePeriod,
+                Adx5MinutePeriod,
+                Csv(FeatureSchemaVersion),
+                Csv(DataLifecycleVersion),
                 Bool(EnableAcceptanceModel), MinimumAcceptanceClosesOutside, MaximumAcceptanceBars,
                 Num(MinimumAcceptanceExcursionTicks), Num(MinimumAcceptanceCloseDistanceTicks),
                 Bool(AllowAcceptanceLaterAttempts), MinimumAcceptancePriorFailedAttempts,
@@ -264,7 +275,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Csv(x.CandidateId), Csv(x.BreakoutEventId), Csv(x.ModelName), Csv(x.ModelVersion), Csv(x.QualificationCode),
                 Csv(x.Direction.ToString()), Dt(x.SignalTime), x.SignalBarIndex, Num(x.RangeLevel), Bool(x.StrongCandleQualified),
                 Bool(x.DirectionPassed), Bool(x.BodyPassed), Bool(x.CloseLocationPassed), Bool(x.RelativeBodyPassed),
-                Csv(x.FinalStatus), Csv(x.QualificationReason), x.BarsAfterBreakout, Num(x.RetestInsideDepthTicks), Num(x.RetestOutsideDistanceTicks),
+                Csv(x.FinalStatus),
+                Bool(x.IsFinalized),
+                Dt(x.FinalizedAt),
+                Csv(x.QualificationReason),
+                x.BarsAfterBreakout, Num(x.RetestInsideDepthTicks), Num(x.RetestOutsideDistanceTicks),
                 Num(c.Open), Num(c.High), Num(c.Low), Num(c.Close), Num(m.RangeTicks), Num(m.BodyTicks), Num(m.BodyPercent),
                 Num(m.UpperWickTicks), Num(m.LowerWickTicks), Num(m.CloseLocationPercent), Num(m.AverageBodyTicks),
                 Num(m.RelativeBodyMultiple), Num(m.AverageVolume), Num(m.RelativeVolumeMultiple),
@@ -293,7 +308,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             completedTradeCount++;
         }
 
-        private void ExportDailySummary(DateTime date)
+        private void ExportDailySummary(
+            DateTime date)
         {
             date = date.Date;
 
@@ -304,21 +320,57 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            dailyWriter.WriteLine(string.Join(",",
-                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), 
-                Csv(Instrument.FullName), 
-                Csv(date.ToString("yyyy-MM-dd")), breakoutEvents.Count,
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Long), 
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Short), 
-                breakoutEvents.Count(x => x.IsFakeout20Ticks),
-                entryCandidates.Count(x => x.StrongCandleQualified), 
-                entryCandidates.Count(
-                    x => x.FinalStatus != null
-                         && x.FinalStatus.StartsWith(
-                             "Rejected",
-                             StringComparison.Ordinal)),
+            var candidatesCreated =
+                entryCandidates.Count;
 
-                completedTradeCount));
+            var candidatesFinalized =
+                entryCandidates.Count(
+                    x => x != null
+                         && x.IsFinalized);
+
+            var candidatesUnresolved =
+                candidatesCreated
+                - candidatesFinalized;
+
+            dailyWriter.WriteLine(
+                string.Join(
+                    ",",
+                    Csv(runId),
+                    Csv(ResearchVersion),
+                    Csv(
+                        Instrument.MasterInstrument.Name),
+                    Csv(Instrument.FullName),
+                    Csv(
+                        date.ToString(
+                            "yyyy-MM-dd")),
+                    breakoutEvents.Count,
+                    breakoutEvents.Count(
+                        x => x.Direction
+                             == TradeDirection.Long),
+                    breakoutEvents.Count(
+                        x => x.Direction
+                             == TradeDirection.Short),
+                    breakoutEvents.Count(
+                        x => x.IsFakeout20Ticks),
+                    entryCandidates.Count(
+                        x => x.StrongCandleQualified),
+                    entryCandidates.Count(
+                        x => x.IsFinalized
+                             && (
+                                 string.Equals(
+                                     x.FinalStatus,
+                                     "SignalRejected",
+                                     StringComparison.Ordinal)
+                                 || x.FinalStatus.StartsWith(
+                                     "Rejected",
+                                     StringComparison.Ordinal)
+                                 || x.FinalStatus.StartsWith(
+                                     "Skipped",
+                                     StringComparison.Ordinal))),
+                    completedTradeCount,
+                    candidatesCreated,
+                    candidatesFinalized,
+                    candidatesUnresolved));
         }
 
         private void FlushAndDisposeExport()

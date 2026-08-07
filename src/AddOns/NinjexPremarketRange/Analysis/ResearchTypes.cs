@@ -220,6 +220,10 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public string QualificationReason { get; set; }
         public string FinalStatus { get; set; }
 
+        // v2.2.1 lifecycle integrity
+        public bool IsFinalized { get; set; }
+        public DateTime FinalizedAt { get; set; }
+
         public double StructuralStopPrice { get; set; }
         public double PlannedEntryPrice { get; set; }
         public DateTime PlannedEntryTime { get; set; }

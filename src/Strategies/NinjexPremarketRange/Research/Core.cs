@@ -17,7 +17,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.2.0";
+        private const string ResearchVersion = "2.2.1";
+        private const string FeatureSchemaVersion = "2.2.0";
+        private const string DataLifecycleVersion = "2.2.1";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
@@ -93,8 +95,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                DateTime time = lastMarketTime != Core.Globals.MinDate ? lastMarketTime : DateTime.Now;
-                FinalizeOpenBreakoutEvents(time, "StrategyTerminated");
+                var time = lastMarketTime != Core.Globals.MinDate
+                        ? lastMarketTime
+                        : DateTime.Now;
+
+                FinalizePendingCandidates(
+                    time,
+                    "StrategyTerminated");
+
+                FinalizeOpenBreakoutEvents(
+                    time,
+                    "StrategyTerminated");
                 ForceCloseAllHypotheticalTrades(time, lastKnownTickPrice, "StrategyTerminated");
                 FinalizeSessionDataQuality(time, "StrategyTerminated");
                 FlushAndDisposeExport();
@@ -239,6 +250,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(barTime) >= FlattenTime)
             {
+                FinalizePendingCandidates(
+                    barTime,
+                    "FlattenTime");
+
                 FinalizeOpenBreakoutEvents(
                     barTime,
                     "FlattenTime");
@@ -346,6 +361,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             EnsureResearchDay(tickTime.Date, tickTime);
             TrackTickData(tickTime);
+            ActivatePendingPrecisionCandidates(
+                tickTime);
 
             if (!EnablePrecisionTickAnalysis || !RequiresTickProcessing())
                 return;
@@ -366,10 +383,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(tickTime) >= FlattenTime)
             {
-                FinalizeOpenBreakoutEvents(tickTime, "FlattenTime");
-                ForceCloseAllHypotheticalTrades(tickTime, tickPrice, "FlattenTime");
-                FinalizeSessionDataQuality(tickTime, "FlattenTime");
-                
+                FinalizePendingCandidates(
+                    tickTime,
+                    "FlattenTime");
+
+                FinalizeOpenBreakoutEvents(
+                    tickTime,
+                    "FlattenTime");
+
+                ForceCloseAllHypotheticalTrades(
+                    tickTime,
+                    tickPrice,
+                    "FlattenTime");
+
+                FinalizeSessionDataQuality(
+                    tickTime,
+                    "FlattenTime");
+
                 ExportDailySummary(
                     tickTime.Date);
 
@@ -379,7 +409,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool RequiresTickProcessing()
         {
-            return activeTrades.Count > 0 || breakoutEvents.Any(x => !x.IsResolved);
+            return activeTrades.Count > 0
+                   || breakoutEvents.Any(
+                       x => !x.IsResolved)
+                   || entryCandidates.Any(
+                       x => x != null
+                            && !x.IsFinalized
+                            && x.StrongCandleQualified
+                            && x.PlannedEntryPrice > 0
+                            && string.Equals(
+                                x.FinalStatus,
+                                "AwaitingPrecisionTick",
+                                StringComparison.Ordinal));
         }
 
         private void EnsureResearchDay(DateTime tradingDate, DateTime eventTime)
@@ -389,7 +430,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (activeTradingDate != Core.Globals.MinDate)
             {
-                FinalizeOpenBreakoutEvents(eventTime, "NewTradingDate");
+                FinalizePendingCandidates(
+                    eventTime,
+                    "NewTradingDate");
+
+                FinalizeOpenBreakoutEvents(
+                    eventTime,
+                    "NewTradingDate");
                 ForceCloseAllHypotheticalTrades(eventTime, lastKnownTickPrice, "NewTradingDate");
                 FinalizeSessionDataQuality(eventTime, "NewTradingDate");
                 ExportDailySummary(activeTradingDate);
