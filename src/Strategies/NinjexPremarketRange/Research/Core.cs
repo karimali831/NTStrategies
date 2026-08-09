@@ -63,7 +63,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name = "Ninjex Premarket Range Research";
-                Description = "Research-only 5-minute context, 1-minute entries and optional tick-precision management analyser.";
+                Description =
+                    "Premarket range research and executable entry-model strategy.";
                 Calculate = Calculate.OnEachTick;
                 IsOverlay = true;
                 IsUnmanaged = false;
@@ -270,7 +271,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExportDailySummary(
                     tradingDate);
 
+                FlattenExecutablePosition(
+                    barTime,
+                    "FlattenTime");
+                
                 FlushExportWriters();
+                
                 return;
             }
 
@@ -402,6 +408,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ExportDailySummary(
                     tickTime.Date);
+                
+                FlattenExecutablePosition(
+                    tickTime,
+                    "FlattenTime");
 
                 FlushExportWriters();
             }
@@ -437,9 +447,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FinalizeOpenBreakoutEvents(
                     eventTime,
                     "NewTradingDate");
-                ForceCloseAllHypotheticalTrades(eventTime, lastKnownTickPrice, "NewTradingDate");
-                FinalizeSessionDataQuality(eventTime, "NewTradingDate");
-                ExportDailySummary(activeTradingDate);
+
+                ForceCloseAllHypotheticalTrades(
+                    eventTime,
+                    lastKnownTickPrice,
+                    "NewTradingDate");
+
+                FinalizeSessionDataQuality(
+                    eventTime,
+                    "NewTradingDate");
+
+                ExportDailySummary(
+                    activeTradingDate);
+
+                FlattenExecutablePosition(
+                    eventTime,
+                    "NewTradingDate");
+
                 FlushExportWriters();
             }
 
@@ -448,6 +472,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             breakoutEvents.Clear();
             entryCandidates.Clear();
             completedTradeCount = 0;
+            
+            ResetExecutionDay();
+            
             breakoutDetector.Reset(tradingDate);
             sessionContext = null;
             sessionQuality = new SessionDataQuality { TradingDate = tradingDate };

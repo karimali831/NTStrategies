@@ -399,6 +399,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
+                // Actual NinjaTrader execution consumes the exact
+                // research candidate after its next-bar entry,
+                // distance and risk have been established.
+                TrySubmitExecutableModelA(
+                    candidate,
+                    entryTime);
+
                 if (!EnablePrecisionTickAnalysis)
                 {
                     FinalizeCandidate(

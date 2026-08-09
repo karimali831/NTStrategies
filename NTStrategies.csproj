@@ -161,6 +161,7 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Execution.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Breakout.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\TradeCandidates.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Core.cs" />

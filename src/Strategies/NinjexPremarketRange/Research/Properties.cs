@@ -11,12 +11,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             EnableDiagnostics = true;
             EnableDataAnalysis = false;
+            EnableTradeExecution = true;
             EnablePrecisionTickAnalysis = true;
             DataSourceLabel = "Historical";
 
-            EnableRetestModel = true;
+            EnableRetestModel = false;
             EnableBreakoutModel = true;
-            EnableAcceptanceModel = true;
+            EnableAcceptanceModel = false;
 
             Atr1MinutePeriod = 14;
             Atr5MinutePeriod = 14;
@@ -36,8 +37,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             FlattenTime = 165500;
 
             MinimumBreakoutDistanceTicks = 1;
-            EntryMinimumDistanceTicksFromRange = 0;
-            EntryMaximumDistanceTicksFromRange = 60;
+            EntryMinimumDistanceTicksFromRange = 30;
+            EntryMaximumDistanceTicksFromRange = 50;
 
             MaximumRetestBars = 5;
             RetestOutsideDistanceTicks = 40;
@@ -51,8 +52,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Quantity = 1;
             RiskRewardRatio = 2.0;
-            MaximumDailyProfit = 1000;
-            MaximumDailyLoss = 500;
+            MaximumDailyProfit = 0;
+            MaximumDailyLoss = 0;
             MaximumInitialStopTicks = 100;
 
             BEProfitTriggerTicks = 0;
@@ -94,6 +95,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Entries
 
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Trade Execution",
+            Order = 1,
+            GroupName = "Execution")]
+        
+        public bool EnableTradeExecution { get; set; }
         [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(Name = "Range Start Time", Order = 8, GroupName = "Entries")]
