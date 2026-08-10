@@ -17,8 +17,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.2.1";
-        private const string FeatureSchemaVersion = "2.2.0";
+        private const string ResearchVersion = "2.3.0";
+        private const string FeatureSchemaVersion = "2.3.0";
         private const string DataLifecycleVersion = "2.2.1";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
@@ -91,6 +91,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 marketFeatureProvider = new MarketFeatureProvider();
                 
                 ConfigureModels();
+                ConfigureRiskScenarios();
+
                 InitializeExport();
                 ExportManifest();
             }
@@ -373,18 +375,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnablePrecisionTickAnalysis || !RequiresTickProcessing())
                 return;
 
-            foreach (var trade in activeTrades.ToList())
+            foreach (var trade
+                     in activeTrades.ToList())
             {
-                trade.ProcessTick(tickTime, tickPrice);
+                trade.ProcessTick(
+                    tickTime,
+                    tickPrice);
+
                 if (trade.IsClosed)
                 {
                     ExportTrade(trade);
                     FlushExportWriters();
-                    
-                    activeTrades.Remove(trade);
+
+                    activeTrades.Remove(
+                        trade);
                 }
             }
 
+            ProcessRiskScenarioTrades(
+                tickTime,
+                tickPrice);
+            
             UpdateBreakoutExcursions(tickTime, tickPrice);
 
             if (ToTime(tickTime) >= FlattenTime)
@@ -420,6 +431,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool RequiresTickProcessing()
         {
             return activeTrades.Count > 0
+                   || activeRiskScenarioTrades.Count > 0
                    || breakoutEvents.Any(
                        x => !x.IsResolved)
                    || entryCandidates.Any(
@@ -549,20 +561,38 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
         }
         
-        private void ForceCloseAllHypotheticalTrades(DateTime time, double price, string reason)
+        private void ForceCloseAllHypotheticalTrades(
+            DateTime time,
+            double price,
+            string reason)
         {
-            if (double.IsNaN(price) || price <= 0)
-                return;
-
-            foreach (var trade in activeTrades.ToList())
+            if (double.IsNaN(price)
+                || price <= 0)
             {
-                trade.ForceClose(time, price, reason);
-                
-                ExportTrade(trade);
-                FlushExportWriters();
-                
-                activeTrades.Remove(trade);
+                return;
             }
+
+            foreach (var trade
+                     in activeTrades.ToList())
+            {
+                trade.ForceClose(
+                    time,
+                    price,
+                    reason);
+
+                ExportTrade(
+                    trade);
+
+                FlushExportWriters();
+
+                activeTrades.Remove(
+                    trade);
+            }
+
+            ForceCloseRiskScenarioTrades(
+                time,
+                price,
+                reason);
         }
        
         private void FinalizeSessionDataQuality(DateTime time, string reason)

@@ -21,6 +21,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private StreamWriter candidateWriter;
         private StreamWriter tradeWriter;
         private StreamWriter dailyWriter;
+        private StreamWriter riskScenarioWriter;
         private string exportBaseName;
 
         private void InitializeExport()
@@ -55,6 +56,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 tradeWriter = CreateWriter(folder, exportBaseName + "_trades.csv",
                     "RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,Policy,EntryTime,EntryPrice,StopPrice,InitialRiskTicks,ExitTime,ExitPrice,ExitReason,RealizedTicks,RealizedUsd,MfeTicks,MaeTicks,BreakEvenActivated,HighestTrailStepActivated");
 
+                riskScenarioWriter =
+                    CreateWriter(
+                        folder,
+                        exportBaseName
+                        + "_risk_scenarios.csv",
+                        "RunId,Version,Instrument,Contract," +
+                        "CandidateId,BreakoutEventId,Model,Direction," +
+                        "ScenarioId,MaximumStopTicks,RiskRewardRatio," +
+                        "EntryTime,EntryPrice,StructuralRiskTicks," +
+                        "InitialRiskTicks,StopWasCapped,StopPrice,TargetPrice," +
+                        "ExitTime,ExitPrice,ExitReason," +
+                        "RealizedTicks,RealizedR,RealizedUsd," +
+                        "MfeTicks,MaeTicks");
+                
                 dailyWriter =
                     CreateWriter(
                         folder,
@@ -372,6 +387,93 @@ namespace NinjaTrader.NinjaScript.Strategies
                     candidatesFinalized,
                     candidatesUnresolved));
         }
+        
+        private void ExportRiskScenarioTrade(
+            HypotheticalTrade trade)
+        {
+            if (riskScenarioWriter == null
+                || trade?.RiskScenario == null)
+            {
+                return;
+            }
+
+            var candidate =
+                trade.Candidate;
+
+            var scenario =
+                trade.RiskScenario;
+
+            var outcome =
+                trade.Outcome;
+
+            var realizedR =
+                trade.InitialRiskTicks > 0
+                    ? outcome.RealizedTicks
+                      / trade.InitialRiskTicks
+                    : 0;
+
+            riskScenarioWriter.WriteLine(
+                string.Join(
+                    ",",
+                    Csv(runId),
+                    Csv(ResearchVersion),
+                    Csv(
+                        Instrument
+                            .MasterInstrument
+                            .Name),
+                    Csv(Instrument.FullName),
+
+                    Csv(candidate.CandidateId),
+                    Csv(candidate.BreakoutEventId),
+                    Csv(candidate.ModelName),
+                    Csv(candidate.Direction.ToString()),
+
+                    Csv(scenario.ScenarioId),
+                    scenario.MaximumInitialStopTicks,
+                    Num(scenario.RiskRewardRatio),
+
+                    Dt(trade.EntryTime),
+                    Num(trade.EntryPrice),
+
+                    Num(
+                        candidate
+                            .StructuralRiskTicks),
+
+                    Num(
+                        trade.InitialRiskTicks),
+
+                    Bool(
+                        trade.StopWasCapped),
+
+                    Num(
+                        trade.InitialStopPrice),
+
+                    Num(
+                        trade.TargetPrice),
+
+                    Dt(outcome.ExitTime),
+
+                    Num(
+                        outcome.ExitPrice),
+
+                    Csv(
+                        outcome.ExitReason),
+
+                    Num(
+                        outcome.RealizedTicks),
+
+                    Num(
+                        realizedR),
+
+                    Num(
+                        outcome.RealizedUsd),
+
+                    Num(
+                        outcome.MfeTicks),
+
+                    Num(
+                        outcome.MaeTicks)));
+        }
 
         private void FlushAndDisposeExport()
         {
@@ -383,7 +485,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CloseWriters()
         {
             CloseWriter(ref manifestWriter); CloseWriter(ref sessionWriter); CloseWriter(ref breakoutAuditWriter); CloseWriter(ref breakoutFinalWriter);
-            CloseWriter(ref candidateWriter); CloseWriter(ref tradeWriter); CloseWriter(ref dailyWriter);
+            CloseWriter(ref candidateWriter); CloseWriter(ref tradeWriter); CloseWriter(ref dailyWriter); CloseWriter(ref riskScenarioWriter);
         }
 
         private static void CloseWriter(ref StreamWriter writer)
@@ -415,6 +517,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             candidateWriter?.Flush();
             tradeWriter?.Flush();
             dailyWriter?.Flush();
+            riskScenarioWriter?.Flush();
             manifestWriter?.Flush();
         }
 

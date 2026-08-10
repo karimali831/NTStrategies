@@ -132,6 +132,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                    && sessionQuality.LastTickTime
                    >= entryTime;
         }
+        
+        private void CreateAllHypotheticalTrades(
+            EntryCandidate candidate,
+            DateTime entryTime,
+            double entryPrice)
+        {
+            CreateTradeVariants(
+                candidate,
+                entryTime,
+                entryPrice);
+
+            CreateRiskScenarioTrades(
+                candidate,
+                entryTime,
+                entryPrice);
+        }
 
         private void CreateTradeVariants(
             EntryCandidate candidate,
@@ -229,8 +245,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     continue;
                 }
-
-                CreateTradeVariants(
+                
+                CreateAllHypotheticalTrades(
                     candidate,
                     candidate.PlannedEntryTime,
                     candidate.PlannedEntryPrice);
@@ -427,7 +443,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // candidate awaiting the first tick at/after entry.
                 if (HasPrecisionTickAtOrAfter(entryTime))
                 {
-                    CreateTradeVariants(
+                    CreateAllHypotheticalTrades(
                         candidate,
                         entryTime,
                         entryPrice);

@@ -13,6 +13,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             EnableDataAnalysis = false;
             EnableTradeExecution = true;
             EnablePrecisionTickAnalysis = true;
+            EnableRiskScenarioAnalysis = true;
             DataSourceLabel = "Historical";
 
             EnableRetestModel = false;
@@ -86,6 +87,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Enable Precision Tick Analysis", Order = 3, GroupName = "Analysis")]
         public bool EnablePrecisionTickAnalysis { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Risk Scenario Analysis",
+            Order = 4,
+            GroupName = "Analysis")]
+        
+        public bool EnableRiskScenarioAnalysis
+        {
+            get;
+            set;
+        }
 
         [NinjaScriptProperty]
         [Display(Name = "Data Source Label", Order = 4, GroupName = "Analysis")]
