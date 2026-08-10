@@ -78,12 +78,17 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Properties\AssemblyInfo.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\AcceptanceContextTracker.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\BreakoutEventDetector.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\CandleMetricsCalculator.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\MarketFeatureProvider.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\NinjexPremarketRangeEngine.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\PriorAttemptTracker.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\ResearchTypes.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\CandidateModelCoordinator.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\BreakoutResolutionSnapshot.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\BreakoutSignalSnapshot.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateFeatureContext.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateFeatureSnapshot.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateModelDetails.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateQualificationCodes.cs" />
@@ -91,13 +96,18 @@
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateResearchRecord.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateSignal.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\RangeSessionSnapshot.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Interfaces\ICandidateFeatureProvider.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Interfaces\IEntryCandidateModel.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Models\AcceptanceBreakoutModel.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Models\AcceptanceObservationState.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\BreakoutConfirmationModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\CandidateModelContext.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\CandidateSignalAdapter.cs" />
-        <Compile Include="src\AddOns\NinjexPremarketRange\Models\IEntryCandidateModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\LiquiditySweepModel.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Models\PriorBreakoutObservation.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\RetestEntryModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\HypotheticalTrade.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\RiskScenario.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
@@ -152,7 +162,9 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Execution.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Breakout.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Research\RiskScenarios.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\TradeCandidates.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Core.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Diagnostics.cs" />

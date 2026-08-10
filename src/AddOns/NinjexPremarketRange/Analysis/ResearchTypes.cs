@@ -111,6 +111,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double DistanceOutsideTicks { get; set; }
         public CandleSnapshot Candle { get; set; }
         public CandleMetrics Metrics { get; set; }
+        public CandidateFeatureSnapshot FeatureSnapshot { get; set; }
 
         public double MfeTicks { get; set; }
         public double MaeTicks { get; set; }
@@ -218,6 +219,10 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public bool RelativeBodyPassed { get; set; }
         public string QualificationReason { get; set; }
         public string FinalStatus { get; set; }
+
+        // v2.2.1 lifecycle integrity
+        public bool IsFinalized { get; set; }
+        public DateTime FinalizedAt { get; set; }
 
         public double StructuralStopPrice { get; set; }
         public double PlannedEntryPrice { get; set; }

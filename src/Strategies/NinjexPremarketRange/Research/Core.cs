@@ -6,8 +6,10 @@ using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Interfaces;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
+using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Ninjex;
 #endregion
 
@@ -15,10 +17,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.2.0-parity";
+        private const string ResearchVersion = "2.3.0";
+        private const string FeatureSchemaVersion = "2.3.0";
+        private const string DataLifecycleVersion = "2.2.1";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
+        
+        private ATR atr1Minute;
+        private ATR atr5Minute;
+        private ADX adx5Minute;
+        private MarketFeatureProvider marketFeatureProvider;
         
         private CandidateModelCoordinator candidateCoordinator;
 
@@ -54,7 +63,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name = "Ninjex Premarket Range Research";
-                Description = "Research-only 5-minute context, 1-minute entries and optional tick-precision management analyser.";
+                Description =
+                    "Premarket range research and executable entry-model strategy.";
                 Calculate = Calculate.OnEachTick;
                 IsOverlay = true;
                 IsUnmanaged = false;
@@ -74,14 +84,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 strategyInstanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
                 premarketRangeEngine = new NinjexPremarketRangeEngine();
+                
+                atr1Minute = ATR(Closes[EntrySeriesIndex], Atr1MinutePeriod);
+                atr5Minute = ATR(Closes[ContextSeriesIndex], Atr5MinutePeriod);
+                adx5Minute = ADX(Closes[ContextSeriesIndex], Adx5MinutePeriod);
+                marketFeatureProvider = new MarketFeatureProvider();
+                
                 ConfigureModels();
+                ConfigureRiskScenarios();
+
                 InitializeExport();
                 ExportManifest();
             }
             else if (State == State.Terminated)
             {
-                DateTime time = lastMarketTime != Core.Globals.MinDate ? lastMarketTime : DateTime.Now;
-                FinalizeOpenBreakoutEvents(time, "StrategyTerminated");
+                var time = lastMarketTime != Core.Globals.MinDate
+                        ? lastMarketTime
+                        : DateTime.Now;
+
+                FinalizePendingCandidates(
+                    time,
+                    "StrategyTerminated");
+
+                FinalizeOpenBreakoutEvents(
+                    time,
+                    "StrategyTerminated");
                 ForceCloseAllHypotheticalTrades(time, lastKnownTickPrice, "StrategyTerminated");
                 FinalizeSessionDataQuality(time, "StrategyTerminated");
                 FlushAndDisposeExport();
@@ -134,6 +161,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                         RetestInsideDistanceTicks,
                     MinimumConfirmationBodyPercent =
                         MinimumRetestConfirmationBodyPercent
+                });
+
+            entryModels.Add(
+                new AcceptanceBreakoutModel
+                {
+                    IsEnabled = EnableAcceptanceModel,
+                    MinimumConsecutiveClosesOutside = MinimumAcceptanceClosesOutside,
+                    MaximumBarsAfterBreakout = MaximumAcceptanceBars,
+                    MinimumExcursionTicks = MinimumAcceptanceExcursionTicks,
+                    MinimumCloseDistanceTicks = MinimumAcceptanceCloseDistanceTicks,
+                    AllowLaterAttempts = AllowAcceptanceLaterAttempts,
+                    MinimumPriorFailedAttempts = MinimumAcceptancePriorFailedAttempts
                 });
 
             candidateCoordinator =
@@ -214,6 +253,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(barTime) >= FlattenTime)
             {
+                FinalizePendingCandidates(
+                    barTime,
+                    "FlattenTime");
+
                 FinalizeOpenBreakoutEvents(
                     barTime,
                     "FlattenTime");
@@ -230,7 +273,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExportDailySummary(
                     tradingDate);
 
+                FlattenExecutablePosition(
+                    barTime,
+                    "FlattenTime");
+                
                 FlushExportWriters();
+                
                 return;
             }
 
@@ -254,6 +302,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     History = entryCandleHistory
                 };
 
+            var atr1Ticks = GetCompletedAtrTicks(atr1Minute, EntrySeriesIndex);
+            var atr5Ticks = GetCompletedAtrTicks(atr5Minute, ContextSeriesIndex);
+            var adx5Value = GetCompletedAdxValue(adx5Minute, ContextSeriesIndex);
+
+            marketFeatureProvider?.UpdateCompletedBar(
+                bar,
+                atr1Ticks,
+                atr5Ticks,
+                adx5Value);
+
             var candidateContext =
                 new CandidateModelContext(
                     sessionSnapshot,
@@ -261,7 +319,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     previousBar,
                     metrics,
                     entryCandleHistory,
-                    CandidateFeatureSnapshot.Empty);
+                    CandidateFeatureSnapshot.Empty,
+                    marketFeatureProvider);
 
             var newBreakouts =
                 breakoutDetector.Detect(
@@ -310,32 +369,60 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             EnsureResearchDay(tickTime.Date, tickTime);
             TrackTickData(tickTime);
+            ActivatePendingPrecisionCandidates(
+                tickTime);
 
             if (!EnablePrecisionTickAnalysis || !RequiresTickProcessing())
                 return;
 
-            foreach (var trade in activeTrades.ToList())
+            foreach (var trade
+                     in activeTrades.ToList())
             {
-                trade.ProcessTick(tickTime, tickPrice);
+                trade.ProcessTick(
+                    tickTime,
+                    tickPrice);
+
                 if (trade.IsClosed)
                 {
                     ExportTrade(trade);
                     FlushExportWriters();
-                    
-                    activeTrades.Remove(trade);
+
+                    activeTrades.Remove(
+                        trade);
                 }
             }
 
+            ProcessRiskScenarioTrades(
+                tickTime,
+                tickPrice);
+            
             UpdateBreakoutExcursions(tickTime, tickPrice);
 
             if (ToTime(tickTime) >= FlattenTime)
             {
-                FinalizeOpenBreakoutEvents(tickTime, "FlattenTime");
-                ForceCloseAllHypotheticalTrades(tickTime, tickPrice, "FlattenTime");
-                FinalizeSessionDataQuality(tickTime, "FlattenTime");
-                
+                FinalizePendingCandidates(
+                    tickTime,
+                    "FlattenTime");
+
+                FinalizeOpenBreakoutEvents(
+                    tickTime,
+                    "FlattenTime");
+
+                ForceCloseAllHypotheticalTrades(
+                    tickTime,
+                    tickPrice,
+                    "FlattenTime");
+
+                FinalizeSessionDataQuality(
+                    tickTime,
+                    "FlattenTime");
+
                 ExportDailySummary(
                     tickTime.Date);
+                
+                FlattenExecutablePosition(
+                    tickTime,
+                    "FlattenTime");
 
                 FlushExportWriters();
             }
@@ -343,7 +430,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool RequiresTickProcessing()
         {
-            return activeTrades.Count > 0 || breakoutEvents.Any(x => !x.IsResolved);
+            return activeTrades.Count > 0
+                   || activeRiskScenarioTrades.Count > 0
+                   || breakoutEvents.Any(
+                       x => !x.IsResolved)
+                   || entryCandidates.Any(
+                       x => x != null
+                            && !x.IsFinalized
+                            && x.StrongCandleQualified
+                            && x.PlannedEntryPrice > 0
+                            && string.Equals(
+                                x.FinalStatus,
+                                "AwaitingPrecisionTick",
+                                StringComparison.Ordinal));
         }
 
         private void EnsureResearchDay(DateTime tradingDate, DateTime eventTime)
@@ -353,10 +452,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (activeTradingDate != Core.Globals.MinDate)
             {
-                FinalizeOpenBreakoutEvents(eventTime, "NewTradingDate");
-                ForceCloseAllHypotheticalTrades(eventTime, lastKnownTickPrice, "NewTradingDate");
-                FinalizeSessionDataQuality(eventTime, "NewTradingDate");
-                ExportDailySummary(activeTradingDate);
+                FinalizePendingCandidates(
+                    eventTime,
+                    "NewTradingDate");
+
+                FinalizeOpenBreakoutEvents(
+                    eventTime,
+                    "NewTradingDate");
+
+                ForceCloseAllHypotheticalTrades(
+                    eventTime,
+                    lastKnownTickPrice,
+                    "NewTradingDate");
+
+                FinalizeSessionDataQuality(
+                    eventTime,
+                    "NewTradingDate");
+
+                ExportDailySummary(
+                    activeTradingDate);
+
+                FlattenExecutablePosition(
+                    eventTime,
+                    "NewTradingDate");
+
                 FlushExportWriters();
             }
 
@@ -365,6 +484,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             breakoutEvents.Clear();
             entryCandidates.Clear();
             completedTradeCount = 0;
+            
+            ResetExecutionDay();
+            
             breakoutDetector.Reset(tradingDate);
             sessionContext = null;
             sessionQuality = new SessionDataQuality { TradingDate = tradingDate };
@@ -372,6 +494,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             sessionSnapshot = null;
 
             candidateCoordinator?.Reset(null);
+            marketFeatureProvider?.Reset(null);
 
             Diagnostic(eventTime, "New research day: {0:yyyy-MM-dd}", tradingDate);
         }
@@ -408,6 +531,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             candidateCoordinator?.Reset(
                 sessionSnapshot);
 
+            marketFeatureProvider?.Reset(
+                sessionSnapshot);
+
             ExportSession(
                 "Created",
                 sessionContext,
@@ -435,20 +561,38 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
         }
         
-        private void ForceCloseAllHypotheticalTrades(DateTime time, double price, string reason)
+        private void ForceCloseAllHypotheticalTrades(
+            DateTime time,
+            double price,
+            string reason)
         {
-            if (double.IsNaN(price) || price <= 0)
-                return;
-
-            foreach (var trade in activeTrades.ToList())
+            if (double.IsNaN(price)
+                || price <= 0)
             {
-                trade.ForceClose(time, price, reason);
-                
-                ExportTrade(trade);
-                FlushExportWriters();
-                
-                activeTrades.Remove(trade);
+                return;
             }
+
+            foreach (var trade
+                     in activeTrades.ToList())
+            {
+                trade.ForceClose(
+                    time,
+                    price,
+                    reason);
+
+                ExportTrade(
+                    trade);
+
+                FlushExportWriters();
+
+                activeTrades.Remove(
+                    trade);
+            }
+
+            ForceCloseRiskScenarioTrades(
+                time,
+                price,
+                reason);
         }
        
         private void FinalizeSessionDataQuality(DateTime time, string reason)
@@ -487,6 +631,41 @@ namespace NinjaTrader.NinjaScript.Strategies
                 sessionQuality.OneMinuteEntryWindowBarCount,
                 sessionQuality.TickCount,
                 reason);
+        }
+
+
+        private double GetCompletedAtrTicks(ATR indicator, int seriesIndex)
+        {
+            if (indicator == null || TickSize <= 0 || CurrentBars[seriesIndex] < 2)
+                return 0;
+
+            try
+            {
+                var value = indicator[1];
+                return double.IsNaN(value) || double.IsInfinity(value)
+                    ? 0
+                    : value / TickSize;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private double GetCompletedAdxValue(ADX indicator, int seriesIndex)
+        {
+            if (indicator == null || CurrentBars[seriesIndex] < 2)
+                return 0;
+
+            try
+            {
+                var value = indicator[1];
+                return double.IsNaN(value) || double.IsInfinity(value) ? 0 : value;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         private bool IsInsideEntryWindow(DateTime time)

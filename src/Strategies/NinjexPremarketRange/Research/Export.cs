@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using NinjaTrader.Core;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
 #endregion
 
@@ -20,6 +21,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private StreamWriter candidateWriter;
         private StreamWriter tradeWriter;
         private StreamWriter dailyWriter;
+        private StreamWriter riskScenarioWriter;
         private string exportBaseName;
 
         private void InitializeExport()
@@ -40,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 exportBaseName = $"{prefix}_{runId}_{contract}_{strategyInstanceId}";
 
                 manifestWriter = CreateWriter(folder, exportBaseName + "_manifest.csv",
-                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
+                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,Atr1MinutePeriod,Atr5MinutePeriod,Adx5MinutePeriod,FeatureSchemaVersion,DataLifecycleVersion,EnableAcceptanceModel,MinimumAcceptanceClosesOutside,MaximumAcceptanceBars,MinimumAcceptanceExcursionTicks,MinimumAcceptanceCloseDistanceTicks,AllowAcceptanceLaterAttempts,MinimumAcceptancePriorFailedAttempts,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
 
                 sessionWriter = CreateWriter(folder, exportBaseName + "_sessions.csv",
                     "RecordType,RunId,Version,Instrument,Contract,TradingDate,PremarketHigh,PremarketLow,RangeTicks,HighFormationTime,LowFormationTime,TickSize,PointValue,FiveMinuteRangeBarCount,OneMinuteEntryWindowBarCount,TickCount,HasFiveMinuteData,HasOneMinuteData,HasTickData,FirstFiveMinuteBarTime,LastFiveMinuteBarTime,FirstOneMinuteBarTime,LastOneMinuteBarTime,FirstTickTime,LastTickTime,DataQualityStatus");
@@ -49,13 +51,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                 breakoutFinalWriter = CreateWriter(folder, exportBaseName + "_breakouts_final.csv", BreakoutHeader(null));
 
                 candidateWriter = CreateWriter(folder, exportBaseName + "_candidates.csv",
-                    "RecordType,RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,DirectionPassed,BodyPassed,CloseLocationPassed,RelativeBodyPassed,FinalStatus,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,UpperWickTicks,LowerWickTicks,CloseLocationPercent,AverageBodyTicks,RelativeBodyMultiple,AverageVolume,RelativeVolumeMultiple,StructuralStopPrice,EntryTime,EntryPrice,EntryDistanceTicks,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
+                    "RecordType,RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,ModelVersion,QualificationCode,Direction,SignalTime,SignalBarIndex,RangeLevel,Qualified,DirectionPassed,BodyPassed,CloseLocationPassed,RelativeBodyPassed,FinalStatus,IsFinalized,FinalizedAt,Reason,BarsAfterBreakout,RetestInsideDepthTicks,RetestOutsideDistanceTicks,ConfirmationOpen,ConfirmationHigh,ConfirmationLow,ConfirmationClose,RangeTicks,BodyTicks,BodyPercent,UpperWickTicks,LowerWickTicks,CloseLocationPercent,AverageBodyTicks,RelativeBodyMultiple,AverageVolume,RelativeVolumeMultiple,FeatureCapturedAt,Atr1MinuteTicks,Atr5MinuteTicks,Adx5Minute,PremarketRangeToAtr5Minute,BreakoutDistanceToAtr1Minute,StructuralRiskToAtr1Minute,ConsecutiveClosesOutside,BarsContinuouslyOutside,MinimumCloseDistanceOutsideTicks,MaximumExcursionSinceBreakoutTicks,AttemptNumber,PriorSameDirectionAttempts,PriorOppositeDirectionAttempts,PriorReturnsInside15Minutes,PriorReturnsInside30Minutes,PriorReturnsInside60Minutes,MinutesSincePreviousAttempt,PreviousAttemptMfeTicks,PreviousAttemptBarsUntilReturnInside,BothRangeSidesBroken,StructuralStopPrice,EntryTime,EntryPrice,EntryDistanceTicks,ActualStopPrice,StructuralRiskTicks,ActualRiskTicks,StopWasCapped");
 
                 tradeWriter = CreateWriter(folder, exportBaseName + "_trades.csv",
                     "RunId,Version,Instrument,Contract,CandidateId,BreakoutEventId,Model,Direction,Policy,EntryTime,EntryPrice,StopPrice,InitialRiskTicks,ExitTime,ExitPrice,ExitReason,RealizedTicks,RealizedUsd,MfeTicks,MaeTicks,BreakEvenActivated,HighestTrailStepActivated");
 
-                dailyWriter = CreateWriter(folder, exportBaseName + "_daily.csv",
-                    "RunId,Version,Instrument,Contract,TradingDate,BreakoutCount,LongBreakouts,ShortBreakouts,Fakeout20Count,QualifiedCandidates,RejectedCandidates,CompletedTrades");
+                riskScenarioWriter =
+                    CreateWriter(
+                        folder,
+                        exportBaseName
+                        + "_risk_scenarios.csv",
+                        "RunId,Version,Instrument,Contract," +
+                        "CandidateId,BreakoutEventId,Model,Direction," +
+                        "ScenarioId,MaximumStopTicks,RiskRewardRatio," +
+                        "EntryTime,EntryPrice,StructuralRiskTicks," +
+                        "InitialRiskTicks,StopWasCapped,StopPrice,TargetPrice," +
+                        "ExitTime,ExitPrice,ExitReason," +
+                        "RealizedTicks,RealizedR,RealizedUsd," +
+                        "MfeTicks,MaeTicks");
+                
+                dailyWriter =
+                    CreateWriter(
+                        folder,
+                        exportBaseName + "_daily.csv",
+                        "RunId,Version,Instrument,Contract,TradingDate," +
+                        "BreakoutCount,LongBreakouts,ShortBreakouts," +
+                        "Fakeout20Count,QualifiedCandidates,RejectedCandidates," +
+                        "CompletedTrades,CandidatesCreated,CandidatesFinalized," +
+                        "CandidatesUnresolved");
             }
             catch (Exception ex)
             {
@@ -112,6 +135,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                    "MfeBeforeRawRetestTicks," +
                    "MfeAfterRawRetestTicks," +
                    "RawRetestStatus," +
+                   "FeatureCapturedAt,Atr1MinuteTicks,Atr5MinuteTicks,Adx5Minute," +
+                   "PremarketRangeToAtr5Minute,BreakoutDistanceToAtr1Minute," +
+                   "ConsecutiveClosesOutside,BarsContinuouslyOutside," +
+                   "MinimumCloseDistanceOutsideTicks,MaximumExcursionSinceBreakoutTicks," +
+                   "PriorSameDirectionAttempts,PriorOppositeDirectionAttempts," +
+                   "PriorReturnsInside15Minutes,PriorReturnsInside30Minutes,PriorReturnsInside60Minutes," +
+                   "MinutesSincePreviousAttempt,PreviousAttemptMfeTicks," +
+                   "PreviousAttemptBarsUntilReturnInside,BothRangeSidesBroken," +
                    "ResolutionTime,ResolutionReason";
         }
 
@@ -135,8 +166,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinimumBreakoutDistanceTicks, EntryMinimumDistanceTicksFromRange, EntryMaximumDistanceTicksFromRange,
                 MaximumRetestBars, RetestOutsideDistanceTicks, RetestInsideDistanceTicks,
                 Num(MinimumStrongBodyPercent), Num(MinimumCloseLocationPercent), RelativeBodyLookback,
-                Num(MinimumRelativeBodyMultiple), Num(MinimumRetestConfirmationBodyPercent), MaximumInitialStopTicks,
-                Num(RiskRewardRatio), Quantity, BEProfitTriggerTicks, BEPlusTicks, Csv(DateTime.Now.ToString("O"))));
+                Num(MinimumRelativeBodyMultiple), Num(MinimumRetestConfirmationBodyPercent),
+                Atr1MinutePeriod,
+                Atr5MinutePeriod,
+                Adx5MinutePeriod,
+                Csv(FeatureSchemaVersion),
+                Csv(DataLifecycleVersion),
+                Bool(EnableAcceptanceModel), MinimumAcceptanceClosesOutside, MaximumAcceptanceBars,
+                Num(MinimumAcceptanceExcursionTicks), Num(MinimumAcceptanceCloseDistanceTicks),
+                Bool(AllowAcceptanceLaterAttempts), MinimumAcceptancePriorFailedAttempts,
+                MaximumInitialStopTicks, Num(RiskRewardRatio), Quantity, BEProfitTriggerTicks, BEPlusTicks, Csv(DateTime.Now.ToString("O"))));
             manifestWriter.Flush();
         }
 
@@ -214,6 +253,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Num(x.MfeBeforeRawRetestTicks),
                 Num(x.MfeAfterRawRetestTicks),
                 Csv(x.RawRetestStatus),
+                Dt((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).CapturedAt),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).Atr1MinuteTicks),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).Atr5MinuteTicks),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).Adx5Minute),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PremarketRangeToAtr5Minute),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).BreakoutDistanceToAtr1Minute),
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).ConsecutiveClosesOutside,
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).BarsContinuouslyOutside,
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).MinimumCloseDistanceOutsideTicks),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).MaximumExcursionSinceBreakoutTicks),
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PriorSameDirectionAttempts,
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PriorOppositeDirectionAttempts,
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PriorReturnsInside15Minutes,
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PriorReturnsInside30Minutes,
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PriorReturnsInside60Minutes,
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).MinutesSincePreviousAttempt),
+                Num((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PreviousAttemptMfeTicks),
+                (x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).PreviousAttemptBarsUntilReturnInside,
+                Bool((x.FeatureSnapshot ?? CandidateFeatureSnapshot.Empty).BothRangeSidesBroken),
                 Dt(x.ResolutionTime),
                 Csv(x.ResolutionReason));
         }
@@ -222,14 +280,33 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (candidateWriter == null || x == null)
                 return;
+
             var c = x.ConfirmationCandle ?? new CandleSnapshot();
             var m = x.Metrics ?? new CandleMetrics();
-            
+            var f = x.Features ?? CandidateFeatureSnapshot.Empty;
+
             candidateWriter.WriteLine(string.Join(",",
-                Csv(recordType), Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(x.CandidateId), Csv(x.BreakoutEventId), Csv(x.ModelName), Csv(x.Direction.ToString()), Dt(x.SignalTime), x.SignalBarIndex, Num(x.RangeLevel), Bool(x.StrongCandleQualified),
-                Bool(x.DirectionPassed), Bool(x.BodyPassed), Bool(x.CloseLocationPassed), Bool(x.RelativeBodyPassed), Csv(x.FinalStatus), Csv(x.QualificationReason), x.BarsAfterBreakout, Num(x.RetestInsideDepthTicks), Num(x.RetestOutsideDistanceTicks),
-                Num(c.Open), Num(c.High), Num(c.Low), Num(c.Close), Num(m.RangeTicks), Num(m.BodyTicks), Num(m.BodyPercent), Num(m.UpperWickTicks), Num(m.LowerWickTicks), Num(m.CloseLocationPercent), Num(m.AverageBodyTicks), Num(m.RelativeBodyMultiple), Num(m.AverageVolume), Num(m.RelativeVolumeMultiple),
-                Num(x.StructuralStopPrice), Dt(x.PlannedEntryTime), Num(x.PlannedEntryPrice), Num(x.EntryDistanceTicks), Num(x.PlannedStopPrice), Num(x.StructuralRiskTicks), Num(x.ActualRiskTicks), Bool(x.StopWasCapped)));
+                Csv(recordType), Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName),
+                Csv(x.CandidateId), Csv(x.BreakoutEventId), Csv(x.ModelName), Csv(x.ModelVersion), Csv(x.QualificationCode),
+                Csv(x.Direction.ToString()), Dt(x.SignalTime), x.SignalBarIndex, Num(x.RangeLevel), Bool(x.StrongCandleQualified),
+                Bool(x.DirectionPassed), Bool(x.BodyPassed), Bool(x.CloseLocationPassed), Bool(x.RelativeBodyPassed),
+                Csv(x.FinalStatus),
+                Bool(x.IsFinalized),
+                Dt(x.FinalizedAt),
+                Csv(x.QualificationReason),
+                x.BarsAfterBreakout, Num(x.RetestInsideDepthTicks), Num(x.RetestOutsideDistanceTicks),
+                Num(c.Open), Num(c.High), Num(c.Low), Num(c.Close), Num(m.RangeTicks), Num(m.BodyTicks), Num(m.BodyPercent),
+                Num(m.UpperWickTicks), Num(m.LowerWickTicks), Num(m.CloseLocationPercent), Num(m.AverageBodyTicks),
+                Num(m.RelativeBodyMultiple), Num(m.AverageVolume), Num(m.RelativeVolumeMultiple),
+                Dt(f.CapturedAt), Num(f.Atr1MinuteTicks), Num(f.Atr5MinuteTicks), Num(f.Adx5Minute),
+                Num(f.PremarketRangeToAtr5Minute), Num(f.BreakoutDistanceToAtr1Minute), Num(f.StructuralRiskToAtr1Minute),
+                f.ConsecutiveClosesOutside, f.BarsContinuouslyOutside, Num(f.MinimumCloseDistanceOutsideTicks),
+                Num(f.MaximumExcursionSinceBreakoutTicks), f.AttemptNumber, f.PriorSameDirectionAttempts,
+                f.PriorOppositeDirectionAttempts, f.PriorReturnsInside15Minutes, f.PriorReturnsInside30Minutes,
+                f.PriorReturnsInside60Minutes, Num(f.MinutesSincePreviousAttempt), Num(f.PreviousAttemptMfeTicks),
+                f.PreviousAttemptBarsUntilReturnInside, Bool(f.BothRangeSidesBroken),
+                Num(x.StructuralStopPrice), Dt(x.PlannedEntryTime), Num(x.PlannedEntryPrice), Num(x.EntryDistanceTicks),
+                Num(x.PlannedStopPrice), Num(x.StructuralRiskTicks), Num(x.ActualRiskTicks), Bool(x.StopWasCapped)));
         }
 
         private void ExportTrade(HypotheticalTrade t)
@@ -246,7 +323,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             completedTradeCount++;
         }
 
-        private void ExportDailySummary(DateTime date)
+        private void ExportDailySummary(
+            DateTime date)
         {
             date = date.Date;
 
@@ -257,21 +335,144 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            dailyWriter.WriteLine(string.Join(",",
-                Csv(runId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), 
-                Csv(Instrument.FullName), 
-                Csv(date.ToString("yyyy-MM-dd")), breakoutEvents.Count,
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Long), 
-                breakoutEvents.Count(x => x.Direction == TradeDirection.Short), 
-                breakoutEvents.Count(x => x.IsFakeout20Ticks),
-                entryCandidates.Count(x => x.StrongCandleQualified), 
-                entryCandidates.Count(
-                    x => x.FinalStatus != null
-                         && x.FinalStatus.StartsWith(
-                             "Rejected",
-                             StringComparison.Ordinal)),
+            var candidatesCreated =
+                entryCandidates.Count;
 
-                completedTradeCount));
+            var candidatesFinalized =
+                entryCandidates.Count(
+                    x => x != null
+                         && x.IsFinalized);
+
+            var candidatesUnresolved =
+                candidatesCreated
+                - candidatesFinalized;
+
+            dailyWriter.WriteLine(
+                string.Join(
+                    ",",
+                    Csv(runId),
+                    Csv(ResearchVersion),
+                    Csv(
+                        Instrument.MasterInstrument.Name),
+                    Csv(Instrument.FullName),
+                    Csv(
+                        date.ToString(
+                            "yyyy-MM-dd")),
+                    breakoutEvents.Count,
+                    breakoutEvents.Count(
+                        x => x.Direction
+                             == TradeDirection.Long),
+                    breakoutEvents.Count(
+                        x => x.Direction
+                             == TradeDirection.Short),
+                    breakoutEvents.Count(
+                        x => x.IsFakeout20Ticks),
+                    entryCandidates.Count(
+                        x => x.StrongCandleQualified),
+                    entryCandidates.Count(
+                        x => x.IsFinalized
+                             && (
+                                 string.Equals(
+                                     x.FinalStatus,
+                                     "SignalRejected",
+                                     StringComparison.Ordinal)
+                                 || x.FinalStatus.StartsWith(
+                                     "Rejected",
+                                     StringComparison.Ordinal)
+                                 || x.FinalStatus.StartsWith(
+                                     "Skipped",
+                                     StringComparison.Ordinal))),
+                    completedTradeCount,
+                    candidatesCreated,
+                    candidatesFinalized,
+                    candidatesUnresolved));
+        }
+        
+        private void ExportRiskScenarioTrade(
+            HypotheticalTrade trade)
+        {
+            if (riskScenarioWriter == null
+                || trade?.RiskScenario == null)
+            {
+                return;
+            }
+
+            var candidate =
+                trade.Candidate;
+
+            var scenario =
+                trade.RiskScenario;
+
+            var outcome =
+                trade.Outcome;
+
+            var realizedR =
+                trade.InitialRiskTicks > 0
+                    ? outcome.RealizedTicks
+                      / trade.InitialRiskTicks
+                    : 0;
+
+            riskScenarioWriter.WriteLine(
+                string.Join(
+                    ",",
+                    Csv(runId),
+                    Csv(ResearchVersion),
+                    Csv(
+                        Instrument
+                            .MasterInstrument
+                            .Name),
+                    Csv(Instrument.FullName),
+
+                    Csv(candidate.CandidateId),
+                    Csv(candidate.BreakoutEventId),
+                    Csv(candidate.ModelName),
+                    Csv(candidate.Direction.ToString()),
+
+                    Csv(scenario.ScenarioId),
+                    scenario.MaximumInitialStopTicks,
+                    Num(scenario.RiskRewardRatio),
+
+                    Dt(trade.EntryTime),
+                    Num(trade.EntryPrice),
+
+                    Num(
+                        candidate
+                            .StructuralRiskTicks),
+
+                    Num(
+                        trade.InitialRiskTicks),
+
+                    Bool(
+                        trade.StopWasCapped),
+
+                    Num(
+                        trade.InitialStopPrice),
+
+                    Num(
+                        trade.TargetPrice),
+
+                    Dt(outcome.ExitTime),
+
+                    Num(
+                        outcome.ExitPrice),
+
+                    Csv(
+                        outcome.ExitReason),
+
+                    Num(
+                        outcome.RealizedTicks),
+
+                    Num(
+                        realizedR),
+
+                    Num(
+                        outcome.RealizedUsd),
+
+                    Num(
+                        outcome.MfeTicks),
+
+                    Num(
+                        outcome.MaeTicks)));
         }
 
         private void FlushAndDisposeExport()
@@ -284,7 +485,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CloseWriters()
         {
             CloseWriter(ref manifestWriter); CloseWriter(ref sessionWriter); CloseWriter(ref breakoutAuditWriter); CloseWriter(ref breakoutFinalWriter);
-            CloseWriter(ref candidateWriter); CloseWriter(ref tradeWriter); CloseWriter(ref dailyWriter);
+            CloseWriter(ref candidateWriter); CloseWriter(ref tradeWriter); CloseWriter(ref dailyWriter); CloseWriter(ref riskScenarioWriter);
         }
 
         private static void CloseWriter(ref StreamWriter writer)
@@ -316,6 +517,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             candidateWriter?.Flush();
             tradeWriter?.Flush();
             dailyWriter?.Flush();
+            riskScenarioWriter?.Flush();
             manifestWriter?.Flush();
         }
 

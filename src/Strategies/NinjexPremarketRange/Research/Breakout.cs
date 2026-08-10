@@ -37,8 +37,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (snapshot != null)
             {
-                candidateCoordinator?.OnBreakout(
-                    snapshot);
+                marketFeatureProvider?.OnBreakoutRegistered(snapshot);
+                breakout.FeatureSnapshot = marketFeatureProvider?.Capture(snapshot)
+                    ?? CandidateFeatureSnapshot.Empty;
+                candidateCoordinator?.OnBreakout(snapshot);
             }
         }
         
@@ -333,6 +335,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             candidateCoordinator?.OnBreakoutResolved(
                 breakout.EventId);
+
+            marketFeatureProvider?.OnBreakoutResolved(
+                BreakoutResolutionSnapshot.From(breakout));
 
             ExportBreakoutAudit(
                 "Resolved",

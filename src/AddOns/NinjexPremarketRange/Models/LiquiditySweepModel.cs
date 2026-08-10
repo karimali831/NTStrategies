@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
+using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Interfaces;
 
 namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Models
 {
