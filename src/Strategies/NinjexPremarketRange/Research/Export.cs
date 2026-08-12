@@ -389,10 +389,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         
         private void ExportRiskScenarioTrade(
-            HypotheticalTrade trade)
+            RiskScenarioTradeResult trade)
         {
             if (riskScenarioWriter == null
-                || trade?.RiskScenario == null)
+                || trade == null
+                || trade.RiskScenario == null)
             {
                 return;
             }
@@ -405,6 +406,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var outcome =
                 trade.Outcome;
+
+            if (candidate == null
+                || outcome == null)
+            {
+                return;
+            }
 
             var realizedR =
                 trade.InitialRiskTicks > 0
@@ -451,7 +458,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Num(
                         trade.TargetPrice),
 
-                    Dt(outcome.ExitTime),
+                    Dt(
+                        outcome.ExitTime),
 
                     Num(
                         outcome.ExitPrice),

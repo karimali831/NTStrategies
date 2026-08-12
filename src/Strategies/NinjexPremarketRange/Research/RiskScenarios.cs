@@ -1,17 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
-using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch
     {
-        private readonly List<HypotheticalTrade>
-            activeRiskScenarioTrades =
-                new List<HypotheticalTrade>();
+        private readonly List<RiskScenarioBatch>
+            activeRiskScenarioBatches =
+                new List<RiskScenarioBatch>();
 
         private readonly List<RiskScenario>
             riskScenarios =
@@ -127,50 +125,53 @@ namespace NinjaTrader.NinjaScript.Strategies
             var baseSettings =
                 BuildTradeManagementSettings();
 
-            foreach (var scenario
-                     in riskScenarios)
-            {
-                activeRiskScenarioTrades.Add(
-                    new HypotheticalTrade(
-                        candidate,
-                        entryTime,
-                        entryPrice,
-                        baseSettings,
-                        scenario));
-            }
+            var batch =
+                new RiskScenarioBatch(
+                    candidate,
+                    entryTime,
+                    entryPrice,
+                    baseSettings,
+                    riskScenarios);
+
+            if (batch.ScenarioCount == 0)
+                return;
+
+            activeRiskScenarioBatches.Add(
+                batch);
 
             Diagnostic(
                 entryTime,
-                "RISK SCENARIOS CREATED Candidate={0} Count={1} StructuralRisk={2:0.0}t",
+                "RISK SCENARIO BATCH CREATED " +
+                "Candidate={0} Count={1} StructuralRisk={2:0.0}t",
                 candidate.CandidateId,
-                riskScenarios.Count,
+                batch.ScenarioCount,
                 candidate.StructuralRiskTicks);
         }
-
 
         private void ProcessRiskScenarioTrades(
             DateTime tickTime,
             double tickPrice)
         {
-            foreach (var trade
-                     in activeRiskScenarioTrades
-                         .ToList())
+            for (var i =
+                     activeRiskScenarioBatches.Count - 1;
+                 i >= 0;
+                 i--)
             {
-                trade.ProcessTick(
-                    tickTime,
-                    tickPrice);
+                var batch =
+                    activeRiskScenarioBatches[i];
 
-                if (!trade.IsClosed)
+                batch.ProcessTick(
+                    tickTime,
+                    tickPrice,
+                    ExportRiskScenarioTrade);
+
+                if (!batch.IsClosed)
                     continue;
 
-                ExportRiskScenarioTrade(
-                    trade);
-
-                activeRiskScenarioTrades.Remove(
-                    trade);
+                activeRiskScenarioBatches.RemoveAt(
+                    i);
             }
         }
-
 
         private void ForceCloseRiskScenarioTrades(
             DateTime time,
@@ -183,20 +184,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            foreach (var trade
-                     in activeRiskScenarioTrades
-                         .ToList())
+            for (var i =
+                     activeRiskScenarioBatches.Count - 1;
+                 i >= 0;
+                 i--)
             {
-                trade.ForceClose(
+                var batch =
+                    activeRiskScenarioBatches[i];
+
+                batch.ForceClose(
                     time,
                     price,
-                    reason);
+                    reason,
+                    ExportRiskScenarioTrade);
 
-                ExportRiskScenarioTrade(
-                    trade);
-
-                activeRiskScenarioTrades.Remove(
-                    trade);
+                activeRiskScenarioBatches.RemoveAt(
+                    i);
             }
         }
     }

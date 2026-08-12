@@ -108,6 +108,7 @@
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\RetestEntryModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\HypotheticalTrade.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\RiskScenario.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\RiskScenarioBatch.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
