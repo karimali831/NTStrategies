@@ -28,7 +28,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             var stopCaps =
                 new[]
                 {
+                    30,
+                    40,
+                    50,
                     60,
+                    70,
                     80,
                     100,
                     120,
@@ -45,14 +49,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     1.5,
                     2.0,
                     2.5,
-                    3.0
+                    3.0,
+                    3.5,
+                    4.0
                 };
 
-            foreach (var stopCap
-                     in stopCaps)
+            foreach (var stopCap in stopCaps)
             {
-                foreach (var rr
-                         in riskRewards)
+                foreach (var rr in riskRewards)
                 {
                     riskScenarios.Add(
                         new RiskScenario(
@@ -70,7 +74,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 riskScenarios.Count);
         }
 
-
         private bool IsRiskScenarioCandidate(
             EntryCandidate candidate)
         {
@@ -80,9 +83,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            if (!candidate.StrongCandleQualified)
-                return false;
-
+            // v2.4:
+            // Risk-scenario research deliberately operates on a much
+            // broader universe than the executable/canonical model.
+            //
+            // DO NOT filter here by:
+            //   - StrongCandleQualified
+            //   - breakout attempt number
+            //   - entry-distance limits
+            //
+            // Those are analysis dimensions for the dashboard.
             if (!string.Equals(
                     candidate.ModelName,
                     "BreakoutConfirmation",
@@ -91,27 +101,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            var attempt =
-                GetBreakoutAttempt(
-                    candidate.BreakoutEventId);
-
-            if (attempt <= 0
-                || attempt > 3)
+            if (candidate.PlannedEntryTime
+                == DateTime.MinValue)
             {
                 return false;
             }
 
-            if (candidate.EntryDistanceTicks
-                    < EntryMinimumDistanceTicksFromRange
-                || candidate.EntryDistanceTicks
-                    > EntryMaximumDistanceTicksFromRange)
-            {
+            if (candidate.PlannedEntryPrice <= 0)
                 return false;
-            }
 
             return candidate.StructuralRiskTicks > 0;
         }
-
 
         private void CreateRiskScenarioTrades(
             EntryCandidate candidate,

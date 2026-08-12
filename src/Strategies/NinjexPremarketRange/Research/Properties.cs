@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             EnableDiagnostics = true;
             EnableDataAnalysis = false;
-            EnableTradeExecution = true;
+            EnableTradeExecution = false;
             EnablePrecisionTickAnalysis = true;
             EnableRiskScenarioAnalysis = true;
             DataSourceLabel = "Historical";

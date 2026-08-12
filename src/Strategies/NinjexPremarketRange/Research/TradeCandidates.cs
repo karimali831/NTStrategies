@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
@@ -40,6 +41,51 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             };
         }
+        
+        private bool ShouldCaptureBroadResearchCandidate(
+            EntryCandidate candidate)
+        {
+            if (!EnableRiskScenarioAnalysis
+                || candidate == null)
+            {
+                return false;
+            }
+
+            return string.Equals(
+                candidate.ModelName,
+                "BreakoutConfirmation",
+                StringComparison.Ordinal);
+        }
+
+
+        private bool IsInsideCanonicalEntryDistance(
+            double entryDistanceTicks)
+        {
+            return
+                entryDistanceTicks
+                >= EntryMinimumDistanceTicksFromRange
+                && entryDistanceTicks
+                <= EntryMaximumDistanceTicksFromRange;
+        }
+
+
+        private bool IsCanonicalTradeCandidate(
+            EntryCandidate candidate)
+        {
+            if (candidate == null)
+                return false;
+
+            if (!candidate.StrongCandleQualified)
+                return false;
+
+            if (!IsInsideCanonicalEntryDistance(
+                    candidate.EntryDistanceTicks))
+            {
+                return false;
+            }
+
+            return candidate.ActualRiskTicks > 0;
+        }
 
         private void RegisterCandidate(
             EntryCandidate candidate)
@@ -65,16 +111,45 @@ namespace NinjaTrader.NinjaScript.Strategies
                 candidate.QualificationCode,
                 candidate.QualificationReason);
 
-            // v2.2.1:
-            // Model-rejected candidates are already terminal.
-            // Every CandidateId must receive exactly one Final row.
-            if (!candidate.StrongCandleQualified)
+            // v2.4:
+            // BreakoutConfirmation candidates participating in broad
+            // research must survive until their next-bar open is known,
+            // even when today's signal model rejected them.
+            //
+            // Other models retain their existing terminal behaviour.
+            if (!candidate.StrongCandleQualified
+                && !ShouldCaptureBroadResearchCandidate(
+                    candidate))
             {
                 FinalizeCandidate(
                     candidate,
                     "SignalRejected",
                     candidate.SignalTime);
             }
+        }
+        
+        private string ResolveCandidateFinalStatus(
+            EntryCandidate candidate,
+            bool precision)
+        {
+            if (candidate == null)
+                return "FinalizedUnknown";
+
+            if (!candidate.StrongCandleQualified)
+                return "SignalRejected";
+
+            if (!IsInsideCanonicalEntryDistance(
+                    candidate.EntryDistanceTicks))
+            {
+                return "RejectedEntryDistance";
+            }
+
+            if (candidate.ActualRiskTicks <= 0)
+                return "RejectedInvalidRisk";
+
+            return precision
+                ? "FilledPrecision"
+                : "FilledNoPrecisionManagement";
         }
         
         private void FinalizeCandidate(
@@ -125,24 +200,31 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool HasPrecisionTickAtOrAfter(
             DateTime entryTime)
         {
-            return sessionQuality != null
-                   && sessionQuality.HasTickData
-                   && sessionQuality.LastTickTime
-                   != DateTime.MinValue
-                   && sessionQuality.LastTickTime
+            if (sessionQuality is not { HasTickData: true }
+                || sessionQuality.LastTickTime
+                == DateTime.MinValue) return false;
+            return sessionQuality.LastTickTime
                    >= entryTime;
         }
         
-        private void CreateAllHypotheticalTrades(
+        private void CreateCandidateSimulations(
             EntryCandidate candidate,
             DateTime entryTime,
             double entryPrice)
         {
-            CreateTradeVariants(
-                candidate,
-                entryTime,
-                entryPrice);
+            if (candidate == null)
+                return;
 
+            // Preserve the existing canonical research trade universe.
+            if (IsCanonicalTradeCandidate(candidate))
+            {
+                CreateTradeVariants(
+                    candidate,
+                    entryTime,
+                    entryPrice);
+            }
+
+            // v2.4 broad research universe.
             CreateRiskScenarioTrades(
                 candidate,
                 entryTime,
@@ -222,7 +304,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (candidate == null
                     || candidate.IsFinalized
-                    || !candidate.StrongCandleQualified
                     || candidate.PlannedEntryPrice <= 0
                     || candidate.PlannedEntryTime
                     == DateTime.MinValue
@@ -245,18 +326,57 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     continue;
                 }
-                
-                CreateAllHypotheticalTrades(
+
+                CreateCandidateSimulations(
                     candidate,
                     candidate.PlannedEntryTime,
                     candidate.PlannedEntryPrice);
 
+                var finalStatus =
+                    ResolveCandidateFinalStatus(
+                        candidate,
+                        true);
+
+                var suffix =
+                    BuildCandidateResearchReasonSuffix(
+                        candidate);
+
                 FinalizeCandidate(
                     candidate,
-                    "FilledPrecision",
+                    finalStatus,
                     tickTime,
-                    "Precision simulation activated when tick data reached the planned entry timestamp.");
+                    suffix);
             }
+        }
+        
+        private string BuildCandidateResearchReasonSuffix(
+            EntryCandidate candidate)
+        {
+            if (candidate == null)
+                return null;
+
+            if (!candidate.StrongCandleQualified)
+            {
+                return
+                    "v2.4 broad research captured hypothetical " +
+                    "next-bar entry and risk scenarios despite " +
+                    "signal-model rejection.";
+            }
+
+            if (!IsInsideCanonicalEntryDistance(
+                    candidate.EntryDistanceTicks))
+            {
+                return string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Canonical entry rejected because distance was " +
+                    "{0:0.0} ticks; configured canonical range is " +
+                    "{1}-{2} ticks. v2.4 risk scenarios were still captured.",
+                    candidate.EntryDistanceTicks,
+                    EntryMinimumDistanceTicksFromRange,
+                    EntryMaximumDistanceTicksFromRange);
+            }
+
+            return null;
         }
         
         private void FinalizePendingCandidates(
@@ -272,8 +392,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                // Model-rejected candidates should already have been
-                // finalized immediately in RegisterCandidate().
+                if (string.Equals(
+                        candidate.FinalStatus,
+                        "AwaitingPrecisionTick",
+                        StringComparison.Ordinal))
+                {
+                    var status =
+                        candidate.StrongCandleQualified
+                            ? "SkippedNoTickData"
+                            : "SignalRejected";
+
+                    FinalizeCandidate(
+                        candidate,
+                        status,
+                        time,
+                        "Precision research simulation could not begin because the tick stream did not reach the planned entry timestamp before the candidate lifecycle ended.");
+
+                    continue;
+                }
+
                 if (!candidate.StrongCandleQualified)
                 {
                     FinalizeCandidate(
@@ -284,39 +421,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                if (string.Equals(
-                        candidate.FinalStatus,
-                        "AwaitingPrecisionTick",
-                        StringComparison.Ordinal))
-                {
-                    FinalizeCandidate(
-                        candidate,
-                        "SkippedNoTickData",
-                        time,
-                        "Precision trade simulation could not begin because the tick stream did not reach the planned entry timestamp before the candidate lifecycle ended.");
-
-                    continue;
-                }
-
-                string status;
+                string finalStatus;
 
                 if (string.Equals(
                         reason,
                         "FlattenTime",
                         StringComparison.Ordinal))
                 {
-                    status =
+                    finalStatus =
                         "RejectedNoEntryBeforeFlatten";
                 }
                 else
                 {
-                    status =
+                    finalStatus =
                         "RejectedSessionEnded";
                 }
 
                 FinalizeCandidate(
                     candidate,
-                    status,
+                    finalStatus,
                     time,
                     $"Candidate ended without a valid next-bar entry. Lifecycle reason={reason}.");
             }
@@ -343,26 +466,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                if (!candidate.StrongCandleQualified)
+                var broadResearchCandidate =
+                    ShouldCaptureBroadResearchCandidate(
+                        candidate);
+
+                // Existing behaviour for candidates outside the broad
+                // v2.4 research universe.
+                if (!candidate.StrongCandleQualified
+                    && !broadResearchCandidate)
+                {
                     continue;
+                }
 
                 // Already assessed at its requested next-bar open.
-                // It may now simply be awaiting the precision tick stream.
                 if (candidate.PlannedEntryPrice > 0)
                     continue;
 
                 if (entryTime <= candidate.SignalTime)
                     continue;
 
-                // This should normally be handled by the explicit
-                // session-finalization path, but retain the guard.
                 if (ToTime(entryTime) >= FlattenTime)
                 {
                     FinalizeCandidate(
                         candidate,
-                        "RejectedNoEntryBeforeFlatten",
+                        candidate.StrongCandleQualified
+                            ? "RejectedNoEntryBeforeFlatten"
+                            : "SignalRejected",
                         entryTime,
-                        "No valid next-bar entry was available before flatten time.");
+                        "No valid next-bar observation was available before flatten time.");
 
                     continue;
                 }
@@ -377,6 +508,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                            - entryPrice)
                           / TickSize;
 
+                // v2.4:
+                // Always record the observed next-bar entry first.
+                // Entry distance is data, not a research gate.
                 candidate.PlannedEntryTime =
                     entryTime;
 
@@ -386,72 +520,82 @@ namespace NinjaTrader.NinjaScript.Strategies
                 candidate.EntryDistanceTicks =
                     entryDistanceTicks;
 
-                if (entryDistanceTicks
-                        < EntryMinimumDistanceTicksFromRange
-                    || entryDistanceTicks
-                        > EntryMaximumDistanceTicksFromRange)
-                {
-                    FinalizeCandidate(
-                        candidate,
-                        "RejectedEntryDistance",
-                        entryTime,
-                        $"Entry rejected at next 1-minute bar open because distance was {entryDistanceTicks:0.0} ticks; permitted range is {EntryMinimumDistanceTicksFromRange}-{EntryMaximumDistanceTicksFromRange} ticks.");
-
-                    continue;
-                }
-
+                // Also calculate structural risk BEFORE applying
+                // canonical Model-A restrictions.
                 PrepareCandidateRisk(
                     candidate,
                     entryPrice);
 
-                if (candidate.ActualRiskTicks <= 0)
+                var validStructuralRisk =
+                    candidate.StructuralRiskTicks > 0;
+
+                var canonicalCandidate =
+                    IsCanonicalTradeCandidate(
+                        candidate);
+
+                //
+                // Actual execution remains strictly canonical.
+                //
+                // Execution.cs independently rechecks:
+                // model, signal qualification, Attempt <= 3,
+                // entry distance and risk before submitting.
+                //
+                if (canonicalCandidate)
+                {
+                    TrySubmitExecutableModelA(
+                        candidate,
+                        entryTime);
+                }
+
+                if (!validStructuralRisk)
                 {
                     FinalizeCandidate(
                         candidate,
-                        "RejectedInvalidRisk",
+                        candidate.StrongCandleQualified
+                            ? "RejectedInvalidRisk"
+                            : "SignalRejected",
                         entryTime,
-                        "Rejected because calculated risk was zero or negative.");
+                        "Broad research could not simulate this candidate because structural risk was zero or negative.");
 
                     continue;
                 }
-
-                // Actual NinjaTrader execution consumes the exact
-                // research candidate after its next-bar entry,
-                // distance and risk have been established.
-                TrySubmitExecutableModelA(
-                    candidate,
-                    entryTime);
 
                 if (!EnablePrecisionTickAnalysis)
                 {
+                    var finalStatus =
+                        ResolveCandidateFinalStatus(
+                            candidate,
+                            false);
+
                     FinalizeCandidate(
                         candidate,
-                        "FilledNoPrecisionManagement",
-                        entryTime);
+                        finalStatus,
+                        entryTime,
+                        BuildCandidateResearchReasonSuffix(
+                            candidate));
 
                     continue;
                 }
 
-                // v2.2.1:
-                //
-                // Do not reject simply because the tick BIP has not yet
-                // executed for this timestamp. The one-minute series may
-                // be processed first.
-                //
-                // If the precision stream has already reached this entry
-                // timestamp, activate immediately. Otherwise leave the
-                // candidate awaiting the first tick at/after entry.
-                if (HasPrecisionTickAtOrAfter(entryTime))
+                if (HasPrecisionTickAtOrAfter(
+                        entryTime))
                 {
-                    CreateAllHypotheticalTrades(
+                    CreateCandidateSimulations(
                         candidate,
                         entryTime,
                         entryPrice);
 
+                    var finalStatus =
+                        ResolveCandidateFinalStatus(
+                            candidate,
+                            true);
+
                     FinalizeCandidate(
                         candidate,
-                        "FilledPrecision",
-                        entryTime);
+                        finalStatus,
+                        entryTime,
+                        BuildCandidateResearchReasonSuffix(
+                            candidate));
                 }
                 else
                 {
@@ -460,9 +604,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     Diagnostic(
                         entryTime,
-                        "CANDIDATE {0} awaiting precision tick at/after {1:HH:mm:ss.fff}",
+                        "CANDIDATE {0} awaiting precision tick " +
+                        "at/after {1:HH:mm:ss.fff} " +
+                        "Qualified={2} Distance={3:0.0}t " +
+                        "StructuralRisk={4:0.0}t BroadResearch={5}",
                         candidate.CandidateId,
-                        entryTime);
+                        entryTime,
+                        candidate.StrongCandleQualified,
+                        candidate.EntryDistanceTicks,
+                        candidate.StructuralRiskTicks,
+                        broadResearchCandidate);
                 }
             }
         }

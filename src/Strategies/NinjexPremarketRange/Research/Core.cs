@@ -17,9 +17,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.3.0";
+        private const string ResearchVersion = "2.4.0";
         private const string FeatureSchemaVersion = "2.3.0";
-        private const string DataLifecycleVersion = "2.2.1";
+        private const string DataLifecycleVersion = "2.4.0";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
@@ -435,10 +435,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                    || breakoutEvents.Any(
                        x => !x.IsResolved)
                    || entryCandidates.Any(
-                       x => x != null
-                            && !x.IsFinalized
-                            && x.StrongCandleQualified
-                            && x.PlannedEntryPrice > 0
+                       x => x is { IsFinalized: false, PlannedEntryPrice: > 0 }
                             && string.Equals(
                                 x.FinalStatus,
                                 "AwaitingPrecisionTick",
