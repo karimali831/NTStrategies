@@ -435,7 +435,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                    || breakoutEvents.Any(
                        x => !x.IsResolved)
                    || entryCandidates.Any(
-                       x => x is { IsFinalized: false, PlannedEntryPrice: > 0 }
+                       x => x != null
+                            && !x.IsFinalized
+                            && x.PlannedEntryPrice > 0
                             && string.Equals(
                                 x.FinalStatus,
                                 "AwaitingPrecisionTick",

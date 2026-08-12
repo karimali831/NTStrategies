@@ -200,9 +200,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool HasPrecisionTickAtOrAfter(
             DateTime entryTime)
         {
-            if (sessionQuality is not { HasTickData: true }
+            if (sessionQuality == null
+                || !sessionQuality.HasTickData
                 || sessionQuality.LastTickTime
-                == DateTime.MinValue) return false;
+                == DateTime.MinValue)
+            {
+                return false;
+            }
+
             return sessionQuality.LastTickTime
                    >= entryTime;
         }
