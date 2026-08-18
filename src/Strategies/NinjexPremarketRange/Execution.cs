@@ -402,14 +402,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 == TradeDirection.Long)
             {
                 EnterLong(
-                    EntrySeriesIndex,
+                    TickSeriesIndex,
                     Quantity,
                     signalName);
             }
             else
             {
                 EnterShort(
-                    EntrySeriesIndex,
+                    TickSeriesIndex,
                     Quantity,
                     signalName);
             }

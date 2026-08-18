@@ -332,6 +332,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
+                //
+                // Both real execution and research become
+                // eligible at the SAME causal tick.
+                //
+
+                TrySubmitExecutableCandidate(
+                    candidate,
+                    tickTime);
+
                 CreateCandidateSimulations(
                     candidate,
                     candidate.PlannedEntryTime,
@@ -531,13 +540,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 var validStructuralRisk =
                     candidate.StructuralRiskTicks > 0;
-
-                if (validStructuralRisk)
-                {
-                    TrySubmitExecutableCandidate(
-                        candidate,
-                        entryTime);
-                }
 
                 if (!validStructuralRisk)
                 {
