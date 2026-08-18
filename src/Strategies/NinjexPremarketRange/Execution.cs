@@ -10,12 +10,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch
     {
-        private const string ExecutableModelAId =
+        private const string ExecutableModelId =
             "BreakoutConfirmation";
-
-        private const int ExecutableModelAMaxAttempt =
-            3;
-
+        
         private string activeExecutionSignalName;
 
         private EntryCandidate activeExecutionCandidate;
@@ -133,7 +130,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool IsExecutableModelACandidate(
+        private bool IsExecutableCandidate(
             EntryCandidate candidate)
         {
             if (candidate == null)
@@ -142,33 +139,72 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableTradeExecution)
                 return false;
 
+            var policy = BuildExecutionCandidatePolicy();
+
             if (!string.Equals(
                     candidate.ModelName,
-                    ExecutableModelAId,
+                    policy.ModelId,
                     StringComparison.Ordinal))
             {
                 return false;
             }
 
-            if (!candidate.StrongCandleQualified)
+            if (candidate.Direction
+                == TradeDirection.Long
+                && !policy.AllowLongs)
+            {
                 return false;
+            }
+
+            if (candidate.Direction
+                == TradeDirection.Short
+                && !policy.AllowShorts)
+            {
+                return false;
+            }
+
+            if (policy.RequireQualifiedSignal
+                && !candidate.StrongCandleQualified)
+            {
+                return false;
+            }
 
             var attempt =
                 GetBreakoutAttempt(
                     candidate.BreakoutEventId);
 
-            if (attempt <= 0
-                || attempt > ExecutableModelAMaxAttempt)
+            if (attempt <= 0)
+                return false;
+
+            if (policy.AttemptMin.HasValue
+                && attempt
+                < policy.AttemptMin.Value)
             {
                 return false;
             }
 
-            if (candidate.EntryDistanceTicks
-                    < EntryMinimumDistanceTicksFromRange
-                || candidate.EntryDistanceTicks
-                    > EntryMaximumDistanceTicksFromRange)
+            if (policy.AttemptMax.HasValue
+                && attempt
+                > policy.AttemptMax.Value)
             {
                 return false;
+            }
+
+            if (policy.EnableEntryDistanceFilter)
+            {
+                if (policy.EntryDistanceMinTicks.HasValue
+                    && candidate.EntryDistanceTicks
+                    < policy.EntryDistanceMinTicks.Value)
+                {
+                    return false;
+                }
+
+                if (policy.EntryDistanceMaxTicks.HasValue
+                    && candidate.EntryDistanceTicks
+                    > policy.EntryDistanceMaxTicks.Value)
+                {
+                    return false;
+                }
             }
 
             if (candidate.ActualRiskTicks <= 0)
@@ -177,9 +213,49 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (candidate.PlannedStopPrice <= 0)
                 return false;
 
+            if (candidate.PlannedEntryPrice <= 0)
+                return false;
+
             return true;
         }
+        
+        private ExecutionCandidatePolicy
+            BuildExecutionCandidatePolicy()
+        {
+            return new ExecutionCandidatePolicy
+            {
+                ModelId =
+                    "BreakoutConfirmation",
 
+                AllowLongs =
+                    ExecuteLongs,
+
+                AllowShorts =
+                    ExecuteShorts,
+
+                AttemptMin =
+                    ExecutionAttemptMin,
+
+                AttemptMax =
+                    ExecutionAttemptMax,
+
+                RequireQualifiedSignal =
+                    RequireQualifiedExecutionSignal,
+
+                EnableEntryDistanceFilter =
+                    EnableExecutionEntryDistanceFilter,
+
+                EntryDistanceMinTicks =
+                    EnableExecutionEntryDistanceFilter
+                        ? ExecutionEntryMinimumDistanceTicks
+                        : (double?)null,
+
+                EntryDistanceMaxTicks =
+                    EnableExecutionEntryDistanceFilter
+                        ? ExecutionEntryMaximumDistanceTicks
+                        : (double?)null
+            };
+        }
 
         private int GetBreakoutAttempt(
             string breakoutEventId)
@@ -221,11 +297,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        private void TrySubmitExecutableModelA(
+        private void TrySubmitExecutableCandidate(
             EntryCandidate candidate,
             DateTime requestedEntryTime)
         {
-            if (!IsExecutableModelACandidate(
+            if (!IsExecutableCandidate(
                     candidate))
             {
                 return;

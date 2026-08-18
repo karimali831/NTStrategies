@@ -95,6 +95,7 @@
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateQualificationSnapshot.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateResearchRecord.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\CandidateSignal.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\ExecutionCandidatePolicy.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Contracts\RangeSessionSnapshot.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Interfaces\ICandidateFeatureProvider.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Interfaces\IEntryCandidateModel.cs" />

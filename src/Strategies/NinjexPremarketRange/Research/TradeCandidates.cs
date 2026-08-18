@@ -525,8 +525,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 candidate.EntryDistanceTicks =
                     entryDistanceTicks;
 
-                // Also calculate structural risk BEFORE applying
-                // canonical Model-A restrictions.
                 PrepareCandidateRisk(
                     candidate,
                     entryPrice);
@@ -534,20 +532,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var validStructuralRisk =
                     candidate.StructuralRiskTicks > 0;
 
-                var canonicalCandidate =
-                    IsCanonicalTradeCandidate(
-                        candidate);
-
-                //
-                // Actual execution remains strictly canonical.
-                //
-                // Execution.cs independently rechecks:
-                // model, signal qualification, Attempt <= 3,
-                // entry distance and risk before submitting.
-                //
-                if (canonicalCandidate)
+                if (validStructuralRisk)
                 {
-                    TrySubmitExecutableModelA(
+                    TrySubmitExecutableCandidate(
                         candidate,
                         entryTime);
                 }

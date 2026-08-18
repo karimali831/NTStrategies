@@ -12,6 +12,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             EnableDiagnostics = true;
             EnableDataAnalysis = false;
             EnableTradeExecution = false;
+
+            ExecuteLongs = false;
+            ExecuteShorts = true;
+
+            ExecutionAttemptMin = 3;
+            ExecutionAttemptMax = 3;
+            
+            RequireQualifiedExecutionSignal = false;
+
+            EnableExecutionEntryDistanceFilter = false;
+            ExecutionEntryMinimumDistanceTicks = 0;
+            ExecutionEntryMaximumDistanceTicks = 0;
+
             EnablePrecisionTickAnalysis = true;
             EnableRiskScenarioAnalysis = true;
             DataSourceLabel = "Historical";
@@ -52,10 +65,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             MinimumRetestConfirmationBodyPercent = 50;
 
             Quantity = 1;
-            RiskRewardRatio = 2.0;
+            RiskRewardRatio = 2.5;
             MaximumDailyProfit = 0;
             MaximumDailyLoss = 0;
-            MaximumInitialStopTicks = 100;
+            MaximumInitialStopTicks = 30;
 
             BEProfitTriggerTicks = 0;
             BEPlusTicks = 0;
@@ -113,8 +126,91 @@ namespace NinjaTrader.NinjaScript.Strategies
             Name = "Enable Trade Execution",
             Order = 1,
             GroupName = "Execution")]
-        
         public bool EnableTradeExecution { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Execute Longs",
+            Order = 2,
+            GroupName = "Execution")]
+        public bool ExecuteLongs { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Execute Shorts",
+            Order = 3,
+            GroupName = "Execution")]
+        public bool ExecuteShorts { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(
+            Name = "Execution Attempt Min",
+            Order = 4,
+            GroupName = "Execution")]
+        public int ExecutionAttemptMin { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(
+            Name = "Execution Attempt Max",
+            Order = 5,
+            GroupName = "Execution")]
+        public int ExecutionAttemptMax { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Require Qualified Signal",
+            Order = 6,
+            GroupName = "Execution")]
+        public bool RequireQualifiedExecutionSignal
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Entry Distance Filter",
+            Order = 7,
+            GroupName = "Execution")]
+        public bool EnableExecutionEntryDistanceFilter
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(
+            Name = "Execution Entry Min Distance",
+            Order = 8,
+            GroupName = "Execution")]
+        public double ExecutionEntryMinimumDistanceTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(
+            Name = "Execution Entry Max Distance",
+            Order = 9,
+            GroupName = "Execution")]
+        public double ExecutionEntryMaximumDistanceTicks
+        {
+            get;
+            set;
+        }
+        
         [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(Name = "Range Start Time", Order = 8, GroupName = "Entries")]

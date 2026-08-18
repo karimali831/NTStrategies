@@ -84,75 +84,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
 
             Initialize();
         }
-
-
-        // Risk scenario trade.
-        public HypotheticalTrade(
-            EntryCandidate candidate,
-            DateTime entryTime,
-            double entryPrice,
-            TradeManagementSettings settings,
-            RiskScenario riskScenario)
-        {
-            Candidate =
-                candidate
-                ?? throw new ArgumentNullException(
-                    nameof(candidate));
-
-            EntryTime =
-                entryTime;
-
-            EntryPrice =
-                entryPrice;
-
-            Settings =
-                settings
-                ?? throw new ArgumentNullException(
-                    nameof(settings));
-
-            RiskScenario =
-                riskScenario
-                ?? throw new ArgumentNullException(
-                    nameof(riskScenario));
-
-            PolicyName =
-                "RiskScenario";
-
-            // Scenario grid currently tests pure
-            // initial-stop / fixed-target combinations.
-            UseBreakEven =
-                false;
-
-            UseTrail =
-                false;
-
-            var structuralRisk =
-                Math.Max(
-                    0,
-                    candidate.StructuralRiskTicks);
-
-            InitialRiskTicks =
-                Math.Min(
-                    structuralRisk,
-                    riskScenario.MaximumInitialStopTicks);
-
-            RiskRewardRatio =
-                riskScenario.RiskRewardRatio;
-
-            InitialStopPrice =
-                candidate.Direction
-                == TradeDirection.Long
-                    ? entryPrice
-                      - InitialRiskTicks
-                      * settings.TickSize
-                    : entryPrice
-                      + InitialRiskTicks
-                      * settings.TickSize;
-
-            Initialize();
-        }
-
-
+        
         public EntryCandidate Candidate
         {
             get;
