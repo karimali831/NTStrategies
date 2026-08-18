@@ -10,6 +10,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch
     {
+     
+        private double activeExecutionEntryPrice =
+            double.NaN;
+
+        private double activeExecutionRiskTicks;
+
+        private DateTime activeExecutionEntryTime =
+            Core.Globals.MinDate;
+        
         private const string ExecutableModelId =
             "BreakoutConfirmation";
         
@@ -36,6 +45,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var name =
                 order.Name ?? string.Empty;
+            
+            if (orderState == OrderState.Rejected)
+            {
+                Diagnostic(
+                    time,
+                    "ORDER REJECTED Name={0} " +
+                    "Type={1} Action={2} " +
+                    "Qty={3} Filled={4} " +
+                    "Limit={5} Stop={6} " +
+                    "AvgFill={7} Error={8} NativeError={9} " +
+                    "ActiveCandidate={10}",
+                    name,
+                    order.OrderType,
+                    order.OrderAction,
+                    quantity,
+                    filled,
+                    limitPrice,
+                    stopPrice,
+                    averageFillPrice,
+                    error,
+                    nativeError,
+                    activeExecutionCandidate?
+                        .CandidateId
+                    ?? string.Empty);
+            }
 
             if (!string.Equals(
                     name,
@@ -84,10 +118,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             var name =
                 order.Name ?? string.Empty;
 
-            if (string.Equals(
-                    name,
-                    activeExecutionSignalName,
-                    StringComparison.Ordinal))
+            if (string.Equals(name,
+                    activeExecutionSignalName, StringComparison.Ordinal))
             {
                 if (order.OrderState
                     == OrderState.Filled)
@@ -95,15 +127,93 @@ namespace NinjaTrader.NinjaScript.Strategies
                     executionEntryPending =
                         false;
 
+                    var candidate =
+                        activeExecutionCandidate;
+
+                    var plannedEntry =
+                        candidate?.PlannedEntryPrice
+                        ?? 0;
+
+                    var fillVsPlannedTicks =
+                        candidate == null
+                        || TickSize <= 0
+                            ? 0
+                            : candidate.Direction
+                              == TradeDirection.Long
+                                ? (price
+                                   - plannedEntry)
+                                  / TickSize
+                                : (plannedEntry
+                                   - price)
+                                  / TickSize;
+
+                    var riskTicks =
+                        candidate?.ActualRiskTicks
+                        ?? 0;
+
+                    var targetTicks =
+                        riskTicks
+                        * RiskRewardRatio;
+
+                    var expectedLiveStop =
+                        candidate?.Direction
+                        == TradeDirection.Long
+                            ? price
+                              - riskTicks
+                              * TickSize
+                            : price
+                              + riskTicks
+                              * TickSize;
+
+                    var expectedLiveTarget =
+                        candidate?.Direction
+                        == TradeDirection.Long
+                            ? price
+                              + targetTicks
+                              * TickSize
+                            : price
+                              - targetTicks
+                              * TickSize;
+
+                    expectedLiveStop =
+                        Instrument.MasterInstrument
+                            .RoundToTickSize(
+                                expectedLiveStop);
+
+                    expectedLiveTarget =
+                        Instrument.MasterInstrument
+                            .RoundToTickSize(
+                                expectedLiveTarget);
+
+                    activeExecutionEntryPrice =
+                        price;
+
+                    activeExecutionRiskTicks =
+                        activeExecutionCandidate?
+                            .ActualRiskTicks
+                        ?? 0;
+
+                    activeExecutionEntryTime =
+                        time;
+
                     Diagnostic(
                         time,
-                        "MODEL A ENTRY FILLED Candidate={0} " +
-                        "Order={1} Qty={2} Price={3}",
-                        activeExecutionCandidate?.CandidateId
+                        "EXEC ENTRY FILLED Candidate={0} Order={1} " +
+                        "Qty={2} PlannedEntry={3} Fill={4} " +
+                        "FillVsPlanned={5:+0.0;-0.0;0.0}t " +
+                        "Risk={6:0.0}t ExpectedStop={7} " +
+                        "TargetRisk={8:0.0}t ExpectedTarget={9}",
+                        candidate?.CandidateId
                         ?? string.Empty,
                         name,
                         quantity,
-                        price);
+                        plannedEntry,
+                        price,
+                        fillVsPlannedTicks,
+                        riskTicks,
+                        expectedLiveStop,
+                        targetTicks,
+                        expectedLiveTarget);
                 }
 
                 return;
@@ -112,12 +222,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (Position.MarketPosition
                 == MarketPosition.Flat)
             {
+                var candidate =
+                    activeExecutionCandidate;
+
+                var entryPrice =
+                    activeExecutionEntryPrice;
+
+                var riskTicks =
+                    activeExecutionRiskTicks;
+
+                var realizedTicks =
+                    0.0;
+
+                if (!double.IsNaN(entryPrice)
+                    && TickSize > 0
+                    && candidate != null)
+                {
+                    realizedTicks =
+                        candidate.Direction
+                        == TradeDirection.Long
+                            ? (price - entryPrice)
+                              / TickSize
+                            : (entryPrice - price)
+                              / TickSize;
+                }
+
+                var realizedR =
+                    riskTicks > 0
+                        ? realizedTicks
+                          / riskTicks
+                        : 0;
+
                 Diagnostic(
                     time,
-                    "MODEL A POSITION FLAT Execution={0} " +
-                    "Price={1}",
+                    "EXEC POSITION FLAT Candidate={0} " +
+                    "Execution={1} Entry={2} Exit={3} " +
+                    "RealizedTicks={4:+0.0;-0.0;0.0}t " +
+                    "RealizedR={5:+0.000;-0.000;0.000}R",
+                    candidate?.CandidateId
+                    ?? string.Empty,
                     name,
-                    price);
+                    entryPrice,
+                    price,
+                    realizedTicks,
+                    realizedR);
 
                 activeExecutionCandidate =
                     null;
@@ -127,6 +275,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 executionEntryPending =
                     false;
+
+                activeExecutionEntryPrice =
+                    double.NaN;
+
+                activeExecutionRiskTicks =
+                    0;
+
+                activeExecutionEntryTime =
+                    Core.Globals.MinDate;
             }
         }
 
@@ -333,45 +490,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BuildExecutionSignalName(
                     candidate);
 
-            var stopPrice =
-                Instrument.MasterInstrument
-                    .RoundToTickSize(
-                        candidate.PlannedStopPrice);
+            var riskTicks =
+                candidate.ActualRiskTicks;
 
-            var targetDistance =
-                candidate.ActualRiskTicks
-                * RiskRewardRatio
-                * TickSize;
-
-            var targetPrice =
-                candidate.Direction
-                    == TradeDirection.Long
-                        ? candidate.PlannedEntryPrice
-                          + targetDistance
-                        : candidate.PlannedEntryPrice
-                          - targetDistance;
-
-            targetPrice =
-                Instrument.MasterInstrument
-                    .RoundToTickSize(
-                        targetPrice);
-
-            //
-            // Managed approach:
-            // configure bracket BEFORE submitting
-            // the associated entry signal.
-            //
+            var targetTicks =
+                riskTicks
+                * RiskRewardRatio;
 
             SetStopLoss(
                 signalName,
-                CalculationMode.Price,
-                stopPrice,
+                CalculationMode.Ticks,
+                riskTicks,
                 false);
 
             SetProfitTarget(
                 signalName,
-                CalculationMode.Price,
-                targetPrice);
+                CalculationMode.Ticks,
+                targetTicks);
 
             activeExecutionCandidate =
                 candidate;
@@ -382,20 +517,39 @@ namespace NinjaTrader.NinjaScript.Strategies
             executionEntryPending =
                 true;
 
+            var marketAtSubmit =
+                Closes[TickSeriesIndex][0];
+
+            var marketVsPlannedTicks =
+                candidate.Direction
+                == TradeDirection.Long
+                    ? (marketAtSubmit
+                       - candidate.PlannedEntryPrice)
+                      / TickSize
+                    : (candidate.PlannedEntryPrice
+                       - marketAtSubmit)
+                      / TickSize;
+            
             Diagnostic(
                 requestedEntryTime,
-                "MODEL A ENTRY SUBMIT Candidate={0} Direction={1} " +
-                "Attempt={2} PlannedEntry={3} Distance={4:0.0}t " +
-                "Risk={5:0.0}t Stop={6} Target={7} Qty={8}",
+                "EXEC ENTRY SUBMIT Candidate={0} Direction={1} " +
+                "Attempt={2} PlannedEntry={3} MarketAtSubmit={4} " +
+                "MarketVsPlanned={5:+0.0;-0.0;0.0}t " +
+                "EntryDistance={6:0.0}t StructuralRisk={7:0.0}t " +
+                "ExecutionRisk={8:0.0}t TargetRisk={9:0.0}t " +
+                "StopCapped={10} Qty={11}",
                 candidate.CandidateId,
                 candidate.Direction,
                 GetBreakoutAttempt(
                     candidate.BreakoutEventId),
                 candidate.PlannedEntryPrice,
+                marketAtSubmit,
+                marketVsPlannedTicks,
                 candidate.EntryDistanceTicks,
-                candidate.ActualRiskTicks,
-                stopPrice,
-                targetPrice,
+                candidate.StructuralRiskTicks,
+                riskTicks,
+                targetTicks,
+                candidate.StopWasCapped,
                 Quantity);
 
             if (candidate.Direction
@@ -438,7 +592,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 attempt);
         }
 
-        
         private void ResetExecutionDay()
         {
             activeExecutionCandidate =
@@ -449,8 +602,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             executionEntryPending =
                 false;
-        }
 
+            activeExecutionEntryPrice =
+                double.NaN;
+
+            activeExecutionRiskTicks =
+                0;
+
+            activeExecutionEntryTime =
+                Core.Globals.MinDate;
+        }
 
         private void FlattenExecutablePosition(
             DateTime time,
