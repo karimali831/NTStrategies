@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk;
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -14,6 +12,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private decimal executionRealizedPnl;
         private int activeExecutionEntryQuantity;
+        
+        private DateTime lastExecutionEquityTime =
+            Core.Globals.MinDate;
+
+        private double lastExecutionEquityPrice =
+            double.NaN;
+
+        private decimal lastExecutionEquityValue;
+
+        private int lastExecutionEquityQuantity;
         
         private decimal CalculateExecutionUnrealizedPnl(
             double marketPrice)
@@ -74,6 +82,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return;
             }
+            
+            if (activeExecutionEntryTime
+                != Core.Globals.MinDate
+                && time
+                < activeExecutionEntryTime)
+            {
+                return;
+            }
 
             var unrealizedPnl =
                 CalculateExecutionUnrealizedPnl(
@@ -89,6 +105,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                 activeTradingDate != Core.Globals.MinDate
                     ? activeTradingDate.Date
                     : time.Date;
+
+            var equityDelta =
+                executionRealizedPnl
+                + unrealizedPnl;
+
+            if (time == lastExecutionEquityTime
+                && Math.Abs(
+                    marketPrice
+                    - lastExecutionEquityPrice) < TickSize / 2.0
+                && equityDelta
+                == lastExecutionEquityValue
+                && Position.Quantity
+                == lastExecutionEquityQuantity)
+            {
+                return;
+            }
+
+            lastExecutionEquityTime =
+                time;
+
+            lastExecutionEquityPrice =
+                marketPrice;
+
+            lastExecutionEquityValue =
+                equityDelta;
+
+            lastExecutionEquityQuantity =
+                Position.Quantity;
 
             var snapshot =
                 executionEquityTracker.Update(
@@ -107,7 +151,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private void ResetExecutionEquity()
         {
-            executionRealizedPnl = 0m;
+            lastExecutionEquityTime =
+                Core.Globals.MinDate;
+
+            lastExecutionEquityPrice =
+                double.NaN;
+
+            lastExecutionEquityValue =
+                0m;
+
+            lastExecutionEquityQuantity =
+                0;
+
+            executionRealizedPnl =
+                0m;
+
             executionEquityTracker.Reset();
         }
     }
