@@ -18,11 +18,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.5.0";
-
-        private const string FeatureSchemaVersion = "2.3.0";
-
-        private const string DataLifecycleVersion = "2.5.0";
+        private const string Version = "2.5.1";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;

@@ -142,52 +142,40 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 : (plannedEntry
                                    - price)
                                   / TickSize;
-
                     var riskTicks =
                         candidate?.ActualRiskTicks
                         ?? 0;
+                    
+                    var researchStop =
+                        candidate?.PlannedStopPrice
+                        ?? 0;
 
-                    var targetTicks =
-                        riskTicks
-                        * RiskRewardRatio;
+                    var researchTarget =
+                        candidate?.PlannedTargetPrice
+                        ?? 0;
 
-                    var expectedLiveStop =
-                        candidate?.Direction
-                        == TradeDirection.Long
-                            ? price
-                              - riskTicks
-                              * TickSize
-                            : price
-                              + riskTicks
-                              * TickSize;
+                    var executableStop =
+                        Instrument.MasterInstrument.RoundToTickSize(
+                            researchStop);
 
-                    var expectedLiveTarget =
-                        candidate?.Direction
-                        == TradeDirection.Long
-                            ? price
-                              + targetTicks
-                              * TickSize
-                            : price
-                              - targetTicks
-                              * TickSize;
-
-                    expectedLiveStop =
-                        Instrument.MasterInstrument
-                            .RoundToTickSize(
-                                expectedLiveStop);
-
-                    expectedLiveTarget =
-                        Instrument.MasterInstrument
-                            .RoundToTickSize(
-                                expectedLiveTarget);
+                    var executableTarget =
+                        Instrument.MasterInstrument.RoundToTickSize(
+                            researchTarget);
 
                     activeExecutionEntryPrice =
                         price;
 
+                    var executionRiskTicks =
+                        candidate == null || TickSize <= 0
+                            ? 0
+                            : candidate.Direction == TradeDirection.Long
+                                ? (price - executableStop) / TickSize
+                                : (executableStop - price) / TickSize;
+
                     activeExecutionRiskTicks =
-                        activeExecutionCandidate?
-                            .ActualRiskTicks
-                        ?? 0;
+                        Math.Max(
+                            0,
+                            executionRiskTicks);
 
                     activeExecutionEntryTime =
                         time;
@@ -200,19 +188,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         "EXEC ENTRY FILLED Candidate={0} Order={1} " +
                         "Qty={2} PlannedEntry={3} Fill={4} " +
                         "FillVsPlanned={5:+0.0;-0.0;0.0}t " +
-                        "Risk={6:0.0}t ExpectedStop={7} " +
-                        "TargetRisk={8:0.0}t ExpectedTarget={9}",
-                        candidate?.CandidateId
-                        ?? string.Empty,
+                        "ResearchRisk={6:0.0}t " +
+                        "ResearchStop={7} ResearchTarget={8} " +
+                        "ExecutableStop={9} ExecutableTarget={10}",
+                        candidate?.CandidateId ?? string.Empty,
                         name,
                         quantity,
                         plannedEntry,
                         price,
                         fillVsPlannedTicks,
                         riskTicks,
-                        expectedLiveStop,
-                        targetTicks,
-                        expectedLiveTarget);
+                        researchStop,
+                        researchTarget,
+                        executableStop,
+                        executableTarget);
                     
                     var tradingDate =
                         activeTradingDate != Core.Globals.MinDate
@@ -402,7 +391,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "PMA-FLAT",
                     activeExecutionSignalName);
             }
-            
         }
     }
 }

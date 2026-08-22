@@ -677,6 +677,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     : entryPrice
                       + candidate.ActualRiskTicks
                       * TickSize;
+
+            var targetDistance =
+                candidate.ActualRiskTicks
+                * TickSize
+                * RiskRewardRatio;
+
+            candidate.PlannedTargetPrice =
+                candidate.Direction
+                == TradeDirection.Long
+                    ? entryPrice + targetDistance
+                    : entryPrice - targetDistance;
         }
 
         private bool IsAnyTrailStepEnabled()

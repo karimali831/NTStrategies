@@ -180,19 +180,8 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             lowestPrice =
                 EntryPrice;
 
-            var riskPrice =
-                InitialRiskTicks
-                * Settings.TickSize;
-
             targetPrice =
-                Candidate.Direction
-                == TradeDirection.Long
-                    ? EntryPrice
-                      + riskPrice
-                      * RiskRewardRatio
-                    : EntryPrice
-                      - riskPrice
-                      * RiskRewardRatio;
+                Candidate.PlannedTargetPrice;
 
             nextTrailReferencePrice =
                 EntryPrice;

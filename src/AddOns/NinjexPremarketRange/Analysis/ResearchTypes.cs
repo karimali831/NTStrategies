@@ -232,6 +232,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis
         public double ActualRiskTicks { get; set; }
         public bool StopWasCapped { get; set; }
         public double EntryDistanceTicks { get; set; }
+        public double PlannedTargetPrice { get; set; }
     }
 
     public sealed class ManagementOutcome

@@ -48,20 +48,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             var riskTicks =
                 candidate.ActualRiskTicks;
 
-            var targetTicks =
-                riskTicks
-                * RiskRewardRatio;
+            var researchStop =
+                candidate.PlannedStopPrice;
 
-            SetStopLoss(
-                signalName,
-                CalculationMode.Ticks,
-                riskTicks,
-                false);
+            var researchTarget =
+                candidate.PlannedTargetPrice;
 
-            SetProfitTarget(
-                signalName,
-                CalculationMode.Ticks,
-                targetTicks);
+            var executableStop =
+                Instrument.MasterInstrument.RoundToTickSize(
+                    researchStop);
+
+            var executableTarget =
+                Instrument.MasterInstrument.RoundToTickSize(
+                    researchTarget);
+
+            var marketAtSubmit =
+                Closes[TickSeriesIndex][0];
+
+            var geometryAlreadyInvalid =
+                candidate.Direction == TradeDirection.Long
+                    ? marketAtSubmit <= executableStop
+                      || marketAtSubmit >= executableTarget
+                    : marketAtSubmit >= executableStop
+                      || marketAtSubmit <= executableTarget;
+
+            if (geometryAlreadyInvalid)
+            {
+                Diagnostic(
+                    requestedEntryTime,
+                    "EXEC ENTRY SKIP Candidate={0} " +
+                    "Reason=ResearchGeometryAlreadyCrossed " +
+                    "Direction={1} PlannedEntry={2} Market={3} " +
+                    "ResearchStop={4} ResearchTarget={5} " +
+                    "ExecutableStop={6} ExecutableTarget={7}",
+                    candidate.CandidateId,
+                    candidate.Direction,
+                    candidate.PlannedEntryPrice,
+                    marketAtSubmit,
+                    researchStop,
+                    researchTarget,
+                    executableStop,
+                    executableTarget);
+
+                return;
+            }
 
             activeExecutionCandidate =
                 candidate;
@@ -72,9 +102,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             executionEntryPending =
                 true;
 
-            var marketAtSubmit =
-                Closes[TickSeriesIndex][0];
+            SetStopLoss(
+                signalName,
+                CalculationMode.Price,
+                executableStop,
+                false);
 
+            SetProfitTarget(
+                signalName,
+                CalculationMode.Price,
+                executableTarget);
+
+            activeExecutionCandidate =
+                candidate;
+
+            activeExecutionSignalName =
+                signalName;
+
+            executionEntryPending =
+                true;
+            
             var marketVsPlannedTicks =
                 candidate.Direction
                 == TradeDirection.Long
@@ -91,19 +138,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "Attempt={2} PlannedEntry={3} MarketAtSubmit={4} " +
                 "MarketVsPlanned={5:+0.0;-0.0;0.0}t " +
                 "EntryDistance={6:0.0}t StructuralRisk={7:0.0}t " +
-                "ExecutionRisk={8:0.0}t TargetRisk={9:0.0}t " +
-                "StopCapped={10} Qty={11}",
+                "ResearchRisk={8:0.0}t " +
+                "ResearchStop={9} ResearchTarget={10} " +
+                "ExecutableStop={11} ExecutableTarget={12} " +
+                "StopCapped={13} Qty={14}",
                 candidate.CandidateId,
                 candidate.Direction,
-                GetBreakoutAttempt(
-                    candidate.BreakoutEventId),
+                GetBreakoutAttempt(candidate.BreakoutEventId),
                 candidate.PlannedEntryPrice,
                 marketAtSubmit,
                 marketVsPlannedTicks,
                 candidate.EntryDistanceTicks,
                 candidate.StructuralRiskTicks,
-                riskTicks,
-                targetTicks,
+                candidate.ActualRiskTicks,
+                candidate.PlannedStopPrice,
+                candidate.PlannedTargetPrice,
+                executableStop,
+                executableTarget,
                 candidate.StopWasCapped,
                 Quantity);
 
@@ -204,11 +255,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (candidate.ActualRiskTicks <= 0)
                 return false;
 
+            if (candidate.PlannedEntryPrice <= 0)
+                return false;
+
             if (candidate.PlannedStopPrice <= 0)
                 return false;
 
-            if (candidate.PlannedEntryPrice <= 0)
+            if (candidate.PlannedTargetPrice <= 0)
                 return false;
+
+            if (candidate.Direction == TradeDirection.Long)
+            {
+                if (candidate.PlannedStopPrice >= candidate.PlannedEntryPrice)
+                    return false;
+
+                if (candidate.PlannedTargetPrice <= candidate.PlannedEntryPrice)
+                    return false;
+            }
+            else
+            {
+                if (candidate.PlannedStopPrice <= candidate.PlannedEntryPrice)
+                    return false;
+
+                if (candidate.PlannedTargetPrice >= candidate.PlannedEntryPrice)
+                    return false;
+            }
 
             return true;
         }

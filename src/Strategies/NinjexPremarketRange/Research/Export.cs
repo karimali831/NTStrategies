@@ -43,7 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 exportBaseName = $"{prefix}_{runId}_{contract}_{strategyInstanceId}";
 
                 manifestWriter = CreateWriter(folder, exportBaseName + "_manifest.csv",
-                    "RunId,StrategyInstanceId,ResearchVersion,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,Atr1MinutePeriod,Atr5MinutePeriod,Adx5MinutePeriod,FeatureSchemaVersion,DataLifecycleVersion,EnableAcceptanceModel,MinimumAcceptanceClosesOutside,MaximumAcceptanceBars,MinimumAcceptanceExcursionTicks,MinimumAcceptanceCloseDistanceTicks,AllowAcceptanceLaterAttempts,MinimumAcceptancePriorFailedAttempts,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
+                    "RunId,StrategyInstanceId,Version,Instrument,Contract,DataSource,ContextTimeframe,EntryTimeframe,PrecisionTickAnalysis,TradingHours,RangeStartTime,MarketOpenTime,EntryStartTime,EntryEndTime,FlattenTime,MinimumBreakoutDistanceTicks,EntryMinDistanceTicks,EntryMaxDistanceTicks,MaximumRetestBars,RetestOutsideTicks,RetestInsideTicks,MinimumStrongBodyPercent,MinimumCloseLocationPercent,RelativeBodyLookback,MinimumRelativeBodyMultiple,MinimumRetestConfirmationBodyPercent,Atr1MinutePeriod,Atr5MinutePeriod,Adx5MinutePeriod,EnableAcceptanceModel,MinimumAcceptanceClosesOutside,MaximumAcceptanceBars,MinimumAcceptanceExcursionTicks,MinimumAcceptanceCloseDistanceTicks,AllowAcceptanceLaterAttempts,MinimumAcceptancePriorFailedAttempts,MaximumInitialStopTicks,RiskRewardRatio,Quantity,BETriggerTicks,BEPlusTicks,CreatedAt");
 
                 sessionWriter = CreateWriter(folder, exportBaseName + "_sessions.csv",
                     "RecordType,RunId,StrategyInstanceId,Version,Instrument,Contract,TradingDate,PremarketHigh,PremarketLow,RangeTicks,HighFormationTime,LowFormationTime,TickSize,PointValue,FiveMinuteRangeBarCount,OneMinuteEntryWindowBarCount,TickCount,HasFiveMinuteData,HasOneMinuteData,HasTickData,FirstFiveMinuteBarTime,LastFiveMinuteBarTime,FirstOneMinuteBarTime,LastOneMinuteBarTime,FirstTickTime,LastTickTime,DataQualityStatus");
@@ -172,7 +172,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             manifestWriter.WriteLine(string.Join(",",
-                Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(DataSourceLabel),
+                Csv(runId), Csv(strategyInstanceId), Csv(Version), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(DataSourceLabel),
                 Csv("5 Minute"), Csv("1 Minute"), Bool(EnablePrecisionTickAnalysis), Csv(Bars?.TradingHours?.Name ?? ""),
                 RangeStartTime, MarketOpenTime, EntryStartTime, EntryEndTime, FlattenTime,
                 MinimumBreakoutDistanceTicks, EntryMinimumDistanceTicksFromRange, EntryMaximumDistanceTicksFromRange,
@@ -182,8 +182,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Atr1MinutePeriod,
                 Atr5MinutePeriod,
                 Adx5MinutePeriod,
-                Csv(FeatureSchemaVersion),
-                Csv(DataLifecycleVersion),
                 Bool(EnableAcceptanceModel), MinimumAcceptanceClosesOutside, MaximumAcceptanceBars,
                 Num(MinimumAcceptanceExcursionTicks), Num(MinimumAcceptanceCloseDistanceTicks),
                 Bool(AllowAcceptanceLaterAttempts), MinimumAcceptancePriorFailedAttempts,
@@ -197,7 +195,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             q = q ?? new SessionDataQuality();
             sessionWriter.WriteLine(string.Join(",",
-                Csv(recordType), Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(s.Instrument), Csv(s.Contract), Csv(s.TradingDate.ToString("yyyy-MM-dd")),
+                Csv(recordType), Csv(runId), Csv(strategyInstanceId), Csv(Version), Csv(s.Instrument), Csv(s.Contract), Csv(s.TradingDate.ToString("yyyy-MM-dd")),
                 Num(s.PremarketHigh), Num(s.PremarketLow), Num(s.RangeTicks), Dt(s.HighFormationTime), Dt(s.LowFormationTime), Num(s.TickSize), Num(s.PointValue),
                 q.FiveMinuteRangeBarCount, q.OneMinuteEntryWindowBarCount, q.TickCount, Bool(q.HasFiveMinuteData), Bool(q.HasOneMinuteData), Bool(q.HasTickData),
                 Dt(q.FirstFiveMinuteBarTime), Dt(q.LastFiveMinuteBarTime), Dt(q.FirstOneMinuteBarTime), Dt(q.LastOneMinuteBarTime), Dt(q.FirstTickTime), Dt(q.LastTickTime), Csv(q.Status)));
@@ -223,7 +221,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var m = x.Metrics ?? new CandleMetrics();
             var prefix = recordType == null ? "" : Csv(recordType) + ",";
             return prefix + string.Join(",",
-                Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(x.Contract),
+                Csv(runId), Csv(strategyInstanceId), Csv(Version), Csv(Instrument.MasterInstrument.Name), Csv(x.Contract),
                 Csv(x.EventId), Csv(x.TradingDate.ToString("yyyy-MM-dd")), Csv(x.Direction.ToString()), x.AttemptNumber,
                 Dt(x.BreakoutTime), Num(x.RangeLevel), Num(x.BreakoutClose), Num(x.DistanceOutsideTicks), Num(c.Open),
                 Num(c.High), Num(c.Low), Num(c.Close), Num(c.Volume),
@@ -298,7 +296,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var f = x.Features ?? CandidateFeatureSnapshot.Empty;
 
             candidateWriter.WriteLine(string.Join(",",
-                Csv(recordType), Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName),
+                Csv(recordType), Csv(runId), Csv(strategyInstanceId), Csv(Version), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName),
                 Csv(x.CandidateId), Csv(x.BreakoutEventId), Csv(x.ModelName), Csv(x.ModelVersion), Csv(x.QualificationCode),
                 Csv(x.Direction.ToString()), Dt(x.SignalTime), x.SignalBarIndex, Num(x.RangeLevel), Bool(x.StrongCandleQualified),
                 Bool(x.DirectionPassed), Bool(x.BodyPassed), Bool(x.CloseLocationPassed), Bool(x.RelativeBodyPassed),
@@ -330,7 +328,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var o = t.Outcome;
             
             tradeWriter.WriteLine(string.Join(",",
-                Csv(runId), Csv(strategyInstanceId), Csv(ResearchVersion), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(c.CandidateId), Csv(c.BreakoutEventId), Csv(c.ModelName), Csv(c.Direction.ToString()), Csv(t.PolicyName), Dt(t.EntryTime), Num(t.EntryPrice), Num(c.PlannedStopPrice), Num(c.ActualRiskTicks), Dt(o.ExitTime), Num(o.ExitPrice), Csv(o.ExitReason), Num(o.RealizedTicks), Num(o.RealizedUsd), Num(o.MfeTicks), Num(o.MaeTicks), Bool(o.BreakEvenActivated), o.HighestTrailStepActivated));
+                Csv(runId), Csv(strategyInstanceId), Csv(Version), Csv(Instrument.MasterInstrument.Name), Csv(Instrument.FullName), Csv(c.CandidateId), Csv(c.BreakoutEventId), Csv(c.ModelName), Csv(c.Direction.ToString()), Csv(t.PolicyName), Dt(t.EntryTime), Num(t.EntryPrice), Num(c.PlannedStopPrice), Num(c.ActualRiskTicks), Dt(o.ExitTime), Num(o.ExitPrice), Csv(o.ExitReason), Num(o.RealizedTicks), Num(o.RealizedUsd), Num(o.MfeTicks), Num(o.MaeTicks), Bool(o.BreakEvenActivated), o.HighestTrailStepActivated));
             
             completedTradeCount++;
         }
@@ -364,7 +362,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ",",
                     Csv(runId),
                     Csv(strategyInstanceId),
-                    Csv(ResearchVersion),
+                    Csv(Version),
                     Csv(
                         Instrument.MasterInstrument.Name),
                     Csv(Instrument.FullName),
@@ -437,7 +435,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ",",
                     Csv(runId),
                     Csv(strategyInstanceId),
-                    Csv(ResearchVersion),
+                    Csv(Version),
                     Csv(
                         Instrument
                             .MasterInstrument
@@ -511,7 +509,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ",",
                     Csv(runId),
                     Csv(strategyInstanceId),
-                    Csv(ResearchVersion),
+                    Csv(Version),
                     Csv(
                         Instrument
                             .MasterInstrument
