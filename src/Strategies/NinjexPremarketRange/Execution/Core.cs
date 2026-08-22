@@ -1,16 +1,13 @@
 ﻿#region Using declarations
 using System;
-using System.Globalization;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
-using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Contracts;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch
     {
-     
         private double activeExecutionEntryPrice =
             double.NaN;
 
@@ -23,8 +20,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             "BreakoutConfirmation";
         
         private string activeExecutionSignalName;
-
-        private EntryCandidate activeExecutionCandidate;
+        
 
         private bool executionEntryPending;
         
@@ -195,6 +191,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     activeExecutionEntryTime =
                         time;
+                    
+                    activeExecutionEntryQuantity =
+                        Math.Abs(Position.Quantity);
 
                     Diagnostic(
                         time,
@@ -214,6 +213,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                         expectedLiveStop,
                         targetTicks,
                         expectedLiveTarget);
+                    
+                    var tradingDate =
+                        activeTradingDate != Core.Globals.MinDate
+                            ? activeTradingDate.Date
+                            : time.Date;
+                    
+                    var entrySnapshot =
+                        executionEquityTracker.Update(
+                            time,
+                            tradingDate,
+                            executionRealizedPnl,
+                            0m,
+                            candidate?.CandidateId,
+                            price,
+                            activeExecutionEntryQuantity,
+                            candidate?.Direction);
+                    
+                    ExportExecutionEquitySnapshot(
+                        entrySnapshot);
                 }
 
                 return;
@@ -252,20 +270,57 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ? realizedTicks
                           / riskTicks
                         : 0;
+                
+                var pointValue =
+                    Instrument.MasterInstrument.PointValue;
+
+                var realizedPnl =
+                    realizedTicks
+                    * TickSize
+                    * pointValue
+                    * Math.Abs(
+                        activeExecutionEntryQuantity);
+
+                executionRealizedPnl +=
+                    Convert.ToDecimal(
+                        realizedPnl);
 
                 Diagnostic(
                     time,
                     "EXEC POSITION FLAT Candidate={0} " +
                     "Execution={1} Entry={2} Exit={3} " +
                     "RealizedTicks={4:+0.0;-0.0;0.0}t " +
-                    "RealizedR={5:+0.000;-0.000;0.000}R",
+                    "RealizedR={5:+0.000;-0.000;0.000}R " +
+                    "TradePnl={6:+0.00;-0.00;0.00} " +
+                    "CumulativePnl={7:+0.00;-0.00;0.00}",
                     candidate?.CandidateId
                     ?? string.Empty,
                     name,
                     entryPrice,
                     price,
                     realizedTicks,
-                    realizedR);
+                    realizedR,
+                    realizedPnl,
+                    executionRealizedPnl);
+                
+                var tradingDate =
+                    activeTradingDate != Core.Globals.MinDate
+                        ? activeTradingDate.Date
+                        : time.Date;
+                
+                var flatSnapshot =
+                    executionEquityTracker.Update(
+                        time,
+                        tradingDate,
+                        executionRealizedPnl,
+                        0m,
+                        candidate?.CandidateId,
+                        price,
+                        0,
+                        candidate?.Direction);
+                
+                ExportExecutionEquitySnapshot(
+                    flatSnapshot);
 
                 activeExecutionCandidate =
                     null;
@@ -282,316 +337,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 activeExecutionRiskTicks =
                     0;
 
+                activeExecutionEntryQuantity =
+                    0;
+
                 activeExecutionEntryTime =
                     Core.Globals.MinDate;
             }
         }
-
-        private bool IsExecutableCandidate(
-            EntryCandidate candidate)
-        {
-            if (candidate == null)
-                return false;
-
-            if (!EnableTradeExecution)
-                return false;
-
-            var policy = BuildExecutionCandidatePolicy();
-
-            if (!string.Equals(
-                    candidate.ModelName,
-                    policy.ModelId,
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (candidate.Direction
-                == TradeDirection.Long
-                && !policy.AllowLongs)
-            {
-                return false;
-            }
-
-            if (candidate.Direction
-                == TradeDirection.Short
-                && !policy.AllowShorts)
-            {
-                return false;
-            }
-
-            if (policy.RequireQualifiedSignal
-                && !candidate.StrongCandleQualified)
-            {
-                return false;
-            }
-
-            var attempt =
-                GetBreakoutAttempt(
-                    candidate.BreakoutEventId);
-
-            if (attempt <= 0)
-                return false;
-
-            if (policy.AttemptMin.HasValue
-                && attempt
-                < policy.AttemptMin.Value)
-            {
-                return false;
-            }
-
-            if (policy.AttemptMax.HasValue
-                && attempt
-                > policy.AttemptMax.Value)
-            {
-                return false;
-            }
-
-            if (policy.EnableEntryDistanceFilter)
-            {
-                if (policy.EntryDistanceMinTicks.HasValue
-                    && candidate.EntryDistanceTicks
-                    < policy.EntryDistanceMinTicks.Value)
-                {
-                    return false;
-                }
-
-                if (policy.EntryDistanceMaxTicks.HasValue
-                    && candidate.EntryDistanceTicks
-                    > policy.EntryDistanceMaxTicks.Value)
-                {
-                    return false;
-                }
-            }
-
-            if (candidate.ActualRiskTicks <= 0)
-                return false;
-
-            if (candidate.PlannedStopPrice <= 0)
-                return false;
-
-            if (candidate.PlannedEntryPrice <= 0)
-                return false;
-
-            return true;
-        }
         
-        private ExecutionCandidatePolicy
-            BuildExecutionCandidatePolicy()
-        {
-            return new ExecutionCandidatePolicy
-            {
-                ModelId =
-                    "BreakoutConfirmation",
-
-                AllowLongs =
-                    ExecuteLongs,
-
-                AllowShorts =
-                    ExecuteShorts,
-
-                AttemptMin =
-                    ExecutionAttemptMin,
-
-                AttemptMax =
-                    ExecutionAttemptMax,
-
-                RequireQualifiedSignal =
-                    RequireQualifiedExecutionSignal,
-
-                EnableEntryDistanceFilter =
-                    EnableExecutionEntryDistanceFilter,
-
-                EntryDistanceMinTicks =
-                    EnableExecutionEntryDistanceFilter
-                        ? ExecutionEntryMinimumDistanceTicks
-                        : (double?)null,
-
-                EntryDistanceMaxTicks =
-                    EnableExecutionEntryDistanceFilter
-                        ? ExecutionEntryMaximumDistanceTicks
-                        : (double?)null
-            };
-        }
-
-        private int GetBreakoutAttempt(
-            string breakoutEventId)
-        {
-            if (string.IsNullOrWhiteSpace(
-                    breakoutEventId))
-            {
-                return 0;
-            }
-
-            // Current IDs:
-            // yyyyMMdd-LONG-01
-            // yyyyMMdd-SHORT-03
-            //
-            // Use the final token so execution remains
-            // independent of LONG/SHORT text.
-
-            var lastDash =
-                breakoutEventId.LastIndexOf('-');
-
-            if (lastDash < 0
-                || lastDash
-                    >= breakoutEventId.Length - 1)
-            {
-                return 0;
-            }
-
-            var token =
-                breakoutEventId.Substring(
-                    lastDash + 1);
-
-            return int.TryParse(
-                token,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out var attempt)
-                    ? attempt
-                    : 0;
-        }
-
-
-        private void TrySubmitExecutableCandidate(
-            EntryCandidate candidate,
-            DateTime requestedEntryTime)
-        {
-            if (!IsExecutableCandidate(
-                    candidate))
-            {
-                return;
-            }
-
-            if (executionEntryPending)
-            {
-                Diagnostic(
-                    requestedEntryTime,
-                    "MODEL A SKIP {0} Reason=EntryPending",
-                    candidate.CandidateId);
-
-                return;
-            }
-
-            if (Position.MarketPosition
-                != MarketPosition.Flat)
-            {
-                Diagnostic(
-                    requestedEntryTime,
-                    "MODEL A SKIP {0} Reason=PositionNotFlat Position={1}",
-                    candidate.CandidateId,
-                    Position.MarketPosition);
-
-                return;
-            }
-
-            var signalName =
-                BuildExecutionSignalName(
-                    candidate);
-
-            var riskTicks =
-                candidate.ActualRiskTicks;
-
-            var targetTicks =
-                riskTicks
-                * RiskRewardRatio;
-
-            SetStopLoss(
-                signalName,
-                CalculationMode.Ticks,
-                riskTicks,
-                false);
-
-            SetProfitTarget(
-                signalName,
-                CalculationMode.Ticks,
-                targetTicks);
-
-            activeExecutionCandidate =
-                candidate;
-
-            activeExecutionSignalName =
-                signalName;
-
-            executionEntryPending =
-                true;
-
-            var marketAtSubmit =
-                Closes[TickSeriesIndex][0];
-
-            var marketVsPlannedTicks =
-                candidate.Direction
-                == TradeDirection.Long
-                    ? (marketAtSubmit
-                       - candidate.PlannedEntryPrice)
-                      / TickSize
-                    : (candidate.PlannedEntryPrice
-                       - marketAtSubmit)
-                      / TickSize;
-            
-            Diagnostic(
-                requestedEntryTime,
-                "EXEC ENTRY SUBMIT Candidate={0} Direction={1} " +
-                "Attempt={2} PlannedEntry={3} MarketAtSubmit={4} " +
-                "MarketVsPlanned={5:+0.0;-0.0;0.0}t " +
-                "EntryDistance={6:0.0}t StructuralRisk={7:0.0}t " +
-                "ExecutionRisk={8:0.0}t TargetRisk={9:0.0}t " +
-                "StopCapped={10} Qty={11}",
-                candidate.CandidateId,
-                candidate.Direction,
-                GetBreakoutAttempt(
-                    candidate.BreakoutEventId),
-                candidate.PlannedEntryPrice,
-                marketAtSubmit,
-                marketVsPlannedTicks,
-                candidate.EntryDistanceTicks,
-                candidate.StructuralRiskTicks,
-                riskTicks,
-                targetTicks,
-                candidate.StopWasCapped,
-                Quantity);
-
-            if (candidate.Direction
-                == TradeDirection.Long)
-            {
-                EnterLong(
-                    TickSeriesIndex,
-                    Quantity,
-                    signalName);
-            }
-            else
-            {
-                EnterShort(
-                    TickSeriesIndex,
-                    Quantity,
-                    signalName);
-            }
-        }
-
-
-        private string BuildExecutionSignalName(
-            EntryCandidate candidate)
-        {
-            // Keep NinjaTrader order names short and deterministic.
-
-            var side =
-                candidate.Direction
-                    == TradeDirection.Long
-                        ? "L"
-                        : "S";
-
-            var attempt =
-                GetBreakoutAttempt(
-                    candidate.BreakoutEventId);
-
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "PMA-{0}-{1:00}",
-                side,
-                attempt);
-        }
-
         private void ResetExecutionDay()
         {
             activeExecutionCandidate =
@@ -609,6 +362,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             activeExecutionRiskTicks =
                 0;
 
+            activeExecutionEntryQuantity =
+                0;
+
             activeExecutionEntryTime =
                 Core.Globals.MinDate;
         }
@@ -617,8 +373,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime time,
             string reason)
         {
-            if (Position.MarketPosition
-                == MarketPosition.Flat)
+            if (Position.MarketPosition == MarketPosition.Flat)
             {
                 return;
             }
@@ -647,6 +402,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "PMA-FLAT",
                     activeExecutionSignalName);
             }
+            
         }
     }
 }

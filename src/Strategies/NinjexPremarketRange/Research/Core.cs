@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange;
 using NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Analysis;
@@ -17,9 +18,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexPremarketRangeResearch : Strategy
     {
-        private const string ResearchVersion = "2.4.1";
+        private const string ResearchVersion = "2.5.0";
+
         private const string FeatureSchemaVersion = "2.3.0";
-        private const string DataLifecycleVersion = "2.4.1";
+
+        private const string DataLifecycleVersion = "2.5.0";
         private const int ContextSeriesIndex = 0;
         private const int EntrySeriesIndex = 1;
         private const int TickSeriesIndex = 2;
@@ -101,6 +104,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 InitializeExport();
                 ExportManifest();
+                
+                ResetExecutionEquity();
             }
             else if (State == State.Terminated)
             {
@@ -425,21 +430,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ExportDailySummary(
                     tickTime.Date);
-                
+
                 FlattenExecutablePosition(
                     tickTime,
                     "FlattenTime");
 
                 FlushExportWriters();
             }
+
+            CaptureExecutionEquity(
+                tickTime,
+                tickPrice);
         }
 
         private bool RequiresTickProcessing()
         {
-            return activeTrades.Count > 0
+            return Position.MarketPosition
+                   != MarketPosition.Flat
+
+                   || activeTrades.Count > 0
+
                    || activeRiskScenarioBatches.Count > 0
+
                    || breakoutEvents.Any(
                        x => !x.IsResolved)
+
                    || entryCandidates.Any(
                        x => x != null
                             && !x.IsFinalized

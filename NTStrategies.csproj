@@ -107,12 +107,11 @@
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\LiquiditySweepModel.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\PriorBreakoutObservation.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Models\RetestEntryModel.cs" />
-        <Compile Include="src\AddOns\NinjexPremarketRange\Models\TrailingDrawdownTracker.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\ExecutionEquityTracker.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\HypotheticalTrade.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\RiskScenario.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Risk\RiskScenarioBatch.cs" />
-        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\TrailingDrawdownSnapshot.cs" />
-        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\TrailingDrawdownTracker.cs" />
+        <Compile Include="src\AddOns\NinjexPremarketRange\Risk\ExecutionEquitySnapshot.cs" />
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
@@ -167,7 +166,9 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\ResearchMode.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
-        <Compile Include="src\Strategies\NinjexPremarketRange\Execution.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Execution\Candidate.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Execution\Core.cs" />
+        <Compile Include="src\Strategies\NinjexPremarketRange\Execution\PnLTracker.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\Breakout.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\RiskScenarios.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Research\TradeCandidates.cs" />
