@@ -81,6 +81,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                if (EnableTradeExecution && !EnablePrecisionTickAnalysis)
+                {
+                    throw new InvalidOperationException(
+                        "Trade execution requires Precision Tick Analysis.");
+                }
+                
                 runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 strategyInstanceId = Guid.NewGuid().ToString("N").Substring(0, 8);
                 premarketRangeEngine = new NinjexPremarketRangeEngine();

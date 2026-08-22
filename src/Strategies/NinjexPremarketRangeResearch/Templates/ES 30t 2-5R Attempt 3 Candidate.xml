@@ -82,6 +82,78 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">false</Max>
+        <Min xsi:type="xsd:boolean">false</Min>
+        <Name>ExecuteLongs</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>False</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">true</Max>
+        <Min xsi:type="xsd:boolean">true</Min>
+        <Name>ExecuteShorts</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>True</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:int">3</Max>
+        <Min xsi:type="xsd:int">3</Min>
+        <Name>ExecutionAttemptMin</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>3</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:int">3</Max>
+        <Min xsi:type="xsd:int">3</Min>
+        <Name>ExecutionAttemptMax</Name>
+        <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>3</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">false</Max>
+        <Min xsi:type="xsd:boolean">false</Min>
+        <Name>RequireQualifiedExecutionSignal</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>False</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:boolean">false</Max>
+        <Min xsi:type="xsd:boolean">false</Min>
+        <Name>EnableExecutionEntryDistanceFilter</Name>
+        <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>False</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
+        <Name>ExecutionEntryMinimumDistanceTicks</Name>
+        <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>0</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
+        <Name>ExecutionEntryMaximumDistanceTicks</Name>
+        <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
+        <ValueSerializable>0</ValueSerializable>
+      </Parameter>
+      <Parameter>
+        <EnumValuesSerializable />
+        <Increment>1</Increment>
         <Max xsi:type="xsd:int">30000</Max>
         <Min xsi:type="xsd:int">30000</Min>
         <Name>RangeStartTime</Name>
@@ -100,11 +172,11 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:boolean">true</Max>
-        <Min xsi:type="xsd:boolean">true</Min>
+        <Max xsi:type="xsd:boolean">false</Max>
+        <Min xsi:type="xsd:boolean">false</Min>
         <Name>EnableRetestModel</Name>
         <ParameterTypeSerializable>System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>True</ValueSerializable>
+        <ValueSerializable>False</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -163,20 +235,20 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">0</Max>
-        <Min xsi:type="xsd:int">0</Min>
+        <Max xsi:type="xsd:int">30</Max>
+        <Min xsi:type="xsd:int">30</Min>
         <Name>EntryMinimumDistanceTicksFromRange</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>0</ValueSerializable>
+        <ValueSerializable>30</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">60</Max>
-        <Min xsi:type="xsd:int">60</Min>
+        <Max xsi:type="xsd:int">50</Max>
+        <Min xsi:type="xsd:int">50</Min>
         <Name>EntryMaximumDistanceTicksFromRange</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>60</ValueSerializable>
+        <ValueSerializable>50</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -343,38 +415,38 @@
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:double">2</Max>
-        <Min xsi:type="xsd:double">2</Min>
+        <Max xsi:type="xsd:double">2.5</Max>
+        <Min xsi:type="xsd:double">2.5</Min>
         <Name>RiskRewardRatio</Name>
         <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>2</ValueSerializable>
+        <ValueSerializable>2.5</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:double">1000</Max>
-        <Min xsi:type="xsd:double">1000</Min>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
         <Name>MaximumDailyProfit</Name>
         <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>1000</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:double">500</Max>
-        <Min xsi:type="xsd:double">500</Min>
+        <Max xsi:type="xsd:double">0</Max>
+        <Min xsi:type="xsd:double">0</Min>
         <Name>MaximumDailyLoss</Name>
         <ParameterTypeSerializable>System.Double, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>500</ValueSerializable>
+        <ValueSerializable>0</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
         <Increment>1</Increment>
-        <Max xsi:type="xsd:int">100</Max>
-        <Min xsi:type="xsd:int">100</Min>
+        <Max xsi:type="xsd:int">30</Max>
+        <Min xsi:type="xsd:int">30</Min>
         <Name>MaximumInitialStopTicks</Name>
         <ParameterTypeSerializable>System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</ParameterTypeSerializable>
-        <ValueSerializable>100</ValueSerializable>
+        <ValueSerializable>30</ValueSerializable>
       </Parameter>
       <Parameter>
         <EnumValuesSerializable />
@@ -555,15 +627,23 @@
       <TradingHoursSerializable />
       <DrawOnPricePanel>false</DrawOnPricePanel>
       <ZOrder>-2147483648</ZOrder>
-      <EnableDiagnostics>false</EnableDiagnostics>
-      <EnableDataAnalysis>true</EnableDataAnalysis>
+      <EnableDiagnostics>true</EnableDiagnostics>
+      <EnableDataAnalysis>false</EnableDataAnalysis>
       <EnablePrecisionTickAnalysis>true</EnablePrecisionTickAnalysis>
       <EnableRiskScenarioAnalysis>true</EnableRiskScenarioAnalysis>
       <DataSourceLabel>Historical</DataSourceLabel>
-      <EnableTradeExecution>false</EnableTradeExecution>
+      <EnableTradeExecution>true</EnableTradeExecution>
+      <ExecuteLongs>false</ExecuteLongs>
+      <ExecuteShorts>true</ExecuteShorts>
+      <ExecutionAttemptMin>3</ExecutionAttemptMin>
+      <ExecutionAttemptMax>3</ExecutionAttemptMax>
+      <RequireQualifiedExecutionSignal>false</RequireQualifiedExecutionSignal>
+      <EnableExecutionEntryDistanceFilter>false</EnableExecutionEntryDistanceFilter>
+      <ExecutionEntryMinimumDistanceTicks>0</ExecutionEntryMinimumDistanceTicks>
+      <ExecutionEntryMaximumDistanceTicks>0</ExecutionEntryMaximumDistanceTicks>
       <RangeStartTime>30000</RangeStartTime>
       <MarketOpenTime>93000</MarketOpenTime>
-      <EnableRetestModel>true</EnableRetestModel>
+      <EnableRetestModel>false</EnableRetestModel>
       <EnableBreakoutModel>true</EnableBreakoutModel>
       <EnableAcceptanceModel>false</EnableAcceptanceModel>
       <EntryStartTime>93500</EntryStartTime>
@@ -590,10 +670,10 @@
       <AllowAcceptanceLaterAttempts>true</AllowAcceptanceLaterAttempts>
       <MinimumAcceptancePriorFailedAttempts>0</MinimumAcceptancePriorFailedAttempts>
       <Quantity>1</Quantity>
-      <RiskRewardRatio>2</RiskRewardRatio>
-      <MaximumDailyProfit>1000</MaximumDailyProfit>
-      <MaximumDailyLoss>500</MaximumDailyLoss>
-      <MaximumInitialStopTicks>100</MaximumInitialStopTicks>
+      <RiskRewardRatio>2.5</RiskRewardRatio>
+      <MaximumDailyProfit>0</MaximumDailyProfit>
+      <MaximumDailyLoss>0</MaximumDailyLoss>
+      <MaximumInitialStopTicks>30</MaximumInitialStopTicks>
       <BEProfitTriggerTicks>0</BEProfitTriggerTicks>
       <BEPlusTicks>0</BEPlusTicks>
       <Step1ProfitTriggerTicks>0</Step1ProfitTriggerTicks>

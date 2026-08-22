@@ -298,8 +298,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
         
-        private void ActivatePendingPrecisionCandidates(
+        private void ActivateCandidateAtPrecisionTick(
+            EntryCandidate candidate,
             DateTime tickTime)
+        {
+            if (candidate == null || candidate.IsFinalized)
+                return;
+
+            //
+            // Real execution and research become eligible
+            // from the same causal market observation.
+            //
+            TrySubmitExecutableCandidate(
+                candidate,
+                tickTime);
+
+            CreateCandidateSimulations(
+                candidate,
+                candidate.PlannedEntryTime,
+                candidate.PlannedEntryPrice);
+
+            var finalStatus =
+                ResolveCandidateFinalStatus(
+                    candidate,
+                    true);
+
+            var suffix =
+                BuildCandidateResearchReasonSuffix(
+                    candidate);
+
+            FinalizeCandidate(
+                candidate,
+                finalStatus,
+                tickTime,
+                suffix);
+        }
+        
+        private void ActivatePendingPrecisionCandidates(DateTime tickTime)
         {
             if (!EnablePrecisionTickAnalysis)
                 return;
@@ -310,8 +345,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (candidate == null
                     || candidate.IsFinalized
                     || candidate.PlannedEntryPrice <= 0
-                    || candidate.PlannedEntryTime
-                    == DateTime.MinValue
+                    || candidate.PlannedEntryTime == DateTime.MinValue
                     || !string.Equals(
                         candidate.FinalStatus,
                         "AwaitingPrecisionTick",
@@ -332,34 +366,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                //
-                // Both real execution and research become
-                // eligible at the SAME causal tick.
-                //
-
-                TrySubmitExecutableCandidate(
+                ActivateCandidateAtPrecisionTick(
                     candidate,
                     tickTime);
-
-                CreateCandidateSimulations(
-                    candidate,
-                    candidate.PlannedEntryTime,
-                    candidate.PlannedEntryPrice);
-
-                var finalStatus =
-                    ResolveCandidateFinalStatus(
-                        candidate,
-                        true);
-
-                var suffix =
-                    BuildCandidateResearchReasonSuffix(
-                        candidate);
-
-                FinalizeCandidate(
-                    candidate,
-                    finalStatus,
-                    tickTime,
-                    suffix);
             }
         }
         
@@ -570,26 +579,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     continue;
                 }
+                
+                var hasPrecisionTick = HasPrecisionTickAtOrAfter(entryTime);
 
-                if (HasPrecisionTickAtOrAfter(
-                        entryTime))
+                if (hasPrecisionTick)
                 {
-                    CreateCandidateSimulations(
+                    ActivateCandidateAtPrecisionTick(
                         candidate,
-                        entryTime,
-                        entryPrice);
-
-                    var finalStatus =
-                        ResolveCandidateFinalStatus(
-                            candidate,
-                            true);
-
-                    FinalizeCandidate(
-                        candidate,
-                        finalStatus,
-                        entryTime,
-                        BuildCandidateResearchReasonSuffix(
-                            candidate));
+                        sessionQuality.LastTickTime);
                 }
                 else
                 {
@@ -609,6 +606,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         candidate.StructuralRiskTicks,
                         broadResearchCandidate);
                 }
+                
+                Diagnostic(
+                    entryTime,
+                    "PRECISION ROUTE Candidate={0} " +
+                    "EntryTime={1:HH:mm:ss.fff} " +
+                    "LastTick={2:HH:mm:ss.fff} " +
+                    "HasTickAtOrAfter={3} " +
+                    "ExecutionEnabled={4}",
+                    candidate.CandidateId,
+                    entryTime,
+                    sessionQuality?.LastTickTime
+                    ?? DateTime.MinValue,
+                    hasPrecisionTick,
+                    EnableTradeExecution);
             }
         }
 
