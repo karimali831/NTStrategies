@@ -94,16 +94,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             executionEntryPending =
                 true;
 
+            var executableRiskTicks =
+                Math.Max(
+                    1,
+                    Math.Round(
+                        candidate.ActualRiskTicks,
+                        0,
+                        MidpointRounding.AwayFromZero));
+
+            var executableTargetTicks =
+                Math.Ceiling(
+                    executableRiskTicks
+                    * RiskRewardRatio
+                    - 0.0000001);
+
             SetStopLoss(
                 signalName,
-                CalculationMode.Price,
-                executableStop,
+                CalculationMode.Ticks,
+                executableRiskTicks,
                 false);
 
             SetProfitTarget(
                 signalName,
-                CalculationMode.Price,
-                executableTarget);
+                CalculationMode.Ticks,
+                executableTargetTicks);
             
             var marketVsPlannedTicks =
                 candidate.Direction
@@ -123,7 +137,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "EntryDistance={6:0.0}t StructuralRisk={7:0.0}t " +
                 "ResearchRisk={8:0.0}t " +
                 "ResearchStop={9} ResearchTarget={10} " +
-                "ExecutableStop={11} ExecutableTarget={12} " +
+                "ExecutionRisk={11:0.0}t ExecutionTarget={12:0.0}t " +
                 "StopCapped={13} Qty={14}",
                 candidate.CandidateId,
                 candidate.Direction,
@@ -136,8 +150,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 candidate.ActualRiskTicks,
                 candidate.PlannedStopPrice,
                 candidate.PlannedTargetPrice,
-                executableStop,
-                executableTarget,
+                executableRiskTicks,
+                executableTargetTicks,
                 candidate.StopWasCapped,
                 Quantity);
 

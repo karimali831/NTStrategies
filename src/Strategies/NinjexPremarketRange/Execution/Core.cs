@@ -153,25 +153,45 @@ namespace NinjaTrader.NinjaScript.Strategies
                     var researchTarget =
                         candidate?.PlannedTargetPrice
                         ?? 0;
+                    
+                    var executionRiskTicks =
+                        candidate?.ActualRiskTicks
+                        ?? 0;
+
+
+                    var targetTicks =
+                        Math.Ceiling(
+                            executionRiskTicks
+                            * RiskRewardRatio
+                            - 0.0000001);
 
                     var executableStop =
-                        Instrument.MasterInstrument.RoundToTickSize(
-                            researchStop);
+                        candidate.Direction == TradeDirection.Long
+                            ? price
+                              - executionRiskTicks * TickSize
+                            : price
+                              + executionRiskTicks * TickSize;
 
                     var executableTarget =
-                        Instrument.MasterInstrument.RoundToTickSize(
-                            researchTarget);
+                        candidate.Direction == TradeDirection.Long
+                            ? price
+                              + targetTicks * TickSize
+                            : price
+                              - targetTicks * TickSize;
+
+                    executableStop =
+                        Instrument.MasterInstrument
+                            .RoundToTickSize(
+                                executableStop);
+
+                    executableTarget =
+                        Instrument.MasterInstrument
+                            .RoundToTickSize(
+                                executableTarget);
 
                     activeExecutionEntryPrice =
                         price;
-
-                    var executionRiskTicks =
-                        candidate == null || TickSize <= 0
-                            ? 0
-                            : candidate.Direction == TradeDirection.Long
-                                ? (price - executableStop) / TickSize
-                                : (executableStop - price) / TickSize;
-
+                    
                     activeExecutionRiskTicks =
                         Math.Max(
                             0,
