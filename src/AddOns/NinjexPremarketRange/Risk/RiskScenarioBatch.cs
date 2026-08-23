@@ -119,8 +119,7 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             activeScenarioCount =
                 states.Count;
         }
-
-
+        
         public EntryCandidate Candidate =>
             candidate;
 
@@ -144,9 +143,12 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
             IReadOnlyCollection<RiskScenario> scenarios)
         {
             var structuralRiskTicks =
-                Math.Max(
-                    0,
-                    candidate.StructuralRiskTicks);
+                Math.Round(
+                    Math.Max(
+                        0,
+                        candidate.StructuralRiskTicks),
+                    8,
+                    MidpointRounding.AwayFromZero);
 
             foreach (var scenario in scenarios)
             {
@@ -158,32 +160,37 @@ namespace NinjaTrader.NinjaScript.AddOns.Ninjex.PremarketRange.Risk
                         structuralRiskTicks,
                         scenario.MaximumInitialStopTicks);
 
+                initialRiskTicks =
+                    Math.Round(
+                        initialRiskTicks,
+                        8,
+                        MidpointRounding.AwayFromZero);
+
                 if (initialRiskTicks <= 0)
                     continue;
-
-                var initialStopPrice =
-                    candidate.Direction
-                    == TradeDirection.Long
-                        ? entryPrice
-                          - initialRiskTicks
-                          * settings.TickSize
-                        : entryPrice
-                          + initialRiskTicks
-                          * settings.TickSize;
-
-                var targetTicks =
+                
+                var rawTargetTicks =
                     initialRiskTicks
                     * scenario.RiskRewardRatio;
 
-                var targetPrice =
-                    candidate.Direction
-                    == TradeDirection.Long
+                var targetTicks =
+                    Math.Ceiling(
+                        rawTargetTicks
+                        - 0.0000001);
+
+                var initialStopPrice =
+                    candidate.Direction == TradeDirection.Long
                         ? entryPrice
-                          + targetTicks
-                          * settings.TickSize
+                          - initialRiskTicks * settings.TickSize
                         : entryPrice
-                          - targetTicks
-                          * settings.TickSize;
+                          + initialRiskTicks * settings.TickSize;
+
+                var targetPrice =
+                    candidate.Direction == TradeDirection.Long
+                        ? entryPrice
+                          + targetTicks * settings.TickSize
+                        : entryPrice
+                          - targetTicks * settings.TickSize;
 
                 states.Add(
                     new ScenarioState

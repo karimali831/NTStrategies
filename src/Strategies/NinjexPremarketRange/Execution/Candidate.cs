@@ -10,9 +10,10 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         private EntryCandidate activeExecutionCandidate;
         
-         private void TrySubmitExecutableCandidate(
+        private void TrySubmitExecutableCandidate(
             EntryCandidate candidate,
-            DateTime requestedEntryTime)
+            DateTime requestedEntryTime,
+            double marketAtSubmit)
         {
             if (!IsExecutableCandidate(
                     candidate))
@@ -61,10 +62,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var executableTarget =
                 Instrument.MasterInstrument.RoundToTickSize(
                     researchTarget);
-
-            var marketAtSubmit =
-                Closes[TickSeriesIndex][0];
-
+            
             var geometryAlreadyInvalid =
                 candidate.Direction == TradeDirection.Long
                     ? marketAtSubmit <= executableStop
@@ -76,17 +74,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Diagnostic(
                     requestedEntryTime,
-                    "EXEC ENTRY SKIP Candidate={0} " +
-                    "Reason=ResearchGeometryAlreadyCrossed " +
-                    "Direction={1} PlannedEntry={2} Market={3} " +
-                    "ResearchStop={4} ResearchTarget={5} " +
-                    "ExecutableStop={6} ExecutableTarget={7}",
+                    "EXEC GEOMETRY ERROR Candidate={0} " +
+                    "Entry={1} Market={2} Stop={3} Target={4}",
                     candidate.CandidateId,
-                    candidate.Direction,
                     candidate.PlannedEntryPrice,
                     marketAtSubmit,
-                    researchStop,
-                    researchTarget,
                     executableStop,
                     executableTarget);
 
@@ -112,15 +104,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 signalName,
                 CalculationMode.Price,
                 executableTarget);
-
-            activeExecutionCandidate =
-                candidate;
-
-            activeExecutionSignalName =
-                signalName;
-
-            executionEntryPending =
-                true;
             
             var marketVsPlannedTicks =
                 candidate.Direction

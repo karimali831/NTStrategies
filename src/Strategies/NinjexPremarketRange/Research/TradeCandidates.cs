@@ -298,41 +298,97 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
         
-        private void ActivateCandidateAtPrecisionTick(
-            EntryCandidate candidate,
-            DateTime tickTime)
+    private void ActivateCandidateAtPrecisionTick(
+        EntryCandidate candidate,
+        DateTime tickTime,
+        double tickPrice)
+    {
+        if (candidate == null
+            || candidate.IsFinalized
+            || double.IsNaN(tickPrice)
+            || tickPrice <= 0
+            || TickSize <= 0)
         {
-            if (candidate == null || candidate.IsFinalized)
-                return;
+            return;
+        }
 
-            //
-            // Real execution and research become eligible
-            // from the same causal market observation.
-            //
-            TrySubmitExecutableCandidate(
-                candidate,
-                tickTime);
+        //
+        // Precision entry is now the canonical research entry.
+        // Both research and execution start from the same causal
+        // market observation.
+        //
+        candidate.PlannedEntryTime =
+            tickTime;
 
-            CreateCandidateSimulations(
-                candidate,
-                candidate.PlannedEntryTime,
-                candidate.PlannedEntryPrice);
+        candidate.PlannedEntryPrice =
+            Instrument.MasterInstrument
+                .RoundToTickSize(
+                    tickPrice);
 
-            var finalStatus =
-                ResolveCandidateFinalStatus(
-                    candidate,
-                    true);
+        candidate.EntryDistanceTicks =
+            candidate.Direction == TradeDirection.Long
+                ? (candidate.PlannedEntryPrice
+                   - candidate.RangeLevel) / TickSize
+                : (candidate.RangeLevel
+                   - candidate.PlannedEntryPrice) / TickSize;
 
-            var suffix =
-                BuildCandidateResearchReasonSuffix(
-                    candidate);
+        //
+        // Rebuild risk geometry from the causal precision entry.
+        //
+        PrepareCandidateRisk(
+            candidate,
+            candidate.PlannedEntryPrice);
 
+        if (candidate.StructuralRiskTicks <= 0
+            || candidate.ActualRiskTicks <= 0)
+        {
             FinalizeCandidate(
                 candidate,
-                finalStatus,
+                candidate.StrongCandleQualified
+                    ? "RejectedInvalidRisk"
+                    : "SignalRejected",
                 tickTime,
-                suffix);
+                "Precision entry produced zero or negative structural risk.");
+
+            return;
         }
+
+        Diagnostic(
+            tickTime,
+            "PRECISION ENTRY Candidate={0} " +
+            "Entry={1} Distance={2:0.0}t " +
+            "StructuralRisk={3:0.0}t ActualRisk={4:0.0}t " +
+            "Stop={5} Target={6}",
+            candidate.CandidateId,
+            candidate.PlannedEntryPrice,
+            candidate.EntryDistanceTicks,
+            candidate.StructuralRiskTicks,
+            candidate.ActualRiskTicks,
+            candidate.PlannedStopPrice,
+            candidate.PlannedTargetPrice);
+
+        TrySubmitExecutableCandidate(
+            candidate,
+            tickTime,
+            candidate.PlannedEntryPrice);
+
+        CreateCandidateSimulations(
+            candidate,
+            candidate.PlannedEntryTime,
+            candidate.PlannedEntryPrice);
+
+        var finalStatus =
+            ResolveCandidateFinalStatus(
+                candidate,
+                true);
+
+        FinalizeCandidate(
+            candidate,
+            finalStatus,
+            tickTime,
+            BuildCandidateResearchReasonSuffix(
+                candidate));
+    }
         
         private void ActivatePendingPrecisionCandidates(DateTime tickTime)
         {
@@ -368,7 +424,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ActivateCandidateAtPrecisionTick(
                     candidate,
-                    tickTime);
+                    tickTime,
+                    Closes[TickSeriesIndex][0]);
             }
         }
         
@@ -536,35 +593,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Entry distance is data, not a research gate.
                 candidate.PlannedEntryTime =
                     entryTime;
-
+                
                 candidate.PlannedEntryPrice =
                     entryPrice;
 
                 candidate.EntryDistanceTicks =
                     entryDistanceTicks;
 
-                PrepareCandidateRisk(
-                    candidate,
-                    entryPrice);
-
-                var validStructuralRisk =
-                    candidate.StructuralRiskTicks > 0;
-
-                if (!validStructuralRisk)
-                {
-                    FinalizeCandidate(
-                        candidate,
-                        candidate.StrongCandleQualified
-                            ? "RejectedInvalidRisk"
-                            : "SignalRejected",
-                        entryTime,
-                        "Broad research could not simulate this candidate because structural risk was zero or negative.");
-
-                    continue;
-                }
-
                 if (!EnablePrecisionTickAnalysis)
                 {
+                    PrepareCandidateRisk(
+                        candidate,
+                        entryPrice);
+
+                    if (candidate.StructuralRiskTicks <= 0)
+                    {
+                        FinalizeCandidate(
+                            candidate,
+                            candidate.StrongCandleQualified
+                                ? "RejectedInvalidRisk"
+                                : "SignalRejected",
+                            entryTime,
+                            "Structural risk was zero or negative.");
+
+                        continue;
+                    }
+
                     var finalStatus =
                         ResolveCandidateFinalStatus(
                             candidate,
@@ -586,7 +640,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     ActivateCandidateAtPrecisionTick(
                         candidate,
-                        sessionQuality.LastTickTime);
+                        sessionQuality.LastTickTime,
+                        Closes[TickSeriesIndex][0]);
                 }
                 else
                 {
@@ -668,26 +723,43 @@ namespace NinjaTrader.NinjaScript.Strategies
                         : 0);
             }
 
-            candidate.PlannedStopPrice =
-                candidate.Direction
-                == TradeDirection.Long
-                    ? entryPrice
-                      - candidate.ActualRiskTicks
-                      * TickSize
-                    : entryPrice
-                      + candidate.ActualRiskTicks
-                      * TickSize;
+            var actualRiskTicks =
+                Math.Min(
+                    MaximumInitialStopTicks,
+                    structuralRiskTicks);
 
-            var targetDistance =
-                candidate.ActualRiskTicks
-                * TickSize
+            var rawTargetTicks =
+                actualRiskTicks
                 * RiskRewardRatio;
 
+            var targetTicks =
+                Math.Ceiling(
+                    rawTargetTicks
+                    - 0.0000001);
+
+            var stopPrice =
+                candidate.Direction == TradeDirection.Long
+                    ? entryPrice
+                      - actualRiskTicks * TickSize
+                    : entryPrice
+                      + actualRiskTicks * TickSize;
+
+            var targetPrice =
+                candidate.Direction == TradeDirection.Long
+                    ? entryPrice
+                      + targetTicks * TickSize
+                    : entryPrice
+                      - targetTicks * TickSize;
+
+            candidate.PlannedStopPrice =
+                Instrument.MasterInstrument
+                    .RoundToTickSize(
+                        stopPrice);
+
             candidate.PlannedTargetPrice =
-                candidate.Direction
-                == TradeDirection.Long
-                    ? entryPrice + targetDistance
-                    : entryPrice - targetDistance;
+                Instrument.MasterInstrument
+                    .RoundToTickSize(
+                        targetPrice);
         }
 
         private bool IsAnyTrailStepEnabled()
