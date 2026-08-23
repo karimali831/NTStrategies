@@ -13,15 +13,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private decimal executionRealizedPnl;
         private int activeExecutionEntryQuantity;
         
-        private DateTime lastExecutionEquityTime =
-            Core.Globals.MinDate;
-
-        private double lastExecutionEquityPrice =
+        private double lastExecutionEquityMarketPrice =
             double.NaN;
 
-        private decimal lastExecutionEquityValue;
+        private decimal lastExecutionEquityRealizedPnl;
 
-        private int lastExecutionEquityQuantity;
+        private int lastExecutionEquityPositionQuantity;
+
+        private MarketPosition lastExecutionEquityPosition =
+            MarketPosition.Flat;
         
         private decimal CalculateExecutionUnrealizedPnl(
             double marketPrice)
@@ -74,19 +74,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             //
             // Intratrade snapshots only.
-            // Flat transitions are captured explicitly from
-            // OnExecutionUpdate when an exit fills.
+            // Entry and flat transitions are captured explicitly
+            // from OnExecutionUpdate.
             //
             if (Position.MarketPosition
                 == MarketPosition.Flat)
             {
                 return;
             }
-            
+
+            //
+            // NinjaTrader multi-series processing can expose
+            // historical tick callbacks whose timestamps precede
+            // the actual execution fill.
+            //
             if (activeExecutionEntryTime
-                != Core.Globals.MinDate
+                    != Core.Globals.MinDate
                 && time
-                < activeExecutionEntryTime)
+                   < activeExecutionEntryTime)
             {
                 return;
             }
@@ -95,44 +100,53 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CalculateExecutionUnrealizedPnl(
                     marketPrice);
 
+            var position =
+                Position.MarketPosition;
+
+            var quantity =
+                Position.Quantity;
+
+            //
+            // Equity cannot have changed when price, realized P&L,
+            // position and quantity are all unchanged.
+            //
+            var sameState =
+                !double.IsNaN(
+                    lastExecutionEquityMarketPrice)
+                && Math.Abs(
+                    marketPrice
+                    - lastExecutionEquityMarketPrice)
+                   < TickSize / 2.0
+                && executionRealizedPnl
+                   == lastExecutionEquityRealizedPnl
+                && quantity
+                   == lastExecutionEquityPositionQuantity
+                && position
+                   == lastExecutionEquityPosition;
+
+            if (sameState)
+                return;
+
+            lastExecutionEquityMarketPrice =
+                marketPrice;
+
+            lastExecutionEquityRealizedPnl =
+                executionRealizedPnl;
+
+            lastExecutionEquityPositionQuantity =
+                quantity;
+
+            lastExecutionEquityPosition =
+                position;
+
             var candidate =
                 activeExecutionCandidate;
 
-            var direction =
-                candidate?.Direction;
-            
             var tradingDate =
-                activeTradingDate != Core.Globals.MinDate
+                activeTradingDate
+                    != Core.Globals.MinDate
                     ? activeTradingDate.Date
                     : time.Date;
-
-            var equityDelta =
-                executionRealizedPnl
-                + unrealizedPnl;
-
-            if (time == lastExecutionEquityTime
-                && Math.Abs(
-                    marketPrice
-                    - lastExecutionEquityPrice) < TickSize / 2.0
-                && equityDelta
-                == lastExecutionEquityValue
-                && Position.Quantity
-                == lastExecutionEquityQuantity)
-            {
-                return;
-            }
-
-            lastExecutionEquityTime =
-                time;
-
-            lastExecutionEquityPrice =
-                marketPrice;
-
-            lastExecutionEquityValue =
-                equityDelta;
-
-            lastExecutionEquityQuantity =
-                Position.Quantity;
 
             var snapshot =
                 executionEquityTracker.Update(
@@ -142,8 +156,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     unrealizedPnl,
                     candidate?.CandidateId,
                     marketPrice,
-                    Position.Quantity,
-                    direction);
+                    quantity,
+                    candidate?.Direction);
 
             ExportExecutionEquitySnapshot(
                 snapshot);
@@ -151,20 +165,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         
         private void ResetExecutionEquity()
         {
-            lastExecutionEquityTime =
-                Core.Globals.MinDate;
-
-            lastExecutionEquityPrice =
-                double.NaN;
-
-            lastExecutionEquityValue =
-                0m;
-
-            lastExecutionEquityQuantity =
-                0;
-
             executionRealizedPnl =
                 0m;
+
+            lastExecutionEquityMarketPrice =
+                double.NaN;
+
+            lastExecutionEquityRealizedPnl =
+                0m;
+
+            lastExecutionEquityPositionQuantity =
+                0;
+
+            lastExecutionEquityPosition =
+                MarketPosition.Flat;
 
             executionEquityTracker.Reset();
         }
