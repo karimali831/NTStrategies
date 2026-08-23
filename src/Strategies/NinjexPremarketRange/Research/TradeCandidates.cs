@@ -327,10 +327,50 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         candidate.EntryDistanceTicks =
             candidate.Direction == TradeDirection.Long
-                ? (candidate.PlannedEntryPrice
-                   - candidate.RangeLevel) / TickSize
-                : (candidate.RangeLevel
-                   - candidate.PlannedEntryPrice) / TickSize;
+                ? (
+                    candidate.PlannedEntryPrice
+                    - candidate.RangeLevel
+                ) / TickSize
+                : (
+                    candidate.RangeLevel
+                    - candidate.PlannedEntryPrice
+                ) / TickSize;
+        
+        var validPrecisionBreakout =
+            candidate.Direction == TradeDirection.Long
+                ? candidate.PlannedEntryPrice
+                  >= candidate.RangeLevel
+                  + MinimumBreakoutDistanceTicks
+                  * TickSize
+                : candidate.PlannedEntryPrice
+                  <= candidate.RangeLevel
+                  - MinimumBreakoutDistanceTicks
+                  * TickSize;
+
+        if (!validPrecisionBreakout)
+        {
+            Diagnostic(
+                tickTime,
+                "PRECISION ENTRY REJECT Candidate={0} " +
+                "Reason=ReturnedInsideBeforeEntry " +
+                "Direction={1} RangeLevel={2} Entry={3} " +
+                "Distance={4:0.0}t",
+                candidate.CandidateId,
+                candidate.Direction,
+                candidate.RangeLevel,
+                candidate.PlannedEntryPrice,
+                candidate.EntryDistanceTicks);
+
+            FinalizeCandidate(
+                candidate,
+                "RejectedPrecisionEntryReturnedInside",
+                tickTime,
+                "Price returned inside the breakout range before the causal precision entry.");
+
+            return;
+        }
+        
+        
 
         //
         // Rebuild risk geometry from the causal precision entry.
