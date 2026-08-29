@@ -1,4 +1,3 @@
-#region Using declarations
 using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -7,7 +6,7 @@ using System.Xml.Serialization;
 using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.NinjaScript.DrawingTools;
-#endregion
+using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
@@ -15,23 +14,16 @@ namespace NinjaTrader.NinjaScript.Indicators
     {
         private const string PanelTag = "NinjexPremarketRange_Panel";
 
-        private DateTime activeDate = Core.Globals.MinDate;
-        private DateTime highBarTime = Core.Globals.MinDate;
-        private DateTime lowBarTime = Core.Globals.MinDate;
-
-        private double premarketHigh = double.NaN;
-        private double premarketLow = double.NaN;
-
-        private bool hasRangeData;
-        private bool rangeFinalized;
+        private NinjexPremarketRangeEngine rangeEngine;
+        private DateTime verticalLinesDate = Core.Globals.MinDate;
         private bool isFiveMinuteChart;
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "Ninjex Premarket Range";
-                Description = "Marks the 03:00-09:30 ET premarket high and low on a 5-minute chart.";
+                Name = "Ninjex Premarket / Overnight Range";
+                Description = "Marks either the 03:00-09:30 ET premarket range or the 18:00-09:30 ET overnight range.";
 
                 Calculate = Calculate.OnBarClose;
                 IsOverlay = true;
@@ -39,7 +31,9 @@ namespace NinjaTrader.NinjaScript.Indicators
                 DrawOnPricePanel = true;
                 IsSuspendedWhileInactive = true;
 
+                Mode = KeyLevelsMode.Premarket;
                 RangeStartTime = 30000;
+                OvernightStartTime = 180000;
                 MarketOpenTime = 93000;
                 MarketCloseTime = 160000;
 
@@ -50,15 +44,17 @@ namespace NinjaTrader.NinjaScript.Indicators
                 VerticalLineBrush = Brushes.DimGray;
                 HighLineBrush = Brushes.RoyalBlue;
                 LowLineBrush = Brushes.RoyalBlue;
-
                 VerticalLineWidth = 1;
                 HorizontalLineWidth = 2;
 
+                // Retain the original plot names for templates and consumers.
+                // KeyLevelHigh/KeyLevelLow below are mode-neutral aliases.
                 AddPlot(Brushes.Transparent, "PremarketHigh");
                 AddPlot(Brushes.Transparent, "PremarketLow");
             }
             else if (State == State.DataLoaded)
             {
+                rangeEngine = new NinjexPremarketRangeEngine();
                 isFiveMinuteChart =
                     BarsPeriod.BarsPeriodType == BarsPeriodType.Minute
                     && BarsPeriod.Value == 5;
@@ -67,102 +63,65 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < 1)
+            if (CurrentBar < 1 || rangeEngine == null)
                 return;
 
-            DateTime barTime = Time[0];
-            DateTime barDate = barTime.Date;
+            var hadRangeData = rangeEngine.HasRangeData;
+            var previousRangeDate = rangeEngine.ActiveRangeDate;
 
-            if (activeDate != barDate)
-                StartNewDay(barDate);
+            var completedNow = rangeEngine.ProcessCompletedBar(
+                Time[0], 
+                High[0], 
+                Low[0], 
+                Mode,
+                RangeStartTime, 
+                OvernightStartTime, 
+                MarketOpenTime);
 
-            DateTime rangeStart = CombineDateAndTime(barDate, RangeStartTime);
-            DateTime marketOpen = CombineDateAndTime(barDate, MarketOpenTime);
+            var startedNewRange =
+                rangeEngine.ActiveRangeDate != previousRangeDate;
 
-            // NinjaTrader minute bars use the bar's closing timestamp.
-            // On a 5-minute chart, the 03:00-09:30 range is represented by
-            // bars stamped 03:05, 03:10, ... 09:30.
-            bool isPremarketRangeBar =
-                barTime > rangeStart
-                && barTime <= marketOpen;
-
-            if (isPremarketRangeBar)
+            if (rangeEngine.HasRangeData
+                && (!hadRangeData || startedNewRange)
+                && DrawVerticalLines
+                && verticalLinesDate != rangeEngine.ActiveRangeDate)
             {
-                if (!hasRangeData)
-                {
-                    hasRangeData = true;
-
-                    if (DrawVerticalLines)
-                        DrawSessionVerticalLines(barDate);
-                }
-
-                UpdateRange(barTime);
+                DrawSessionVerticalLines(rangeEngine.ActiveRangeDate);
+                verticalLinesDate = rangeEngine.ActiveRangeDate;
             }
 
-            if (!rangeFinalized && hasRangeData && barTime >= marketOpen)
-                FinalizeRange(barDate);
+            if (completedNow && DrawHorizontalLines)
+                DrawRangeLines(rangeEngine.LatestRangeDate);
 
-            UpdateOutputSeries();
+            Values[0][0] = rangeEngine.IsRangeComplete
+                ? rangeEngine.LatestHigh
+                : double.NaN;
+
+            Values[1][0] = rangeEngine.IsRangeComplete
+                ? rangeEngine.LatestLow
+                : double.NaN;
 
             if (DisplayPanel)
-                UpdatePanel(barTime);
+                UpdatePanel();
             else
                 RemoveDrawObject(PanelTag);
         }
 
-        private void StartNewDay(DateTime date)
+        private void DrawSessionVerticalLines(DateTime rangeDate)
         {
-            activeDate = date;
-            highBarTime = Core.Globals.MinDate;
-            lowBarTime = Core.Globals.MinDate;
+            var key = Mode + "_" + rangeDate.ToString("yyyyMMdd");
+            var startValue = Mode == KeyLevelsMode.Overnight
+                ? OvernightStartTime
+                : RangeStartTime;
 
-            premarketHigh = double.NaN;
-            premarketLow = double.NaN;
-
-            hasRangeData = false;
-            rangeFinalized = false;
-        }
-
-        private void UpdateRange(DateTime barTime)
-        {
-            if (!hasRangeData || double.IsNaN(premarketHigh) || High[0] > premarketHigh)
-            {
-                premarketHigh = High[0];
-                highBarTime = barTime;
-            }
-
-            if (!hasRangeData || double.IsNaN(premarketLow) || Low[0] < premarketLow)
-            {
-                premarketLow = Low[0];
-                lowBarTime = barTime;
-            }
-        }
-
-        private void FinalizeRange(DateTime date)
-        {
-            rangeFinalized =
-                hasRangeData
-                && IsValidLevel(premarketHigh)
-                && IsValidLevel(premarketLow);
-
-            if (!rangeFinalized)
-                return;
-
-            if (DrawHorizontalLines)
-                DrawRangeLines(date);
-        }
-
-        private void DrawSessionVerticalLines(DateTime date)
-        {
-            string dateKey = date.ToString("yyyyMMdd");
-
-            DateTime startTime = CombineDateAndTime(date, RangeStartTime);
-            DateTime openTime = CombineDateAndTime(date, MarketOpenTime);
+            var startDate = Mode == KeyLevelsMode.Overnight
+                ? rangeDate.AddDays(-1)
+                : rangeDate;
 
             Draw.VerticalLine(
                 this,
-                "NinjexPremarketRange_Start_" + dateKey,
-                startTime,
+                "NinjexKeyLevels_Start_" + key,
+                CombineDateAndTime(startDate, startValue),
                 VerticalLineBrush,
                 DashStyleHelper.Dash,
                 VerticalLineWidth,
@@ -170,101 +129,113 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             Draw.VerticalLine(
                 this,
-                "NinjexPremarketRange_Open_" + dateKey,
-                openTime,
+                "NinjexKeyLevels_Open_" + key,
+                CombineDateAndTime(rangeDate, MarketOpenTime),
                 VerticalLineBrush,
                 DashStyleHelper.Dash,
                 VerticalLineWidth,
                 true);
         }
 
-        private void DrawRangeLines(DateTime date)
+        private void DrawRangeLines(DateTime rangeDate)
         {
-            string dateKey = date.ToString("yyyyMMdd");
-            DateTime marketClose = CombineDateAndTime(date, MarketCloseTime);
+            string key = Mode + "_" + rangeDate.ToString("yyyyMMdd");
+            DateTime marketClose = CombineDateAndTime(rangeDate, MarketCloseTime);
 
             Draw.Line(
                 this,
-                "NinjexPremarketRange_High_" + dateKey,
+                "NinjexKeyLevels_High_" + key,
                 false,
-                highBarTime,
-                premarketHigh,
+                rangeEngine.HighBarTime,
+                rangeEngine.LatestHigh,
                 marketClose,
-                premarketHigh,
+                rangeEngine.LatestHigh,
                 HighLineBrush,
                 DashStyleHelper.Solid,
                 HorizontalLineWidth);
 
             Draw.Line(
                 this,
-                "NinjexPremarketRange_Low_" + dateKey,
+                "NinjexKeyLevels_Low_" + key,
                 false,
-                lowBarTime,
-                premarketLow,
+                rangeEngine.LowBarTime,
+                rangeEngine.LatestLow,
                 marketClose,
-                premarketLow,
+                rangeEngine.LatestLow,
                 LowLineBrush,
                 DashStyleHelper.Solid,
                 HorizontalLineWidth);
         }
 
-        private void UpdateOutputSeries()
+        private void UpdatePanel()
         {
-            Values[0][0] = rangeFinalized ? premarketHigh : double.NaN;
-            Values[1][0] = rangeFinalized ? premarketLow : double.NaN;
-        }
-
-        private void UpdatePanel(DateTime barTime)
-        {
-            string chartStatus = isFiveMinuteChart
+            var chartStatus = isFiveMinuteChart
                 ? "Chart: 5-minute"
                 : "WARNING: use a 5-minute chart";
 
-            string rangeStatus;
-            if (rangeFinalized)
-                rangeStatus = "Status: Complete";
-            else if (hasRangeData)
-                rangeStatus = "Status: Building";
-            else
-                rangeStatus = "Status: Waiting for 03:00";
+            string status = rangeEngine.IsRangeComplete
+                ? "Status: Complete"
+                : rangeEngine.HasRangeData
+                    ? "Status: Building"
+                    : "Status: Waiting for " + FormatTime(SelectedStartTime);
 
-            string highText = IsValidLevel(premarketHigh)
-                ? premarketHigh.ToString("0.00")
+            var dateText = rangeEngine.ActiveRangeDate == Core.Globals.MinDate
+                ? "-"
+                : rangeEngine.ActiveRangeDate.ToString("dd MMM yyyy");
+
+            string highText = IsValidLevel(rangeEngine.LatestHigh)
+                ? rangeEngine.LatestHigh.ToString("0.00")
                 : "-";
 
-            string lowText = IsValidLevel(premarketLow)
-                ? premarketLow.ToString("0.00")
+            var lowText = IsValidLevel(rangeEngine.LatestLow)
+                ? rangeEngine.LatestLow.ToString("0.00")
                 : "-";
 
-            string highTimeText = highBarTime != Core.Globals.MinDate
-                ? highBarTime.ToString("HH:mm")
-                : "-";
+            var highTimeText = rangeEngine.HighBarTime == Core.Globals.MinDate
+                ? "-"
+                : rangeEngine.HighBarTime.ToString("dd MMM HH:mm");
 
-            string lowTimeText = lowBarTime != Core.Globals.MinDate
-                ? lowBarTime.ToString("HH:mm")
-                : "-";
+            var lowTimeText = rangeEngine.LowBarTime == Core.Globals.MinDate
+                ? "-"
+                : rangeEngine.LowBarTime.ToString("dd MMM HH:mm");
 
-            string text =
-                "Premarket Range 03:00-09:30 ET\n" +
+            var text =
+                ModeTitle + "\n" +
                 chartStatus + "\n" +
-                "Date: " + activeDate.ToString("dd MMM yyyy") + "\n" +
-                rangeStatus + "\n" +
+                "Range date: " + dateText + "\n" +
+                status + "\n" +
                 "High: " + highText + "  (" + highTimeText + ")\n" +
                 "Low:  " + lowText + "  (" + lowTimeText + ")";
 
-            Draw.TextFixed(
-                this,
-                PanelTag,
-                text,
-                TextPosition.TopRight);
+            Draw.TextFixed(this, PanelTag, text, TextPosition.TopRight);
+        }
+
+        private int SelectedStartTime =>
+            Mode == KeyLevelsMode.Overnight
+                ? OvernightStartTime
+                : RangeStartTime;
+
+        private string ModeTitle =>
+            (Mode == KeyLevelsMode.Overnight
+                ? "Overnight Range "
+                : "Premarket Range ")
+            + FormatTime(SelectedStartTime)
+            + "-"
+            + FormatTime(MarketOpenTime)
+            + " ET";
+
+        private static string FormatTime(int hhmmss)
+        {
+            var hour = hhmmss / 10000;
+            var minute = (hhmmss / 100) % 100;
+            return hour.ToString("00") + ":" + minute.ToString("00");
         }
 
         private static DateTime CombineDateAndTime(DateTime date, int hhmmss)
         {
-            int hour = hhmmss / 10000;
-            int minute = (hhmmss / 100) % 100;
-            int second = hhmmss % 100;
-
+            var hour = hhmmss / 10000;
+            var minute = (hhmmss / 100) % 100;
+            var second = hhmmss % 100;
             return date.Date.AddHours(hour).AddMinutes(minute).AddSeconds(second);
         }
 
@@ -278,18 +249,27 @@ namespace NinjaTrader.NinjaScript.Indicators
         #region Inputs
 
         [NinjaScriptProperty]
+        [Display(Name = "Key Levels Mode", Order = 0, GroupName = "Key Levels")]
+        public KeyLevelsMode Mode { get; set; }
+
+        [NinjaScriptProperty]
         [Range(0, 235959)]
-        [Display(Name = "Range Start Time", Order = 1, GroupName = "Time")]
+        [Display(Name = "Premarket Start Time", Order = 1, GroupName = "Time")]
         public int RangeStartTime { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 235959)]
-        [Display(Name = "Market Open Time", Order = 2, GroupName = "Time")]
+        [Display(Name = "Overnight Start Time", Order = 2, GroupName = "Time")]
+        public int OvernightStartTime { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 235959)]
+        [Display(Name = "Market Open Time", Order = 3, GroupName = "Time")]
         public int MarketOpenTime { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 235959)]
-        [Display(Name = "Market Close Time", Order = 3, GroupName = "Time")]
+        [Display(Name = "Market Close Time", Order = 4, GroupName = "Time")]
         public int MarketCloseTime { get; set; }
 
         [NinjaScriptProperty]
@@ -353,45 +333,54 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         [Browsable(false)]
         [XmlIgnore]
-        public Series<double> PremarketHigh
-        {
-            get { return Values[0]; }
-        }
+        public Series<double> KeyLevelHigh => Values[0];
 
         [Browsable(false)]
         [XmlIgnore]
-        public Series<double> PremarketLow
-        {
-            get { return Values[1]; }
-        }
+        public Series<double> KeyLevelLow => Values[1];
+
+        // Compatibility aliases for existing indicator consumers.
+        [Browsable(false)]
+        [XmlIgnore]
+        public Series<double> PremarketHigh => Values[0];
 
         [Browsable(false)]
         [XmlIgnore]
-        public double LatestPremarketHigh
-        {
-            get { return rangeFinalized ? premarketHigh : double.NaN; }
-        }
+        public Series<double> PremarketLow => Values[1];
 
         [Browsable(false)]
         [XmlIgnore]
-        public double LatestPremarketLow
-        {
-            get { return rangeFinalized ? premarketLow : double.NaN; }
-        }
+        public double LatestHigh =>
+            rangeEngine != null && rangeEngine.IsRangeComplete
+                ? rangeEngine.LatestHigh
+                : double.NaN;
 
         [Browsable(false)]
         [XmlIgnore]
-        public bool IsRangeComplete
-        {
-            get { return rangeFinalized; }
-        }
+        public double LatestLow =>
+            rangeEngine != null && rangeEngine.IsRangeComplete
+                ? rangeEngine.LatestLow
+                : double.NaN;
 
         [Browsable(false)]
         [XmlIgnore]
-        public DateTime LatestRangeDate
-        {
-            get { return activeDate; }
-        }
+        public double LatestPremarketHigh => LatestHigh;
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public double LatestPremarketLow => LatestLow;
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public bool IsRangeComplete =>
+            rangeEngine != null && rangeEngine.IsRangeComplete;
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public DateTime LatestRangeDate =>
+            rangeEngine != null
+                ? rangeEngine.LatestRangeDate
+                : Core.Globals.MinDate;
 
         #endregion
     }
