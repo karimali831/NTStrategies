@@ -788,7 +788,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MarketOpenTime,
                     ToTime(time));
 
+//
+// Data-quality flags.
+//
+// Keep incomplete sessions in the raw dataset so that
+// collection remains neutral. They can then be excluded
+// explicitly during downstream research.
+//
+            row.OvernightRangeComplete =
+                OvernightRangeComplete;
 
+            row.PremarketRangeComplete =
+                PremarketRangeComplete;
+
+            row.RangeDataComplete =
+                RangeDataComplete;
             //
             // 1-minute bar.
             //
@@ -1976,6 +1990,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DateTimeValue(
                         sessionOvernightLowTime),
                     sessionOvernightBars.ToString(Inv),
+                    Bool(OvernightRangeComplete),
+
                     Num(sessionPremarketHigh),
                     Num(sessionPremarketLow),
                     DateTimeValue(
@@ -1983,6 +1999,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DateTimeValue(
                         sessionPremarketLowTime),
                     sessionPremarketBars.ToString(Inv),
+                    Bool(PremarketRangeComplete),
+
+                    Bool(RangeDataComplete),
+
                     Num(priorDayHigh),
                     Num(priorDayLow),
                     Num(priorDayClose),
@@ -2197,8 +2217,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             sessionsWriter.WriteLine(
                 "RunId,Contract,TradingDate,"
-                + "OvernightHigh,OvernightLow,OvernightHighTime,OvernightLowTime,OvernightBars,"
-                + "PremarketHigh,PremarketLow,PremarketHighTime,PremarketLowTime,PremarketBars,"
+                + "OvernightHigh,OvernightLow,OvernightHighTime,OvernightLowTime,OvernightBars,OvernightRangeComplete,"
+                + "PremarketHigh,PremarketLow,PremarketHighTime,PremarketLowTime,PremarketBars,PremarketRangeComplete,"
+                + "RangeDataComplete,"
                 + "PriorDayHigh,PriorDayLow,PriorDayClose,"
                 + "RthOpen,RthHigh,RthLow,RthClose,"
                 + "OpeningRangeHigh,OpeningRangeLow,"
@@ -2210,6 +2231,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             observationsWriter.WriteLine(
                 "RunId,Contract,TradingDate,Time,DayOfWeek,MinutesFromOpen,"
+                +
+                "OvernightRangeComplete,PremarketRangeComplete,RangeDataComplete,"
                 +
                 "Open1m,High1m,Low1m,Close1m,Volume1m,"
                 +
@@ -2329,6 +2352,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DateTimeValue(r.Time),
                     Csv(r.DayOfWeek),
                     r.MinutesFromOpen.ToString(Inv),
+
+                    Bool(r.OvernightRangeComplete),
+                    Bool(r.PremarketRangeComplete),
+                    Bool(r.RangeDataComplete),
 
                     Num(r.Open1m),
                     Num(r.High1m),
@@ -2975,6 +3002,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public int MinutesFromOpen;
 
+            public bool OvernightRangeComplete;
+
+            public bool PremarketRangeComplete;
+
+            public bool RangeDataComplete;
 
             public double Open1m;
 
