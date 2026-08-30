@@ -82,6 +82,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private static readonly CultureInfo Inv =
             CultureInfo.InvariantCulture;
+        
+        private bool OvernightRangeComplete =>
+            sessionOvernightBars >= 186;
+
+        private bool PremarketRangeComplete =>
+            sessionPremarketBars >= 78;
+
+        private bool RangeDataComplete =>
+            OvernightRangeComplete
+            && PremarketRangeComplete;
 
 
         #region Engines / indicators
@@ -692,6 +702,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 low,
                 close);
 
+            //
+// Maintain RTH state for every completed RTH bar,
+// not merely bars that become research observations.
+//
+            if (timeValue >= MarketOpenTime
+                && timeValue < RthEndTime)
+            {
+                UpdateRthSessionState(
+                    barTime,
+                    open,
+                    high,
+                    low,
+                    close,
+                    volume);
+            }
 
             if (timeValue < ObservationStartTime
                 || timeValue >= ObservationEndTime)
