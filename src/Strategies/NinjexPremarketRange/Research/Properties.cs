@@ -1,6 +1,8 @@
 #region Using declarations
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using NinjaTrader.NinjaScript.Ninjex;
+
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -13,8 +15,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             EnableDataAnalysis = false;
             EnableTradeExecution = false;
 
-            ExecuteLongs = false;
+            ExecuteLongs = true;
             ExecuteShorts = true;
+
+            LongKeyLevelsMode = KeyLevelsMode.Overnight;
+            ShortKeyLevelsMode = KeyLevelsMode.Premarket;
 
             ExecutionAttemptMin = 3;
             ExecutionAttemptMax = 3;
@@ -142,13 +147,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             Order = 3,
             GroupName = "Execution")]
         public bool ExecuteShorts { get; set; }
+        
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Long Key Levels",
+            Order = 4,
+            GroupName = "Execution")]
+        public KeyLevelsMode LongKeyLevelsMode { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Short Key Levels",
+            Order = 5,
+            GroupName = "Execution")]
+        public KeyLevelsMode ShortKeyLevelsMode { get; set; }
 
 
         [NinjaScriptProperty]
         [Range(1, 100)]
         [Display(
             Name = "Execution Attempt Min",
-            Order = 4,
+            Order = 6,
             GroupName = "Execution")]
         public int ExecutionAttemptMin { get; set; }
 
@@ -157,7 +176,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 100)]
         [Display(
             Name = "Execution Attempt Max",
-            Order = 5,
+            Order = 7,
             GroupName = "Execution")]
         public int ExecutionAttemptMax { get; set; }
 
@@ -165,7 +184,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(
             Name = "Require Qualified Signal",
-            Order = 6,
+            Order = 8,
             GroupName = "Execution")]
         public bool RequireQualifiedExecutionSignal
         {
@@ -177,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(
             Name = "Enable Entry Distance Filter",
-            Order = 7,
+            Order = 9,
             GroupName = "Execution")]
         public bool EnableExecutionEntryDistanceFilter
         {
@@ -190,7 +209,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 10000)]
         [Display(
             Name = "Execution Entry Min Distance",
-            Order = 8,
+            Order = 10,
             GroupName = "Execution")]
         public double ExecutionEntryMinimumDistanceTicks
         {
@@ -203,7 +222,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 10000)]
         [Display(
             Name = "Execution Entry Max Distance",
-            Order = 9,
+            Order = 11,
             GroupName = "Execution")]
         public double ExecutionEntryMaximumDistanceTicks
         {

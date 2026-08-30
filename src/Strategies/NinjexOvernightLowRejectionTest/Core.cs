@@ -164,6 +164,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinimumReclaimTicks = 1;
 
                 MinimumBodyPercent = 50;
+                
+                MinimumCloseLocationPercent = 60;
 
                 ResetDistanceTicks = 2;
 
@@ -340,19 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return;
             }
-
-            //
-            // Do not generate another setup while an entry or
-            // position is already active.
-            //
-            if (pendingLongEntry
-                || entryOrderPending
-                || Position.MarketPosition
-                    != MarketPosition.Flat)
-            {
-                return;
-            }
-
+            
             var open =
                 Opens[EntrySeriesIndex][1];
 
@@ -367,8 +357,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             //
-            // Once price has clearly moved away from the low,
-            // allow a future independent rejection attempt.
+            // Always maintain touch-episode state,
+            // even while an entry/position is active.
             //
             if (touchEpisodeActive
                 && low
@@ -380,26 +370,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             //
-            // A rejection interaction must actually trade at or
-            // through the overnight low.
+            // Do not generate a new setup while an entry
+            // or position is active.
+            //
+            if (pendingLongEntry
+                || entryOrderPending
+                || Position.MarketPosition
+                    != MarketPosition.Flat)
+            {
+                return;
+            }
+
+
+            //
+            // Must trade at or through overnight low.
             //
             var penetrationTicks =
                 (overnightLow - low)
                 / TickSize;
 
             var touchedLow =
-                low
-                <= overnightLow
-                   - MinimumPenetrationTicks
-                   * TickSize;
+                low <= overnightLow
+                    - MinimumPenetrationTicks
+                    * TickSize;
 
             if (!touchedLow)
                 return;
 
 
             //
-            // We count one attempt per distinct touch episode,
-            // not one attempt per arbitrary candle.
+            // One attempt per distinct touch episode.
             //
             if (touchEpisodeActive)
                 return;
@@ -419,13 +419,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             var candleRange =
                 high - low;
 
+            var closeLocationPercent =
+                candleRange > 0
+                    ? (close - low)
+                      / candleRange
+                      * 100.0
+                    : 0;
+
             var body =
                 Math.Abs(
                     close - open);
 
             var bodyPercent =
                 candleRange > 0
-                    ? body / candleRange * 100.0
+                    ? body
+                      / candleRange
+                      * 100.0
                     : 0;
 
 
@@ -436,15 +445,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "Level={1} Low={2} Close={3} " +
                 "Penetration={4:0.0}t " +
                 "Reclaim={5:0.0}t " +
-                "Bullish={6} Body={7:0.0}%",
+                "CloseLocation={6:0.0}% " +
+                "Body={7:0.0}% " +
+                "Bullish={8}",
                 rejectionAttempt,
                 overnightLow,
                 low,
                 close,
                 penetrationTicks,
                 reclaimTicks,
-                bullish,
-                bodyPercent);
+                closeLocationPercent,
+                bodyPercent,
+                bullish);
 
 
             if (rejectionAttempt < AttemptMin
@@ -455,18 +467,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             var reclaimed =
-                close
-                >= overnightLow
-                   + MinimumReclaimTicks
-                   * TickSize;
+                close >= overnightLow
+                    + MinimumReclaimTicks
+                    * TickSize;
 
             if (!reclaimed)
-                return;
-
-            if (!bullish)
-                return;
-
-            if (bodyPercent < MinimumBodyPercent)
                 return;
 
 
@@ -498,12 +503,63 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "OvernightLow={1} " +
                 "SignalClose={2} " +
                 "StructuralStop={3} " +
-                "Body={4:0.0}% " +
-                "Reclaim={5:0.0}t",
+                "Penetration={4:0.0}t " +
+                "Reclaim={5:0.0}t " +
+                "CloseLocation={6:0.0}% " +
+                "Body={7:0.0}% " +
+                "Bullish={8}",
                 pendingAttempt,
                 overnightLow,
                 pendingSignalClose,
                 pendingStructuralStop,
+                penetrationTicks,
+                reclaimTicks,
+                closeLocationPercent,
+                bodyPercent,
+                bullish);
+
+            if (rejectionAttempt < AttemptMin
+                || rejectionAttempt > AttemptMax)
+            {
+                return;
+            }
+            
+            //
+            // Signal accepted.
+            //
+            pendingLongEntry = true;
+
+            pendingSignalTime =
+                barTime;
+
+            pendingAttempt =
+                rejectionAttempt;
+
+            pendingStructuralStop =
+                low;
+
+            pendingSignalClose =
+                close;
+
+            pendingSignalLow =
+                low;
+
+
+            Diagnostic(
+                barTime,
+                "LONG SIGNAL " +
+                "Attempt={0} " +
+                "OvernightLow={1} " +
+                "SignalClose={2} " +
+                "StructuralStop={3} " +
+                "CloseLocation={4:0.0}% " +
+                "Body={5:0.0}% " +
+                "Reclaim={6:0.0}t",
+                pendingAttempt,
+                overnightLow,
+                pendingSignalClose,
+                pendingStructuralStop,
+                closeLocationPercent,
                 bodyPercent,
                 reclaimTicks);
         }
@@ -1134,6 +1190,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             set;
         }
 
+        [NinjaScriptProperty]
+        [Range(0, 100)]
+        [Display(
+            Name = "Minimum Close Location %",
+            Order = 3,
+            GroupName = "Entry")]
+        public double MinimumCloseLocationPercent
+        {
+            get;
+            set;
+        }
 
         [NinjaScriptProperty]
         [Range(0, 100)]
