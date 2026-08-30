@@ -2,14 +2,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Ninjex;
 
@@ -239,6 +236,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private double last5mEmaSlowSlopeTicks =
             double.NaN;
+        
+        private DateTime lastTickDiagnosticDate =
+            Core.Globals.MinDate;
 
         #endregion
 
@@ -665,25 +665,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 barTime);
 
 
-            //
-            // First, this completed bar belongs to the future
-            // path of every earlier observation.
-            //
-            UpdateForwardObservations(
-                barTime,
-                high,
-                low,
-                close);
-
-
             var timeValue =
                 ToTime(barTime);
 
 
-            //
-            // Stop forward tracking at RTH end rather than allowing
-            // forward labels to leak into the evening session.
-            //
+//
+// Never allow forward labels to consume
+// bars at/after the configured RTH end.
+//
             if (timeValue >= RthEndTime)
             {
                 FinalizeRemainingForwardObservations(
@@ -693,16 +682,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            if (timeValue >= MarketOpenTime)
-            {
-                UpdateRthSessionState(
-                    barTime,
-                    open,
-                    high,
-                    low,
-                    close,
-                    volume);
-            }
+//
+// This completed bar belongs to the future path
+// of every earlier observation.
+//
+            UpdateForwardObservations(
+                barTime,
+                high,
+                low,
+                close);
 
 
             if (timeValue < ObservationStartTime
@@ -1357,13 +1345,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[TickSeriesIndex] < 1)
                 return;
 
-
             var time =
                 Times[TickSeriesIndex][0];
 
             var price =
                 Closes[TickSeriesIndex][0];
 
+            if (time.Date != lastTickDiagnosticDate)
+            {
+                lastTickDiagnosticDate =
+                    time.Date;
+
+                Diagnostic(
+                    time,
+                    "TICK SERIES ACTIVE Date={0:yyyy-MM-dd} Price={1}",
+                    time.Date,
+                    price);
+            }
 
             var minute =
                 TruncateMinute(
