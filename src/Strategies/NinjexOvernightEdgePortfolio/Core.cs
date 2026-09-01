@@ -33,8 +33,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///     - Completed 5-minute ATR >= 25 ticks.
     ///
     /// Baseline Model B - SHORT:
-    ///     - 1-minute bar sweeps above Overnight High and closes back below it.
-    ///     - Signal close remains above the completed 5-minute slow EMA.
+    ///     - Previous 1-minute close >= Overnight High.
+    ///     - Current completed 1-minute close < Overnight High.
+    ///     - Signal close is below the completed 5-minute slow EMA.
     ///     - Overnight range width <= 300 ticks.
     ///
     /// Execution:
@@ -54,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.0.0";
+        private const string StrategyVersion = "1.0.1";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -78,6 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region Engines / indicators
 
         private NinjexPremarketRangeEngine overnightRangeEngine;
+        private NinjexPremarketRangeEngine premarketRangeEngine;
 
         private ATR atr5m;
         private EMA emaSlow5m;
@@ -99,6 +101,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int overnightBars;
 
         private bool overnightRangeReady;
+
+        private DateTime premarketRangeDate =
+            Core.Globals.MinDate;
+
+        private int premarketBars;
+
+        private bool premarketRangeReady;
 
         #endregion
 
@@ -246,6 +255,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RequireCompleteOvernightRange = true;
                 ExpectedOvernightBars = 186;
 
+                RequireCompletePremarketRange = true;
+                ExpectedPremarketBars = 78;
+
 
                 //
                 // Indicators
@@ -305,6 +317,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.DataLoaded)
             {
                 overnightRangeEngine =
+                    new NinjexPremarketRangeEngine();
+
+                premarketRangeEngine =
                     new NinjexPremarketRangeEngine();
 
                 atr5m =
@@ -388,7 +403,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             //
             // Build overnight range from completed 5-minute bars.
             //
-            var finalizedNow =
+            var overnightFinalizedNow =
                 overnightRangeEngine
                     .ProcessCompletedBar(
                         barTime,
@@ -399,8 +414,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         OvernightStartTime,
                         MarketOpenTime);
 
+            var premarketFinalizedNow =
+                premarketRangeEngine
+                    .ProcessCompletedBar(
+                        barTime,
+                        high,
+                        low,
+                        KeyLevelsMode.Premarket,
+                        PremarketStartTime,
+                        OvernightStartTime,
+                        MarketOpenTime);
 
-            if (finalizedNow
+
+            if (overnightFinalizedNow
                 && overnightRangeEngine.IsRangeComplete)
             {
                 overnightRangeDate =
@@ -446,6 +472,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                     GetOvernightWidthTicks(),
                     overnightBars,
                     overnightRangeReady);
+            }
+
+
+            if (premarketFinalizedNow
+                && premarketRangeEngine.IsRangeComplete)
+            {
+                premarketRangeDate =
+                    premarketRangeEngine.LatestRangeDate;
+
+                premarketBars =
+                    premarketRangeEngine.RangeBarCount;
+
+                premarketRangeReady =
+                    !RequireCompletePremarketRange
+                    || premarketBars >= ExpectedPremarketBars;
+
+                Diagnostic(
+                    barTime,
+                    "PREMARKET READY " +
+                    "Date={0:yyyy-MM-dd} Bars={1} Complete={2}",
+                    premarketRangeDate,
+                    premarketBars,
+                    premarketRangeReady);
             }
 
 
@@ -529,6 +578,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var close =
                 Closes[SignalSeriesIndex][1];
 
+            var previousClose =
+                Closes[SignalSeriesIndex][2];
+
 
             var minutesFromOpen =
                 MinutesBetween(
@@ -586,16 +638,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             //
             // Model B:
-            // Sweep above Overnight High + completed close back below,
-            // while close is still above the completed 5-minute slow EMA.
+            // Previous completed 1-minute close was at/above Overnight High,
+            // then the current completed close crosses back below it.
             //
-            var shortSweep =
-                high > overnightHigh
+            // IMPORTANT: the research predicate Px>Slow5 was direction-normalized.
+            // For a SHORT, translating it back to raw price means close < EMA slow.
+            //
+            var shortCrossBelow =
+                previousClose >= overnightHigh
                 && close < overnightHigh;
 
             var shortEmaOk =
                 IsFinite(last5mEmaSlow)
-                && close > last5mEmaSlow;
+                && close < last5mEmaSlow;
 
             var shortWidthOk =
                 IsFinite(overnightWidthTicks)
@@ -604,24 +659,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var shortQualified =
                 EnableShortModel
-                && shortSweep
+                && shortCrossBelow
                 && shortEmaOk
                 && shortWidthOk;
 
 
             if (EnableShortModel
-                && shortSweep)
+                && shortCrossBelow)
             {
                 Diagnostic(
                     signalTime,
                     "SHORT CHECK " +
                     "Qualified={0} " +
-                    "ONH={1} High={2} Close={3} " +
-                    "EMA5Slow={4} CloseAboveEMA={5} " +
+                    "ONH={1} PrevClose={2} Close={3} " +
+                    "EMA5Slow={4} CloseBelowEMA={5} " +
                     "ONWidth={6:0.0}t MaxWidth={7:0.0}t",
                     shortQualified,
                     overnightHigh,
-                    high,
+                    previousClose,
                     close,
                     last5mEmaSlow,
                     shortEmaOk,
@@ -631,9 +686,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             //
-            // A pathological 1-minute candle can technically sweep both
-            // extremes. The research did not establish an ordering rule
-            // for such a candle, so do not invent one.
+            // A completed minute can theoretically qualify both models.
+            // The research did not establish an ordering rule for opposing
+            // same-timestamp signals, so do not invent one.
             //
             if (longQualified
                 && shortQualified)
@@ -721,6 +776,48 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Bars={0} Expected={1}",
                     overnightBars,
                     ExpectedOvernightBars);
+
+                return false;
+            }
+
+
+            if (!premarketRangeReady)
+            {
+                Diagnostic(
+                    signalTime,
+                    "SIGNAL BLOCK " +
+                    "Reason=PremarketRangeNotReady");
+
+                return false;
+            }
+
+
+            if (premarketRangeDate
+                != signalTime.Date)
+            {
+                Diagnostic(
+                    signalTime,
+                    "SIGNAL BLOCK " +
+                    "Reason=PremarketRangeDateMismatch " +
+                    "RangeDate={0:yyyy-MM-dd} SignalDate={1:yyyy-MM-dd}",
+                    premarketRangeDate,
+                    signalTime.Date);
+
+                return false;
+            }
+
+
+            if (RequireCompletePremarketRange
+                && premarketBars
+                    < ExpectedPremarketBars)
+            {
+                Diagnostic(
+                    signalTime,
+                    "SIGNAL BLOCK " +
+                    "Reason=IncompletePremarketRange " +
+                    "Bars={0} Expected={1}",
+                    premarketBars,
+                    ExpectedPremarketBars);
 
                 return false;
             }
@@ -1757,6 +1854,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             GroupName = "2. Session",
             Order = 7)]
         public int ExpectedOvernightBars
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Require Complete Premarket Range",
+            GroupName = "2. Session",
+            Order = 8)]
+        public bool RequireCompletePremarketRange
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(1, 1000)]
+        [Display(
+            Name = "Expected Premarket Bars",
+            Description = "Expected completed 5-minute bars in the normal 03:00-09:30 premarket range.",
+            GroupName = "2. Session",
+            Order = 9)]
+        public int ExpectedPremarketBars
         {
             get;
             set;
