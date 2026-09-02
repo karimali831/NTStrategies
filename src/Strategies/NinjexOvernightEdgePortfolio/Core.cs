@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// Execution:
     ///     - First causal tick after the completed 1-minute signal.
     ///     - Fixed 20-tick stop / 40-tick target.
+    ///     - Maximum 60-minute holding period by default.
     ///     - Protective orders are fill-relative.
     ///     - No break-even.
     ///
@@ -55,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.0.1";
+        private const string StrategyVersion = "1.0.2";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -66,6 +67,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private const string LongEodExitSignal = "EOD-L";
         private const string ShortEodExitSignal = "EOD-S";
+
+        private const string LongTimeExitSignal = "TIME-L";
+        private const string ShortTimeExitSignal = "TIME-S";
 
 
         private enum PendingDirection
@@ -170,6 +174,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool activeTradeCounted;
         private PendingDirection activeTradeDirection =
             PendingDirection.None;
+
+        private DateTime submittedSignalTime =
+            Core.Globals.MinDate;
+
+        private DateTime activeMaxHoldExitTime =
+            Core.Globals.MinDate;
 
         private int activeEntryFilledQuantity;
         private double activeEntryPriceQuantity;
@@ -287,6 +297,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopLossTicks = 20;
                 ProfitTargetTicks = 40;
 
+                MaxHoldMinutes = 60;
+
                 MaxTradesPerDay = 3;
                 MaxWinnersPerDay = 2;
 
@@ -337,12 +349,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "READY Version={0} " +
                     "Long={1} Short={2} " +
                     "Stop={3}t Target={4}t " +
-                    "MaxTrades={5} MaxWinners={6}",
+                    "MaxHold={5}m " +
+                    "MaxTrades={6} MaxWinners={7}",
                     StrategyVersion,
                     EnableLongModel,
                     EnableShortModel,
                     StopLossTicks,
                     ProfitTargetTicks,
+                    MaxHoldMinutes,
                     MaxTradesPerDay,
                     MaxWinnersPerDay);
             }
@@ -530,9 +544,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             var signalTime =
                 Times[SignalSeriesIndex][1];
 
-            var currentMinuteTime =
-                Times[SignalSeriesIndex][0];
-
+            //
+            // NinjaTrader time-based bars are end-stamped. At the first
+            // tick of the next 1-minute bar, Times[1][0] is already one
+            // minute later than the tick that made [1] complete. Arm from
+            // signalTime so BIP 2 can use that first causal tick rather
+            // than waiting through the whole next minute.
+            //
             EnsureTradingDate(
                 signalTime.Date,
                 signalTime);
@@ -710,7 +728,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ArmPendingEntry(
                     PendingDirection.Long,
                     signalTime,
-                    currentMinuteTime,
+                    signalTime,
                     high,
                     low,
                     close,
@@ -726,7 +744,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ArmPendingEntry(
                     PendingDirection.Short,
                     signalTime,
-                    currentMinuteTime,
+                    signalTime,
                     high,
                     low,
                     close,
@@ -947,6 +965,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
+            if (TryExitForMaximumHold(
+                    time))
+            {
+                return;
+            }
+
+
             if (pendingDirection
                 == PendingDirection.None)
             {
@@ -1031,6 +1056,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 direction == PendingDirection.Long
                     ? LongEntrySignal
                     : ShortEntrySignal;
+
+            submittedSignalTime =
+                pendingSignalTime;
 
 
             //
@@ -1269,6 +1297,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     activeEntryOrder = null;
 
+                    if (filled <= 0
+                        && !activeTradeCounted)
+                    {
+                        submittedSignalTime =
+                            Core.Globals.MinDate;
+
+                        activeMaxHoldExitTime =
+                            Core.Globals.MinDate;
+                    }
+
 
                     Diagnostic(
                         time,
@@ -1283,7 +1321,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             if (order.Name == LongEodExitSignal
-                || order.Name == ShortEodExitSignal)
+                || order.Name == ShortEodExitSignal
+                || order.Name == LongTimeExitSignal
+                || order.Name == ShortTimeExitSignal)
             {
                 if (orderState == OrderState.Rejected
                     || orderState == OrderState.Cancelled
@@ -1344,6 +1384,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     activeEntryPriceQuantity = 0;
 
                     activeTradeGrossPnl = 0;
+
+                    activeMaxHoldExitTime =
+                        MaxHoldMinutes > 0
+                        && submittedSignalTime
+                            != Core.Globals.MinDate
+                            ? submittedSignalTime.AddMinutes(
+                                MaxHoldMinutes)
+                            : Core.Globals.MinDate;
 
                     tradesToday++;
                 }
@@ -1493,6 +1541,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             activeEntryOrder = null;
 
+            submittedSignalTime =
+                Core.Globals.MinDate;
+
+            activeMaxHoldExitTime =
+                Core.Globals.MinDate;
+
             manualExitPending = false;
         }
 
@@ -1573,6 +1627,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ShortEodExitSignal,
                     ShortEntrySignal);
             }
+        }
+
+
+        private bool TryExitForMaximumHold(
+            DateTime time)
+        {
+            if (MaxHoldMinutes <= 0
+                || activeMaxHoldExitTime
+                    == Core.Globals.MinDate
+                || time < activeMaxHoldExitTime
+                || manualExitPending)
+            {
+                return false;
+            }
+
+
+            if (Position.MarketPosition
+                == MarketPosition.Long)
+            {
+                manualExitPending = true;
+
+                Diagnostic(
+                    time,
+                    "TIME EXIT LONG " +
+                    "Deadline={0:HH:mm:ss.fff} Qty={1}",
+                    activeMaxHoldExitTime,
+                    Position.Quantity);
+
+                ExitLong(
+                    TickSeriesIndex,
+                    Position.Quantity,
+                    LongTimeExitSignal,
+                    LongEntrySignal);
+
+                return true;
+            }
+
+
+            if (Position.MarketPosition
+                == MarketPosition.Short)
+            {
+                manualExitPending = true;
+
+                Diagnostic(
+                    time,
+                    "TIME EXIT SHORT " +
+                    "Deadline={0:HH:mm:ss.fff} Qty={1}",
+                    activeMaxHoldExitTime,
+                    Position.Quantity);
+
+                ExitShort(
+                    TickSeriesIndex,
+                    Position.Quantity,
+                    ShortTimeExitSignal,
+                    ShortEntrySignal);
+
+                return true;
+            }
+
+
+            return false;
         }
 
 
@@ -1991,12 +2106,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
+        [Range(0, 390)]
+        [Display(
+            Name = "Max Hold Minutes",
+            Description = "Maximum minutes from the completed signal to a market exit. 0 disables this limit; 60 mirrors the research horizon.",
+            GroupName = "6. Risk",
+            Order = 3)]
+        public int MaxHoldMinutes
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
         [Range(0, 100)]
         [Display(
             Name = "Max Trades Per Day",
             Description = "0 disables this limit.",
             GroupName = "6. Risk",
-            Order = 3)]
+            Order = 4)]
         public int MaxTradesPerDay
         {
             get;
@@ -2010,7 +2139,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Name = "Max Winners Per Day",
             Description = "0 disables this limit.",
             GroupName = "6. Risk",
-            Order = 4)]
+            Order = 5)]
         public int MaxWinnersPerDay
         {
             get;
@@ -2022,7 +2151,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "Stop After First Loss",
             GroupName = "6. Risk",
-            Order = 5)]
+            Order = 6)]
         public bool StopAfterFirstLoss
         {
             get;
