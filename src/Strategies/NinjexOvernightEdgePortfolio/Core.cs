@@ -15,6 +15,14 @@ using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
+    public enum NinjexOvernightEdgePortfolioMode
+    {
+        BaselineAB,
+        FourModelResearchFiltered,
+        FourModelNoFastEma
+    }
+
+
     /// <summary>
     /// Execution strategy built from the neutral ES market-research study.
     ///
@@ -38,6 +46,16 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///     - Signal close is below the completed 5-minute slow EMA.
     ///     - Overnight range width <= 300 ticks.
     ///
+    /// Four-model portfolio:
+    ///     - LONG prior-day-close reclaim, 1-minute range <= 30 ticks,
+    ///       Overnight width >= 200 ticks.
+    ///     - SHORT premarket-high sweep/rejection in the first 120 minutes,
+    ///       completed 5-minute ATR >= 30 ticks.
+    ///     - SHORT RTH-open breakdown from 120 minutes after the open,
+    ///       Premarket width >= 140 ticks.
+    ///     - SHORT premarket-low breakdown, completed 5-minute ATR >= 20 ticks.
+    ///       The research-filtered mode also requires close > 5-minute EMA(9).
+    ///
     /// Execution:
     ///     - First causal tick after the completed 1-minute signal.
     ///     - Fixed 20-tick stop / 40-tick target.
@@ -50,13 +68,12 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///     - Maximum 2 winning trades per RTH day.
     ///     - Do not stop after the first loss by default.
     ///
-    /// Both models live in one strategy deliberately: this preserves the
-    /// shared daily portfolio limits found in research. Each model can be
-    /// independently disabled for isolated validation.
+    /// PortfolioMode retains the validated baseline A/B portfolio and adds
+    /// both filtered and unfiltered versions of the four-model portfolio.
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.0.2";
+        private const string StrategyVersion = "1.1.0";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -64,6 +81,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private const string LongEntrySignal = "ONL-RECLAIM-L";
         private const string ShortEntrySignal = "ONH-FAILURE-S";
+
+        private const string PriorCloseEntrySignal = "PDC-RECLAIM-L";
+        private const string PremarketHighEntrySignal = "PMH-REJECT-S";
+        private const string RthOpenEntrySignal = "RTHOPEN-BREAK-S";
+        private const string PremarketLowEntrySignal = "PML-BREAK-S";
+
+        private const string BaselineLongModelName =
+            "Baseline A - Overnight Low Reclaim";
+
+        private const string BaselineShortModelName =
+            "Baseline B - Overnight High Failure";
+
+        private const string PriorCloseModelName =
+            "Prior-day-close reclaim";
+
+        private const string PremarketHighModelName =
+            "Premarket-high sweep/rejection";
+
+        private const string RthOpenModelName =
+            "RTH-open breakdown";
+
+        private const string PremarketLowModelName =
+            "Premarket-low breakdown";
 
         private const string LongEodExitSignal = "EOD-L";
         private const string ShortEodExitSignal = "EOD-S";
@@ -86,6 +126,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private NinjexPremarketRangeEngine premarketRangeEngine;
 
         private ATR atr5m;
+        private EMA emaFast5m;
         private EMA emaSlow5m;
 
         #endregion
@@ -109,9 +150,33 @@ namespace NinjaTrader.NinjaScript.Strategies
         private DateTime premarketRangeDate =
             Core.Globals.MinDate;
 
+        private double premarketHigh =
+            double.NaN;
+
+        private double premarketLow =
+            double.NaN;
+
         private int premarketBars;
 
         private bool premarketRangeReady;
+
+        private DateTime currentRthReferenceDate =
+            Core.Globals.MinDate;
+
+        private double currentRthLastClose =
+            double.NaN;
+
+        private DateTime priorDayCloseDate =
+            Core.Globals.MinDate;
+
+        private double priorDayClose =
+            double.NaN;
+
+        private DateTime rthOpenDate =
+            Core.Globals.MinDate;
+
+        private double rthOpen =
+            double.NaN;
 
         #endregion
 
@@ -124,6 +189,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double last5mAtrTicks =
             double.NaN;
 
+        private double last5mEmaFast =
+            double.NaN;
+
         private double last5mEmaSlow =
             double.NaN;
 
@@ -134,6 +202,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private PendingDirection pendingDirection =
             PendingDirection.None;
+
+        private string pendingModelName =
+            string.Empty;
+
+        private string pendingEntrySignal =
+            string.Empty;
 
         private DateTime pendingSignalTime =
             Core.Globals.MinDate;
@@ -156,7 +230,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double pendingEmaSlow5m =
             double.NaN;
 
+        private double pendingEmaFast5m =
+            double.NaN;
+
         private double pendingOvernightWidthTicks =
+            double.NaN;
+
+        private double pendingPremarketWidthTicks =
             double.NaN;
 
         private int pendingMinutesFromOpen;
@@ -174,6 +254,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool activeTradeCounted;
         private PendingDirection activeTradeDirection =
             PendingDirection.None;
+
+        private string activeModelName =
+            string.Empty;
+
+        private string activeEntrySignal =
+            string.Empty;
 
         private DateTime submittedSignalTime =
             Core.Globals.MinDate;
@@ -213,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Ninjex Overnight Edge Portfolio";
 
                 Description =
-                    "Two-model ES overnight-extreme execution strategy derived from neutral market research.";
+                    "Selectable baseline A/B and four-model ES edge portfolios derived from neutral market research.";
 
                 Calculate =
                     Calculate.OnEachTick;
@@ -246,6 +332,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //
                 // Models
                 //
+                PortfolioMode =
+                    NinjexOvernightEdgePortfolioMode
+                        .FourModelResearchFiltered;
+
                 EnableLongModel = true;
                 EnableShortModel = true;
 
@@ -273,6 +363,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Indicators
                 //
                 AtrPeriod = 14;
+                EmaFastPeriod = 9;
                 EmaSlowPeriod = 21;
 
 
@@ -287,6 +378,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Model B - short overnight-high failure
                 //
                 ShortMaximumOvernightWidthTicks = 300.0;
+
+
+                //
+                // Four-model portfolio
+                //
+                PriorCloseMaximumRangeTicks = 30.0;
+                PriorCloseMinimumOvernightWidthTicks = 200.0;
+
+                PremarketHighMaximumMinutesFromOpen = 120;
+                PremarketHighMinimumAtr5mTicks = 30.0;
+
+                RthOpenMinimumMinutesFromOpen = 120;
+                RthOpenMinimumPremarketWidthTicks = 140.0;
+
+                PremarketLowMinimumAtr5mTicks = 20.0;
 
 
                 //
@@ -339,6 +445,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Closes[ContextSeriesIndex],
                         AtrPeriod);
 
+                emaFast5m =
+                    EMA(
+                        Closes[ContextSeriesIndex],
+                        EmaFastPeriod);
+
                 emaSlow5m =
                     EMA(
                         Closes[ContextSeriesIndex],
@@ -347,11 +458,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Diagnostic(
                     DateTime.Now,
                     "READY Version={0} " +
-                    "Long={1} Short={2} " +
-                    "Stop={3}t Target={4}t " +
-                    "MaxHold={5}m " +
-                    "MaxTrades={6} MaxWinners={7}",
+                    "Mode={1} BaselineLong={2} BaselineShort={3} " +
+                    "Stop={4}t Target={5}t " +
+                    "MaxHold={6}m " +
+                    "MaxTrades={7} MaxWinners={8}",
                     StrategyVersion,
+                    PortfolioMode,
                     EnableLongModel,
                     EnableShortModel,
                     StopLossTicks,
@@ -393,7 +505,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[ContextSeriesIndex]
                 < Math.Max(
                     Math.Max(
-                        AtrPeriod,
+                        Math.Max(
+                            AtrPeriod,
+                            EmaFastPeriod),
                         EmaSlowPeriod),
                     30) + 2)
             {
@@ -495,18 +609,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                 premarketRangeDate =
                     premarketRangeEngine.LatestRangeDate;
 
+                premarketHigh =
+                    premarketRangeEngine.LatestHigh;
+
+                premarketLow =
+                    premarketRangeEngine.LatestLow;
+
                 premarketBars =
                     premarketRangeEngine.RangeBarCount;
 
                 premarketRangeReady =
-                    !RequireCompletePremarketRange
-                    || premarketBars >= ExpectedPremarketBars;
+                    IsFinite(premarketHigh)
+                    && IsFinite(premarketLow)
+                    && premarketHigh > premarketLow
+                    && (!RequireCompletePremarketRange
+                        || premarketBars
+                            >= ExpectedPremarketBars);
 
                 Diagnostic(
                     barTime,
                     "PREMARKET READY " +
-                    "Date={0:yyyy-MM-dd} Bars={1} Complete={2}",
+                    "Date={0:yyyy-MM-dd} " +
+                    "High={1} Low={2} Width={3:0.0}t " +
+                    "Bars={4} Complete={5}",
                     premarketRangeDate,
+                    premarketHigh,
+                    premarketLow,
+                    GetPremarketWidthTicks(),
                     premarketBars,
                     premarketRangeReady);
             }
@@ -522,6 +651,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             last5mAtrTicks =
                 atr5m[1] / TickSize;
+
+            last5mEmaFast =
+                emaFast5m[1];
 
             last5mEmaSlow =
                 emaSlow5m[1];
@@ -544,6 +676,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             var signalTime =
                 Times[SignalSeriesIndex][1];
 
+            var currentBarOpen =
+                Opens[SignalSeriesIndex][0];
+
+            var high =
+                Highs[SignalSeriesIndex][1];
+
+            var low =
+                Lows[SignalSeriesIndex][1];
+
+            var close =
+                Closes[SignalSeriesIndex][1];
+
+            var previousClose =
+                Closes[SignalSeriesIndex][2];
+
             //
             // NinjaTrader time-based bars are end-stamped. At the first
             // tick of the next 1-minute bar, Times[1][0] is already one
@@ -559,6 +706,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             var timeValue =
                 ToTimeValue(
                     signalTime);
+
+
+            UpdateRthReferenceLevels(
+                signalTime,
+                timeValue,
+                currentBarOpen,
+                close);
 
 
             if (timeValue < EntryStartTime
@@ -584,22 +738,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            var open =
-                Opens[SignalSeriesIndex][1];
-
-            var high =
-                Highs[SignalSeriesIndex][1];
-
-            var low =
-                Lows[SignalSeriesIndex][1];
-
-            var close =
-                Closes[SignalSeriesIndex][1];
-
-            var previousClose =
-                Closes[SignalSeriesIndex][2];
-
-
             var minutesFromOpen =
                 MinutesBetween(
                     MarketOpenTime,
@@ -609,6 +747,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                 GetOvernightWidthTicks();
 
 
+            if (PortfolioMode
+                == NinjexOvernightEdgePortfolioMode.BaselineAB)
+            {
+                ProcessBaselineSignals(
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    previousClose,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+
+                return;
+            }
+
+
+            ProcessFourModelSignals(
+                signalTime,
+                high,
+                low,
+                close,
+                previousClose,
+                minutesFromOpen,
+                overnightWidthTicks);
+        }
+
+
+        private void ProcessBaselineSignals(
+            DateTime signalTime,
+            double high,
+            double low,
+            double close,
+            double previousClose,
+            int minutesFromOpen,
+            double overnightWidthTicks)
+        {
             //
             // Model A:
             // Sweep below Overnight Low + completed close back above.
@@ -726,6 +900,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (longQualified)
             {
                 ArmPendingEntry(
+                    BaselineLongModelName,
+                    LongEntrySignal,
                     PendingDirection.Long,
                     signalTime,
                     signalTime,
@@ -742,6 +918,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (shortQualified)
             {
                 ArmPendingEntry(
+                    BaselineShortModelName,
+                    ShortEntrySignal,
                     PendingDirection.Short,
                     signalTime,
                     signalTime,
@@ -750,6 +928,340 @@ namespace NinjaTrader.NinjaScript.Strategies
                     close,
                     minutesFromOpen,
                     overnightWidthTicks);
+            }
+        }
+
+
+        private void ProcessFourModelSignals(
+            DateTime signalTime,
+            double high,
+            double low,
+            double close,
+            double previousClose,
+            int minutesFromOpen,
+            double overnightWidthTicks)
+        {
+            var range1mTicks =
+                TickSize > 0
+                    ? (high - low) / TickSize
+                    : double.NaN;
+
+            var premarketWidthTicks =
+                GetPremarketWidthTicks();
+
+
+            var priorCloseCross =
+                IsFinite(priorDayClose)
+                && priorDayCloseDate < signalTime.Date
+                && previousClose <= priorDayClose
+                && close > priorDayClose;
+
+            var priorCloseQualified =
+                priorCloseCross
+                && IsFinite(range1mTicks)
+                && range1mTicks
+                    <= PriorCloseMaximumRangeTicks
+                && IsFinite(overnightWidthTicks)
+                && overnightWidthTicks
+                    >= PriorCloseMinimumOvernightWidthTicks;
+
+
+            if (priorCloseCross)
+            {
+                Diagnostic(
+                    signalTime,
+                    "FOUR CHECK Model=PDC-Reclaim " +
+                    "Qualified={0} PDC={1} " +
+                    "PrevClose={2} Close={3} " +
+                    "Range1m={4:0.0}t MaxRange={5:0.0}t " +
+                    "ONWidth={6:0.0}t MinONWidth={7:0.0}t",
+                    priorCloseQualified,
+                    priorDayClose,
+                    previousClose,
+                    close,
+                    range1mTicks,
+                    PriorCloseMaximumRangeTicks,
+                    overnightWidthTicks,
+                    PriorCloseMinimumOvernightWidthTicks);
+            }
+
+
+            var premarketHighSweep =
+                IsFinite(premarketHigh)
+                && high > premarketHigh
+                && close < premarketHigh;
+
+            var premarketHighQualified =
+                premarketHighSweep
+                && minutesFromOpen >= 0
+                && minutesFromOpen
+                    <= PremarketHighMaximumMinutesFromOpen
+                && IsFinite(last5mAtrTicks)
+                && last5mAtrTicks
+                    >= PremarketHighMinimumAtr5mTicks;
+
+
+            if (premarketHighSweep)
+            {
+                Diagnostic(
+                    signalTime,
+                    "FOUR CHECK Model=PMH-Rejection " +
+                    "Qualified={0} PMH={1} High={2} Close={3} " +
+                    "MinutesFromOpen={4} MaxMinutes={5} " +
+                    "ATR5={6:0.0}t MinATR={7:0.0}t",
+                    premarketHighQualified,
+                    premarketHigh,
+                    high,
+                    close,
+                    minutesFromOpen,
+                    PremarketHighMaximumMinutesFromOpen,
+                    last5mAtrTicks,
+                    PremarketHighMinimumAtr5mTicks);
+            }
+
+
+            var rthOpenCross =
+                IsFinite(rthOpen)
+                && rthOpenDate == signalTime.Date
+                && previousClose >= rthOpen
+                && close < rthOpen;
+
+            var rthOpenQualified =
+                rthOpenCross
+                && minutesFromOpen
+                    >= RthOpenMinimumMinutesFromOpen
+                && IsFinite(premarketWidthTicks)
+                && premarketWidthTicks
+                    >= RthOpenMinimumPremarketWidthTicks;
+
+
+            if (rthOpenCross)
+            {
+                Diagnostic(
+                    signalTime,
+                    "FOUR CHECK Model=RTH-Open-Breakdown " +
+                    "Qualified={0} RTHOpen={1} " +
+                    "PrevClose={2} Close={3} " +
+                    "MinutesFromOpen={4} MinMinutes={5} " +
+                    "PMWidth={6:0.0}t MinPMWidth={7:0.0}t",
+                    rthOpenQualified,
+                    rthOpen,
+                    previousClose,
+                    close,
+                    minutesFromOpen,
+                    RthOpenMinimumMinutesFromOpen,
+                    premarketWidthTicks,
+                    RthOpenMinimumPremarketWidthTicks);
+            }
+
+
+            var premarketLowCross =
+                IsFinite(premarketLow)
+                && previousClose >= premarketLow
+                && close < premarketLow;
+
+            var useFastEmaFilter =
+                PortfolioMode
+                == NinjexOvernightEdgePortfolioMode
+                    .FourModelResearchFiltered;
+
+            //
+            // The archived research result is based on raw close > EMA(9).
+            // Earlier prose called this "below" after direction-normalizing
+            // the short feature; raw-price NinjaScript must use the relation
+            // below to reproduce the 274-trade research portfolio.
+            //
+            var fastEmaOk =
+                !useFastEmaFilter
+                || (IsFinite(last5mEmaFast)
+                    && close > last5mEmaFast);
+
+            var premarketLowQualified =
+                premarketLowCross
+                && IsFinite(last5mAtrTicks)
+                && last5mAtrTicks
+                    >= PremarketLowMinimumAtr5mTicks
+                && fastEmaOk;
+
+
+            if (premarketLowCross)
+            {
+                Diagnostic(
+                    signalTime,
+                    "FOUR CHECK Model=PML-Breakdown " +
+                    "Qualified={0} PML={1} " +
+                    "PrevClose={2} Close={3} " +
+                    "ATR5={4:0.0}t MinATR={5:0.0}t " +
+                    "EMAFilter={6} EMA5Fast={7} CloseAboveEMA={8}",
+                    premarketLowQualified,
+                    premarketLow,
+                    previousClose,
+                    close,
+                    last5mAtrTicks,
+                    PremarketLowMinimumAtr5mTicks,
+                    useFastEmaFilter,
+                    last5mEmaFast,
+                    IsFinite(last5mEmaFast)
+                        && close > last5mEmaFast);
+            }
+
+
+            var qualifiedCount =
+                (priorCloseQualified ? 1 : 0)
+                + (premarketHighQualified ? 1 : 0)
+                + (rthOpenQualified ? 1 : 0)
+                + (premarketLowQualified ? 1 : 0);
+
+            if (qualifiedCount > 1)
+            {
+                Diagnostic(
+                    signalTime,
+                    "FOUR PRIORITY Multiple={0} " +
+                    "Order=PDC,PMH,RTHOpen,PML",
+                    qualifiedCount);
+            }
+
+
+            //
+            // This ordering is the ordering used by the research portfolio
+            // when more than one model qualifies on the same timestamp.
+            //
+            if (priorCloseQualified)
+            {
+                ArmPendingEntry(
+                    PriorCloseModelName,
+                    PriorCloseEntrySignal,
+                    PendingDirection.Long,
+                    signalTime,
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+
+                return;
+            }
+
+
+            if (premarketHighQualified)
+            {
+                ArmPendingEntry(
+                    PremarketHighModelName,
+                    PremarketHighEntrySignal,
+                    PendingDirection.Short,
+                    signalTime,
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+
+                return;
+            }
+
+
+            if (rthOpenQualified)
+            {
+                ArmPendingEntry(
+                    RthOpenModelName,
+                    RthOpenEntrySignal,
+                    PendingDirection.Short,
+                    signalTime,
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+
+                return;
+            }
+
+
+            if (premarketLowQualified)
+            {
+                ArmPendingEntry(
+                    PremarketLowModelName,
+                    PremarketLowEntrySignal,
+                    PendingDirection.Short,
+                    signalTime,
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+            }
+        }
+
+
+        private void UpdateRthReferenceLevels(
+            DateTime signalTime,
+            int timeValue,
+            double currentBarOpen,
+            double completedClose)
+        {
+            if (timeValue < MarketOpenTime
+                || timeValue >= FlattenTime)
+            {
+                return;
+            }
+
+
+            if (currentRthReferenceDate
+                != signalTime.Date)
+            {
+                if (currentRthReferenceDate
+                        != Core.Globals.MinDate
+                    && IsFinite(currentRthLastClose))
+                {
+                    priorDayCloseDate =
+                        currentRthReferenceDate;
+
+                    priorDayClose =
+                        currentRthLastClose;
+
+                    Diagnostic(
+                        signalTime,
+                        "PRIOR DAY CLOSE READY " +
+                        "SourceDate={0:yyyy-MM-dd} Close={1}",
+                        priorDayCloseDate,
+                        priorDayClose);
+                }
+
+
+                currentRthReferenceDate =
+                    signalTime.Date;
+
+                currentRthLastClose =
+                    double.NaN;
+            }
+
+
+            if (timeValue == MarketOpenTime
+                && IsFinite(currentBarOpen))
+            {
+                rthOpenDate =
+                    signalTime.Date;
+
+                rthOpen =
+                    currentBarOpen;
+
+                Diagnostic(
+                    signalTime,
+                    "RTH OPEN READY " +
+                    "Date={0:yyyy-MM-dd} Open={1}",
+                    rthOpenDate,
+                    rthOpen);
+            }
+
+
+            if (IsFinite(completedClose))
+            {
+                currentRthLastClose =
+                    completedClose;
             }
         }
 
@@ -842,6 +1354,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             if (!IsFinite(last5mAtrTicks)
+                || !IsFinite(last5mEmaFast)
                 || !IsFinite(last5mEmaSlow))
             {
                 Diagnostic(
@@ -858,6 +1371,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         private void ArmPendingEntry(
+            string modelName,
+            string entrySignal,
             PendingDirection direction,
             DateTime signalTime,
             DateTime earliestExecutionTime,
@@ -869,6 +1384,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             pendingDirection =
                 direction;
+
+            pendingModelName =
+                modelName ?? string.Empty;
+
+            pendingEntrySignal =
+                entrySignal ?? string.Empty;
 
             pendingSignalTime =
                 signalTime;
@@ -891,8 +1412,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             pendingEmaSlow5m =
                 last5mEmaSlow;
 
+            pendingEmaFast5m =
+                last5mEmaFast;
+
             pendingOvernightWidthTicks =
                 overnightWidthTicks;
+
+            pendingPremarketWidthTicks =
+                GetPremarketWidthTicks();
 
             pendingMinutesFromOpen =
                 minutesFromOpen;
@@ -901,17 +1428,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             Diagnostic(
                 signalTime,
                 "SIGNAL ARMED " +
-                "Model={0} " +
-                "EarliestTick={1:HH:mm:ss.fff} " +
-                "Close={2} ATR5={3:0.0}t " +
-                "EMA5Slow={4} ONWidth={5:0.0}t " +
-                "Trades={6}/{7} Winners={8}/{9}",
+                "Model={0} Signal={1} Direction={2} " +
+                "EarliestTick={3:HH:mm:ss.fff} " +
+                "Close={4} ATR5={5:0.0}t " +
+                "EMA5Fast={6} EMA5Slow={7} " +
+                "ONWidth={8:0.0}t PMWidth={9:0.0}t " +
+                "Trades={10}/{11} Winners={12}/{13}",
+                pendingModelName,
+                pendingEntrySignal,
                 direction,
                 pendingEarliestExecutionTime,
                 pendingSignalClose,
                 pendingAtr5mTicks,
+                pendingEmaFast5m,
                 pendingEmaSlow5m,
                 pendingOvernightWidthTicks,
+                pendingPremarketWidthTicks,
                 tradesToday,
                 MaxTradesPerDay,
                 winnersToday,
@@ -1053,9 +1585,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             var signalName =
-                direction == PendingDirection.Long
-                    ? LongEntrySignal
-                    : ShortEntrySignal;
+                pendingEntrySignal;
+
+            var modelName =
+                pendingModelName;
+
+            if (string.IsNullOrEmpty(signalName))
+            {
+                ClearPendingEntry(
+                    time,
+                    "MissingEntrySignal");
+
+                return;
+            }
 
             submittedSignalTime =
                 pendingSignalTime;
@@ -1087,10 +1629,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             Diagnostic(
                 time,
                 "ENTRY SUBMIT " +
-                "Model={0} ObservedMarket={1} " +
-                "SignalTime={2:HH:mm:ss} " +
-                "Stop={3}t Target={4}t " +
-                "Qty={5}",
+                "Model={0} Signal={1} Direction={2} " +
+                "ObservedMarket={3} " +
+                "SignalTime={4:HH:mm:ss} " +
+                "Stop={5}t Target={6}t " +
+                "Qty={7}",
+                modelName,
+                signalName,
                 direction,
                 observedMarketPrice,
                 pendingSignalTime,
@@ -1105,14 +1650,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnterLong(
                     TickSeriesIndex,
                     OrderQuantity,
-                    LongEntrySignal);
+                    signalName);
             }
             else
             {
                 EnterShort(
                     TickSeriesIndex,
                     OrderQuantity,
-                    ShortEntrySignal);
+                    signalName);
             }
 
 
@@ -1281,8 +1826,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
 
-            if (order.Name == LongEntrySignal
-                || order.Name == ShortEntrySignal)
+            if (IsEntrySignalName(
+                    order.Name))
             {
                 activeEntryOrder =
                     order;
@@ -1357,12 +1902,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             var isLongEntry =
-                order.Name
-                == LongEntrySignal;
+                IsLongEntrySignalName(
+                    order.Name);
 
             var isShortEntry =
-                order.Name
-                == ShortEntrySignal;
+                IsShortEntrySignalName(
+                    order.Name);
 
 
             if (isLongEntry
@@ -1379,6 +1924,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         isLongEntry
                             ? PendingDirection.Long
                             : PendingDirection.Short;
+
+                    activeEntrySignal =
+                        order.Name;
+
+                    activeModelName =
+                        GetModelNameForEntrySignal(
+                            order.Name);
 
                     activeEntryFilledQuantity = 0;
                     activeEntryPriceQuantity = 0;
@@ -1407,9 +1959,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Diagnostic(
                     time,
                     "ENTRY FILL " +
-                    "Model={0} Price={1} Qty={2} " +
-                    "AvgEntry={3:0.########} " +
-                    "TradesToday={4}",
+                    "Model={0} Signal={1} Direction={2} " +
+                    "Price={3} Qty={4} " +
+                    "AvgEntry={5:0.########} " +
+                    "TradesToday={6}",
+                    activeModelName,
+                    activeEntrySignal,
                     activeTradeDirection,
                     price,
                     quantity,
@@ -1430,15 +1985,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ?? string.Empty;
 
             var belongsToActiveTrade =
-                (activeTradeDirection
-                    == PendingDirection.Long
-                    && fromEntrySignal
-                        == LongEntrySignal)
-                ||
-                (activeTradeDirection
-                    == PendingDirection.Short
-                    && fromEntrySignal
-                        == ShortEntrySignal);
+                !string.IsNullOrEmpty(activeEntrySignal)
+                && fromEntrySignal
+                    == activeEntrySignal;
 
 
             if (!belongsToActiveTrade)
@@ -1472,9 +2021,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             Diagnostic(
                 time,
                 "EXIT FILL " +
-                "Model={0} Order={1} Price={2} Qty={3} " +
-                "ExecutionPnl={4:0.00} " +
-                "TradeGross={5:0.00}",
+                "Model={0} Signal={1} Direction={2} " +
+                "Order={3} Price={4} Qty={5} " +
+                "ExecutionPnl={6:0.00} " +
+                "TradeGross={7:0.00}",
+                activeModelName,
+                activeEntrySignal,
                 activeTradeDirection,
                 order.Name,
                 price,
@@ -1516,10 +2068,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             Diagnostic(
                 time,
                 "TRADE COMPLETE " +
-                "Model={0} Exit={1} " +
-                "GrossPnl={2:0.00} " +
-                "DayTrades={3} Winners={4} Losses={5} " +
-                "DayGross={6:0.00}",
+                "Model={0} Signal={1} Direction={2} Exit={3} " +
+                "GrossPnl={4:0.00} " +
+                "DayTrades={5} Winners={6} Losses={7} " +
+                "DayGross={8:0.00}",
+                activeModelName,
+                activeEntrySignal,
                 activeTradeDirection,
                 exitName,
                 activeTradeGrossPnl,
@@ -1533,6 +2087,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             activeTradeDirection =
                 PendingDirection.None;
+
+            activeModelName =
+                string.Empty;
+
+            activeEntrySignal =
+                string.Empty;
 
             activeEntryFilledQuantity = 0;
             activeEntryPriceQuantity = 0;
@@ -1604,7 +2164,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     LongEodExitSignal,
-                    LongEntrySignal);
+                    GetActiveEntrySignalForExit(
+                        PendingDirection.Long));
 
                 return;
             }
@@ -1625,7 +2186,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     ShortEodExitSignal,
-                    ShortEntrySignal);
+                    GetActiveEntrySignalForExit(
+                        PendingDirection.Short));
             }
         }
 
@@ -1659,7 +2221,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     LongTimeExitSignal,
-                    LongEntrySignal);
+                    GetActiveEntrySignalForExit(
+                        PendingDirection.Long));
 
                 return true;
             }
@@ -1681,7 +2244,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     ShortTimeExitSignal,
-                    ShortEntrySignal);
+                    GetActiveEntrySignalForExit(
+                        PendingDirection.Short));
 
                 return true;
             }
@@ -1701,7 +2265,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Diagnostic(
                     time,
                     "PENDING CLEAR " +
-                    "Model={0} Reason={1}",
+                    "Model={0} Signal={1} " +
+                    "Direction={2} Reason={3}",
+                    pendingModelName,
+                    pendingEntrySignal,
                     pendingDirection,
                     reason);
             }
@@ -1709,6 +2276,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             pendingDirection =
                 PendingDirection.None;
+
+            pendingModelName =
+                string.Empty;
+
+            pendingEntrySignal =
+                string.Empty;
 
             pendingSignalTime =
                 Core.Globals.MinDate;
@@ -1731,7 +2304,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             pendingEmaSlow5m =
                 double.NaN;
 
+            pendingEmaFast5m =
+                double.NaN;
+
             pendingOvernightWidthTicks =
+                double.NaN;
+
+            pendingPremarketWidthTicks =
                 double.NaN;
 
             pendingMinutesFromOpen = 0;
@@ -1756,6 +2335,92 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (overnightHigh
                  - overnightLow)
                 / TickSize;
+        }
+
+
+        private double GetPremarketWidthTicks()
+        {
+            if (!IsFinite(premarketHigh)
+                || !IsFinite(premarketLow)
+                || TickSize <= 0)
+            {
+                return double.NaN;
+            }
+
+
+            return
+                (premarketHigh
+                 - premarketLow)
+                / TickSize;
+        }
+
+
+        private static bool IsEntrySignalName(
+            string signalName)
+        {
+            return
+                IsLongEntrySignalName(signalName)
+                || IsShortEntrySignalName(signalName);
+        }
+
+
+        private static bool IsLongEntrySignalName(
+            string signalName)
+        {
+            return
+                signalName == LongEntrySignal
+                || signalName == PriorCloseEntrySignal;
+        }
+
+
+        private static bool IsShortEntrySignalName(
+            string signalName)
+        {
+            return
+                signalName == ShortEntrySignal
+                || signalName == PremarketHighEntrySignal
+                || signalName == RthOpenEntrySignal
+                || signalName == PremarketLowEntrySignal;
+        }
+
+
+        private static string GetModelNameForEntrySignal(
+            string signalName)
+        {
+            if (signalName == LongEntrySignal)
+                return BaselineLongModelName;
+
+            if (signalName == ShortEntrySignal)
+                return BaselineShortModelName;
+
+            if (signalName == PriorCloseEntrySignal)
+                return PriorCloseModelName;
+
+            if (signalName == PremarketHighEntrySignal)
+                return PremarketHighModelName;
+
+            if (signalName == RthOpenEntrySignal)
+                return RthOpenModelName;
+
+            if (signalName == PremarketLowEntrySignal)
+                return PremarketLowModelName;
+
+
+            return "Unknown";
+        }
+
+
+        private string GetActiveEntrySignalForExit(
+            PendingDirection direction)
+        {
+            if (!string.IsNullOrEmpty(activeEntrySignal))
+                return activeEntrySignal;
+
+
+            return
+                direction == PendingDirection.Long
+                    ? LongEntrySignal
+                    : ShortEntrySignal;
         }
 
 
@@ -1849,9 +2514,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
-            Name = "Enable Long Model",
+            Name = "Portfolio Mode",
+            Description = "Selects the retained baseline A/B portfolio, the exact research-filtered four-model portfolio, or its no-fast-EMA comparison.",
             GroupName = "1. Models",
             Order = 0)]
+        public NinjexOvernightEdgePortfolioMode PortfolioMode
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Long Model",
+            Description = "Used only when Portfolio Mode is BaselineAB.",
+            GroupName = "1. Models",
+            Order = 1)]
         public bool EnableLongModel
         {
             get;
@@ -1862,8 +2540,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(
             Name = "Enable Short Model",
+            Description = "Used only when Portfolio Mode is BaselineAB.",
             GroupName = "1. Models",
-            Order = 1)]
+            Order = 2)]
         public bool EnableShortModel
         {
             get;
@@ -2017,9 +2696,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Range(1, 240)]
         [Display(
-            Name = "EMA Slow Period",
+            Name = "EMA Fast Period",
             GroupName = "3. Indicators",
             Order = 1)]
+        public int EmaFastPeriod
+        {
+            get;
+            set;
+        } = 9;
+
+
+        [NinjaScriptProperty]
+        [Range(1, 240)]
+        [Display(
+            Name = "EMA Slow Period",
+            GroupName = "3. Indicators",
+            Order = 2)]
         public int EmaSlowPeriod
         {
             get;
@@ -2067,10 +2759,102 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
+        [Range(1.0, 1000.0)]
+        [Display(
+            Name = "PDC Maximum 1-Minute Range Ticks",
+            GroupName = "6. Four Model",
+            Order = 0)]
+        public double PriorCloseMaximumRangeTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 5000.0)]
+        [Display(
+            Name = "PDC Minimum Overnight Width Ticks",
+            GroupName = "6. Four Model",
+            Order = 1)]
+        public double PriorCloseMinimumOvernightWidthTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0, 390)]
+        [Display(
+            Name = "PMH Maximum Minutes From Open",
+            GroupName = "6. Four Model",
+            Order = 2)]
+        public int PremarketHighMaximumMinutesFromOpen
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 1000.0)]
+        [Display(
+            Name = "PMH Minimum ATR5 Ticks",
+            GroupName = "6. Four Model",
+            Order = 3)]
+        public double PremarketHighMinimumAtr5mTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0, 390)]
+        [Display(
+            Name = "RTH Open Minimum Minutes From Open",
+            GroupName = "6. Four Model",
+            Order = 4)]
+        public int RthOpenMinimumMinutesFromOpen
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 5000.0)]
+        [Display(
+            Name = "RTH Open Minimum Premarket Width Ticks",
+            GroupName = "6. Four Model",
+            Order = 5)]
+        public double RthOpenMinimumPremarketWidthTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 1000.0)]
+        [Display(
+            Name = "PML Minimum ATR5 Ticks",
+            Description = "FourModelResearchFiltered additionally requires raw 1-minute close above the completed 5-minute EMA Fast.",
+            GroupName = "6. Four Model",
+            Order = 6)]
+        public double PremarketLowMinimumAtr5mTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
         [Range(1, 100)]
         [Display(
             Name = "Order Quantity",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 0)]
         public int OrderQuantity
         {
@@ -2083,7 +2867,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 1000)]
         [Display(
             Name = "Stop Loss Ticks",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 1)]
         public int StopLossTicks
         {
@@ -2096,7 +2880,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 5000)]
         [Display(
             Name = "Profit Target Ticks",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 2)]
         public int ProfitTargetTicks
         {
@@ -2110,7 +2894,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "Max Hold Minutes",
             Description = "Maximum minutes from the completed signal to a market exit. 0 disables this limit; 60 mirrors the research horizon.",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 3)]
         public int MaxHoldMinutes
         {
@@ -2124,7 +2908,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "Max Trades Per Day",
             Description = "0 disables this limit.",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 4)]
         public int MaxTradesPerDay
         {
@@ -2138,7 +2922,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "Max Winners Per Day",
             Description = "0 disables this limit.",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 5)]
         public int MaxWinnersPerDay
         {
@@ -2150,7 +2934,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(
             Name = "Stop After First Loss",
-            GroupName = "6. Risk",
+            GroupName = "7. Risk",
             Order = 6)]
         public bool StopAfterFirstLoss
         {
@@ -2162,7 +2946,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(
             Name = "Enable Diagnostics",
-            GroupName = "7. Diagnostics",
+            GroupName = "8. Diagnostics",
             Order = 0)]
         public bool EnableDiagnostics
         {
