@@ -29,7 +29,8 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// Expected chart:
     ///     ES 5-minute
     ///     CME US Index Futures ETH
-    ///     Same chart timezone used by the market-research collector
+    ///     Chart and collector timestamps must both be US Eastern (ET).
+    ///     No timezone conversion is performed.
     ///
     /// Added series:
     ///     BIP 1 = 1-minute signal series
@@ -66,14 +67,18 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// Portfolio controls:
     ///     - Maximum 3 entries per RTH day.
     ///     - Maximum 2 winning trades per RTH day.
-    ///     - Do not stop after the first loss by default.
+    ///     - Maximum 2 losing trades per RTH day (0 disables the limit).
     ///
     /// PortfolioMode retains the validated baseline A/B portfolio and adds
     /// both filtered and unfiltered versions of the four-model portfolio.
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.1.0";
+        private const string StrategyVersion = "1.2.0";
+
+        // Regular RTH close in ET. ETH bars after this time must not
+        // overwrite the prior-day reference, even if FlattenTime changes.
+        private const int RegularRthCloseTime = 160000;
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -408,7 +413,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaxTradesPerDay = 3;
                 MaxWinnersPerDay = 2;
 
-                StopAfterFirstLoss = false;
+                MaxLossesPerDay = 2;
 
 
                 //
@@ -461,7 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Mode={1} BaselineLong={2} BaselineShort={3} " +
                     "Stop={4}t Target={5}t " +
                     "MaxHold={6}m " +
-                    "MaxTrades={7} MaxWinners={8}",
+                    "MaxTrades={7} MaxWinners={8} MaxLosses={9}",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -470,7 +475,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ProfitTargetTicks,
                     MaxHoldMinutes,
                     MaxTradesPerDay,
-                    MaxWinnersPerDay);
+                    MaxWinnersPerDay,
+                    MaxLossesPerDay);
             }
         }
 
@@ -1203,8 +1209,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             double currentBarOpen,
             double completedClose)
         {
+            // Minute bars are end-stamped. Include the bar ending at 16:00
+            // (15:59-16:00), but exclude subsequent ETH bars. Updating this
+            // reference is independent of the strategy's flatten cutoff.
             if (timeValue < MarketOpenTime
-                || timeValue >= FlattenTime)
+                || timeValue > RegularRthCloseTime)
             {
                 return;
             }
@@ -1262,6 +1271,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 currentRthLastClose =
                     completedClose;
+
+                if (timeValue == RegularRthCloseTime)
+                {
+                    Diagnostic(
+                        signalTime,
+                        "RTH CLOSE CAPTURED Date={0:yyyy-MM-dd} Close={1}",
+                        signalTime.Date,
+                        currentRthLastClose);
+                }
             }
         }
 
@@ -1733,15 +1751,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            if (StopAfterFirstLoss
-                && lossesToday >= 1)
+            if (MaxLossesPerDay > 0
+                && lossesToday >= MaxLossesPerDay)
             {
                 if (logReason)
                 {
                     Diagnostic(
                         time,
                         "TRADE BLOCK " +
-                        "Reason=StopAfterFirstLoss");
+                        "Reason=MaxLosses Losses={0} Limit={1}",
+                        lossesToday,
+                        MaxLossesPerDay);
                 }
 
                 return false;
@@ -2932,11 +2952,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
+        [Range(0, 100)]
         [Display(
-            Name = "Stop After First Loss",
+            Name = "Max Losing Trades Per Day",
+            Description = "Maximum completed losing trades per ET trading date. 0 disables this limit; 1 stops after the first loss; 2 stops after the second loss. Losses use gross trade PnL, matching the winner counter.",
             GroupName = "7. Risk",
             Order = 6)]
-        public bool StopAfterFirstLoss
+        public int MaxLossesPerDay
         {
             get;
             set;
