@@ -15,6 +15,8 @@ Export the PREVIOUS evening too. Manifest can include several disjoint files.
 Reports go into a NEW timestamped folder under OutputDirectory:
  inventory.csv: every NCD file, raw filename date, bytes, read errors, optional SHA256.
  dates.csv: Tick-Last vs Minute-Last per raw filename date; previous day included.
+ download-checklist.csv: every absent date with the download interval(s) to select.
+ download-checklist.txt: the same readable checklist shown in the console.
  issues.csv: directory failures, unknown names, zero bytes, missing dates, window gaps.
  comparison.csv: union of PC/VPS relative filenames; hashes/bytes comparison.
  exports.csv: actual export rows, parse/order/duplicate-minute issues.
@@ -252,6 +254,41 @@ All findings need calendar/export-scope review. Premarket overlaps overnight.
 Matching hashes mean identical file bytes, not complete/accurate market data.
 Run on both machines with NinjaTrader closed for a stable comparison.
 "@ | Set-Content -LiteralPath (Join-Path $run 'summary.txt') -Encoding UTF8
-$dates | Group-Object Contract,Status | Select-Object Name,Count | Format-Table -AutoSize
+$downloadChecklist = @(
+ foreach ($row in ($dates | Sort-Object Contract,RawFileDate)) {
+  if ($row.Status -eq 'FILES_PRESENT_CONTENT_UNVERIFIED') { continue }
+  $intervals = if ($row.TickLastFiles -eq 0 -and $row.MinuteLastFiles -eq 0) {
+   'Tick + Minute'
+  } elseif ($row.TickLastFiles -eq 0) { 'Tick' } else { 'Minute' }
+  $action = if ($row.Basis -eq 'WeekendReview') {
+   'REVIEW weekend/session'
+  } elseif ($row.Basis -eq 'PriorEveningDependency') {
+   'REVIEW prior evening'
+  } else { 'DOWNLOAD / verify holiday' }
+  [pscustomobject]@{
+   Contract = $row.Contract
+   MissingDate = $row.RawFileDate
+   SelectIntervals = $intervals
+   SelectDataType = 'Last'
+   Action = $action
+  }
+ }
+)
+SaveCsv $downloadChecklist 'download-checklist.csv' @('Contract','MissingDate','SelectIntervals','SelectDataType','Action')
+$checklistText = @(
+ 'MISSING DATA - DOWNLOAD CHECKLIST'
+ 'Select the contract, listed date, interval(s), and Last in Historical Data > Download.'
+ 'Dates below are raw file dates. Check ET coverage on adjacent dates when downloading.'
+ 'Holiday/weekend absence may be normal. Check issues.csv for read errors before downloading.'
+ 'No source data is changed and no download is submitted by this script.'
+ ''
+)
+if ($downloadChecklist.Count -gt 0) {
+ $checklistText += ($downloadChecklist | Format-Table Contract,MissingDate,SelectIntervals,SelectDataType,Action -AutoSize | Out-String -Width 180)
+} else {
+ $checklistText += 'No absent date-level files found in the audited windows. Intraday completeness remains unverified.'
+}
+$checklistText | Set-Content -LiteralPath (Join-Path $run 'download-checklist.txt') -Encoding UTF8
+$checklistText | ForEach-Object { Write-Host $_ }
 Write-Host "Reports: $run" -ForegroundColor Cyan
-Write-Host 'Review dates.csv and issues.csv first. No data completeness certificate is issued.' -ForegroundColor Yellow
+Write-Host 'Start with download-checklist.csv. Intraday export gaps remain in gaps.csv when an ExportManifest is supplied.' -ForegroundColor Yellow
