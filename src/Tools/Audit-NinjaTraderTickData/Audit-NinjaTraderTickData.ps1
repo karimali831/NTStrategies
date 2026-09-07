@@ -1,9 +1,9 @@
 #requires -Version 5.1
 <#
 READ-ONLY NinjaTrader data audit. Does not modify the NinjaTrader database.
-Quick start: .\Audit-NinjaTraderData-v1.1.ps1
-Compare: .\Audit-NinjaTraderData-v1.1.ps1 -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'
-Focused check: .\Audit-NinjaTraderData-v1.1.ps1 -From '2025-10-01' -To '2025-10-01'
+Quick start: .\Audit-NinjaTraderData-v1.2.ps1
+Compare: .\Audit-NinjaTraderData-v1.2.ps1 -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'
+Focused check: .\Audit-NinjaTraderData-v1.2.ps1 -From '2025-10-01' -To '2025-10-01'
 Optional deep audit: -ExportManifest 'C:\exports\manifest.csv'
 Manifest columns: Contract,Interval,Path
 Example row: ES 12-25,Minute,C:\exports\ES-12-25-minute.Last.txt
@@ -14,7 +14,9 @@ Export the PREVIOUS evening too. Manifest can include several disjoint files.
 
 Reports go into a NEW timestamped folder under OutputDirectory:
  inventory.csv: every NCD file, raw filename date, bytes, read errors, optional SHA256.
- dates.csv: Tick-Last vs Minute-Last per raw filename date; previous day included.
+ dates.csv: Tick-Last vs Minute-Last inside assigned contract windows only.
+ warmup-checks.csv: prior-evening context needed by the first audited session;
+ separate from missing full-day downloads, not inferred from another contract.
  download-checklist.csv: every absent date with the download interval(s) to select.
  download-checklist.txt: the same readable checklist shown in the console.
  issues.csv: directory failures, unknown names, zero bytes, missing dates, window gaps.
@@ -46,7 +48,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Write-Host 'NinjaTrader Data Audit v1.1 - weekends excluded from date reports and download checklist' -ForegroundColor Cyan
+Write-Host 'NinjaTrader Data Audit v1.2 - assigned contract dates only; warm-up checks reported separately' -ForegroundColor Cyan
 $ci = [Globalization.CultureInfo]::InvariantCulture
 try { $et = [TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time') }
 catch { $et = [TimeZoneInfo]::FindSystemTimeZoneById('America/New_York') }
@@ -63,6 +65,7 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 $issues = [Collections.Generic.List[object]]::new()
 $inventory = [Collections.Generic.List[object]]::new()
 $dates = [Collections.Generic.List[object]]::new()
+$warmup = [Collections.Generic.List[object]]::new()
 function Issue($scope,$detail) { $issues.Add([pscustomobject]@{Scope=$scope;Detail=$detail}) }
 function SaveCsv($rows,$name,$columns) {
  $path=Join-Path $run $name
@@ -123,20 +126,35 @@ foreach($c in $contracts) {
  }
  $a=if($c.From -gt $From){$c.From}else{$From};$b=if($c.To -lt $To){$c.To}else{$To}
  if($a -gt $b){continue}
- # Weekends excluded from date/checklist reports by user preference.
+ # Only assigned weekdays are included in date/checklist reports.
  # Inventory and export parsing retain Sunday evening records for Monday context.
- for($d=$a.AddDays(-1);$d -le $b;$d=$d.AddDays(1)) {
+ # A date belongs only to its configured research window in this report.
+ # Warm-up needs are separate: a prior contract cannot substitute price levels.
+ $firstSession=$a
+ while($firstSession.DayOfWeek -in @('Saturday','Sunday')) {$firstSession=$firstSession.AddDays(1)}
+ if($firstSession -le $b) {
+  $warmup.Add([pscustomobject]@{
+   Contract=$c.Contract
+   FirstSessionET=$firstSession.ToString('yyyy-MM-dd')
+   OvernightStartET=$firstSession.AddDays(-1).AddHours(18).ToString('yyyy-MM-dd HH:mm')
+   OvernightEndET=$firstSession.AddHours(9.5).ToString('yyyy-MM-dd HH:mm')
+   Status='CONTENT_CHECK_REQUIRED_NOT_A_WHOLE_DAY_DOWNLOAD'
+   Note='Check same-contract overnight records; earlier history may also be needed for ATR/EMA and prior-day close. Inventory does not verify this interval.'
+  })
+ }
+ for($d=$a;$d -le $b;$d=$d.AddDays(1)) {
   if($d.DayOfWeek -in @('Saturday','Sunday')) {continue}
   $label=$d.ToString('yyyy-MM-dd');$t=0;$m=0
   if($lookup.ContainsKey("$($c.Contract)|tick|$label")){$t=$lookup["$($c.Contract)|tick|$label"]}
   if($lookup.ContainsKey("$($c.Contract)|minute|$label")){$m=$lookup["$($c.Contract)|minute|$label"]}
   $status=if($t -gt 0 -and $m -gt 0){'FILES_PRESENT_CONTENT_UNVERIFIED'}elseif($t -gt 0){'MINUTE_LAST_ABSENT'}elseif($m -gt 0){'TICK_LAST_ABSENT'}else{'BOTH_ABSENT'}
-  $basis=if($d -lt $a){'PriorEveningDependency'}else{'WeekdayReview'}
+  $basis='AssignedContractDate'
   $dates.Add([pscustomobject]@{Contract=$c.Contract;RawFileDate=$label;Basis=$basis;TickLastFiles=$t;MinuteLastFiles=$m;Status=$status})
   if($status -ne 'FILES_PRESENT_CONTENT_UNVERIFIED') {Issue $status "$($c.Contract) raw filename date $label ($basis); verify ET mapping and exchange calendar."}
  }
 }
 SaveCsv $inventory 'inventory.csv' @('Machine','RelativePath','Contract','Interval','PriceType','FileDate','RawStamp','Bytes','LastWriteUtc','SHA256','Problem')
+SaveCsv $warmup 'warmup-checks.csv' @('Contract','FirstSessionET','OvernightStartET','OvernightEndET','Status','Note')
 SaveCsv $dates 'dates.csv' @('Contract','RawFileDate','Basis','TickLastFiles','MinuteLastFiles','Status')
 if($CompareInventory) {
  $other=@{};foreach($r in (Import-Csv -LiteralPath $CompareInventory)){$other[$r.RelativePath]=$r}
@@ -244,7 +262,9 @@ NCD files are checked for names/size/readability, NOT decoded or certified.
 Filename dates are raw storage labels, not ET session dates. Weekday absence
 is a review finding, not proof of a missing trading session. Holidays/halts
 and early closes are NOT automatically removed. Verify the CME product calendar.
-Saturday/Sunday dates are excluded from dates.csv and the download checklist.
+Only dates within each configured contract window appear in dates.csv and the
+download checklist; Saturday/Sunday dates are excluded. Earlier context is
+listed separately in warmup-checks.csv and needs content verification.
 Sunday evening records remain in inventory and Monday overnight export checks.
 Contract windows preserve your allocation (ES/NQ September 2026 capped at
 2026-09-17); later dates are flagged unassigned. Supply ContractsCsv to extend.
@@ -265,9 +285,7 @@ $downloadChecklist = @(
   $intervals = if ($row.TickLastFiles -eq 0 -and $row.MinuteLastFiles -eq 0) {
    'Tick + Minute'
   } elseif ($row.TickLastFiles -eq 0) { 'Tick' } else { 'Minute' }
-  $action = if ($row.Basis -eq 'PriorEveningDependency') {
-   'REVIEW prior evening'
-  } else { 'DOWNLOAD / verify holiday' }
+  $action = 'DOWNLOAD / verify holiday'
   [pscustomobject]@{
    Contract = $row.Contract
    MissingDate = $row.RawFileDate
@@ -294,5 +312,6 @@ if ($downloadChecklist.Count -gt 0) {
 }
 $checklistText | Set-Content -LiteralPath (Join-Path $run 'download-checklist.txt') -Encoding UTF8
 $checklistText | ForEach-Object { Write-Host $_ }
+Write-Host 'First-session overnight context is listed separately in warmup-checks.csv; these are not full-day missing-data claims.' -ForegroundColor Yellow
 Write-Host "Reports: $run" -ForegroundColor Cyan
 Write-Host 'Start with download-checklist.csv. Intraday export gaps remain in gaps.csv when an ExportManifest is supplied.' -ForegroundColor Yellow
