@@ -1,216 +1,257 @@
+#requires -Version 5.1
+<#
+READ-ONLY NinjaTrader data audit. Does not modify the NinjaTrader database.
+Quick start: .\Audit-NinjaTraderData.ps1
+Compare: .\Audit-NinjaTraderData.ps1 -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'
+Focused check: .\Audit-NinjaTraderData.ps1 -From '2025-10-01' -To '2025-10-01'
+Optional deep audit: -ExportManifest 'C:\exports\manifest.csv'
+Manifest columns: Contract,Interval,Path
+Example row: ES 12-25,Minute,C:\exports\ES-12-25-minute.Last.txt
+Another row: ES 12-25,Tick,C:\exports\ES-12-25-tick.Last.txt
+Use native NinjaTrader Last exports (one-minute bars, not five-minute bars).
+Exports are UTC. Convert to ET for session analysis; chart timezone stays ET.
+Export the PREVIOUS evening too. Manifest can include several disjoint files.
+
+Reports go into a NEW timestamped folder under OutputDirectory:
+ inventory.csv: every NCD file, raw filename date, bytes, read errors, optional SHA256.
+ dates.csv: Tick-Last vs Minute-Last per raw filename date; previous day included.
+ issues.csv: directory failures, unknown names, zero bytes, missing dates, window gaps.
+ comparison.csv: union of PC/VPS relative filenames; hashes/bytes comparison.
+ exports.csv: actual export rows, parse/order/duplicate-minute issues.
+ sessions.csv: expected one-minute buckets with no data, by ET session window.
+ gaps.csv: individual missing ET minutes (tick absence is not proof of missing trades).
+ summary.txt: scope and limits.
+
+A nonempty NCD is NOT proof of intraday completeness. NCD binary records are NOT
+ decoded. Filename dates are NOT assumed to be ET session dates. No holiday is
+ silently excluded. Default schedule checks weekdays, normal overnight/premarket/
+ RTH windows only; exchange holidays/halts require review, not automatic repair.
+Contract windows are YOUR research allocation, not exchange validity rules.
+Files outside them are retained and are not 'misplaced'. Never move contracts.
+Deep audit checks timestamp coverage and basic numeric integrity, not price truth
+ or tick-by-tick equivalence. Optional hashes compare bytes, not economic identity.
+#>
+[CmdletBinding()]
 param(
-    [string]$TickRoot =
-        "$env:USERPROFILE\Documents\NinjaTrader 8\db\tick",
-
-    [string]$OutputCsv =
-        "$env:USERPROFILE\Documents\NinjaTrader 8\db\tick\tick_data_audit.csv"
+ [string]$DbRoot = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NinjaTrader 8\db'),
+ [string]$OutputDirectory = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NinjaTraderDataAudits'),
+ [datetime]$From = '2025-09-15',
+ [datetime]$To = [datetime]::MinValue,
+ [string]$ContractsCsv,
+ [string]$ExportManifest,
+ [string]$CompareInventory,
+ [switch]$HashFiles
 )
-
-$ErrorActionPreference = "Stop"
-
-# -------------------------------------------------------------------------
-# Dynamic End Date Calculation for the current active contract
-# -------------------------------------------------------------------------
-$LastCompletedMarketDate = [datetime]::Today
-if ($LastCompletedMarketDate.DayOfWeek -eq [System.DayOfWeek]::Saturday) {
-    $LastCompletedMarketDate = $LastCompletedMarketDate.AddDays(-1)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$ci = [Globalization.CultureInfo]::InvariantCulture
+try { $et = [TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time') }
+catch { $et = [TimeZoneInfo]::FindSystemTimeZoneById('America/New_York') }
+if ($To -eq [datetime]::MinValue) {
+ # Conservative default: previous ET weekday, never a partly completed today.
+ $To = [TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow,$et).Date.AddDays(-1)
+ while ($To.DayOfWeek -in @('Saturday','Sunday')) { $To = $To.AddDays(-1) }
 }
-elseif ($LastCompletedMarketDate.DayOfWeek -eq [System.DayOfWeek]::Sunday) {
-    $LastCompletedMarketDate = $LastCompletedMarketDate.AddDays(-2)
+$From=$From.Date; $To=$To.Date
+if ($From -gt $To) { throw 'From must be on or before To.' }
+if (-not (Test-Path -LiteralPath $DbRoot -PathType Container)) { throw "Database folder not found: $DbRoot. Supply -DbRoot (including redirected Documents/OneDrive if applicable)." }
+$run = Join-Path $OutputDirectory ((Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
+New-Item -ItemType Directory -Path $run -Force | Out-Null
+$issues = [Collections.Generic.List[object]]::new()
+$inventory = [Collections.Generic.List[object]]::new()
+$dates = [Collections.Generic.List[object]]::new()
+function Issue($scope,$detail) { $issues.Add([pscustomobject]@{Scope=$scope;Detail=$detail}) }
+function SaveCsv($rows,$name,$columns) {
+ $path=Join-Path $run $name
+ if ($rows.Count -gt 0) { $rows | Select-Object -Property $columns | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8 }
+ else { ('"'+($columns -join '","')+'"') | Set-Content -LiteralPath $path -Encoding UTF8 }
 }
+if ($ContractsCsv) { $raw=@(Import-Csv -LiteralPath $ContractsCsv) }
 else {
-    $LastCompletedMarketDate = $LastCompletedMarketDate.AddDays(-1)
+ $raw=@(foreach($symbol in @('ES','NQ')) {
+  [pscustomobject]@{Contract="$symbol 12-25";From='2025-09-15';To='2025-12-18'}
+  [pscustomobject]@{Contract="$symbol 03-26";From='2025-12-19';To='2026-03-19'}
+  [pscustomobject]@{Contract="$symbol 06-26";From='2026-03-20';To='2026-06-11'}
+  [pscustomobject]@{Contract="$symbol 09-26";From='2026-06-12';To='2026-09-17'}
+ })
 }
-
-# -------------------------------------------------------------------------
-# Official US Market Holidays (Full Closure Days for CME Equities)
-# -------------------------------------------------------------------------
-$marketHolidays = @{
-    # 2025
-    "2025-01-01" = "New Year's Day"
-    "2025-01-20" = "Martin Luther King Jr. Day"
-    "2025-02-17" = "Presidents' Day"
-    "2025-04-18" = "Good Friday"
-    "2025-05-26" = "Memorial Day"
-    "2025-06-19" = "Juneteenth"
-    "2025-07-04" = "Independence Day"
-    "2025-09-01" = "Labor Day"
-    "2025-11-27" = "Thanksgiving Day"
-    "2025-12-25" = "Christmas Day"
-    # 2026
-    "2026-01-01" = "New Year's Day"
-    "2026-01-19" = "Martin Luther King Jr. Day"
-    "2026-02-16" = "Presidents' Day"
-    "2026-04-03" = "Good Friday"
-    "2026-05-25" = "Memorial Day"
-    "2026-06-19" = "Juneteenth"
-    "2026-07-03" = "Independence Day (Observed)"
-    "2026-09-07" = "Labor Day"
-    "2026-11-26" = "Thanksgiving Day"
-    "2026-12-25" = "Christmas Day"
+$contracts=@(foreach($r in $raw) {
+ if ($r.Contract -notmatch '^(ES|NQ) \d{2}-\d{2}$') { throw "Invalid contract: $($r.Contract)" }
+ $a=[datetime]::ParseExact($r.From,'yyyy-MM-dd',$ci); $b=[datetime]::ParseExact($r.To,'yyyy-MM-dd',$ci)
+ if($a -gt $b) {throw "Reversed window: $($r.Contract)"}
+ [pscustomobject]@{Contract=$r.Contract;Symbol=$r.Contract.Split(' ')[0];From=$a;To=$b}
+})
+if (@($contracts.Contract | Select-Object -Unique).Count -ne $contracts.Count) {throw 'Duplicate contract rows.'}
+foreach($symbol in @('ES','NQ')) {
+ $s=@($contracts | Where-Object Symbol -eq $symbol | Sort-Object From)
+ for($i=1;$i -lt $s.Count;$i++) { if($s[$i].From -le $s[$i-1].To) {throw "Overlapping research windows: $symbol"} }
+ for($d=$From;$d -le $To;$d=$d.AddDays(1)) {
+  if($d.DayOfWeek -in @('Saturday','Sunday')) {continue}
+  if(@($s | Where-Object {$d -ge $_.From -and $d -le $_.To}).Count -eq 0) {Issue 'UnassignedDate' "$symbol $($d.ToString('yyyy-MM-dd')): update ContractsCsv; no active contract guessed."}
+ }
 }
-
-# -------------------------------------------------------------------------
-# Contract windows (No overlaps allowed per instrument)
-# -------------------------------------------------------------------------
-$contracts = @(
-    # NQ
-    @{ Instrument = "NQ"; Contract = "NQ 12-25"; From = [datetime]"2025-09-15"; To = [datetime]"2025-12-18" },
-    @{ Instrument = "NQ"; Contract = "NQ 03-26"; From = [datetime]"2025-12-19"; To = [datetime]"2026-03-19" },
-    @{ Instrument = "NQ"; Contract = "NQ 06-26"; From = [datetime]"2026-03-20"; To = [datetime]"2026-06-11" },
-    @{ Instrument = "NQ"; Contract = "NQ 09-26"; From = [datetime]"2026-06-12"; To = $LastCompletedMarketDate },
-
-    # ES
-    @{ Instrument = "ES"; Contract = "ES 12-25"; From = [datetime]"2025-09-15"; To = [datetime]"2025-12-18" },
-    @{ Instrument = "ES"; Contract = "ES 03-26"; From = [datetime]"2025-12-19"; To = [datetime]"2026-03-19" },
-    @{ Instrument = "ES"; Contract = "ES 06-26"; From = [datetime]"2026-03-20"; To = [datetime]"2026-06-11" },
-    @{ Instrument = "ES"; Contract = "ES 09-26"; From = [datetime]"2026-06-12"; To = $LastCompletedMarketDate }
-)
-
-# -------------------------------------------------------------------------
-# Phase 1: Validate Setup Boundaries
-# -------------------------------------------------------------------------
-Write-Host "Validating contract configurations for overlaps..." -ForegroundColor Cyan
-Write-Host "Dynamic End Date set to: $($LastCompletedMarketDate.ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
-
-$instruments = "ES", "NQ"
-foreach ($inst in $instruments) {
-    $filtered = $contracts | Where-Object { $_.Instrument -eq $inst } | Sort-Object From
-    for ($i = 0; $i -lt ($filtered.Count - 1); $i++) {
-        if ($filtered[$i].To.Date -ge $filtered[$i+1].From.Date) {
-            Write-Error "CRITICAL OVERLAP DETECTED for [$inst]: $($filtered[$i].Contract) ($($filtered[$i].To.ToString('yyyy-MM-dd'))) overlaps with $($filtered[$i+1].Contract) ($($filtered[$i+1].From.ToString('yyyy-MM-dd')))"
-        }
+$lookup=@{}
+foreach($c in $contracts) {
+ foreach($interval in @('tick','minute')) {
+  $folder=Join-Path (Join-Path $DbRoot $interval) $c.Contract
+  if(-not (Test-Path -LiteralPath $folder -PathType Container)) {Issue 'MissingFolder' $folder;continue}
+  try { $files=@(Get-ChildItem -LiteralPath $folder -File -Filter '*.ncd' -ErrorAction Stop) }
+  catch {Issue 'DirectoryReadError' "$folder : $_";continue}
+  foreach($f in $files) {
+   $date='';$price='Unknown';$stamp='';$problem='';$hash=''
+   if($f.Name -match '^(?<stamp>\d{8}(?:\d{4}(?:\d{2})?)?)\.(?<price>Last|Bid|Ask)\.ncd$') {
+    $stamp=$Matches.stamp; $price=$Matches.price
+    $fmt=switch($stamp.Length){8 {'yyyyMMdd'} 12 {'yyyyMMddHHmm'} 14 {'yyyyMMddHHmmss'}}
+    try {$parsed=[datetime]::ParseExact($stamp,$fmt,$ci);$date=$parsed.ToString('yyyy-MM-dd')}
+    catch {$problem='Invalid filename timestamp'}
+   } else {$problem='Unrecognized filename format; retained for inspection'}
+   if($f.Length -eq 0) {$problem+='; Zero bytes'}
+   try {
+    if($HashFiles) {$hash=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash}
+    else { $stream=[IO.File]::Open($f.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite);try {[void]$stream.ReadByte()} finally {$stream.Dispose()} }
+   } catch {$problem+="; Read failed: $_"}
+   if($problem) {Issue 'FileIssue' "$($f.FullName): $problem"}
+   $key="$($c.Contract)|$interval|$date"
+   if($price -eq 'Last' -and $date -and -not $problem) {
+    if(-not $lookup.ContainsKey($key)) {$lookup[$key]=0};$lookup[$key]++
+   }
+   $inventory.Add([pscustomobject]@{Machine=[Environment]::MachineName;RelativePath="$interval/$($c.Contract)/$($f.Name)";Contract=$c.Contract;Interval=$interval;PriceType=$price;FileDate=$date;RawStamp=$stamp;Bytes=$f.Length;LastWriteUtc=$f.LastWriteTimeUtc.ToString('o');SHA256=$hash;Problem=$problem})
+  }
+ }
+ $a=if($c.From -gt $From){$c.From}else{$From};$b=if($c.To -lt $To){$c.To}else{$To}
+ if($a -gt $b){continue}
+ # Include previous calendar date for evening warm-up; don't discard Sunday files.
+ for($d=$a.AddDays(-1);$d -le $b;$d=$d.AddDays(1)) {
+  $label=$d.ToString('yyyy-MM-dd');$t=0;$m=0
+  if($lookup.ContainsKey("$($c.Contract)|tick|$label")){$t=$lookup["$($c.Contract)|tick|$label"]}
+  if($lookup.ContainsKey("$($c.Contract)|minute|$label")){$m=$lookup["$($c.Contract)|minute|$label"]}
+  $status=if($t -gt 0 -and $m -gt 0){'FILES_PRESENT_CONTENT_UNVERIFIED'}elseif($t -gt 0){'MINUTE_LAST_ABSENT'}elseif($m -gt 0){'TICK_LAST_ABSENT'}else{'BOTH_ABSENT'}
+  $basis=if($d -lt $a){'PriorEveningDependency'}elseif($d.DayOfWeek -in @('Saturday','Sunday')){'WeekendReview'}else{'WeekdayReview'}
+  $dates.Add([pscustomobject]@{Contract=$c.Contract;RawFileDate=$label;Basis=$basis;TickLastFiles=$t;MinuteLastFiles=$m;Status=$status})
+  if($status -ne 'FILES_PRESENT_CONTENT_UNVERIFIED' -and $basis -ne 'WeekendReview') {Issue $status "$($c.Contract) raw filename date $label ($basis); verify ET mapping and exchange calendar."}
+ }
+}
+SaveCsv $inventory 'inventory.csv' @('Machine','RelativePath','Contract','Interval','PriceType','FileDate','RawStamp','Bytes','LastWriteUtc','SHA256','Problem')
+SaveCsv $dates 'dates.csv' @('Contract','RawFileDate','Basis','TickLastFiles','MinuteLastFiles','Status')
+if($CompareInventory) {
+ $other=@{};foreach($r in (Import-Csv -LiteralPath $CompareInventory)){$other[$r.RelativePath]=$r}
+ $here=@{};foreach($r in $inventory){$here[$r.RelativePath]=$r}
+ $comparison=@(foreach($key in @(@($other.Keys)+@($here.Keys) | Sort-Object -Unique)) {
+  $status=if(-not $here.ContainsKey($key)){'ONLY_OTHER'}elseif(-not $other.ContainsKey($key)){'ONLY_HERE'}elseif($here[$key].Problem -or $other[$key].Problem){'READ_OR_FORMAT_ISSUE'}elseif($here[$key].SHA256 -and $other[$key].SHA256){if($here[$key].SHA256 -eq $other[$key].SHA256){'HASH_MATCH'}else{'HASH_DIFF'}}elseif([long]$here[$key].Bytes -ne [long]$other[$key].Bytes){'SIZE_DIFF'}else{'SAME_SIZE_UNVERIFIED'}
+  [pscustomobject]@{RelativePath=$key;Status=$status}
+ })
+ SaveCsv $comparison 'comparison.csv' @('RelativePath','Status')
+}
+$exportStats=[Collections.Generic.List[object]]::new()
+$sessions=[Collections.Generic.List[object]]::new()
+$gaps=[Collections.Generic.List[object]]::new()
+if($ExportManifest) {
+ $buckets=@{}
+ foreach($entry in (Import-Csv -LiteralPath $ExportManifest)) {
+  if($entry.Interval -notin @('Tick','Minute')){throw 'Export interval must be Tick or Minute.'}
+  if($entry.Contract -notin $contracts.Contract){throw "Export contract not in research windows: $($entry.Contract)"}
+  $key="$($entry.Contract)|$($entry.Interval)"
+  if(-not $buckets.ContainsKey($key)){$buckets[$key]=[Collections.Generic.HashSet[long]]::new()}
+  $seen=$buckets[$key];$rows=0L;$bad=0L;$outOfOrder=0L;$duplicates=0L;$first=$null;$last=$null;$previous=$null
+  $reader=[IO.StreamReader]::new($entry.Path)
+  try {
+   while($null -ne ($line=$reader.ReadLine())) {
+    if([string]::IsNullOrWhiteSpace($line)){continue}
+    $rows++
+    try {
+     $parts=$line.Split(';')
+     if($entry.Interval -eq 'Minute' -and $parts.Length -ne 6){throw 'Expected minute OHLCV row'}
+     if($entry.Interval -eq 'Tick' -and $parts.Length -notin @(3,5)){throw 'Expected native Last tick row'}
+     $ts=$parts[0].Trim()
+     $format=if($ts -match '^\d{8} \d{6} \d{7}$'){'yyyyMMdd HHmmss fffffff'}elseif($ts -match '^\d{8} \d{6}$'){'yyyyMMdd HHmmss'}else{throw 'Invalid timestamp'}
+     $utc=[datetime]::SpecifyKind([datetime]::ParseExact($ts,$format,$ci),[DateTimeKind]::Utc)
+     for($n=1;$n -lt $parts.Length;$n++) {
+      $v=[double]::Parse($parts[$n],$ci)
+      if([double]::IsNaN($v) -or [double]::IsInfinity($v) -or $v -lt 0){throw 'Invalid numeric value'}
+     }
+     if($entry.Interval -eq 'Minute') {
+      if($utc.Second -ne 0){throw 'Minute export is not end-stamped on minute boundary'}
+      $o=[double]::Parse($parts[1],$ci);$h=[double]::Parse($parts[2],$ci);$l=[double]::Parse($parts[3],$ci);$cl=[double]::Parse($parts[4],$ci)
+      if($l -le 0 -or $h -lt $l -or $o -lt $l -or $o -gt $h -or $cl -lt $l -or $cl -gt $h){throw 'Invalid OHLC'}
+     } elseif([double]::Parse($parts[1],$ci) -le 0){throw 'Invalid Last price'}
+     if($null -ne $previous -and $utc -lt $previous){$outOfOrder++}
+     $previous=$utc
+     if($null -eq $first -or $utc -lt $first){$first=$utc}
+     if($null -eq $last -or $utc -gt $last){$last=$utc}
+     $local=[TimeZoneInfo]::ConvertTimeFromUtc($utc,$et)
+     # Minute exports are close-stamped; tick occupancy uses next minute close.
+     $bucket=$local.Ticks-($local.Ticks % [TimeSpan]::TicksPerMinute)
+     if($entry.Interval -eq 'Tick'){$bucket += [TimeSpan]::TicksPerMinute}
+     if(-not $seen.Add($bucket) -and $entry.Interval -eq 'Minute'){$duplicates++}
+    } catch {
+     $bad++
+     if($bad -le 5){Issue 'ExportRowError' "$($entry.Path) line $rows : $_"}
     }
-}
-
-function Get-Weekdays {
-    param([datetime]$From, [datetime]$To)
-    $dates = New-Object System.Collections.Generic.List[datetime]
-    for ($date = $From.Date; $date -le $To.Date; $date = $date.AddDays(1)) {
-        $dateStr = $date.ToString("yyyy-MM-dd")
-        if ($date.DayOfWeek -ne [System.DayOfWeek]::Saturday -and 
-            $date.DayOfWeek -ne [System.DayOfWeek]::Sunday -and 
-            -not $marketHolidays.ContainsKey($dateStr)) {
-            $dates.Add($date)
-        }
+   }
+  } finally {$reader.Dispose()}
+  $exportStats.Add([pscustomobject]@{Contract=$entry.Contract;Interval=$entry.Interval;Path=$entry.Path;Rows=$rows;BadRows=$bad;OutOfOrder=$outOfOrder;DuplicateMinuteBuckets=$duplicates;FirstUtc=$(if($first){$first.ToString('o')}else{''});LastUtc=$(if($last){$last.ToString('o')}else{''})})
+ }
+ foreach($c in $contracts) {
+  $a=if($c.From -gt $From){$c.From}else{$From};$b=if($c.To -lt $To){$c.To}else{$To}
+  for($d=$a;$d -le $b;$d=$d.AddDays(1)) {
+   if($d.DayOfWeek -in @('Saturday','Sunday')){continue}
+   foreach($interval in @('Tick','Minute')) {
+    $key="$($c.Contract)|$interval"
+    if(-not $buckets.ContainsKey($key)){
+     $sessions.Add([pscustomobject]@{Contract=$c.Contract;DateET=$d.ToString('yyyy-MM-dd');Interval=$interval;Window='All';ExpectedMinutes=0;PresentMinutes=0;MissingMinutes=0;Status='NOT_EXPORTED'})
+     continue
     }
-    return $dates
-}
-
-function Get-TickDatesFromFolder {
-    param([string]$Folder)
-    if (-not (Test-Path $Folder)) { return @() }
-    
-    $foundDates = Get-ChildItem -Path $Folder -Filter "*.Last.ncd" -File -ErrorAction SilentlyContinue |
-        ForEach-Object {
-            if ($_.Name -match '^(\d{4})(\d{2})(\d{2})\d{4}\.Last\.ncd$') {
-                try { 
-                    [datetime]::new([int]$matches[1], [int]$matches[2], [int]$matches[3]) 
-                } catch {}
-            }
-        } | Sort-Object -Unique
-    return @($foundDates)
-}
-
-function Find-CorrectContract {
-    param([string]$Instrument, [datetime]$Date)
-    $match = $contracts | Where-Object { $_.Instrument -eq $Instrument -and $Date.Date -ge $_.From.Date -and $Date.Date -le $_.To.Date }
-    if ($match) { return $match.Contract }
-    return "OUT_OF_BOUNDS / REMOVED"
-}
-
-$results = New-Object System.Collections.Generic.List[object]
-$globalMisplacedFiles = New-Object System.Collections.Generic.List[object]
-$globalMissingDates = New-Object System.Collections.Generic.List[object]
-
-# -------------------------------------------------------------------------
-# Phase 2: Audit Folders and Cross-Reference Dates
-# -------------------------------------------------------------------------
-foreach ($item in $contracts) {
-    $folder = Join-Path $TickRoot $item.Contract
-    $allTickDates = Get-TickDatesFromFolder -Folder $folder
-
-    $tickDatesInWindow = New-Object System.Collections.Generic.List[datetime]
-    $wrongContractAlerts = New-Object System.Collections.Generic.List[string]
-
-    foreach ($date in $allTickDates) {
-        if ($date.Date -ge $item.From.Date -and $date.Date -le $item.To.Date) {
-            $tickDatesInWindow.Add($date)
-        } else {
-            $correctContract = Find-CorrectContract -Instrument $item.Instrument -Date $date
-            $formattedDate = $date.ToString("yyyy-MM-dd")
-            $wrongContractAlerts.Add("$formattedDate->$correctContract")
-            
-            $globalMisplacedFiles.Add([pscustomobject]@{
-                CurrentFolder = $item.Contract
-                FileDate      = $formattedDate
-                TargetFolder  = $correctContract
-            })
-        }
+    $windows=@(
+     @{Name='Overnight';Start=$d.AddDays(-1).AddHours(18).AddMinutes(1);End=$d.AddHours(9.5)},
+     @{Name='Premarket';Start=$d.AddHours(3).AddMinutes(1);End=$d.AddHours(9.5)},
+     @{Name='RTH';Start=$d.AddHours(9.5).AddMinutes(1);End=$d.AddHours(16)}
+    )
+    foreach($w in $windows) {
+     $expected=0;$present=0
+     for($minute=$w.Start;$minute -le $w.End;$minute=$minute.AddMinutes(1)) {
+      $expected++
+      if($buckets[$key].Contains($minute.Ticks)){$present++}
+      else {$gaps.Add([pscustomobject]@{Contract=$c.Contract;Interval=$interval;Window=$w.Name;MissingMinuteCloseET=$minute.ToString('yyyy-MM-dd HH:mm:ss')})}
+     }
+     $status=if($present -eq $expected){'BUCKETS_PRESENT_NOT_PRICE_VALIDATION'}else{'GAPS_REVIEW_CALENDAR_AND_EXPORT_SCOPE'}
+     $sessions.Add([pscustomobject]@{Contract=$c.Contract;DateET=$d.ToString('yyyy-MM-dd');Interval=$interval;Window=$w.Name;ExpectedMinutes=$expected;PresentMinutes=$present;MissingMinutes=($expected-$present);Status=$status})
     }
-
-    $expectedWeekdays = @(Get-Weekdays -From $item.From -To $item.To)
-    $tickDateLookup = @{}
-    foreach ($date in $tickDatesInWindow) { $tickDateLookup[$date.ToString("yyyy-MM-dd")] = $true }
-
-    $missingDates = @($expectedWeekdays | Where-Object { -not $tickDateLookup.ContainsKey($_.ToString("yyyy-MM-dd")) })
-    
-    # Log individual missing dates for dedicated visualization
-    foreach ($mDate in $missingDates) {
-        $globalMissingDates.Add([pscustomobject]@{
-            Instrument = $item.Instrument
-            Contract   = $item.Contract
-            Date       = $mDate.ToString("yyyy-MM-dd")
-            Status     = "Missing"
-        })
-    }
-
-    $firstTick = if ($tickDatesInWindow.Count -gt 0) { $tickDatesInWindow[0] } else { $null }
-    $lastTick = if ($tickDatesInWindow.Count -gt 0) { $tickDatesInWindow[$tickDatesInWindow.Count - 1] } else { $null }
-
-    $coveragePercent = if ($expectedWeekdays.Count -gt 0) { [math]::Round(($tickDatesInWindow.Count / $expectedWeekdays.Count) * 100, 1) } else { 0 }
-
-    $status = if (-not (Test-Path $folder)) { "FOLDER MISSING" }
-              elseif ($allTickDates.Count -eq 0) { "NO TICK DATA" }
-              elseif ($wrongContractAlerts.Count -gt 0) { "MISPLACED DATA DETECTED" }
-              elseif ($missingDates.Count -eq 0) { "COMPLETE" }
-              elseif ($coveragePercent -ge 90) { "MOSTLY COMPLETE" }
-              else { "INCOMPLETE" }
-
-    $result = [pscustomobject]@{
-        Instrument          = $item.Instrument
-        Contract            = $item.Contract
-        ExpectedFrom        = $item.From.ToString("yyyy-MM-dd")
-        ExpectedTo          = $item.To.ToString("yyyy-MM-dd")
-        FirstTickDate       = if ($firstTick) { $firstTick.ToString("yyyy-MM-dd") } else { "" }
-        LastTickDate        = if ($lastTick) { $lastTick.ToString("yyyy-MM-dd") } else { "" }
-        ExpectedWeekdays    = $expectedWeekdays.Count
-        ValidTickDaysFound  = $tickDatesInWindow.Count
-        MisplacedDaysFound  = $wrongContractAlerts.Count
-        MissingWeekdays     = $missingDates.Count
-        CoveragePercent     = $coveragePercent
-        Status              = $status
-        MisplacedDatesMap   = ($wrongContractAlerts -join ", ")
-        MissingDates        = ($missingDates | ForEach-Object { $_.ToString("yyyy-MM-dd") }) -join ", "
-    }
-    $results.Add($result)
+   }
+  }
+ }
+ SaveCsv $exportStats 'exports.csv' @('Contract','Interval','Path','Rows','BadRows','OutOfOrder','DuplicateMinuteBuckets','FirstUtc','LastUtc')
+ SaveCsv $sessions 'sessions.csv' @('Contract','DateET','Interval','Window','ExpectedMinutes','PresentMinutes','MissingMinutes','Status')
+ SaveCsv $gaps 'gaps.csv' @('Contract','Interval','Window','MissingMinuteCloseET')
 }
+SaveCsv $issues 'issues.csv' @('Scope','Detail')
+@"
+NinjaTrader audit - $(Get-Date -Format o)
+Machine: $([Environment]::MachineName)
+Database: $DbRoot
+Requested dates: $($From.ToString('yyyy-MM-dd')) through $($To.ToString('yyyy-MM-dd'))
+Files inventoried: $($inventory.Count). Issues/review items: $($issues.Count).
+Hashing: $HashFiles. Export manifest: $ExportManifest
 
-# -------------------------------------------------------------------------
-# Console Summary and Export
-# -------------------------------------------------------------------------
-Write-Host ""
-Write-Host "============================================================"
-Write-Host " NinjaTrader Tick Data Audit Report"
-Write-Host "============================================================"
+Required combinations: Tick + Last, Minute + Last. Bid/Ask are inventoried if
+present, not required by this strategy. Day bars and market-replay files are
+outside this audit. Last is a price type, not a third interval.
+NCD files are checked for names/size/readability, NOT decoded or certified.
+Filename dates are raw storage labels, not ET session dates. Weekday absence
+is a review finding, not proof of a missing trading session. Holidays/halts
+and early closes are NOT automatically removed. Verify the CME product calendar.
+Contract windows preserve your allocation (ES/NQ September 2026 capped at
+2026-09-17); later dates are flagged unassigned. Supply ContractsCsv to extend.
+Window overlap on disk is legitimate. No source file is moved or deleted.
 
-$results | Format-Table -Property Instrument, Contract, Status, ValidTickDaysFound, MisplacedDaysFound, MissingWeekdays, CoveragePercent
-
-if ($globalMissingDates.Count -gt 0) {
-    Write-Host ""
-    Write-Host "============================================================" -ForegroundColor Red
-    Write-Host " MISSING DATES BREAKDOWN" -ForegroundColor Red
-    Write-Host "============================================================" -ForegroundColor Red
-    $globalMissingDates | Sort-Object Contract, Date | Format-Table -Property Instrument, Contract, Date, Status
-}
-
+Deep checks require native UTC NinjaTrader Last text exports. Export at least
+the prior evening plus every requested day. Minute exports must be ONE minute.
+Normal ET windows: overnight (18:00,09:30], premarket (03:00,09:30], RTH
+(09:30,16:00]. Tick bins cover the preceding minute, not bar-close ticks.
+Missing tick bins can be inactivity; missing minute bins can be exchange closures.
+All findings need calendar/export-scope review. Premarket overlaps overnight.
+Matching hashes mean identical file bytes, not complete/accurate market data.
+Run on both machines with NinjaTrader closed for a stable comparison.
+"@ | Set-Content -LiteralPath (Join-Path $run 'summary.txt') -Encoding UTF8
+$dates | Group-Object Contract,Status | Select-Object Name,Count | Format-Table -AutoSize
+Write-Host "Reports: $run" -ForegroundColor Cyan
+Write-Host 'Review dates.csv and issues.csv first. No data completeness certificate is issued.' -ForegroundColor Yellow
