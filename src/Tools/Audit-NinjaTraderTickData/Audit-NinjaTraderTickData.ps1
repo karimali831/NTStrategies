@@ -1,9 +1,9 @@
 #requires -Version 5.1
 <#
 READ-ONLY NinjaTrader data audit. Does not modify the NinjaTrader database.
-Quick start: .\Audit-NinjaTraderData.ps1
-Compare: .\Audit-NinjaTraderData.ps1 -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'
-Focused check: .\Audit-NinjaTraderData.ps1 -From '2025-10-01' -To '2025-10-01'
+Quick start: .\Audit-NinjaTraderData-v1.1.ps1
+Compare: .\Audit-NinjaTraderData-v1.1.ps1 -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'
+Focused check: .\Audit-NinjaTraderData-v1.1.ps1 -From '2025-10-01' -To '2025-10-01'
 Optional deep audit: -ExportManifest 'C:\exports\manifest.csv'
 Manifest columns: Contract,Interval,Path
 Example row: ES 12-25,Minute,C:\exports\ES-12-25-minute.Last.txt
@@ -46,6 +46,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Write-Host 'NinjaTrader Data Audit v1.1 - weekends excluded from date reports and download checklist' -ForegroundColor Cyan
 $ci = [Globalization.CultureInfo]::InvariantCulture
 try { $et = [TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time') }
 catch { $et = [TimeZoneInfo]::FindSystemTimeZoneById('America/New_York') }
@@ -122,15 +123,17 @@ foreach($c in $contracts) {
  }
  $a=if($c.From -gt $From){$c.From}else{$From};$b=if($c.To -lt $To){$c.To}else{$To}
  if($a -gt $b){continue}
- # Include previous calendar date for evening warm-up; don't discard Sunday files.
+ # Weekends excluded from date/checklist reports by user preference.
+ # Inventory and export parsing retain Sunday evening records for Monday context.
  for($d=$a.AddDays(-1);$d -le $b;$d=$d.AddDays(1)) {
+  if($d.DayOfWeek -in @('Saturday','Sunday')) {continue}
   $label=$d.ToString('yyyy-MM-dd');$t=0;$m=0
   if($lookup.ContainsKey("$($c.Contract)|tick|$label")){$t=$lookup["$($c.Contract)|tick|$label"]}
   if($lookup.ContainsKey("$($c.Contract)|minute|$label")){$m=$lookup["$($c.Contract)|minute|$label"]}
   $status=if($t -gt 0 -and $m -gt 0){'FILES_PRESENT_CONTENT_UNVERIFIED'}elseif($t -gt 0){'MINUTE_LAST_ABSENT'}elseif($m -gt 0){'TICK_LAST_ABSENT'}else{'BOTH_ABSENT'}
-  $basis=if($d -lt $a){'PriorEveningDependency'}elseif($d.DayOfWeek -in @('Saturday','Sunday')){'WeekendReview'}else{'WeekdayReview'}
+  $basis=if($d -lt $a){'PriorEveningDependency'}else{'WeekdayReview'}
   $dates.Add([pscustomobject]@{Contract=$c.Contract;RawFileDate=$label;Basis=$basis;TickLastFiles=$t;MinuteLastFiles=$m;Status=$status})
-  if($status -ne 'FILES_PRESENT_CONTENT_UNVERIFIED' -and $basis -ne 'WeekendReview') {Issue $status "$($c.Contract) raw filename date $label ($basis); verify ET mapping and exchange calendar."}
+  if($status -ne 'FILES_PRESENT_CONTENT_UNVERIFIED') {Issue $status "$($c.Contract) raw filename date $label ($basis); verify ET mapping and exchange calendar."}
  }
 }
 SaveCsv $inventory 'inventory.csv' @('Machine','RelativePath','Contract','Interval','PriceType','FileDate','RawStamp','Bytes','LastWriteUtc','SHA256','Problem')
@@ -241,6 +244,8 @@ NCD files are checked for names/size/readability, NOT decoded or certified.
 Filename dates are raw storage labels, not ET session dates. Weekday absence
 is a review finding, not proof of a missing trading session. Holidays/halts
 and early closes are NOT automatically removed. Verify the CME product calendar.
+Saturday/Sunday dates are excluded from dates.csv and the download checklist.
+Sunday evening records remain in inventory and Monday overnight export checks.
 Contract windows preserve your allocation (ES/NQ September 2026 capped at
 2026-09-17); later dates are flagged unassigned. Supply ContractsCsv to extend.
 Window overlap on disk is legitimate. No source file is moved or deleted.
@@ -260,9 +265,7 @@ $downloadChecklist = @(
   $intervals = if ($row.TickLastFiles -eq 0 -and $row.MinuteLastFiles -eq 0) {
    'Tick + Minute'
   } elseif ($row.TickLastFiles -eq 0) { 'Tick' } else { 'Minute' }
-  $action = if ($row.Basis -eq 'WeekendReview') {
-   'REVIEW weekend/session'
-  } elseif ($row.Basis -eq 'PriorEveningDependency') {
+  $action = if ($row.Basis -eq 'PriorEveningDependency') {
    'REVIEW prior evening'
   } else { 'DOWNLOAD / verify holiday' }
   [pscustomobject]@{
@@ -279,7 +282,8 @@ $checklistText = @(
  'MISSING DATA - DOWNLOAD CHECKLIST'
  'Select the contract, listed date, interval(s), and Last in Historical Data > Download.'
  'Dates below are raw file dates. Check ET coverage on adjacent dates when downloading.'
- 'Holiday/weekend absence may be normal. Check issues.csv for read errors before downloading.'
+ 'Saturday/Sunday dates excluded. Holiday absence may be normal; verify the exchange calendar.'
+ 'Sunday evening data can still be required for Monday overnight ranges. Check issues.csv for read errors.'
  'No source data is changed and no download is submitted by this script.'
  ''
 )
