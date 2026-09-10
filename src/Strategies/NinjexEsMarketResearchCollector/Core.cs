@@ -74,7 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexEsMarketResearchCollector : Strategy
     {
-        private const string CollectorVersion = "1.0.0";
+        private const string CollectorVersion = "1.1.0";
 
         private const int ContextSeriesIndex = 0;
         private const int MinuteSeriesIndex = 1;
@@ -1464,6 +1464,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             ] =
                 activeTickStats;
 
+            // The minute-series callback can precede tick-bucket finalization.
+            // Backfill only that observation's exact bucket, before cache pruning.
+            foreach (var tracker in activeForwardObservations)
+            {
+                if (!tracker.Row.TickStatsAvailable &&
+                    TruncateMinute(tracker.Row.Time).AddMinutes(-1) == activeTickStats.Minute)
+                    PopulateTickStatistics(tracker.Row, tracker.Row.Time);
+            }
+
 
             //
             // Only retain a small rolling window.
@@ -1492,30 +1501,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             MarketObservation row,
             DateTime barTime)
         {
-            TickMinuteStats stats = null;
-
-            var key =
-                TruncateMinute(
-                    barTime);
-
-
-            if (!completedTickStats.TryGetValue(
-                    key,
-                    out stats))
-            {
-                //
-                // Depending on NT timestamp convention, the
-                // completed minute may be labelled one minute later.
-                //
-                completedTickStats.TryGetValue(
-                    key.AddMinutes(-1),
-                    out stats);
-            }
-
-
-            if (stats == null)
+            // NT minute bars are end-stamped; tick buckets are start-stamped.
+            // A bar labelled 09:36 must use only the 09:35 tick bucket.
+            var key = TruncateMinute(barTime).AddMinutes(-1);
+            TickMinuteStats stats;
+            if (!completedTickStats.TryGetValue(key, out stats))
                 return;
 
+            row.TickStatsAvailable = true;
 
             row.TickStatsMinute =
                 stats.Minute;
@@ -1591,6 +1584,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
 
+                // Do not let elapsed time hide a missing minute or let a later
+                // bar populate an earlier horizon. Retain horizons completed
+                // before the gap, but terminate the remaining path as incomplete.
+                var expectedTime = tracker.Row.Time.AddMinutes(tracker.MinutesObserved + 1);
+                if (barTime != expectedTime)
+                {
+                    tracker.Row.ForwardComplete = false;
+                    tracker.Row.ForwardFinalizeReason = barTime > expectedTime
+                        ? "ForwardMinuteGap"
+                        : "ForwardMinuteOutOfOrder";
+                    tracker.Row.ForwardMinutesObserved = tracker.MinutesObserved;
+                    WriteObservation(tracker.Row);
+                    activeForwardObservations.RemoveAt(i);
+                    continue;
+                }
+
                 tracker.Update(
                     high,
                     low,
@@ -1617,7 +1626,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         true;
 
                     tracker.Row.ForwardMinutesObserved =
-                        elapsedMinutes;
+                        tracker.MinutesObserved;
 
                     WriteObservation(
                         tracker.Row);
@@ -2116,6 +2125,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "CollectorVersion",
                 CollectorVersion);
 
+            WriteManifestValue("TimestampConvention", "US Eastern; minute bars end-stamped; tick buckets start-stamped");
+            WriteManifestValue("RthEndTime", RthEndTime);
+            WriteManifestValue("PriorCloseDefinition", "Last available minute close strictly before RthEndTime; 15:59 with complete data and RthEndTime=160000");
+            WriteManifestValue("SessionBoundaryPolicy", "Legacy baseline retained: MarketOpenTime inclusive; RthEndTime exclusive");
+            WriteManifestValue("TickMinuteMapping", "Exact bar close minus one minute; finalized buckets only; no fallback");
+            WriteManifestValue("TickStatsAvailableMeaning", "Exact bucket found; does not certify that every tick was received");
+            WriteManifestValue("ForwardCoveragePolicy", "Contiguous one-minute timestamps required; terminate at first gap or out-of-order bar; retain earlier completed horizons");
+            WriteManifestValue("ForwardIncompleteReasons", "ForwardMinuteGap; ForwardMinuteOutOfOrder; RthEnd; NewTradingDate; StrategyTerminated");
+
             WriteManifestValue(
                 "Instrument",
                 Instrument?.FullName
@@ -2296,7 +2314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 +
                 "SweepAbovePremarketHighAndCloseBelow,"
                 +
-                "TickStatsMinute,TickCount,UpTicks,DownTicks,UnchangedTicks,"
+                "TickStatsAvailable,TickStatsMinute,TickCount,UpTicks,DownTicks,UnchangedTicks,"
                 +
                 "UpTickPercent,TickRangeTicks,TickNetChangeTicks,"
                 +
@@ -2463,6 +2481,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Bool(
                         r.SweepAbovePremarketHighAndCloseBelow),
 
+                    Bool(r.TickStatsAvailable),
                     DateTimeValue(r.TickStatsMinute),
                     r.TickCount.ToString(Inv),
                     r.UpTicks.ToString(Inv),
@@ -3190,6 +3209,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public bool SweepAbovePremarketHighAndCloseBelow;
 
+
+            public bool TickStatsAvailable;
 
             public DateTime TickStatsMinute =
                 Core.Globals.MinDate;
