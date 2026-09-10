@@ -74,11 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.0";
-
-        // Regular RTH close in ET. ETH bars after this time must not
-        // overwrite the prior-day reference, even if FlattenTime changes.
-        private const int RegularRthCloseTime = 160000;
+        private const string StrategyVersion = "1.2.1";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -1209,11 +1205,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             double currentBarOpen,
             double completedClose)
         {
-            // Minute bars are end-stamped. Include the bar ending at 16:00
-            // (15:59-16:00), but exclude subsequent ETH bars. Updating this
-            // reference is independent of the strategy's flatten cutoff.
+            // Preserve the Run 2 reference boundary for the controlled loss-limit
+            // comparison: only completed bars strictly before FlattenTime count.
+            // With FlattenTime=160000 and complete minute data, the final
+            // reference is the 15:59 close, not the official 16:00 RTH close.
             if (timeValue < MarketOpenTime
-                || timeValue > RegularRthCloseTime)
+                || timeValue >= FlattenTime)
             {
                 return;
             }
@@ -1272,14 +1269,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 currentRthLastClose =
                     completedClose;
 
-                if (timeValue == RegularRthCloseTime)
-                {
-                    Diagnostic(
-                        signalTime,
-                        "RTH CLOSE CAPTURED Date={0:yyyy-MM-dd} Close={1}",
-                        signalTime.Date,
-                        currentRthLastClose);
-                }
             }
         }
 
