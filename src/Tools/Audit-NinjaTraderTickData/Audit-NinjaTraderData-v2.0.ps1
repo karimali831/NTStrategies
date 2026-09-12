@@ -1,14 +1,14 @@
 ﻿#requires -Version 5.1
 <#
-Audit-NinjaTraderData-v2.0.ps1 -- READ ONLY. No downloads/deletes/database writes.
+Audit-NinjaTraderData-v2.1.ps1 -- READ ONLY. No downloads/deletes/database writes.
 
 FOCUSED CHECK (candidate filename mapping; independent exports recommended):
- .\Audit-NinjaTraderData-v2.0.ps1 -Symbols ES -From '2026-08-27' -To '2026-09-01'
+ .\Audit-NinjaTraderData-v2.1.ps1 -Symbols ES -From '2026-08-27' -To '2026-09-01'
 
 IMPORTANT: filenames alone cannot establish their timezone or start/end label.
-UTC / Start are candidate defaults. Verify using a known file's actual contents
+ET / End are inferred defaults from your supplied inventory and UI examples. Verify using a known file's actual contents
 and NT's Historical Data timestamps. Then supply the verified values, e.g.:
- -NcdTimeZoneId 'UTC' -TickFileHourLabel Start -ConfirmNcdMapping
+ -NcdTimeZoneId 'Eastern Standard Time' -TickFileHourLabel End -ConfirmNcdMapping
 MinuteFileDateLabel defaults to CloseDate; use BarStartDate only if independently
 verified (this affects the midnight bar's daily container).
 For ET filenames use 'Eastern Standard Time' on Windows. Do not equate the chart
@@ -39,7 +39,9 @@ US bank-holiday list. No holiday exclusions are guessed. All scope is ET/DST awa
 Optional ContractsCsv: Contract,From,To (yyyy-MM-dd). Defaults preserve your ES/NQ
 research allocation, not official roll dates. Same-contract warm-up is required.
 Optional -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'.
-Outputs: required-files.csv, required-sessions.csv, inventory.csv, sessions.csv,
+v2.1 changes: ET/end inferred mapping; extra warm-up findings separated; positive
+file coverage shown per session/contract. Content verification remains separate.
+Outputs: coverage-summary.csv, file-session-summary.csv, warmup-review.csv, required-files.csv, required-sessions.csv, inventory.csv, sessions.csv,
 exports.csv, gaps.csv, issues.csv, download-checklist.csv/txt, summary.txt.
 New uniquely named report folder every run. No COMPLETE / READY certification.
 Historical db/tick and db/minute only; db/replay Market Replay files not validated.
@@ -56,15 +58,15 @@ param(
  [switch]$HashFiles,
  [ValidateSet('ES','NQ')][string[]]$Symbols = @('ES','NQ'),
  [ValidateRange(0,30)][int]$WarmupSessions = 3,
- [string]$NcdTimeZoneId = 'UTC',
- [ValidateSet('Start','End')][string]$TickFileHourLabel = 'Start',
+ [string]$NcdTimeZoneId = 'Eastern Standard Time',
+ [ValidateSet('Start','End')][string]$TickFileHourLabel = 'End',
  [ValidateSet('CloseDate','BarStartDate')][string]$MinuteFileDateLabel = 'CloseDate',
  [switch]$ConfirmNcdMapping,
  [string]$ClosuresCsv
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Write-Host 'NinjaTrader Data Audit v2.0 - hourly tick checks + minute content gaps + overnight dependencies' -ForegroundColor Cyan
+Write-Host 'NinjaTrader Data Audit v2.1 - hourly tick checks + minute content gaps + overnight dependencies' -ForegroundColor Cyan
 $ci = [Globalization.CultureInfo]::InvariantCulture
 try { $et = [TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time') }
 catch { $et = [TimeZoneInfo]::FindSystemTimeZoneById('America/New_York') }
@@ -156,10 +158,13 @@ if($CompareInventory) {
 
 # NCD storage mapping is explicit and is NEVER automatically certified from names.
 # Confirm against a known hourly file and NT's Historical Data view before using
-# -ConfirmNcdMapping. UTC/start are candidate defaults, not an undocumented guarantee.
+# -ConfirmNcdMapping. ET/end defaults match this supplied inventory; other installations need verification.
 try {$storageZone=[TimeZoneInfo]::FindSystemTimeZoneById($NcdTimeZoneId)}
-catch {throw "Unknown NcdTimeZoneId: $NcdTimeZoneId"}
-$mappingStatus=if($ConfirmNcdMapping){'USER_CONFIRMED'}else{'UNCONFIRMED_CANDIDATE'}
+catch {
+ if($NcdTimeZoneId -eq 'Eastern Standard Time'){$storageZone=[TimeZoneInfo]::FindSystemTimeZoneById('America/New_York')}
+ else {throw "Unknown NcdTimeZoneId: $NcdTimeZoneId"}
+}
+$mappingStatus=if($ConfirmNcdMapping){'USER_CONFIRMED'}else{'INFERRED_MAPPING_NOT_CONTENT_VERIFIED'}
 if(-not $ConfirmNcdMapping){Write-Warning 'NCD mapping is unconfirmed: hourly filename findings are candidates. Native UTC text exports provide the independent content check. See script help.'}
 $closures=@()
 if($ClosuresCsv){
@@ -206,7 +211,9 @@ foreach($r in $inventory){
  $healthy[$r.RelativePath]=$true
 }
 $requirements=@{}
+$sessionFiles=[Collections.Generic.List[object]]::new()
 foreach($w in $windows){
+ $windowKeys=@{tick=[Collections.Generic.HashSet[string]]::new();minute=[Collections.Generic.HashSet[string]]::new()}
  # Iterate minutes so partial-hour exchange closures and storage-day boundaries
  # do not accidentally suppress an entire required hour. Normal window is 23h.
  for($t=$w.Start;$t -lt $w.End;$t=$t.AddMinutes(1)){
@@ -218,22 +225,31 @@ foreach($w in $windows){
   foreach($interval in @('tick','minute')){
    $file=if($interval -eq 'tick'){$hour.ToString('yyyyMMddHHmm')+'.Last.ncd'}else{$minuteClose.ToString('yyyyMMdd')+'.Last.ncd'}
    $key="$interval/$($w.Contract)/$file"
+   [void]$windowKeys[$interval].Add($key)
    if(-not $requirements.ContainsKey($key)){
     $requirements[$key]=[pscustomobject]@{Contract=$w.Contract;Interval=$interval;DataType='Last';ExpectedRelativePath=$key;RequiredFromET=$t;RequiredThroughET=$t.AddMinutes(1);FirstSessionET=$w.DateET;Basis=$w.Basis;Mapping=$mappingStatus;Status=$(if($healthy.ContainsKey($key)){'FILE_PRESENT_CONTENT_UNVERIFIED'}else{'FILE_ABSENT_OR_UNREADABLE'})}
    }else{
     $r=$requirements[$key]
+    if($w.Basis -eq 'AssignedTradingDay'){$r.Basis='AssignedTradingDay'}
     if($t -lt $r.RequiredFromET){$r.RequiredFromET=$t}
     if($t.AddMinutes(1) -gt $r.RequiredThroughET){$r.RequiredThroughET=$t.AddMinutes(1)}
    }
   }
  }
+ foreach($interval in @('tick','minute')){
+  $found=0
+  foreach($key in $windowKeys[$interval]){if($healthy.ContainsKey($key)){$found++}}
+  $expected=$windowKeys[$interval].Count
+  $sessionFiles.Add([pscustomobject]@{Contract=$w.Contract;SessionET=$w.DateET;Basis=$w.Basis;Interval=$interval;ExpectedFiles=$expected;PresentFiles=$found;MissingFiles=($expected-$found);Mapping=$mappingStatus;Status=$(if($expected -eq 0){'EXCLUDED_BY_CALENDAR'}elseif($found -eq $expected){'ALL_EXPECTED_FILES_PRESENT_CONTENT_UNVERIFIED'}else{'FILE_GAPS_REVIEW_MAPPING_AND_CALENDAR'})})
+ }
 }
+SaveCsv $sessionFiles 'file-session-summary.csv' @('Contract','SessionET','Basis','Interval','ExpectedFiles','PresentFiles','MissingFiles','Mapping','Status')
 $fileChecks=@($requirements.Values | Sort-Object -Property @('Contract','RequiredFromET','Interval'))
 SaveCsv $fileChecks 'required-files.csv' @('Contract','Interval','DataType','ExpectedRelativePath','RequiredFromET','RequiredThroughET','FirstSessionET','Basis','Mapping','Status')
 $actions=[Collections.Generic.List[object]]::new()
 foreach($r in $fileChecks){
  if($r.Status -eq 'FILE_PRESENT_CONTENT_UNVERIFIED'){continue}
- $actions.Add([pscustomobject]@{Contract=$r.Contract;Interval=$r.Interval;DataType='Last';FromET=$r.RequiredFromET;ThroughET=$r.RequiredThroughET;Reason='Missing or unreadable NCD container';Action=$(if($ConfirmNcdMapping){'DOWNLOAD / CHECK CALENDAR'}else{'VERIFY FILENAME MAPPING THEN DOWNLOAD'});File=$r.ExpectedRelativePath})
+ $actions.Add([pscustomobject]@{Contract=$r.Contract;Interval=$r.Interval;Basis=$r.Basis;DataType='Last';FromET=$r.RequiredFromET;ThroughET=$r.RequiredThroughET;Reason='Missing or unreadable NCD container';Action=$(if($ConfirmNcdMapping){'DOWNLOAD / CHECK CALENDAR'}else{'VERIFY FILENAME MAPPING THEN DOWNLOAD'});File=$r.ExpectedRelativePath})
 }
 $exportStats=[Collections.Generic.List[object]]::new()
 $sessions=[Collections.Generic.List[object]]::new()
@@ -314,23 +330,26 @@ foreach($group in ($gaps | Group-Object -Property @('Contract','Interval'))){
  foreach($g in $ordered){
   $t=[datetime]::ParseExact($g.MissingMinuteCloseET,'yyyy-MM-dd HH:mm:ss',$ci)
   if($null -ne $end -and $t -eq $end.AddMinutes(1)){$end=$t;continue}
-  if($null -ne $start){$actions.Add([pscustomobject]@{Contract=$contract;Interval=$interval;DataType='Last';FromET=$start.AddMinutes(-1);ThroughET=$end;Reason='No valid exported records in minute buckets';Action='VERIFY EXPORT SCOPE / CALENDAR; RE-DOWNLOAD IF MISSING';File=''})}
+  if($null -ne $start){$actions.Add([pscustomobject]@{Contract=$contract;Interval=$interval;Basis=$group.Group[0].Basis;DataType='Last';FromET=$start.AddMinutes(-1);ThroughET=$end;Reason='No valid exported records in minute buckets';Action='VERIFY EXPORT SCOPE / CALENDAR; RE-DOWNLOAD IF MISSING';File=''})}
   $start=$t;$end=$t;$contract=$g.Contract;$interval=$g.Interval
  }
- if($null -ne $start){$actions.Add([pscustomobject]@{Contract=$contract;Interval=$interval;DataType='Last';FromET=$start.AddMinutes(-1);ThroughET=$end;Reason='No valid exported records in minute buckets';Action='VERIFY EXPORT SCOPE / CALENDAR; RE-DOWNLOAD IF MISSING';File=''})}
+ if($null -ne $start){$actions.Add([pscustomobject]@{Contract=$contract;Interval=$interval;Basis=$group.Group[0].Basis;DataType='Last';FromET=$start.AddMinutes(-1);ThroughET=$end;Reason='No valid exported records in minute buckets';Action='VERIFY EXPORT SCOPE / CALENDAR; RE-DOWNLOAD IF MISSING';File=''})}
 }
 SaveCsv $exportStats 'exports.csv' @('Contract','Interval','Path','Rows','BadRows','OutOfOrder','DuplicateMinuteBuckets','FirstUtc','LastUtc')
 SaveCsv $sessions 'sessions.csv' @('Contract','DateET','Basis','Interval','ExpectedMinutes','PresentMinutes','MissingMinutes','Status')
 SaveCsv $gaps 'gaps.csv' @('Contract','Interval','SessionET','Basis','Window','MissingMinuteCloseET')
 $checklist=@($actions | Sort-Object -Property @('Contract','FromET','Interval') | ForEach-Object {
- [pscustomobject]@{Contract=$_.Contract;DownloadFromET=$_.FromET.ToString('yyyy-MM-dd');DownloadThroughET=$_.ThroughET.ToString('yyyy-MM-dd');MissingFromET=$_.FromET.ToString('yyyy-MM-dd HH:mm');MissingThroughET=$_.ThroughET.ToString('yyyy-MM-dd HH:mm');SelectIntervals=$_.Interval;SelectDataType=$_.DataType;Action=$_.Action;Reason=$_.Reason;ExpectedRelativePath=$_.File}
+ [pscustomobject]@{Contract=$_.Contract;Basis=$_.Basis;DownloadFromET=$_.FromET.ToString('yyyy-MM-dd');DownloadThroughET=$_.ThroughET.ToString('yyyy-MM-dd');MissingFromET=$_.FromET.ToString('yyyy-MM-dd HH:mm');MissingThroughET=$_.ThroughET.ToString('yyyy-MM-dd HH:mm');SelectIntervals=$_.Interval;SelectDataType=$_.DataType;Action=$_.Action;Reason=$_.Reason;ExpectedRelativePath=$_.File}
 })
+$warmupChecklist=@($checklist | Where-Object Basis -eq 'WarmupDependency')
+$checklist=@($checklist | Where-Object Basis -ne 'WarmupDependency')
+SaveCsv $warmupChecklist 'warmup-review.csv' @('Contract','Basis','DownloadFromET','DownloadThroughET','MissingFromET','MissingThroughET','SelectIntervals','SelectDataType','Action','Reason','ExpectedRelativePath')
 SaveCsv $checklist 'download-checklist.csv' @('Contract','DownloadFromET','DownloadThroughET','MissingFromET','MissingThroughET','SelectIntervals','SelectDataType','Action','Reason','ExpectedRelativePath')
 SaveCsv $issues 'issues.csv' @('Scope','Detail')
 $display=@(
- 'MISSING DATA / REVIEW CHECKLIST - v2.0'
+ 'MISSING DATA / REVIEW CHECKLIST - v2.1'
  'All download dates and missing intervals below are Eastern Time; convert if NT uses another display timezone.'
- 'Sunday evening and earlier warm-up dependencies ARE included. Weekends are not trading days.'
+ 'Required prior evenings (including Sunday for Monday) are included. Extra warm-up history is separate in warmup-review.csv.'
  "NCD storage mapping: $NcdTimeZoneId / $TickFileHourLabel / minute-$MinuteFileDateLabel / $mappingStatus"
  'Review exchange closures and export scope before downloading; no data is changed.'
  ''
@@ -339,10 +358,20 @@ if($checklist.Count){$display+=($checklist | Format-Table -Property @('Contract'
 else{$display+='No missing containers or exported minute buckets detected within configured scope. This is NOT a certification of every tick or of strategy readiness.'}
 $display | Set-Content -LiteralPath (Join-Path $run 'download-checklist.txt') -Encoding UTF8
 $display | ForEach-Object {Write-Host $_}
+Write-Host 'FILE COVERAGE BY CONTRACT - assigned trading sessions only; content is still unverified' -ForegroundColor Cyan
+$coverage=@(foreach($c in $contracts){
+ $ticks=@($sessionFiles | Where-Object {$_.Contract -eq $c.Contract -and $_.Basis -eq 'AssignedTradingDay' -and $_.Interval -eq 'tick'})
+ $minutes=@($sessionFiles | Where-Object {$_.Contract -eq $c.Contract -and $_.Basis -eq 'AssignedTradingDay' -and $_.Interval -eq 'minute'})
+ if($ticks.Count -eq 0){continue}
+ [pscustomobject]@{Contract=$c.Contract;Sessions=$ticks.Count;TickFilesAllPresent=@($ticks | Where-Object Status -eq 'ALL_EXPECTED_FILES_PRESENT_CONTENT_UNVERIFIED').Count;TickSessionsWithGaps=@($ticks | Where-Object {$_.MissingFiles -gt 0}).Count;MinuteFilesAllPresent=@($minutes | Where-Object Status -eq 'ALL_EXPECTED_FILES_PRESENT_CONTENT_UNVERIFIED').Count}
+})
+$coverage | Format-Table -AutoSize | Out-Host
+SaveCsv $coverage 'coverage-summary.csv' @('Contract','Sessions','TickFilesAllPresent','TickSessionsWithGaps','MinuteFilesAllPresent')
+Write-Host "Additional warm-up review rows: $($warmupChecklist.Count). These are not reassigned trading dates." -ForegroundColor Yellow
 $unverified=@($sessions | Where-Object Status -eq 'NOT_EXPORTED_CONTENT_UNVERIFIED').Count
 Write-Host "Sessions/intervals without content exports: $unverified. See sessions.csv; file presence is not completeness." -ForegroundColor Yellow
 @"
-NinjaTrader data audit v2.0 - $(Get-Date -Format o)
+NinjaTrader data audit v2.1 - $(Get-Date -Format o)
 Database: $DbRoot
 Requested ET trading dates: $($From.ToString('yyyy-MM-dd')) through $($To.ToString('yyyy-MM-dd'))
 Symbols: $($Symbols -join ','). Warm-up sessions per contract: $WarmupSessions
@@ -352,14 +381,16 @@ Calendar overrides: $ClosuresCsv. Bank holidays are NOT silently excluded.
 Full ETH context is checked conservatively, including 16:00-17:00 for indicators.
 Warm-up is configurable, NOT proof of EMA convergence or exact live initialization.
 NCD mapping: $NcdTimeZoneId / $TickFileHourLabel / minute-$MinuteFileDateLabel / $mappingStatus
-UTC/start filename mapping is only a candidate default unless independently confirmed.
+ET/end mapping is inferred from supplied inventory, not certified from binary records.
 required-files.csv lists every expected hourly tick and daily minute container.
 Present files are CONTENT_UNVERIFIED; NCD binary contents are not decoded.
 Native UTC Last exports provide separate one-minute occupancy and OHLC checks.
 Exports supplied: $ExportManifest
 Sessions/intervals without exports: $unverified
 Missing/review checklist rows: $($checklist.Count)
-File and export findings both appear in download-checklist.csv/txt.
+Assigned-session file/export findings appear in download-checklist.csv/txt.
+Extra warm-up findings appear separately in warmup-review.csv.
+coverage-summary.csv and file-session-summary.csv show positive file coverage.
 Absent ticks in a minute may mean inactivity, a halt, missing source data, or export
 scope that did not include the window. Verify before treating it as a source hole.
 One tick in a minute does not prove ALL ticks exist. Minute OHLC consistency with
