@@ -1,9 +1,9 @@
 ﻿#requires -Version 5.1
 <#
-Audit-NinjaTraderData-v2.1.ps1 -- READ ONLY. No downloads/deletes/database writes.
+Audit-NinjaTraderData-v2.2.ps1 -- READ ONLY. No downloads/deletes/database writes.
 
 FOCUSED CHECK (candidate filename mapping; independent exports recommended):
- .\Audit-NinjaTraderData-v2.1.ps1 -Symbols ES -From '2026-08-27' -To '2026-09-01'
+ .\Audit-NinjaTraderData-v2.2.ps1 -Symbols ES -From '2026-08-27' -To '2026-09-01'
 
 IMPORTANT: filenames alone cannot establish their timezone or start/end label.
 ET / End are inferred defaults from your supplied inventory and UI examples. Verify using a known file's actual contents
@@ -30,16 +30,24 @@ WarmupSessions defaults to 3 prior weekdays per contract (configurable 0..30).
 required-sessions.csv gives exact scope to export. This conservative lookback does
 not guarantee EMA convergence or duplicate every strategy initialization setting.
 Normal scope covers each session's previous 18:00 to 17:00 ET, including Sunday
-for Monday. Saturday/Sunday are not session dates. Daily 17:00-18:00 excluded.
-Optional ClosuresCsv contains explicit non-trading half-open ET intervals:
- StartET,EndET,Reason
-Use yyyy-MM-dd HH:mm. Supply verified CME product closures/early closes, not a
-US bank-holiday list. No holiday exclusions are guessed. All scope is ET/DST aware.
+for Monday. Built-in closures cover ES/NQ holidays in Sep 15 2025-Sep 11 2026.
+Only the closed portion is excluded: pre-close and evening reopen data stays required.
+Sources and exact ET times are saved in calendar-closures.csv each run.
+-NoBuiltInClosures disables this preset. -ClosuresCsv appends verified intervals:
+ StartET,EndET,Reason,Source
+Use yyyy-MM-dd HH:mm. Source is optional for user CSVs. Never add a whole bank
+holiday unless equity futures were actually closed for that entire interval.
+AvailableFromET defaults to 2025-09-15 00:00 based on your reported provider limit.
+Earlier missing data moves to unavailable-history.csv, but coverage remains
+incomplete for sessions that depend on it. Use -AvailableFromET to change it.
+The November 2025 CME outage is not auto-excluded without exact verified boundaries.
 
 Optional ContractsCsv: Contract,From,To (yyyy-MM-dd). Defaults preserve your ES/NQ
 research allocation, not official roll dates. Same-contract warm-up is required.
 Optional -HashFiles -CompareInventory 'C:\AuditPC\inventory.csv'.
-v2.1 changes: ET/end inferred mapping; extra warm-up findings separated; positive
+v2.2 changes: sourced closed-period exclusions; provider availability reporting;
+fixed export-gap grouping by warmup/assigned basis; wider console summary.
+ET/end inferred mapping; extra warm-up findings separated; positive
 file coverage shown per session/contract. Content verification remains separate.
 Outputs: coverage-summary.csv, file-session-summary.csv, warmup-review.csv, required-files.csv, required-sessions.csv, inventory.csv, sessions.csv,
 exports.csv, gaps.csv, issues.csv, download-checklist.csv/txt, summary.txt.
@@ -62,11 +70,13 @@ param(
  [ValidateSet('Start','End')][string]$TickFileHourLabel = 'End',
  [ValidateSet('CloseDate','BarStartDate')][string]$MinuteFileDateLabel = 'CloseDate',
  [switch]$ConfirmNcdMapping,
- [string]$ClosuresCsv
+ [string]$ClosuresCsv,
+ [switch]$NoBuiltInClosures,
+ [datetime]$AvailableFromET = '2025-09-15 00:00' 
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Write-Host 'NinjaTrader Data Audit v2.1 - hourly tick checks + minute content gaps + overnight dependencies' -ForegroundColor Cyan
+Write-Host 'NinjaTrader Data Audit v2.2 - hourly tick checks + minute content gaps + overnight dependencies' -ForegroundColor Cyan
 $ci = [Globalization.CultureInfo]::InvariantCulture
 try { $et = [TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time') }
 catch { $et = [TimeZoneInfo]::FindSystemTimeZoneById('America/New_York') }
@@ -166,15 +176,40 @@ catch {
 }
 $mappingStatus=if($ConfirmNcdMapping){'USER_CONFIRMED'}else{'INFERRED_MAPPING_NOT_CONTENT_VERIFIED'}
 if(-not $ConfirmNcdMapping){Write-Warning 'NCD mapping is unconfirmed: hourly filename findings are candidates. Native UTC text exports provide the independent content check. See script help.'}
-$closures=@()
-if($ClosuresCsv){
- $closures=@(foreach($r in (Import-Csv -LiteralPath $ClosuresCsv)){
-  $cs=[datetime]::ParseExact($r.StartET,'yyyy-MM-dd HH:mm',$ci)
-  $ce=[datetime]::ParseExact($r.EndET,'yyyy-MM-dd HH:mm',$ci)
-  if($ce -le $cs){throw 'Closure EndET must follow StartET.'}
-  [pscustomobject]@{Start=$cs;End=$ce;Reason=$r.Reason}
- })
+# Versioned ES/NQ equity schedule for this research period only.
+# All timestamps below are ET, converted from the cited CT notices. These are
+# CLOSED intervals, not dates on which we disable trading for an entire day.
+# No outage interval or future-year holiday is guessed.
+$calendarRaw=@()
+if(-not $NoBuiltInClosures){
+ $calendarRaw=@(@'
+StartET,EndET,Reason,Source
+2025-11-27 13:00,2025-11-27 18:00,Thanksgiving equity halt,https://www.ampfutures.com/news/holiday-trading-schedule-thanksgiving
+2025-11-28 13:15,2025-11-28 17:00,Post-Thanksgiving equity early close,https://www.ampfutures.com/news/holiday-trading-schedule-thanksgiving
+2025-12-24 13:15,2025-12-25 18:00,Christmas equity close and holiday,https://www.ampfutures.com/news/christmas-holiday-trading-schedule
+2025-12-31 17:00,2026-01-01 18:00,New Year equity holiday,https://www.ampfutures.com/news/new-year-holiday-trading-schedule
+2026-01-19 13:00,2026-01-19 18:00,MLK equity halt,https://www.ironbeam.com/dr-martin-luther-king-jr-holiday-trading-schedule/
+2026-02-16 13:00,2026-02-16 18:00,Presidents Day equity halt,https://www.ampfutures.com/news/holiday-trading-schedule-presidents-day
+2026-04-03 09:15,2026-04-03 17:00,Good Friday equity early close,https://community.optimusfutures.com/t/notice-good-friday-easter-holiday-schedule-april-3rd-2026/11698
+2026-05-25 13:00,2026-05-25 18:00,Memorial Day equity halt,https://www.ironbeam.com/memorial-day-2026-futures-trading-hours/
+2026-06-19 13:00,2026-06-19 17:00,Juneteenth equity early close,https://www.ironbeam.com/juneteenth-2026-futures-trading-schedule/
+2026-07-03 13:00,2026-07-03 17:00,Independence Day equity early close,https://www.ironbeam.com/independence-day-2026-futures-trading-schedule/
+2026-09-07 13:00,2026-09-07 18:00,Labor Day equity halt,https://edgeclear.com/exchange-holiday-hours/
+'@ | ConvertFrom-Csv)
+ if($From -lt [datetime]'2025-09-15' -or $To -gt [datetime]'2026-09-11'){
+  Issue 'CalendarScopeReview' 'Built-in holiday coverage only 2025-09-15 through 2026-09-11. Add verified ClosuresCsv for other dates.'
+ }
 }
+if($ClosuresCsv){$calendarRaw+=@(Import-Csv -LiteralPath $ClosuresCsv)}
+$closures=@(foreach($r in $calendarRaw){
+ $cs=[datetime]::ParseExact($r.StartET,'yyyy-MM-dd HH:mm',$ci)
+ $ce=[datetime]::ParseExact($r.EndET,'yyyy-MM-dd HH:mm',$ci)
+ if($ce -le $cs){throw 'Closure EndET must follow StartET.'}
+ $source=if($r.PSObject.Properties.Name -contains 'Source'){$r.Source}else{'User supplied ClosuresCsv'}
+ [pscustomobject]@{Start=$cs;End=$ce;Reason=$r.Reason;Source=$source}
+})
+$calendarReport=@($closures | ForEach-Object {[pscustomobject]@{StartET=$_.Start.ToString('yyyy-MM-dd HH:mm');EndET=$_.End.ToString('yyyy-MM-dd HH:mm');Reason=$_.Reason;Source=$_.Source}})
+SaveCsv $calendarReport 'calendar-closures.csv' @('StartET','EndET','Reason','Source')
 function IsClosed([datetime]$t){
  foreach($cl in $closures){if($t -ge $cl.Start -and $t -lt $cl.End){return $true}}
  return $false
@@ -324,7 +359,7 @@ foreach($w in $windows){
  }
 }
 # Coalesce consecutive missing minutes. Do not hide gaps inside existing NCDs.
-foreach($group in ($gaps | Group-Object -Property @('Contract','Interval'))){
+foreach($group in ($gaps | Group-Object -Property @('Contract','Interval','Basis'))){
  $ordered=@($group.Group | Sort-Object MissingMinuteCloseET -Unique)
  $start=$null;$end=$null;$contract='';$interval=''
  foreach($g in $ordered){
@@ -338,6 +373,13 @@ foreach($group in ($gaps | Group-Object -Property @('Contract','Interval'))){
 SaveCsv $exportStats 'exports.csv' @('Contract','Interval','Path','Rows','BadRows','OutOfOrder','DuplicateMinuteBuckets','FirstUtc','LastUtc')
 SaveCsv $sessions 'sessions.csv' @('Contract','DateET','Basis','Interval','ExpectedMinutes','PresentMinutes','MissingMinutes','Status')
 SaveCsv $gaps 'gaps.csv' @('Contract','Interval','SessionET','Basis','Window','MissingMinuteCloseET')
+$unavailable=@($actions | Where-Object {$_.ThroughET -le $AvailableFromET} | ForEach-Object {
+ [pscustomobject]@{Contract=$_.Contract;Interval=$_.Interval;Basis=$_.Basis;FromET=$_.FromET.ToString('yyyy-MM-dd HH:mm');ThroughET=$_.ThroughET.ToString('yyyy-MM-dd HH:mm');Status='UNAVAILABLE_HISTORY_NOT_MARKET_CLOSURE';ExpectedRelativePath=$_.File}
+})
+SaveCsv $unavailable 'unavailable-history.csv' @('Contract','Interval','Basis','FromET','ThroughET','Status','ExpectedRelativePath')
+# Keep the original missing coverage counts. An unavailable dependency still means
+# the session is not fully supported, even though re-download cannot repair it.
+$actions=@($actions | Where-Object {$_.ThroughET -gt $AvailableFromET})
 $checklist=@($actions | Sort-Object -Property @('Contract','FromET','Interval') | ForEach-Object {
  [pscustomobject]@{Contract=$_.Contract;Basis=$_.Basis;DownloadFromET=$_.FromET.ToString('yyyy-MM-dd');DownloadThroughET=$_.ThroughET.ToString('yyyy-MM-dd');MissingFromET=$_.FromET.ToString('yyyy-MM-dd HH:mm');MissingThroughET=$_.ThroughET.ToString('yyyy-MM-dd HH:mm');SelectIntervals=$_.Interval;SelectDataType=$_.DataType;Action=$_.Action;Reason=$_.Reason;ExpectedRelativePath=$_.File}
 })
@@ -347,11 +389,12 @@ SaveCsv $warmupChecklist 'warmup-review.csv' @('Contract','Basis','DownloadFromE
 SaveCsv $checklist 'download-checklist.csv' @('Contract','DownloadFromET','DownloadThroughET','MissingFromET','MissingThroughET','SelectIntervals','SelectDataType','Action','Reason','ExpectedRelativePath')
 SaveCsv $issues 'issues.csv' @('Scope','Detail')
 $display=@(
- 'MISSING DATA / REVIEW CHECKLIST - v2.1'
+ 'MISSING DATA / REVIEW CHECKLIST - v2.2'
  'All download dates and missing intervals below are Eastern Time; convert if NT uses another display timezone.'
  'Required prior evenings (including Sunday for Monday) are included. Extra warm-up history is separate in warmup-review.csv.'
  "NCD storage mapping: $NcdTimeZoneId / $TickFileHourLabel / minute-$MinuteFileDateLabel / $mappingStatus"
- 'Review exchange closures and export scope before downloading; no data is changed.'
+ 'Verified scheduled closures are excluded; see calendar-closures.csv. Remaining gaps are not automatically holidays.'
+ "Unavailable history before $($AvailableFromET.ToString('yyyy-MM-dd HH:mm')) ET is separate in unavailable-history.csv. Coverage counts retain the missing dependencies."
  ''
 )
 if($checklist.Count){$display+=($checklist | Format-Table -Property @('Contract','MissingFromET','MissingThroughET','SelectIntervals','SelectDataType','Action') -AutoSize | Out-String -Width 230)}
@@ -365,19 +408,22 @@ $coverage=@(foreach($c in $contracts){
  if($ticks.Count -eq 0){continue}
  [pscustomobject]@{Contract=$c.Contract;Sessions=$ticks.Count;TickFilesAllPresent=@($ticks | Where-Object Status -eq 'ALL_EXPECTED_FILES_PRESENT_CONTENT_UNVERIFIED').Count;TickSessionsWithGaps=@($ticks | Where-Object {$_.MissingFiles -gt 0}).Count;MinuteFilesAllPresent=@($minutes | Where-Object Status -eq 'ALL_EXPECTED_FILES_PRESENT_CONTENT_UNVERIFIED').Count}
 })
-$coverage | Format-Table -AutoSize | Out-Host
+$coverage | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
 SaveCsv $coverage 'coverage-summary.csv' @('Contract','Sessions','TickFilesAllPresent','TickSessionsWithGaps','MinuteFilesAllPresent')
 Write-Host "Additional warm-up review rows: $($warmupChecklist.Count). These are not reassigned trading dates." -ForegroundColor Yellow
 $unverified=@($sessions | Where-Object Status -eq 'NOT_EXPORTED_CONTENT_UNVERIFIED').Count
 Write-Host "Sessions/intervals without content exports: $unverified. See sessions.csv; file presence is not completeness." -ForegroundColor Yellow
 @"
-NinjaTrader data audit v2.1 - $(Get-Date -Format o)
+NinjaTrader data audit v2.2 - $(Get-Date -Format o)
 Database: $DbRoot
 Requested ET trading dates: $($From.ToString('yyyy-MM-dd')) through $($To.ToString('yyyy-MM-dd'))
 Symbols: $($Symbols -join ','). Warm-up sessions per contract: $WarmupSessions
 Normal scope: previous calendar day 18:00 through session day 17:00 ET.
 Weekend trading dates excluded. Sunday evenings included for Monday.
-Calendar overrides: $ClosuresCsv. Bank holidays are NOT silently excluded.
+Built-in ES/NQ holiday intervals enabled: $(-not $NoBuiltInClosures). Additional closures: $ClosuresCsv.
+See calendar-closures.csv for exact closed intervals and sources. Open holiday hours remain required.
+AvailableFromET: $AvailableFromET. Missing earlier history is unavailable, NOT complete or closed.
+November 2025 exchange outage remains review-only; exact outage boundaries are not assumed.
 Full ETH context is checked conservatively, including 16:00-17:00 for indicators.
 Warm-up is configurable, NOT proof of EMA convergence or exact live initialization.
 NCD mapping: $NcdTimeZoneId / $TickFileHourLabel / minute-$MinuteFileDateLabel / $mappingStatus
