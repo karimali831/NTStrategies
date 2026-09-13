@@ -103,10 +103,12 @@ function SaveCsv($rows,$name,$columns) {
 if ($ContractsCsv) { $raw=@(Import-Csv -LiteralPath $ContractsCsv) }
 else {
  $raw=@(foreach($symbol in $Symbols) {
-  [pscustomobject]@{Contract="$symbol 12-25";From='2025-09-15';To='2025-12-18'}
-  [pscustomobject]@{Contract="$symbol 03-26";From='2025-12-19';To='2026-03-19'}
-  [pscustomobject]@{Contract="$symbol 06-26";From='2026-03-20';To='2026-06-11'}
-  [pscustomobject]@{Contract="$symbol 09-26";From='2026-06-12';To='2026-09-17'}
+  [pscustomobject]@{Contract="$symbol 12-25";From='2025-09-15';To='2025-12-12'}
+  [pscustomobject]@{Contract="$symbol 03-26";From='2025-12-15';To='2026-03-13'}
+  [pscustomobject]@{Contract="$symbol 06-26";From='2026-03-16';To='2026-06-12'}
+  [pscustomobject]@{Contract="$symbol 09-26";From='2026-06-15';To='2026-09-11'}
+  [pscustomobject]@{Contract="$symbol 12-26";From='2026-09-14';To='2026-12-11'}
+  [pscustomobject]@{Contract="$symbol 03-27";From='2026-12-14';To='2027-03-12'}
  })
 }
 $contracts=@(foreach($r in $raw) {
