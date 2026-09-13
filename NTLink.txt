@@ -1,0 +1,23 @@
+C:\Users\Administrator\Documents\NinjaTrader 8\bin\Custom\AddOns
+
+
+For templates
+mklink /J "C:\Users\administrator\Documents\NinjaTrader 8\templates\Strategy\NinjexOpeningVolumeProfileBreakout" "C:\Projects\NTStrategies\src\Strategies\NinjexOpeningVolumeProfileBreakout\Templates"
+
+
+mklink /J "C:\Users\administrator\Documents\NinjaTrader 8\bin\Custom\Strategies\Ninjex" "C:\Projects\NTStrategies\src\Strategies"
+mklink /J "C:\Users\administrator\Documents\NinjaTrader 8\bin\Custom\Indicators\Ninjex" "C:\Projects\NTStrategies\src\Indicators"
+mklink /J "C:\Users\administrator\Documents\NinjaTrader 8\bin\Custom\Strategies\Ninjex\API" "C:\Projects\NTStrategies\src\API"
+mklink /J "C:\Users\administrator\Documents\NinjaTrader 8\bin\Custom\Strategies\Ninjex\Shared" "C:\Projects\NTStrategies\src\Shared"
+
+For strategy engines
+mklink /J "C:\Users\Administrator\Documents\NinjaTrader 8\bin\Custom\AddOns\NinjexPremarketRange" "C:\Projects\NTStrategies\src\AddOns\NinjexPremarketRange"
+
+
+NT directories:
+C:\Users\administrator\Documents\NinjaTrader 8\templates\Strategy
+C:\Users\administrator\Documents\NinjaTrader 8\templates\Indicator
+
+
+dir "C:\Users\administrator\Documents\NinjaTrader 8\bin\Custom\Strategies" /AL
+dir "C:\Users\Administrator\Documents\NinjaTrader 8\bin\Custom\AddOns" /AL
