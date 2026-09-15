@@ -1,4 +1,4 @@
-﻿#region Using declarations
+#region Using declarations
 
 using System;
 using System.Collections.Generic;
@@ -74,20 +74,59 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexEsMarketResearchCollector : Strategy
     {
-        private const string CollectorVersion = "1.1.0";
+        private const string CollectorVersion = "1.2.0";
+
+        private const string CompatibleStrategy =
+            "NinjexOvernightEdgePortfolio";
+
+        private const string CompatibleStrategyVersion = "1.2.1";
+
+        private const string CompatiblePortfolioMode =
+            "FourModelResearchFiltered";
 
         private const int ContextSeriesIndex = 0;
         private const int MinuteSeriesIndex = 1;
         private const int TickSeriesIndex = 2;
 
+        private const int RequiredPrimaryMinutes = 5;
+        private const int ExpectedOvernightBars = 186;
+        private const int ExpectedPremarketBars = 78;
+
+        private const double PriorCloseMaximumRangeTicks = 30.0;
+        private const double PriorCloseMinimumOvernightWidthTicks = 200.0;
+        private const int PremarketHighMaximumMinutesFromOpen = 120;
+        private const double PremarketHighMinimumAtr5mTicks = 30.0;
+        private const int RthOpenMinimumMinutesFromOpen = 120;
+        private const double RthOpenMinimumPremarketWidthTicks = 140.0;
+        private const double PremarketLowMinimumAtr5mTicks = 20.0;
+
+        private const string PriorCloseModelName =
+            "Prior-day-close reclaim";
+
+        private const string PremarketHighModelName =
+            "Premarket-high sweep/rejection";
+
+        private const string RthOpenModelName =
+            "RTH-open breakdown";
+
+        private const string PremarketLowModelName =
+            "Premarket-low breakdown";
+
+        private const string PriorCloseEntrySignal = "PDC-RECLAIM-L";
+        private const string PremarketHighEntrySignal = "PMH-REJECT-S";
+        private const string RthOpenEntrySignal = "RTHOPEN-BREAK-S";
+        private const string PremarketLowEntrySignal = "PML-BREAK-S";
+
         private static readonly CultureInfo Inv =
             CultureInfo.InvariantCulture;
         
         private bool OvernightRangeComplete =>
-            sessionOvernightBars >= 186;
+            sessionOvernightRangeDate == activeRthDate
+            && sessionOvernightBars >= ExpectedOvernightBars;
 
         private bool PremarketRangeComplete =>
-            sessionPremarketBars >= 78;
+            sessionPremarketRangeDate == activeRthDate
+            && sessionPremarketBars >= ExpectedPremarketBars;
 
         private bool RangeDataComplete =>
             OvernightRangeComplete
@@ -157,12 +196,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double priorDayClose =
             double.NaN;
 
+        private DateTime priorDayDate =
+            Core.Globals.MinDate;
+
 
         private double sessionOvernightHigh =
             double.NaN;
 
         private double sessionOvernightLow =
             double.NaN;
+
+        private DateTime sessionOvernightRangeDate =
+            Core.Globals.MinDate;
 
         private DateTime sessionOvernightHighTime =
             Core.Globals.MinDate;
@@ -178,6 +223,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private double sessionPremarketLow =
             double.NaN;
+
+        private DateTime sessionPremarketRangeDate =
+            Core.Globals.MinDate;
 
         private DateTime sessionPremarketHighTime =
             Core.Globals.MinDate;
@@ -378,6 +426,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                if (BarsPeriod == null
+                    || BarsPeriod.BarsPeriodType
+                        != BarsPeriodType.Minute
+                    || BarsPeriod.Value
+                        != RequiredPrimaryMinutes)
+                {
+                    var actualSeries =
+                        BarsPeriod == null
+                            ? "Unavailable"
+                            : string.Format(
+                                Inv,
+                                "{0} {1}",
+                                BarsPeriod.BarsPeriodType,
+                                BarsPeriod.Value);
+
+                    var message =
+                        string.Format(
+                            Inv,
+                            "{0} requires an ES {1}-minute primary chart. Actual primary series: {2}.",
+                            Name,
+                            RequiredPrimaryMinutes,
+                            actualSeries);
+
+                    Print(message);
+
+                    throw new InvalidOperationException(
+                        message);
+                }
+
+
                 overnightRangeEngine =
                     new NinjexPremarketRangeEngine();
 
@@ -531,6 +609,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (overnightFinalized
                 && overnightRangeEngine.IsRangeComplete)
             {
+                sessionOvernightRangeDate =
+                    overnightRangeEngine.LatestRangeDate;
+
                 sessionOvernightHigh =
                     overnightRangeEngine.LatestHigh;
 
@@ -560,6 +641,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (premarketFinalized
                 && premarketRangeEngine.IsRangeComplete)
             {
+                sessionPremarketRangeDate =
+                    premarketRangeEngine.LatestRangeDate;
+
                 sessionPremarketHigh =
                     premarketRangeEngine.LatestHigh;
 
@@ -657,6 +741,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var open =
                 Opens[MinuteSeriesIndex][1];
 
+            var currentBarOpen =
+                Opens[MinuteSeriesIndex][0];
+
             var high =
                 Highs[MinuteSeriesIndex][1];
 
@@ -665,6 +752,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var close =
                 Closes[MinuteSeriesIndex][1];
+
+            var previousClose =
+                Closes[MinuteSeriesIndex][2];
 
             var volume =
                 Volumes[MinuteSeriesIndex][1];
@@ -711,7 +801,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 UpdateRthSessionState(
                     barTime,
-                    open,
+                    currentBarOpen,
                     high,
                     low,
                     close,
@@ -738,6 +828,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var row =
                 BuildObservation(
                     barTime,
+                    previousClose,
                     open,
                     high,
                     low,
@@ -757,6 +848,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private MarketObservation BuildObservation(
             DateTime time,
+            double previousClose,
             double open,
             double high,
             double low,
@@ -787,6 +879,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinutesBetween(
                     MarketOpenTime,
                     ToTime(time));
+
+            row.PreviousClose1m =
+                previousClose;
 
 //
 // Data-quality flags.
@@ -991,6 +1086,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             row.OvernightLow =
                 sessionOvernightLow;
 
+            row.OvernightRangeDate =
+                sessionOvernightRangeDate;
+
             row.OvernightWidthTicks =
                 (
                     sessionOvernightHigh
@@ -1003,6 +1101,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             row.PremarketLow =
                 sessionPremarketLow;
+
+            row.PremarketRangeDate =
+                sessionPremarketRangeDate;
 
             row.PremarketWidthTicks =
                 (
@@ -1019,6 +1120,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             row.PriorDayClose =
                 priorDayClose;
+
+            row.PriorDayDate =
+                priorDayDate;
 
             row.RthOpen =
                 rthOpen;
@@ -1122,6 +1226,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             //
+            // Exact four-model predicates from
+            // NinjexOvernightEdgePortfolio 1.2.1.
+            //
+            PopulateStrategyCompatibility(
+                row,
+                previousClose,
+                high,
+                low,
+                close);
+
+
+            //
             // Tick microstructure.
             //
             PopulateTickStatistics(
@@ -1164,6 +1280,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (hasCurrentRthData)
                 {
+                    priorDayDate =
+                        activeRthDate;
+
                     priorDayHigh =
                         currentRthHigh;
 
@@ -1223,6 +1342,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             sessionOvernightLow =
                 double.NaN;
 
+            sessionOvernightRangeDate =
+                Core.Globals.MinDate;
+
             sessionOvernightHighTime =
                 Core.Globals.MinDate;
 
@@ -1237,6 +1359,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             sessionPremarketLow =
                 double.NaN;
+
+            sessionPremarketRangeDate =
+                Core.Globals.MinDate;
 
             sessionPremarketHighTime =
                 Core.Globals.MinDate;
@@ -1256,7 +1381,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void UpdateRthSessionState(
             DateTime time,
-            double open,
+            double currentBarOpen,
             double high,
             double low,
             double close,
@@ -1278,7 +1403,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 hasCurrentRthData = true;
 
                 rthOpen =
-                    open;
+                    timeValue == MarketOpenTime
+                        ? currentBarOpen
+                        : double.NaN;
 
                 currentRthHigh =
                     high;
@@ -1731,6 +1858,133 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Level features
 
+        private void PopulateStrategyCompatibility(
+            MarketObservation row,
+            double previousClose,
+            double high,
+            double low,
+            double close)
+        {
+            row.StrategyContextReady =
+                RangeDataComplete
+                && IsFinite(previousClose)
+                && IsFinite(last5mAtrTicks)
+                && IsFinite(last5mEmaFast)
+                && IsFinite(last5mEmaSlow);
+
+
+            row.PdcReclaimCross =
+                IsFinite(priorDayClose)
+                && priorDayDate < row.TradingDate
+                && previousClose <= priorDayClose
+                && close > priorDayClose;
+
+            row.PdcReclaimQualified =
+                row.StrategyContextReady
+                && row.PdcReclaimCross
+                && row.Range1mTicks
+                    <= PriorCloseMaximumRangeTicks
+                && row.OvernightWidthTicks
+                    >= PriorCloseMinimumOvernightWidthTicks;
+
+
+            row.PmhRejectionSweep =
+                IsFinite(sessionPremarketHigh)
+                && high > sessionPremarketHigh
+                && close < sessionPremarketHigh;
+
+            row.PmhRejectionQualified =
+                row.StrategyContextReady
+                && row.PmhRejectionSweep
+                && row.MinutesFromOpen >= 0
+                && row.MinutesFromOpen
+                    <= PremarketHighMaximumMinutesFromOpen
+                && last5mAtrTicks
+                    >= PremarketHighMinimumAtr5mTicks;
+
+
+            row.RthOpenBreakdownCross =
+                IsFinite(rthOpen)
+                && previousClose >= rthOpen
+                && close < rthOpen;
+
+            row.RthOpenBreakdownQualified =
+                row.StrategyContextReady
+                && row.RthOpenBreakdownCross
+                && row.MinutesFromOpen
+                    >= RthOpenMinimumMinutesFromOpen
+                && row.PremarketWidthTicks
+                    >= RthOpenMinimumPremarketWidthTicks;
+
+
+            row.PmlFastEmaFilterPassed =
+                IsFinite(last5mEmaFast)
+                && close > last5mEmaFast;
+
+            row.PmlBreakdownCross =
+                IsFinite(sessionPremarketLow)
+                && previousClose >= sessionPremarketLow
+                && close < sessionPremarketLow;
+
+            row.PmlBreakdownQualified =
+                row.StrategyContextReady
+                && row.PmlBreakdownCross
+                && last5mAtrTicks
+                    >= PremarketLowMinimumAtr5mTicks
+                && row.PmlFastEmaFilterPassed;
+
+
+            row.QualifiedModelCount =
+                (row.PdcReclaimQualified ? 1 : 0)
+                + (row.PmhRejectionQualified ? 1 : 0)
+                + (row.RthOpenBreakdownQualified ? 1 : 0)
+                + (row.PmlBreakdownQualified ? 1 : 0);
+
+
+            // Match the production strategy priority exactly:
+            // PDC, PMH, RTH-open, then PML.
+            if (row.PdcReclaimQualified)
+            {
+                row.SelectedStrategyModel =
+                    PriorCloseModelName;
+
+                row.SelectedEntrySignal =
+                    PriorCloseEntrySignal;
+
+                row.SelectedDirection = "Long";
+            }
+            else if (row.PmhRejectionQualified)
+            {
+                row.SelectedStrategyModel =
+                    PremarketHighModelName;
+
+                row.SelectedEntrySignal =
+                    PremarketHighEntrySignal;
+
+                row.SelectedDirection = "Short";
+            }
+            else if (row.RthOpenBreakdownQualified)
+            {
+                row.SelectedStrategyModel =
+                    RthOpenModelName;
+
+                row.SelectedEntrySignal =
+                    RthOpenEntrySignal;
+
+                row.SelectedDirection = "Short";
+            }
+            else if (row.PmlBreakdownQualified)
+            {
+                row.SelectedStrategyModel =
+                    PremarketLowModelName;
+
+                row.SelectedEntrySignal =
+                    PremarketLowEntrySignal;
+
+                row.SelectedDirection = "Short";
+            }
+        }
+
         private void PopulateLevelInteractionFlags(
             MarketObservation row,
             double high,
@@ -1992,6 +2246,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ?? string.Empty),
                     Date(
                         activeRthDate),
+                    Date(
+                        sessionOvernightRangeDate),
                     Num(sessionOvernightHigh),
                     Num(sessionOvernightLow),
                     DateTimeValue(
@@ -2001,6 +2257,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     sessionOvernightBars.ToString(Inv),
                     Bool(OvernightRangeComplete),
 
+                    Date(
+                        sessionPremarketRangeDate),
                     Num(sessionPremarketHigh),
                     Num(sessionPremarketLow),
                     DateTimeValue(
@@ -2012,6 +2270,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     Bool(RangeDataComplete),
 
+                    Date(priorDayDate),
                     Num(priorDayHigh),
                     Num(priorDayLow),
                     Num(priorDayClose),
@@ -2125,6 +2384,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "CollectorVersion",
                 CollectorVersion);
 
+            WriteManifestValue(
+                "CompatibleStrategy",
+                CompatibleStrategy);
+
+            WriteManifestValue(
+                "CompatibleStrategyVersion",
+                CompatibleStrategyVersion);
+
+            WriteManifestValue(
+                "CompatiblePortfolioMode",
+                CompatiblePortfolioMode);
+
             WriteManifestValue("TimestampConvention", "US Eastern; minute bars end-stamped; tick buckets start-stamped");
             WriteManifestValue("RthEndTime", RthEndTime);
             WriteManifestValue("PriorCloseDefinition", "Last available minute close strictly before RthEndTime; 15:59 with complete data and RthEndTime=160000");
@@ -2141,7 +2412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             WriteManifestValue(
                 "PrimarySeries",
-                "Expected 5-minute");
+                "Required 5-minute; collector rejects other primary series");
 
             WriteManifestValue(
                 "SecondarySeries",
@@ -2200,8 +2471,52 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaximumForwardMinutes);
 
             WriteManifestValue(
+                "PriorCloseMaximumRangeTicks",
+                PriorCloseMaximumRangeTicks);
+
+            WriteManifestValue(
+                "PriorCloseMinimumOvernightWidthTicks",
+                PriorCloseMinimumOvernightWidthTicks);
+
+            WriteManifestValue(
+                "PremarketHighMaximumMinutesFromOpen",
+                PremarketHighMaximumMinutesFromOpen);
+
+            WriteManifestValue(
+                "PremarketHighMinimumAtr5mTicks",
+                PremarketHighMinimumAtr5mTicks);
+
+            WriteManifestValue(
+                "RthOpenMinimumMinutesFromOpen",
+                RthOpenMinimumMinutesFromOpen);
+
+            WriteManifestValue(
+                "RthOpenMinimumPremarketWidthTicks",
+                RthOpenMinimumPremarketWidthTicks);
+
+            WriteManifestValue(
+                "PremarketLowMinimumAtr5mTicks",
+                PremarketLowMinimumAtr5mTicks);
+
+            WriteManifestValue(
+                "PremarketLowFastEmaFilter",
+                "Raw Close1m > completed EmaFast5m");
+
+            WriteManifestValue(
+                "FourModelPriority",
+                "PDC,PMH,RTHOpen,PML");
+
+            WriteManifestValue(
+                "FourModelQualificationScope",
+                "Price and context predicates only; open-position state, daily caps, pending orders and execution fills are not simulated; match configured periods and windows to the strategy");
+
+            WriteManifestValue(
                 "ForwardDataPrecision",
                 "1-minute OHLC; same-bar target/stop order marked Ambiguous");
+
+            WriteManifestValue(
+                "BarrierReference",
+                "Completed signal Close1m; production strategy enters on first causal tick, so join to strategy trades for authoritative execution PnL");
 
             WriteManifestValue(
                 "TickData",
@@ -2235,10 +2550,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             sessionsWriter.WriteLine(
                 "RunId,Contract,TradingDate,"
-                + "OvernightHigh,OvernightLow,OvernightHighTime,OvernightLowTime,OvernightBars,OvernightRangeComplete,"
-                + "PremarketHigh,PremarketLow,PremarketHighTime,PremarketLowTime,PremarketBars,PremarketRangeComplete,"
+                + "OvernightRangeDate,OvernightHigh,OvernightLow,OvernightHighTime,OvernightLowTime,OvernightBars,OvernightRangeComplete,"
+                + "PremarketRangeDate,PremarketHigh,PremarketLow,PremarketHighTime,PremarketLowTime,PremarketBars,PremarketRangeComplete,"
                 + "RangeDataComplete,"
-                + "PriorDayHigh,PriorDayLow,PriorDayClose,"
+                + "PriorDayDate,PriorDayHigh,PriorDayLow,PriorDayClose,"
                 + "RthOpen,RthHigh,RthLow,RthClose,"
                 + "OpeningRangeHigh,OpeningRangeLow,"
                 + "ObservationCount,FinalizeReason");
@@ -2252,7 +2567,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 +
                 "OvernightRangeComplete,PremarketRangeComplete,RangeDataComplete,"
                 +
-                "Open1m,High1m,Low1m,Close1m,Volume1m,"
+                "Open1m,High1m,Low1m,Close1m,Volume1m,PreviousClose1m,"
                 +
                 "Range1mTicks,Body1mTicks,BodyPercent,CloseLocationPercent,"
                 +
@@ -2270,11 +2585,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 +
                 "Vwap,DistanceFromVwapTicks,"
                 +
-                "OvernightHigh,OvernightLow,OvernightWidthTicks,"
+                "OvernightRangeDate,OvernightHigh,OvernightLow,OvernightWidthTicks,"
                 +
-                "PremarketHigh,PremarketLow,PremarketWidthTicks,"
+                "PremarketRangeDate,PremarketHigh,PremarketLow,PremarketWidthTicks,"
                 +
-                "PriorDayHigh,PriorDayLow,PriorDayClose,RthOpen,"
+                "PriorDayDate,PriorDayHigh,PriorDayLow,PriorDayClose,RthOpen,"
                 +
                 "OpeningRangeReady,OpeningRangeHigh,OpeningRangeLow,"
                 +
@@ -2313,6 +2628,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "SweepBelowPremarketLowAndCloseAbove,"
                 +
                 "SweepAbovePremarketHighAndCloseBelow,"
+                +
+                "StrategyContextReady,"
+                +
+                "PdcReclaimCross,PdcReclaimQualified,"
+                +
+                "PmhRejectionSweep,PmhRejectionQualified,"
+                +
+                "RthOpenBreakdownCross,RthOpenBreakdownQualified,"
+                +
+                "PmlBreakdownCross,PmlFastEmaFilterPassed,PmlBreakdownQualified,"
+                +
+                "QualifiedModelCount,SelectedStrategyModel,SelectedEntrySignal,SelectedDirection,"
                 +
                 "TickStatsAvailable,TickStatsMinute,TickCount,UpTicks,DownTicks,UnchangedTicks,"
                 +
@@ -2380,6 +2707,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Num(r.Low1m),
                     Num(r.Close1m),
                     r.Volume1m.ToString(Inv),
+                    Num(r.PreviousClose1m),
 
                     Num(r.Range1mTicks),
                     Num(r.Body1mTicks),
@@ -2418,14 +2746,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Num(r.Vwap),
                     Num(r.DistanceFromVwapTicks),
 
+                    Date(r.OvernightRangeDate),
                     Num(r.OvernightHigh),
                     Num(r.OvernightLow),
                     Num(r.OvernightWidthTicks),
 
+                    Date(r.PremarketRangeDate),
                     Num(r.PremarketHigh),
                     Num(r.PremarketLow),
                     Num(r.PremarketWidthTicks),
 
+                    Date(r.PriorDayDate),
                     Num(r.PriorDayHigh),
                     Num(r.PriorDayLow),
                     Num(r.PriorDayClose),
@@ -2480,6 +2811,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     Bool(
                         r.SweepAbovePremarketHighAndCloseBelow),
+
+                    Bool(r.StrategyContextReady),
+                    Bool(r.PdcReclaimCross),
+                    Bool(r.PdcReclaimQualified),
+                    Bool(r.PmhRejectionSweep),
+                    Bool(r.PmhRejectionQualified),
+                    Bool(r.RthOpenBreakdownCross),
+                    Bool(r.RthOpenBreakdownQualified),
+                    Bool(r.PmlBreakdownCross),
+                    Bool(r.PmlFastEmaFilterPassed),
+                    Bool(r.PmlBreakdownQualified),
+                    r.QualifiedModelCount.ToString(Inv),
+                    Csv(r.SelectedStrategyModel),
+                    Csv(r.SelectedEntrySignal),
+                    Csv(r.SelectedDirection),
 
                     Bool(r.TickStatsAvailable),
                     DateTimeValue(r.TickStatsMinute),
@@ -3037,6 +3383,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public double Volume1m;
 
+            public double PreviousClose1m;
+
 
             public double Range1mTicks;
 
@@ -3110,12 +3458,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public double OvernightLow;
 
+            public DateTime OvernightRangeDate =
+                Core.Globals.MinDate;
+
             public double OvernightWidthTicks;
 
 
             public double PremarketHigh;
 
             public double PremarketLow;
+
+            public DateTime PremarketRangeDate =
+                Core.Globals.MinDate;
 
             public double PremarketWidthTicks;
 
@@ -3125,6 +3479,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             public double PriorDayLow;
 
             public double PriorDayClose;
+
+            public DateTime PriorDayDate =
+                Core.Globals.MinDate;
 
             public double RthOpen;
 
@@ -3208,6 +3565,38 @@ namespace NinjaTrader.NinjaScript.Strategies
             public bool SweepBelowPremarketLowAndCloseAbove;
 
             public bool SweepAbovePremarketHighAndCloseBelow;
+
+
+            public bool StrategyContextReady;
+
+            public bool PdcReclaimCross;
+
+            public bool PdcReclaimQualified;
+
+            public bool PmhRejectionSweep;
+
+            public bool PmhRejectionQualified;
+
+            public bool RthOpenBreakdownCross;
+
+            public bool RthOpenBreakdownQualified;
+
+            public bool PmlBreakdownCross;
+
+            public bool PmlFastEmaFilterPassed;
+
+            public bool PmlBreakdownQualified;
+
+            public int QualifiedModelCount;
+
+            public string SelectedStrategyModel =
+                string.Empty;
+
+            public string SelectedEntrySignal =
+                string.Empty;
+
+            public string SelectedDirection =
+                string.Empty;
 
 
             public bool TickStatsAvailable;
