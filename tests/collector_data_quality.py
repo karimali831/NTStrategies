@@ -11,6 +11,16 @@ def method(name):
         depth += (source[end] == "{") - (source[end] == "}")
         end += 1
     return source[start:end]
+snapshot_start = source.index("        #region Timestamped five-minute snapshots")
+snapshot_end = source.index("        #endregion", snapshot_start)
+snapshot_types = source[snapshot_start:snapshot_end] + "        #endregion\n"
+# Ensure the production call sites use the tested history, including signal filters.
+assert "fiveMinuteContexts.AtOrBefore(barTime)" in source
+assert "last5m" not in source
+assert "row.Context5mTime <= row.Time" in source
+assert "IsFinite(row.Atr5mTicks)" in source
+assert "close > row.EmaFast5m" in source
+assert 'OBSERVATION SKIP Reason=FiveMinuteContextUnavailable' in source
 methods = "\n".join(method(n) for n in ["PopulateTickStatistics", "FinalizeTickMinute", "UpdateForwardObservations", "CaptureForwardHorizon", "FinalizeRemainingForwardObservations"])
 fixture = r'''
 using System;
@@ -46,6 +56,32 @@ class Test {
  MarketObservation Start(){var r=new MarketObservation{Time=T};activeForwardObservations.Add(new(r));return r;}
  void Bar(int minutes)=>UpdateForwardObservations(T.AddMinutes(minutes),101,100,100.5);
  static void Main(){
+  var history=new FiveMinuteContextHistory();
+  var day=new DateTime(2026,6,9);
+  var prior=new FiveMinuteContext{Time=day.AddHours(10).AddMinutes(55),AtrTicks=31,EmaFast=7000,Close=7001};
+  var future=new FiveMinuteContext{Time=day.AddHours(11),AtrTicks=99,EmaFast=8000,Close=8001};
+  history.Add(prior); history.Add(future);
+  var delayed=history.AtOrBefore(day.AddHours(10).AddMinutes(57));
+  Check(ReferenceEquals(delayed,prior)&&delayed.AtrTicks==31&&delayed.EmaFast==7000&&delayed.Close==7001,
+        "June 9 delayed minute must use all values from 10:55, not 11:00");
+  Check(ReferenceEquals(history.AtOrBefore(future.Time),future),"exact context boundary allowed");
+  Check(history.AtOrBefore(prior.Time.AddMinutes(-1))==null,"future-only history unavailable");
+  history.Clear();
+  var june25=new DateTime(2026,6,25);
+  var p=new FiveMinuteContext{Time=june25.AddHours(9).AddMinutes(55),AtrTicks=20};
+  var q=new FiveMinuteContext{Time=june25.AddHours(10),AtrTicks=90};
+  history.Add(q);history.Add(p);
+  Check(ReferenceEquals(history.AtOrBefore(june25.AddHours(9).AddMinutes(59)),p),
+        "June 25 lookup is ordered by timestamps, not insertion");
+  history.Add(new FiveMinuteContext{Time=p.Time,AtrTicks=21});
+  Check(history.AtOrBefore(p.Time).AtrTicks==21,"same timestamp replaces snapshot");
+  history.Clear();Check(history.AtOrBefore(q.Time)==null,"restart clears snapshots");
+  for(int i=0;i<513;i++)history.Add(new FiveMinuteContext{Time=day.AddMinutes(i)});
+  Check(history.AtOrBefore(day)==null&&history.AtOrBefore(day.AddMinutes(1))!=null,
+        "bounded retention reports evicted context unavailable");
+  Check(history.AtOrBefore(day.AddMinutes(900)).Time==day.AddMinutes(512),
+        "stale context keeps original timestamp");
+  Console.WriteLine("PASS: actual context history - both June regressions, future-only, equality, ordering, replacement, eviction, reset");
   var a=new Test();var r=a.Start();
   a.completedTickStats[T]=new(){Minute=T};
   a.PopulateTickStatistics(r,T);Check(!r.TickStatsAvailable,"must not use next bucket");
@@ -69,5 +105,5 @@ class Test {
 with tempfile.TemporaryDirectory() as tmp:
     p=Path(tmp)
     (p/"Test.csproj").write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>')
-    (p/"Program.cs").write_text(fixture+"\n"+methods+"\n}")
+    (p/"Program.cs").write_text(fixture+"\n"+snapshot_types+"\n"+methods+"\n}")
     subprocess.run(["dotnet","run","--project",str(p/"Test.csproj")],check=True)
