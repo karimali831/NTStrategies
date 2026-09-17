@@ -13,7 +13,7 @@ def method(name):
     return source[start:end]
 snapshot_start = source.index("        #region Timestamped five-minute snapshots")
 snapshot_end = source.index("        #endregion", snapshot_start)
-snapshot_types = source[snapshot_start:snapshot_end]
+snapshot_types = source[snapshot_start:snapshot_end] + "        #endregion\n"
 # Ensure the production call sites use the tested history, including signal filters.
 assert "fiveMinuteContexts.AtOrBefore(barTime)" in source
 assert "last5m" not in source
