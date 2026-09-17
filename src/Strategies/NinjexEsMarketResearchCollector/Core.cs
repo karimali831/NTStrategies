@@ -74,7 +74,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexEsMarketResearchCollector : Strategy
     {
+        // CSV schema version retained for the existing Research Explorer importer.
         private const string CollectorVersion = "1.2.0";
+        private const string CollectorImplementationRevision = "context-asof-1";
 
         private const string CompatibleStrategy =
             "NinjexOvernightEdgePortfolio";
@@ -258,48 +260,69 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
 
-        #region Last 5-minute context
+        #region Five-minute context history
 
-        private DateTime last5mTime =
-            Core.Globals.MinDate;
+        private readonly FiveMinuteContextHistory fiveMinuteContexts =
+            new FiveMinuteContextHistory();
 
-        private double last5mOpen =
-            double.NaN;
-
-        private double last5mHigh =
-            double.NaN;
-
-        private double last5mLow =
-            double.NaN;
-
-        private double last5mClose =
-            double.NaN;
-
-        private double last5mVolume;
-
-        private double last5mAtrTicks =
-            double.NaN;
-
-        private double last5mAdx =
-            double.NaN;
-
-        private double last5mEmaFast =
-            double.NaN;
-
-        private double last5mEmaSlow =
-            double.NaN;
-
-        private double last5mEmaFastSlopeTicks =
-            double.NaN;
-
-        private double last5mEmaSlowSlopeTicks =
-            double.NaN;
-        
         private DateTime lastTickDiagnosticDate =
             Core.Globals.MinDate;
 
         #endregion
 
+
+        #region Timestamped five-minute snapshots
+
+        // Values are captured together when a completed context bar is processed.
+        // Never relabel a later bar with an earlier observation timestamp.
+        private sealed class FiveMinuteContext
+        {
+            public DateTime Time;
+            public double Open = double.NaN;
+            public double High = double.NaN;
+            public double Low = double.NaN;
+            public double Close = double.NaN;
+            public double Volume = double.NaN;
+            public double AtrTicks = double.NaN;
+            public double Adx = double.NaN;
+            public double EmaFast = double.NaN;
+            public double EmaSlow = double.NaN;
+            public double EmaFastSlopeTicks = double.NaN;
+            public double EmaSlowSlopeTicks = double.NaN;
+        }
+
+        private sealed class FiveMinuteContextHistory
+        {
+            private const int Capacity = 512;
+            private readonly SortedList<DateTime, FiveMinuteContext> items =
+                new SortedList<DateTime, FiveMinuteContext>();
+
+            public void Clear()
+            {
+                items.Clear();
+            }
+
+            public void Add(FiveMinuteContext context)
+            {
+                items[context.Time] = context;
+                while (items.Count > Capacity)
+                    items.RemoveAt(0);
+            }
+
+            public FiveMinuteContext AtOrBefore(DateTime observationTime)
+            {
+                for (var i = items.Count - 1; i >= 0; i--)
+                {
+                    if (items.Keys[i] <= observationTime)
+                        return items.Values[i];
+                }
+
+                // Missing/evicted history must not fall forward to a later bar.
+                return null;
+            }
+        }
+
+        #endregion
 
         #region Tick aggregation
 
@@ -502,6 +525,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         AdxPeriod);
 
 
+                fiveMinuteContexts.Clear();
                 InitializeExport();
             }
             else if (State == State.Terminated)
@@ -670,55 +694,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            //
-            // Persist completed 5-minute context.
-            //
-            last5mTime =
-                barTime;
-
-            last5mOpen =
-                open;
-
-            last5mHigh =
-                high;
-
-            last5mLow =
-                low;
-
-            last5mClose =
-                close;
-
-            last5mVolume =
-                volume;
-
+            // Capture one coherent completed-bar snapshot. Delayed minute callbacks
+            // select this by event time rather than consuming the latest cache.
+            var context = new FiveMinuteContext
+            {
+                Time = barTime,
+                Open = open,
+                High = high,
+                Low = low,
+                Close = close,
+                Volume = volume
+            };
 
             if (CurrentBars[ContextSeriesIndex]
-                > Math.Max(
-                    EmaSlowPeriod,
-                    AtrPeriod) + 2)
+                > Math.Max(EmaSlowPeriod, AtrPeriod) + 2)
             {
-                last5mAtrTicks =
-                    atr5m[1] / TickSize;
-
-                last5mAdx =
-                    adx5m[1];
-
-                last5mEmaFast =
-                    emaFast5m[1];
-
-                last5mEmaSlow =
-                    emaSlow5m[1];
-
-                last5mEmaFastSlopeTicks =
-                    (emaFast5m[1]
-                     - emaFast5m[2])
-                    / TickSize;
-
-                last5mEmaSlowSlopeTicks =
-                    (emaSlow5m[1]
-                     - emaSlow5m[2])
-                    / TickSize;
+                context.AtrTicks = atr5m[1] / TickSize;
+                context.Adx = adx5m[1];
+                context.EmaFast = emaFast5m[1];
+                context.EmaSlow = emaSlow5m[1];
+                context.EmaFastSlopeTicks =
+                    (emaFast5m[1] - emaFast5m[2]) / TickSize;
+                context.EmaSlowSlopeTicks =
+                    (emaSlow5m[1] - emaSlow5m[2]) / TickSize;
             }
+
+            fiveMinuteContexts.Add(context);
         }
 
         #endregion
@@ -825,9 +826,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
+            var context = fiveMinuteContexts.AtOrBefore(barTime);
+            if (context == null)
+            {
+                Diagnostic(
+                    barTime,
+                    "OBSERVATION SKIP Reason=FiveMinuteContextUnavailable");
+                return;
+            }
+
+            if (barTime - context.Time >= TimeSpan.FromMinutes(RequiredPrimaryMinutes))
+            {
+                Diagnostic(
+                    barTime,
+                    "CONTEXT REVIEW Observation={0:yyyy-MM-dd HH:mm:ss} Context={1:yyyy-MM-dd HH:mm:ss} Reason=StaleFiveMinuteContext",
+                    barTime,
+                    context.Time);
+            }
+
             var row =
                 BuildObservation(
                     barTime,
+                    context,
                     previousClose,
                     open,
                     high,
@@ -848,6 +868,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private MarketObservation BuildObservation(
             DateTime time,
+            FiveMinuteContext context,
             double previousClose,
             double open,
             double high,
@@ -1015,51 +1036,51 @@ namespace NinjaTrader.NinjaScript.Strategies
             // 5-minute context.
             //
             row.Context5mTime =
-                last5mTime;
+                context.Time;
 
             row.Open5m =
-                last5mOpen;
+                context.Open;
 
             row.High5m =
-                last5mHigh;
+                context.High;
 
             row.Low5m =
-                last5mLow;
+                context.Low;
 
             row.Close5m =
-                last5mClose;
+                context.Close;
 
             row.Volume5m =
-                last5mVolume;
+                context.Volume;
 
             row.Atr5mTicks =
-                last5mAtrTicks;
+                context.AtrTicks;
 
             row.Adx5m =
-                last5mAdx;
+                context.Adx;
 
             row.EmaFast5m =
-                last5mEmaFast;
+                context.EmaFast;
 
             row.EmaSlow5m =
-                last5mEmaSlow;
+                context.EmaSlow;
 
             row.EmaFastSlope5mTicks =
-                last5mEmaFastSlopeTicks;
+                context.EmaFastSlopeTicks;
 
             row.EmaSlowSlope5mTicks =
-                last5mEmaSlowSlopeTicks;
+                context.EmaSlowSlopeTicks;
 
 
             row.PriceVsEmaFast5mTicks =
-                IsFinite(last5mEmaFast)
-                    ? (close - last5mEmaFast)
+                IsFinite(context.EmaFast)
+                    ? (close - context.EmaFast)
                       / TickSize
                     : double.NaN;
 
             row.PriceVsEmaSlow5mTicks =
-                IsFinite(last5mEmaSlow)
-                    ? (close - last5mEmaSlow)
+                IsFinite(context.EmaSlow)
+                    ? (close - context.EmaSlow)
                       / TickSize
                     : double.NaN;
 
@@ -1867,10 +1888,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             row.StrategyContextReady =
                 RangeDataComplete
+                && row.Context5mTime <= row.Time
                 && IsFinite(previousClose)
-                && IsFinite(last5mAtrTicks)
-                && IsFinite(last5mEmaFast)
-                && IsFinite(last5mEmaSlow);
+                && IsFinite(row.Atr5mTicks)
+                && IsFinite(row.EmaFast5m)
+                && IsFinite(row.EmaSlow5m);
 
 
             row.PdcReclaimCross =
@@ -1899,7 +1921,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && row.MinutesFromOpen >= 0
                 && row.MinutesFromOpen
                     <= PremarketHighMaximumMinutesFromOpen
-                && last5mAtrTicks
+                && row.Atr5mTicks
                     >= PremarketHighMinimumAtr5mTicks;
 
 
@@ -1918,8 +1940,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             row.PmlFastEmaFilterPassed =
-                IsFinite(last5mEmaFast)
-                && close > last5mEmaFast;
+                IsFinite(row.EmaFast5m)
+                && close > row.EmaFast5m;
 
             row.PmlBreakdownCross =
                 IsFinite(sessionPremarketLow)
@@ -1929,7 +1951,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             row.PmlBreakdownQualified =
                 row.StrategyContextReady
                 && row.PmlBreakdownCross
-                && last5mAtrTicks
+                && row.Atr5mTicks
                     >= PremarketLowMinimumAtr5mTicks
                 && row.PmlFastEmaFilterPassed;
 
@@ -2383,6 +2405,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             WriteManifestValue(
                 "CollectorVersion",
                 CollectorVersion);
+
+            WriteManifestValue(
+                "CollectorImplementationRevision",
+                CollectorImplementationRevision);
+
+            WriteManifestValue(
+                "FiveMinuteContextPolicy",
+                "Latest captured completed snapshot at or before observation time; skip and diagnose if unavailable; stale snapshots retain their actual timestamp");
 
             WriteManifestValue(
                 "CompatibleStrategy",
