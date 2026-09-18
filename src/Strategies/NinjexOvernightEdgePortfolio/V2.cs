@@ -284,7 +284,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name =
-                    "Ninjex Overnight Edge Portfolio";
+                    "Ninjex Overnight Edge Portfolio V2";
 
                 Description =
                     "Selectable baseline A/B and four-model ES edge portfolios derived from neutral market research.";
