@@ -7,13 +7,6 @@ using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public enum NinjexOvernightEdgePortfolioMode
-    {
-        BaselineAB,
-        FourModelResearchFiltered,
-        FourModelNoFastEma
-    }
-
 
     /// <summary>
     /// Execution strategy built from the neutral ES market-research study.
@@ -51,7 +44,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///
     /// Execution:
     ///     - First causal tick after the completed 1-minute signal.
-    ///     - Fixed 20-tick stop / 40-tick target.
+    ///     - V2: PML breakdown requires a minimum break depth and uses a
+    ///       bounded signal-candle structural stop; other models retain the
+    ///       fixed 20-tick stop / 40-tick target.
     ///     - Maximum 60-minute holding period by default.
     ///     - Protective orders are fill-relative.
     ///     - No break-even.
@@ -64,9 +59,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// PortfolioMode retains the validated baseline A/B portfolio and adds
     /// both filtered and unfiltered versions of the four-model portfolio.
     /// </summary>
-    public class NinjexOvernightEdgePortfolio : Strategy
+    public class NinjexOvernightEdgePortfolioV2 : Strategy
     {
-        private const string StrategyVersion = "1.2.1";
+        private const string StrategyVersion = "2.0.0";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -395,6 +390,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 StopLossTicks = 20;
                 ProfitTargetTicks = 40;
+
+                // V2 PML-breakdown protection.  The PML model is the only
+                // model changed from V1 so the remaining portfolio logic
+                // stays comparable with the validated research version.
+                PmlMinimumBreakTicks = 4;
+                PmlStructureStopBufferTicks = 2;
+                PmlMinimumStopLossTicks = 20;
+                PmlMaximumStopLossTicks = 32;
 
                 MaxHoldMinutes = 60;
 
@@ -1054,6 +1057,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && previousClose >= premarketLow
                 && close < premarketLow;
 
+            // V1 shorted the first close below PML, even when the break was
+            // only one tick and the candle was likely to reclaim the level.
+            // V2 requires a meaningful close below the level before arming.
+            var premarketLowBreakTicks =
+                IsFinite(premarketLow)
+                    && TickSize > 0
+                    ? (premarketLow - close) / TickSize
+                    : double.NaN;
+
+            var premarketLowBreakDepthOk =
+                IsFinite(premarketLowBreakTicks)
+                && premarketLowBreakTicks
+                    >= PmlMinimumBreakTicks;
+
             var useFastEmaFilter =
                 PortfolioMode
                 == NinjexOvernightEdgePortfolioMode
@@ -1072,6 +1089,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var premarketLowQualified =
                 premarketLowCross
+                && premarketLowBreakDepthOk
                 && IsFinite(last5mAtrTicks)
                 && last5mAtrTicks
                     >= PremarketLowMinimumAtr5mTicks
@@ -1085,17 +1103,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "FOUR CHECK Model=PML-Breakdown " +
                     "Qualified={0} PML={1} " +
                     "PrevClose={2} Close={3} " +
-                    "ATR5={4:0.0}t MinATR={5:0.0}t " +
-                    "EMAFilter={6} EMA5Fast={7} CloseAboveEMA={8}",
+                    "BreakDepth={4:0.0}t MinBreak={5:0.0}t " +
+                    "ATR5={6:0.0}t MinATR={7:0.0}t " +
+                    "EMAFilter={8} EMA5Fast={9} CloseAboveEMA={10}",
                     premarketLowQualified,
                     premarketLow,
                     previousClose,
                     close,
+                    premarketLowBreakTicks,
+                    PmlMinimumBreakTicks,
                     last5mAtrTicks,
                     PremarketLowMinimumAtr5mTicks,
                     useFastEmaFilter,
-                    last5mEmaFast,
-                    IsFinite(last5mEmaFast)
+                        last5mEmaFast,
+                        IsFinite(last5mEmaFast)
                         && close > last5mEmaFast);
             }
 
@@ -1454,6 +1475,46 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Tick execution
 
+        private int GetStopLossTicksForPendingTrade(
+            double observedMarketPrice)
+        {
+            // All non-PML models retain the V1 fixed stop.  This keeps the
+            // V2 experiment focused on the repeated false-break pattern.
+            if (pendingEntrySignal != PremarketLowEntrySignal
+                || !IsFinite(observedMarketPrice)
+                || TickSize <= 0
+                || !IsFinite(pendingSignalHigh))
+            {
+                return StopLossTicks;
+            }
+
+            // For a short, the invalidation point is above the signal
+            // candle high.  The actual protective order remains
+            // fill-relative, so the calculated distance is bounded and
+            // cannot silently become an oversized loss.
+            var structuralStopPrice =
+                pendingSignalHigh
+                + PmlStructureStopBufferTicks * TickSize;
+
+            var structuralDistanceTicks =
+                (structuralStopPrice - observedMarketPrice) / TickSize;
+
+            if (!IsFinite(structuralDistanceTicks)
+                || structuralDistanceTicks <= 0)
+            {
+                return StopLossTicks;
+            }
+
+            var roundedTicks =
+                (int)Math.Ceiling(structuralDistanceTicks);
+
+            return Math.Max(
+                PmlMinimumStopLossTicks,
+                Math.Min(
+                    PmlMaximumStopLossTicks,
+                    roundedTicks));
+        }
+
         private void ProcessTickSeries()
         {
             if (CurrentBars[TickSeriesIndex] < 1)
@@ -1610,10 +1671,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             // NinjaTrader anchors the protective orders to the actual
             // execution fill rather than the pre-submission observed tick.
             //
+            var stopLossTicksForTrade =
+                GetStopLossTicksForPendingTrade(
+                    observedMarketPrice);
+
             SetStopLoss(
                 signalName,
                 CalculationMode.Ticks,
-                StopLossTicks,
+                stopLossTicksForTrade,
                 false);
 
             SetProfitTarget(
@@ -1638,7 +1703,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 direction,
                 observedMarketPrice,
                 pendingSignalTime,
-                StopLossTicks,
+                stopLossTicksForTrade,
                 ProfitTargetTicks,
                 OrderQuantity);
 
@@ -2891,12 +2956,68 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
+        [Range(0.0, 100.0)]
+        [Display(
+            Name = "PML Minimum Break Ticks",
+            Description = "Minimum completed 1-minute close distance below the premarket low before PML-BREAK-S can qualify.",
+            GroupName = "7. Risk",
+            Order = 3)]
+        public double PmlMinimumBreakTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 100.0)]
+        [Display(
+            Name = "PML Structure Stop Buffer Ticks",
+            Description = "Ticks above the PML signal candle high used as the structural invalidation buffer.",
+            GroupName = "7. Risk",
+            Order = 4)]
+        public double PmlStructureStopBufferTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(1, 1000)]
+        [Display(
+            Name = "PML Minimum Stop Ticks",
+            Description = "Lower bound for the PML structure-aware stop.",
+            GroupName = "7. Risk",
+            Order = 5)]
+        public int PmlMinimumStopLossTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(1, 1000)]
+        [Display(
+            Name = "PML Maximum Stop Ticks",
+            Description = "Hard upper bound for the PML structure-aware stop.",
+            GroupName = "7. Risk",
+            Order = 6)]
+        public int PmlMaximumStopLossTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
         [Range(0, 390)]
         [Display(
             Name = "Max Hold Minutes",
             Description = "Maximum minutes from the completed signal to a market exit. 0 disables this limit; 60 mirrors the research horizon.",
             GroupName = "7. Risk",
-            Order = 3)]
+            Order = 7)]
         public int MaxHoldMinutes
         {
             get;
