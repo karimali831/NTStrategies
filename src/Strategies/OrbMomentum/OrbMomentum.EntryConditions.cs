@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (longBreak)
             {
-                if (!trendUp)
+                if (!trendUp && UseEMAsForEntry)
                 {
                     failReason = "long-block: emaFast-not-above-emaSlow";
                     return 0;
@@ -153,7 +153,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (shortBreak)
             {
-                if (!trendDown)
+                if (!trendDown && UseEMAsForEntry)
                 {
                     failReason = "short-block: emaFast-not-below-emaSlow";
                     return 0;
