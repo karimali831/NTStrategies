@@ -147,6 +147,7 @@
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Summary.cs" />
         <Compile Include="src\Strategies\MicroPBV4\MicroPBV4.Trend.cs" />
         <Compile Include="src\Strategies\NinjexEsMarketResearchCollector\Core.cs" />
+        <Compile Include="src\Strategies\NinjexEsOrbResearchCollector\Core.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Bracket.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Core.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Diag.cs" />
