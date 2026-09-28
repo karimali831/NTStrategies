@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.Indicators;
@@ -66,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.2-debug-rth";
+        private const string StrategyVersion = "1.2.3-verified-rth";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -189,6 +190,34 @@ namespace NinjaTrader.NinjaScript.Strategies
             double.NaN;
 
         private const int RthDiagnosticTickLimit = 5;
+
+        private sealed class RthOpenOverrideEntry
+        {
+            public RthOpenOverrideEntry(
+                double price,
+                string source)
+            {
+                Price = price;
+                Source = source ?? string.Empty;
+            }
+
+            public readonly double Price;
+            public readonly string Source;
+        }
+
+        // Only independently verified live-vs-stored-data discrepancies belong
+        // here. Never add a value because it improves a historical outcome.
+        private static readonly Dictionary<DateTime, RthOpenOverrideEntry>
+            VerifiedRthOpenOverrides =
+                new Dictionary<DateTime, RthOpenOverrideEntry>
+                {
+                    {
+                        new DateTime(2026, 9, 24),
+                        new RthOpenOverrideEntry(
+                            7734.25,
+                            "Observed live strategy log; downloaded Replay/Historical used 7734.00")
+                    }
+                };
 
         #endregion
 
@@ -429,10 +458,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //
                 EnableDiagnostics = true;
 
-                // Blank = normal strategy behaviour.
-                // Recommended diagnostic format is yyyy-MM-dd=price so an
-                // override cannot accidentally leak into another session.
-                DebugRthOpenOverride = string.Empty;
+                // Disabled by default. Verified overrides are intended only
+                // for forensic Replay/Historical reconstruction when a live
+                // RTH open discrepancy has been independently confirmed.
+                EnableVerifiedRthOpenOverrides = false;
             }
             else if (State == State.Configure)
             {
@@ -480,7 +509,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Stop={4}t Target={5}t " +
                     "MaxHold={6}m " +
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
-                    "DebugRthOpen='{10}'",
+                    "VerifiedRthOpenOverrides={10}",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -491,7 +520,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxTradesPerDay,
                     MaxWinnersPerDay,
                     MaxLossesPerDay,
-                    DebugRthOpenOverride ?? string.Empty);
+                    EnableVerifiedRthOpenOverrides);
             }
         }
 
@@ -1283,19 +1312,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var appliedRthOpen =
                     capturedBarOpen;
 
-                double debugOverridePrice;
-                string debugOverrideReason;
+                double verifiedOverridePrice;
+                string verifiedOverrideSource;
+                string verifiedOverrideReason;
 
-                var debugOverrideApplied =
-                    TryGetDebugRthOpenOverride(
+                var verifiedOverrideApplied =
+                    TryGetVerifiedRthOpenOverride(
                         signalTime.Date,
-                        out debugOverridePrice,
-                        out debugOverrideReason);
+                        out verifiedOverridePrice,
+                        out verifiedOverrideSource,
+                        out verifiedOverrideReason);
 
-                if (debugOverrideApplied)
+                if (verifiedOverrideApplied)
                 {
                     appliedRthOpen =
-                        debugOverridePrice;
+                        verifiedOverridePrice;
                 }
 
                 rthOpen =
@@ -1323,18 +1354,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "CompletedBarStamp={1:HH:mm:ss.fff} " +
                     "CurrentBarStamp={2:HH:mm:ss.fff} " +
                     "CapturedBarOpen={3} AppliedOpen={4} " +
-                    "OverrideApplied={5} OverrideSetting='{6}' " +
-                    "OverrideReason={7} " +
-                    "FirstRthTickTime={8} FirstRthTickPrice={9} " +
-                    "State={10}",
+                    "OverrideApplied={5} OverridesEnabled={6} " +
+                    "OverrideReason={7} OverrideSource='{8}' " +
+                    "FirstRthTickTime={9} FirstRthTickPrice={10} " +
+                    "State={11}",
                     rthOpenDate,
                     signalTime,
                     currentBarTime,
                     capturedBarOpen,
                     rthOpen,
-                    debugOverrideApplied,
-                    DebugRthOpenOverride ?? string.Empty,
-                    debugOverrideReason,
+                    verifiedOverrideApplied,
+                    EnableVerifiedRthOpenOverrides,
+                    verifiedOverrideReason,
+                    verifiedOverrideSource,
                     firstTickTimeText,
                     firstTickPriceText,
                     State);
@@ -1345,8 +1377,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Date={0:yyyy-MM-dd} Open={1} Source={2}",
                     rthOpenDate,
                     rthOpen,
-                    debugOverrideApplied
-                        ? "DebugOverride"
+                    verifiedOverrideApplied
+                        ? "VerifiedOverride"
                         : "Captured1mOpen");
             }
 
@@ -2661,114 +2693,56 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        private bool TryGetDebugRthOpenOverride(
+        private bool TryGetVerifiedRthOpenOverride(
             DateTime tradingDate,
             out double overridePrice,
+            out string source,
             out string reason)
         {
             overridePrice =
                 double.NaN;
 
+            source =
+                string.Empty;
+
             reason =
-                "Blank";
+                "Disabled";
 
-            var setting =
-                (DebugRthOpenOverride
-                 ?? string.Empty).Trim();
-
-            if (setting.Length == 0)
+            if (!EnableVerifiedRthOpenOverrides)
                 return false;
 
 
-            var priceText =
-                setting;
+            RthOpenOverrideEntry entry;
 
-            var equalsIndex =
-                setting.IndexOf('=');
-
-            if (equalsIndex >= 0)
-            {
-                var dateText =
-                    setting.Substring(
-                        0,
-                        equalsIndex).Trim();
-
-                priceText =
-                    setting.Substring(
-                        equalsIndex + 1).Trim();
-
-                DateTime configuredDate;
-
-                if (!DateTime.TryParseExact(
-                        dateText,
-                        "yyyy-MM-dd",
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        System.Globalization.DateTimeStyles.None,
-                        out configuredDate))
-                {
-                    reason =
-                        "InvalidDate";
-
-                    return false;
-                }
-
-
-                if (configuredDate.Date
-                    != tradingDate.Date)
-                {
-                    reason =
-                        string.Format(
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            "DateMismatch({0:yyyy-MM-dd})",
-                            configuredDate.Date);
-
-                    return false;
-                }
-            }
-
-
-            double parsedPrice;
-
-            var parsed =
-                double.TryParse(
-                    priceText,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out parsedPrice);
-
-            if (!parsed)
-            {
-                parsed =
-                    double.TryParse(
-                        priceText,
-                        System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        out parsedPrice);
-            }
-
-
-            if (!parsed
-                || !IsFinite(parsedPrice)
-                || parsedPrice <= 0)
+            if (!VerifiedRthOpenOverrides.TryGetValue(
+                    tradingDate.Date,
+                    out entry))
             {
                 reason =
-                    "InvalidPrice";
+                    "NoVerifiedOverride";
 
                 return false;
             }
 
 
-            if (TickSize > 0)
+            if (entry == null
+                || !IsFinite(entry.Price)
+                || entry.Price <= 0)
             {
-                parsedPrice =
-                    Math.Round(
-                        parsedPrice / TickSize)
-                    * TickSize;
+                reason =
+                    "InvalidVerifiedOverride";
+
+                return false;
             }
 
 
             overridePrice =
-                parsedPrice;
+                TickSize > 0
+                    ? Math.Round(entry.Price / TickSize) * TickSize
+                    : entry.Price;
+
+            source =
+                entry.Source ?? string.Empty;
 
             reason =
                 "Applied";
@@ -3289,11 +3263,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
-            Name = "Debug RTH Open Override",
-            Description = "Diagnostic only. Leave blank for normal behaviour. Recommended format: yyyy-MM-dd=price (example: 2026-09-24=7734.25). A price-only value is also accepted but applies to every processed date, so date-qualified format is safer.",
+            Name = "Enable Verified RTH Open Overrides",
+            Description = "Applies only date-keyed RTH-open corrections that were independently verified from live data. Disabled by default. Run 5 (2025-09-16 through 2026-09-11) has no override dates.",
             GroupName = "8. Diagnostics",
             Order = 1)]
-        public string DebugRthOpenOverride
+        public bool EnableVerifiedRthOpenOverrides
         {
             get;
             set;
