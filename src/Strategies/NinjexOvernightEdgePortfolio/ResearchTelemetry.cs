@@ -186,10 +186,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double researchPreviousEmaFast = double.NaN;
         private double researchPreviousEmaSlow = double.NaN;
         private string researchTelemetryPath = string.Empty;
+        private bool researchTelemetryFaulted;
 
         private void InitializeResearchTelemetry()
         {
             DisposeResearchTelemetry();
+            researchTelemetryFaulted = false;
 
             if (!EnableResearchTelemetry)
             {
@@ -198,27 +200,47 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            var directory = Path.Combine(Core.Globals.UserDataDir, "NinjexResearch", "OvernightEdgePortfolio");
-            Directory.CreateDirectory(directory);
+            try
+            {
+                var directory = Path.Combine(Core.Globals.UserDataDir, "NinjexResearch", "OvernightEdgePortfolio");
+                Directory.CreateDirectory(directory);
 
-            var instrumentName = Instrument == null ? "UnknownInstrument" : SanitizeFileName(Instrument.FullName);
-            var fileName = string.Format(
-                CultureInfo.InvariantCulture,
-                "overnight_edge_research_{0}_{1}_{2}.csv",
-                instrumentName,
-                DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture),
-                Guid.NewGuid().ToString("N").Substring(0, 8));
+                var instrumentName = Instrument == null ? "UnknownInstrument" : SanitizeFileName(Instrument.FullName);
+                var fileName = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "overnight_edge_research_{0}_{1}_{2}.csv",
+                    instrumentName,
+                    DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture),
+                    Guid.NewGuid().ToString("N").Substring(0, 8));
 
-            researchTelemetryPath = Path.Combine(directory, fileName);
-            researchSink = new NinjexOvernightEdgeCsvResearchSink(researchTelemetryPath);
-            Diagnostic(DateTime.Now, "RESEARCH TELEMETRY READY Path={0}", researchTelemetryPath);
+                researchTelemetryPath = Path.Combine(directory, fileName);
+                researchSink = new NinjexOvernightEdgeCsvResearchSink(researchTelemetryPath);
+                Diagnostic(DateTime.Now, "RESEARCH TELEMETRY READY Path={0}", researchTelemetryPath);
+            }
+            catch (Exception ex)
+            {
+                researchTelemetryFaulted = true;
+                researchTelemetryPath = string.Empty;
+                researchSink = new NinjexOvernightEdgeNullResearchSink();
+                Diagnostic(DateTime.Now, "RESEARCH TELEMETRY DISABLED InitError={0}", ex.Message);
+            }
         }
 
         private void DisposeResearchTelemetry()
         {
-            if (researchSink != null)
-                researchSink.Dispose();
-            researchSink = new NinjexOvernightEdgeNullResearchSink();
+            try
+            {
+                if (researchSink != null)
+                    researchSink.Dispose();
+            }
+            catch
+            {
+                // Telemetry cleanup must never interfere with strategy lifecycle.
+            }
+            finally
+            {
+                researchSink = new NinjexOvernightEdgeNullResearchSink();
+            }
         }
 
         private void ResetResearchTelemetryDailyState()
@@ -240,7 +262,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
             int minutesFromOpen, double overnightWidthTicks)
         {
-            if (!EnableResearchTelemetry)
+            if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
             var range1mTicks = TickSize > 0 ? (high - low) / TickSize : double.NaN;
@@ -354,14 +376,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             row.LossesToday = lossesToday;
             row.DayGross = grossPnlToday;
 
-            researchSink.Write(row);
+            WriteResearchRow(row);
             researchSignalSnapshots[ResearchSignalKey(signalTime, signalName)] = row.Clone();
         }
 
         private void AttachPendingResearchSignal(DateTime signalTime, string signalName)
         {
             pendingResearchSignal = null;
-            if (!EnableResearchTelemetry)
+            if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
             NinjexOvernightEdgeResearchRow snapshot;
@@ -376,7 +398,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RecordResearchEntryFill(DateTime time, double entryPrice)
         {
-            if (!EnableResearchTelemetry)
+            if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
             activeResearchSignal = pendingResearchSignal == null
@@ -395,12 +417,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             activeResearchSignal.LossesToday = lossesToday;
             activeResearchSignal.DayGross = grossPnlToday;
             activeResearchSignal.EntryPrice = entryPrice;
-            researchSink.Write(activeResearchSignal);
+            WriteResearchRow(activeResearchSignal);
         }
 
         private void RecordResearchTradeExit(DateTime time, string exitName, double exitPrice)
         {
-            if (!EnableResearchTelemetry)
+            if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
             var row = activeResearchSignal == null
@@ -417,9 +439,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             row.WinnersToday = winnersToday;
             row.LossesToday = lossesToday;
             row.DayGross = grossPnlToday;
-            researchSink.Write(row);
+            WriteResearchRow(row);
             activeResearchSignal = null;
             pendingResearchSignal = null;
+        }
+
+        private void WriteResearchRow(NinjexOvernightEdgeResearchRow row)
+        {
+            if (row == null || !EnableResearchTelemetry || researchTelemetryFaulted)
+                return;
+
+            try
+            {
+                researchSink.Write(row);
+            }
+            catch (Exception ex)
+            {
+                researchTelemetryFaulted = true;
+                DisposeResearchTelemetry();
+                Diagnostic(
+                    row.EventTime == Core.Globals.MinDate ? DateTime.Now : row.EventTime,
+                    "RESEARCH TELEMETRY DISABLED WriteError={0}",
+                    ex.Message);
+            }
         }
 
         private NinjexOvernightEdgeResearchRow CreateBaseResearchRow(DateTime time, string modelName, string signalName, PendingDirection direction)
