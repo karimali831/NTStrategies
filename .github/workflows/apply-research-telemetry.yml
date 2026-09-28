@@ -1,0 +1,31 @@
+name: Apply overnight edge research telemetry patch
+
+on:
+  push:
+    branches:
+      - feature/overnight-edge-research-telemetry
+    paths:
+      - '.github/scripts/apply-research-telemetry-core.py'
+      - '.github/workflows/apply-research-telemetry.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/overnight-edge-research-telemetry
+      - name: Patch Core.cs
+        run: python .github/scripts/apply-research-telemetry-core.py
+      - name: Remove one-shot helper files
+        run: rm .github/scripts/apply-research-telemetry-core.py .github/workflows/apply-research-telemetry.yml
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add V1 research telemetry hooks and partial-class cleanup"
+          git push
