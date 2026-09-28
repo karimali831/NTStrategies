@@ -65,9 +65,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// PortfolioMode retains the validated baseline A/B portfolio and adds
     /// both filtered and unfiltered versions of the four-model portfolio.
     /// </summary>
-    public class NinjexOvernightEdgePortfolio : Strategy
+    public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.3-verified-rth";
+        private const string StrategyVersion = "1.2.4-research-telemetry";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -457,6 +457,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Diagnostics
                 //
                 EnableDiagnostics = true;
+                EnableResearchTelemetry = false;
 
                 // Disabled by default. Verified overrides are intended only
                 // for forensic Replay/Historical reconstruction when a live
@@ -502,6 +503,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Closes[ContextSeriesIndex],
                         EmaSlowPeriod);
 
+                InitializeResearchTelemetry();
+
                 Diagnostic(
                     DateTime.Now,
                     "READY Version={0} " +
@@ -509,7 +512,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Stop={4}t Target={5}t " +
                     "MaxHold={6}m " +
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
-                    "VerifiedRthOpenOverrides={10}",
+                    "VerifiedRthOpenOverrides={10} " +
+                    "ResearchTelemetry={11} ResearchPath='{12}'",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -520,7 +524,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxTradesPerDay,
                     MaxWinnersPerDay,
                     MaxLossesPerDay,
-                    EnableVerifiedRthOpenOverrides);
+                    EnableVerifiedRthOpenOverrides,
+                    EnableResearchTelemetry,
+                    researchTelemetryPath);
+            }
+            else if (State == State.Terminated)
+            {
+                DisposeResearchTelemetry();
             }
         }
 
@@ -692,6 +702,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             //
+            // Preserve the previous completed EMA values for observational
+            // research telemetry before the authoritative context is updated.
+            // This does not participate in signal qualification.
+            //
+            CaptureResearchPreviousFiveMinuteContext(
+                last5mEmaFast,
+                last5mEmaSlow);
+
+            //
             // Cache exactly the completed 5-minute context.
             // This mirrors the neutral collector: signal rows do not
             // peek into the still-forming 5-minute candle.
@@ -731,6 +750,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var currentBarOpen =
                 Opens[SignalSeriesIndex][0];
+
+            var signalOpen =
+                Opens[SignalSeriesIndex][1];
 
             var high =
                 Highs[SignalSeriesIndex][1];
@@ -783,15 +805,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            if (!CanTakeNewTrade(
-                    signalTime,
-                    true,
-                    false))
-            {
-                return;
-            }
-
-
             var minutesFromOpen =
                 MinutesBetween(
                     MarketOpenTime,
@@ -799,6 +812,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var overnightWidthTicks =
                 GetOvernightWidthTicks();
+
+
+            // Capture raw four-model candidates before portfolio-state gating so
+            // research can see signals displaced by an active trade or daily cap.
+            // Core execution below remains unchanged and authoritative.
+            if (PortfolioMode
+                != NinjexOvernightEdgePortfolioMode.BaselineAB)
+            {
+                CaptureFourModelResearchCandidates(
+                    signalTime,
+                    signalOpen,
+                    high,
+                    low,
+                    close,
+                    previousClose,
+                    minutesFromOpen,
+                    overnightWidthTicks);
+            }
+
+
+            if (!CanTakeNewTrade(
+                    signalTime,
+                    true,
+                    false))
+            {
+                return;
+            }
 
 
             if (PortfolioMode
@@ -1550,6 +1590,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             pendingMinutesFromOpen =
                 minutesFromOpen;
 
+            AttachPendingResearchSignal(
+                signalTime,
+                entrySignal);
+
 
             Diagnostic(
                 signalTime,
@@ -1937,6 +1981,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             grossPnlToday = 0;
 
+            ResetResearchTelemetryDailyState();
+
 
             ClearPendingEntry(
                 eventTime,
@@ -1989,6 +2035,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (filled <= 0
                         && !activeTradeCounted)
                     {
+                        ClearPendingResearchSignal();
+
                         submittedSignalTime =
                             Core.Globals.MinDate;
 
@@ -2059,6 +2107,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 entryOrderPending = false;
 
+                var isNewResearchTrade =
+                    !activeTradeCounted;
+
 
                 if (!activeTradeCounted)
                 {
@@ -2098,6 +2149,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 activeEntryPriceQuantity +=
                     price * quantity;
+
+                if (isNewResearchTrade)
+                {
+                    RecordResearchEntryFill(
+                        time,
+                        GetActiveAverageEntryPrice());
+                }
 
 
                 Diagnostic(
@@ -2185,14 +2243,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 FinalizeActiveTrade(
                     time,
-                    order.Name);
+                    order.Name,
+                    price);
             }
         }
 
 
         private void FinalizeActiveTrade(
             DateTime time,
-            string exitName)
+            string exitName,
+            double exitPrice)
         {
             if (!activeTradeCounted)
                 return;
@@ -2207,6 +2267,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             else if (activeTradeGrossPnl < 0)
                 lossesToday++;
+
+            RecordResearchTradeExit(
+                time,
+                exitName,
+                exitPrice);
 
 
             Diagnostic(
@@ -2458,6 +2523,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double.NaN;
 
             pendingMinutesFromOpen = 0;
+
+            ClearPendingResearchSignal();
         }
 
         #endregion
