@@ -1,0 +1,31 @@
+name: Harden overnight edge research telemetry
+
+on:
+  push:
+    branches:
+      - feature/overnight-edge-research-telemetry
+    paths:
+      - '.github/scripts/harden-research-telemetry.py'
+      - '.github/workflows/harden-research-telemetry.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/overnight-edge-research-telemetry
+      - name: Harden telemetry
+        run: python .github/scripts/harden-research-telemetry.py
+      - name: Remove one-shot helper files
+        run: rm .github/scripts/harden-research-telemetry.py .github/workflows/harden-research-telemetry.yml
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Make research telemetry fail-safe"
+          git push
