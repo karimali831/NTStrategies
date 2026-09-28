@@ -1,6 +1,4 @@
 using System;
-using System.Globalization;
-using System.IO;
 
 
 namespace NinjaTrader.NinjaScript.Ninjex
@@ -14,20 +12,6 @@ namespace NinjaTrader.NinjaScript.Ninjex
     public sealed class NinjexPremarketRangeEngine
     {
         private bool activeRangeFinalized;
-
-        // Stateful range construction requires monotonic completed bars. NinjaTrader
-        // can replay older warm-up rows while a Playback strategy transitions from
-        // loaded history to the live Playback stream. Track each mode independently
-        // so a duplicate/backward bar cannot reset or truncate an already-building
-        // range. This has no effect on normal chronological data.
-        private DateTime lastPremarketBarCloseTime = Core.Globals.MinDate;
-        private DateTime lastOvernightBarCloseTime = Core.Globals.MinDate;
-
-        // Temporary forensic diagnostics for Playback startup/range construction.
-        // This is observational only and can be removed once the Nov-2025 DST/startup
-        // discrepancy has been fully explained.
-        private static readonly object RangeDiagnosticSync = new object();
-        private static readonly string RangeDiagnosticPath = BuildRangeDiagnosticPath();
 
         public KeyLevelsMode Mode { get; private set; } = KeyLevelsMode.Premarket;
         public DateTime ActiveRangeDate { get; private set; } = Core.Globals.MinDate;
@@ -88,65 +72,8 @@ namespace NinjaTrader.NinjaScript.Ninjex
                 mode,
                 overnightStartValue);
 
-            var traceBoundary =
-                mode == KeyLevelsMode.Overnight
-                && ShouldTraceBoundary(timeValue);
-
-            if (traceBoundary)
-            {
-                WriteRangeDiagnostic(
-                    "INPUT",
-                    mode,
-                    barCloseTime,
-                    timeValue,
-                    rangeDate,
-                    ActiveRangeDate,
-                    RangeBarCount,
-                    RangeBarCount,
-                    barHigh,
-                    barLow);
-            }
-
-            if (!AcceptMonotonicBar(barCloseTime, mode))
-            {
-                WriteRangeDiagnostic(
-                    "REJECT_NON_MONOTONIC",
-                    mode,
-                    barCloseTime,
-                    timeValue,
-                    rangeDate,
-                    ActiveRangeDate,
-                    RangeBarCount,
-                    RangeBarCount,
-                    barHigh,
-                    barLow);
-
-                return false;
-            }
-
             if (ActiveRangeDate != rangeDate || Mode != mode)
-            {
-                var beforeCount = RangeBarCount;
-                var previousActiveDate = ActiveRangeDate;
-
                 StartNewRange(rangeDate, mode);
-
-                if (mode == KeyLevelsMode.Overnight
-                    && (traceBoundary || previousActiveDate > rangeDate))
-                {
-                    WriteRangeDiagnostic(
-                        "START_NEW_RANGE",
-                        mode,
-                        barCloseTime,
-                        timeValue,
-                        rangeDate,
-                        previousActiveDate,
-                        beforeCount,
-                        RangeBarCount,
-                        barHigh,
-                        barLow);
-                }
-            }
 
             if (activeRangeFinalized)
                 return false;
@@ -156,39 +83,7 @@ namespace NinjaTrader.NinjaScript.Ninjex
                 : timeValue > premarketStartValue && timeValue <= openValue;
 
             if (isRangeBar)
-            {
-                var beforeCount = RangeBarCount;
                 AddBar(barCloseTime, barHigh, barLow);
-
-                if (traceBoundary)
-                {
-                    WriteRangeDiagnostic(
-                        "ADD_RANGE_BAR",
-                        mode,
-                        barCloseTime,
-                        timeValue,
-                        rangeDate,
-                        ActiveRangeDate,
-                        beforeCount,
-                        RangeBarCount,
-                        barHigh,
-                        barLow);
-                }
-            }
-            else if (traceBoundary)
-            {
-                WriteRangeDiagnostic(
-                    "NOT_RANGE_BAR",
-                    mode,
-                    barCloseTime,
-                    timeValue,
-                    rangeDate,
-                    ActiveRangeDate,
-                    RangeBarCount,
-                    RangeBarCount,
-                    barHigh,
-                    barLow);
-            }
 
             // An overnight range must only finalize on its range date,
             // never on the prior evening where timeValue is also >= openValue.
@@ -202,48 +97,10 @@ namespace NinjaTrader.NinjaScript.Ninjex
             {
                 LatestRangeDate = ActiveRangeDate;
                 activeRangeFinalized = true;
-
-                if (mode == KeyLevelsMode.Overnight)
-                {
-                    WriteRangeDiagnostic(
-                        "FINALIZE",
-                        mode,
-                        barCloseTime,
-                        timeValue,
-                        rangeDate,
-                        ActiveRangeDate,
-                        RangeBarCount,
-                        RangeBarCount,
-                        barHigh,
-                        barLow);
-                }
-
                 return true;
             }
 
             return false;
-        }
-
-        private bool AcceptMonotonicBar(
-            DateTime barCloseTime,
-            KeyLevelsMode mode)
-        {
-            var lastTime = mode == KeyLevelsMode.Overnight
-                ? lastOvernightBarCloseTime
-                : lastPremarketBarCloseTime;
-
-            if (lastTime != Core.Globals.MinDate
-                && barCloseTime <= lastTime)
-            {
-                return false;
-            }
-
-            if (mode == KeyLevelsMode.Overnight)
-                lastOvernightBarCloseTime = barCloseTime;
-            else
-                lastPremarketBarCloseTime = barCloseTime;
-
-            return true;
         }
 
         private static DateTime GetRangeDate(
@@ -288,97 +145,6 @@ namespace NinjaTrader.NinjaScript.Ninjex
 
             HasRangeData = true;
             RangeBarCount++;
-        }
-
-        private static bool ShouldTraceBoundary(int timeValue)
-        {
-            return (timeValue >= 174500 && timeValue <= 191500)
-                   || (timeValue >= 92000 && timeValue <= 93500);
-        }
-
-        private static string BuildRangeDiagnosticPath()
-        {
-            try
-            {
-                var directory = Path.Combine(
-                    Core.Globals.UserDataDir,
-                    "NinjexResearch",
-                    "OvernightEdgePortfolio");
-
-                Directory.CreateDirectory(directory);
-
-                return Path.Combine(
-                    directory,
-                    "range_engine_diag_"
-                    + DateTime.Now.ToString(
-                        "yyyyMMdd_HHmmss_fff",
-                        CultureInfo.InvariantCulture)
-                    + ".csv");
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static void WriteRangeDiagnostic(
-            string action,
-            KeyLevelsMode mode,
-            DateTime barCloseTime,
-            int timeValue,
-            DateTime rangeDate,
-            DateTime activeRangeDate,
-            int beforeCount,
-            int afterCount,
-            double high,
-            double low)
-        {
-            if (string.IsNullOrEmpty(RangeDiagnosticPath))
-                return;
-
-            try
-            {
-                var line = string.Join(
-                    ",",
-                    DateTime.Now.ToString(
-                        "yyyy-MM-dd HH:mm:ss.fff",
-                        CultureInfo.InvariantCulture),
-                    action,
-                    mode.ToString(),
-                    barCloseTime.ToString(
-                        "yyyy-MM-dd HH:mm:ss.fff",
-                        CultureInfo.InvariantCulture),
-                    timeValue.ToString(CultureInfo.InvariantCulture),
-                    rangeDate == Core.Globals.MinDate
-                        ? string.Empty
-                        : rangeDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    activeRangeDate == Core.Globals.MinDate
-                        ? string.Empty
-                        : activeRangeDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    beforeCount.ToString(CultureInfo.InvariantCulture),
-                    afterCount.ToString(CultureInfo.InvariantCulture),
-                    high.ToString("0.########", CultureInfo.InvariantCulture),
-                    low.ToString("0.########", CultureInfo.InvariantCulture));
-
-                lock (RangeDiagnosticSync)
-                {
-                    if (!File.Exists(RangeDiagnosticPath))
-                    {
-                        File.AppendAllText(
-                            RangeDiagnosticPath,
-                            "LoggedAt,Action,Mode,BarCloseTime,TimeValue,DerivedRangeDate,ActiveRangeDate,BeforeCount,AfterCount,High,Low"
-                            + Environment.NewLine);
-                    }
-
-                    File.AppendAllText(
-                        RangeDiagnosticPath,
-                        line + Environment.NewLine);
-                }
-            }
-            catch
-            {
-                // Diagnostics must never interfere with range construction.
-            }
         }
 
         private static int NormalizeTimeInput(int value)
