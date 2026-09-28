@@ -13,6 +13,14 @@ namespace NinjaTrader.NinjaScript.Ninjex
     {
         private bool activeRangeFinalized;
 
+        // Stateful range construction requires monotonic completed bars. NinjaTrader
+        // can replay older warm-up rows while a Playback strategy transitions from
+        // loaded history to the live Playback stream. Track each mode independently
+        // so a duplicate/backward bar cannot reset or truncate an already-building
+        // range. This has no effect on normal chronological data.
+        private DateTime lastPremarketBarCloseTime = Core.Globals.MinDate;
+        private DateTime lastOvernightBarCloseTime = Core.Globals.MinDate;
+
         public KeyLevelsMode Mode { get; private set; } = KeyLevelsMode.Premarket;
         public DateTime ActiveRangeDate { get; private set; } = Core.Globals.MinDate;
         public DateTime LatestRangeDate { get; private set; } = Core.Globals.MinDate;
@@ -61,6 +69,9 @@ namespace NinjaTrader.NinjaScript.Ninjex
             if (barHigh <= 0 || barLow <= 0 || barHigh < barLow)
                 return false;
 
+            if (!AcceptMonotonicBar(barCloseTime, mode))
+                return false;
+
             int timeValue = ToTime(barCloseTime);
             int premarketStartValue = NormalizeTimeInput(premarketStartTime);
             int overnightStartValue = NormalizeTimeInput(overnightStartTime);
@@ -101,6 +112,28 @@ namespace NinjaTrader.NinjaScript.Ninjex
             }
 
             return false;
+        }
+
+        private bool AcceptMonotonicBar(
+            DateTime barCloseTime,
+            KeyLevelsMode mode)
+        {
+            var lastTime = mode == KeyLevelsMode.Overnight
+                ? lastOvernightBarCloseTime
+                : lastPremarketBarCloseTime;
+
+            if (lastTime != Core.Globals.MinDate
+                && barCloseTime <= lastTime)
+            {
+                return false;
+            }
+
+            if (mode == KeyLevelsMode.Overnight)
+                lastOvernightBarCloseTime = barCloseTime;
+            else
+                lastPremarketBarCloseTime = barCloseTime;
+
+            return true;
         }
 
         private static DateTime GetRangeDate(
