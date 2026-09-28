@@ -1,0 +1,342 @@
+name: Apply stale guard and shadow research
+
+on:
+  push:
+    branches:
+      - feature/stale-guard-shadow-research
+    paths:
+      - .github/workflows/apply-stale-shadow.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/stale-guard-shadow-research
+          fetch-depth: 0
+
+      - name: Patch V1 strategy and telemetry
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core_path = Path('src/Strategies/NinjexOvernightEdgePortfolio/Core.cs')
+          research_path = Path('src/Strategies/NinjexOvernightEdgePortfolio/ResearchTelemetry.cs')
+          core = core_path.read_text(encoding='utf-8-sig')
+          research = research_path.read_text(encoding='utf-8')
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected exactly 1 occurrence, found {count}')
+              return text.replace(old, new, 1)
+
+          # ---------------- Core.cs ----------------
+          core = replace_once(
+              core,
+              'private const string StrategyVersion = "1.2.4-research-telemetry";',
+              'private const string StrategyVersion = "1.2.5-shadow-research";',
+              'version')
+
+          daily_anchor = '''        private double grossPnlToday;\n\n        #endregion\n\n\n        #region NinjaScript lifecycle\n'''
+          daily_replacement = '''        private double grossPnlToday;\n\n        #endregion\n\n\n        #region Monotonic series guards\n\n        // NinjaTrader can replay historical warm-up rows while transitioning\n        // between loaded history and Playback. Guard each BIP independently so\n        // an older row can never reset range/daily state that was already built\n        // from newer data. Equal tick timestamps remain valid.\n        private DateTime lastProcessedContextBarTime = Core.Globals.MinDate;\n        private DateTime lastProcessedSignalBarTime = Core.Globals.MinDate;\n        private DateTime lastProcessedTickTime = Core.Globals.MinDate;\n\n        #endregion\n\n\n        #region NinjaScript lifecycle\n'''
+          core = replace_once(core, daily_anchor, daily_replacement, 'monotonic fields')
+
+          context_anchor = '''            var barTime =\n                Times[ContextSeriesIndex][1];\n\n            var high =\n'''
+          context_replacement = '''            var barTime =\n                Times[ContextSeriesIndex][1];\n\n            if (lastProcessedContextBarTime != Core.Globals.MinDate\n                && barTime <= lastProcessedContextBarTime)\n            {\n                Diagnostic(\n                    barTime,\n                    "STALE SERIES SKIP Series=5Minute Event={0:yyyy-MM-dd HH:mm:ss.fff} Last={1:yyyy-MM-dd HH:mm:ss.fff}",\n                    barTime,\n                    lastProcessedContextBarTime);\n                return;\n            }\n\n            lastProcessedContextBarTime = barTime;\n\n            var high =\n'''
+          core = replace_once(core, context_anchor, context_replacement, 'context stale guard')
+
+          signal_anchor = '''            var signalTime =\n                Times[SignalSeriesIndex][1];\n\n            var currentBarTime =\n'''
+          signal_replacement = '''            var signalTime =\n                Times[SignalSeriesIndex][1];\n\n            if (lastProcessedSignalBarTime != Core.Globals.MinDate\n                && signalTime <= lastProcessedSignalBarTime)\n            {\n                Diagnostic(\n                    signalTime,\n                    "STALE SERIES SKIP Series=1Minute Event={0:yyyy-MM-dd HH:mm:ss.fff} Last={1:yyyy-MM-dd HH:mm:ss.fff}",\n                    signalTime,\n                    lastProcessedSignalBarTime);\n                return;\n            }\n\n            lastProcessedSignalBarTime = signalTime;\n\n            var currentBarTime =\n'''
+          core = replace_once(core, signal_anchor, signal_replacement, 'signal stale guard')
+
+          signal_date_old = '''            EnsureTradingDate(\n                signalTime.Date,\n                signalTime);\n'''
+          signal_date_new = '''            if (!EnsureTradingDate(\n                    signalTime.Date,\n                    signalTime))\n            {\n                return;\n            }\n'''
+          core = replace_once(core, signal_date_old, signal_date_new, 'signal trading date')
+
+          tick_anchor = '''            var time =\n                Times[TickSeriesIndex][0];\n\n            var price =\n'''
+          tick_replacement = '''            var time =\n                Times[TickSeriesIndex][0];\n\n            if (lastProcessedTickTime != Core.Globals.MinDate\n                && time < lastProcessedTickTime)\n            {\n                Diagnostic(\n                    time,\n                    "STALE SERIES SKIP Series=1Tick Event={0:yyyy-MM-dd HH:mm:ss.fff} Last={1:yyyy-MM-dd HH:mm:ss.fff}",\n                    time,\n                    lastProcessedTickTime);\n                return;\n            }\n\n            if (time > lastProcessedTickTime)\n                lastProcessedTickTime = time;\n\n            var price =\n'''
+          core = replace_once(core, tick_anchor, tick_replacement, 'tick stale guard')
+
+          tick_date_old = '''            EnsureTradingDate(\n                time.Date,\n                time);\n'''
+          tick_date_new = '''            if (!EnsureTradingDate(\n                    time.Date,\n                    time))\n            {\n                return;\n            }\n'''
+          core = replace_once(core, tick_date_old, tick_date_new, 'tick trading date')
+
+          tick_shadow_anchor = '''            LogRthOpenTickDiagnostic(\n                time,\n                price);\n\n\n            //\n            // RTH flatten and pending-entry cancellation.\n'''
+          tick_shadow_replacement = '''            LogRthOpenTickDiagnostic(\n                time,\n                price);\n\n            // Research-only shadow executions consume the same causal tick\n            // stream but never submit NinjaTrader orders or alter portfolio state.\n            ProcessResearchShadowTick(\n                time,\n                price);\n\n\n            //\n            // RTH flatten and pending-entry cancellation.\n'''
+          core = replace_once(core, tick_shadow_anchor, tick_shadow_replacement, 'shadow tick hook')
+
+          ensure_old = '''        private void EnsureTradingDate(\n            DateTime date,\n            DateTime eventTime)\n        {\n            date =\n                date.Date;\n\n\n            if (activeTradingDate\n                == date)\n            {\n                return;\n            }\n'''
+          ensure_new = '''        private bool EnsureTradingDate(\n            DateTime date,\n            DateTime eventTime)\n        {\n            date =\n                date.Date;\n\n\n            if (activeTradingDate != Core.Globals.MinDate\n                && date < activeTradingDate)\n            {\n                Diagnostic(\n                    eventTime,\n                    "STALE DATE SKIP EventDate={0:yyyy-MM-dd} ActiveDate={1:yyyy-MM-dd}",\n                    date,\n                    activeTradingDate);\n                return false;\n            }\n\n\n            if (activeTradingDate\n                == date)\n            {\n                return true;\n            }\n'''
+          core = replace_once(core, ensure_old, ensure_new, 'ensure signature and stale date')
+
+          ensure_end_old = '''            Diagnostic(\n                eventTime,\n                "NEW TRADING DATE {0:yyyy-MM-dd}",\n                activeTradingDate);\n        }\n\n        #endregion\n'''
+          ensure_end_new = '''            Diagnostic(\n                eventTime,\n                "NEW TRADING DATE {0:yyyy-MM-dd}",\n                activeTradingDate);\n\n            return true;\n        }\n\n        #endregion\n'''
+          core = replace_once(core, ensure_end_old, ensure_end_new, 'ensure return')
+
+          # ---------------- ResearchTelemetry.cs ----------------
+          research = replace_once(
+              research,
+              '"Model,Signal,Direction,RawTrigger,Qualified,SelectedByPriority,PortfolioEligible,PortfolioBlockReason," +',
+              '"Model,Signal,Direction,CandidateId,RawTrigger,Qualified,SelectedByPriority,PortfolioEligible,PortfolioBlockReason," +',
+              'candidate id header')
+
+          research = replace_once(
+              research,
+              '"TradesToday,WinnersToday,LossesToday,DayGross,EntryPrice,ExitPrice,TradeGross,ExitName";',
+              '"TradesToday,WinnersToday,LossesToday,DayGross,EntryPrice,ExitPrice,TradeGross,ExitName," +\n            "HypotheticalEntryTime,HypotheticalEntryPrice,HypotheticalExitTime,HypotheticalExitPrice,HypotheticalExitReason,HypotheticalGrossPnl,HypotheticalMFE,HypotheticalMAE";',
+              'shadow header')
+
+          field_anchor = '''        public string Signal;\n        public string Direction;\n        public bool? RawTrigger;\n'''
+          field_replacement = '''        public string Signal;\n        public string Direction;\n        public string CandidateId;\n        public bool? RawTrigger;\n'''
+          research = replace_once(research, field_anchor, field_replacement, 'candidate id field')
+
+          shadow_fields_anchor = '''        public double TradeGross = double.NaN;\n        public string ExitName;\n\n        public NinjexOvernightEdgeResearchRow Clone()\n'''
+          shadow_fields_replacement = '''        public double TradeGross = double.NaN;\n        public string ExitName;\n        public DateTime HypotheticalEntryTime = Core.Globals.MinDate;\n        public double HypotheticalEntryPrice = double.NaN;\n        public DateTime HypotheticalExitTime = Core.Globals.MinDate;\n        public double HypotheticalExitPrice = double.NaN;\n        public string HypotheticalExitReason;\n        public double HypotheticalGrossPnl = double.NaN;\n        public double HypotheticalMfe = double.NaN;\n        public double HypotheticalMae = double.NaN;\n\n        public NinjexOvernightEdgeResearchRow Clone()\n'''
+          research = replace_once(research, shadow_fields_anchor, shadow_fields_replacement, 'shadow row fields')
+
+          csv_model_old = '''                Csv(Instrument), Csv(StrategyVersion), Csv(PortfolioMode), Csv(Model), Csv(Signal), Csv(Direction),\n                Bool(RawTrigger), Bool(Qualified), Bool(SelectedByPriority), Bool(PortfolioEligible), Csv(PortfolioBlockReason),\n'''
+          csv_model_new = '''                Csv(Instrument), Csv(StrategyVersion), Csv(PortfolioMode), Csv(Model), Csv(Signal), Csv(Direction), Csv(CandidateId),\n                Bool(RawTrigger), Bool(Qualified), Bool(SelectedByPriority), Bool(PortfolioEligible), Csv(PortfolioBlockReason),\n'''
+          research = replace_once(research, csv_model_old, csv_model_new, 'candidate id csv')
+
+          csv_tail_old = '''                Int(TradesToday), Int(WinnersToday), Int(LossesToday), Number(DayGross), Number(EntryPrice), Number(ExitPrice), Number(TradeGross), Csv(ExitName)\n            };\n'''
+          csv_tail_new = '''                Int(TradesToday), Int(WinnersToday), Int(LossesToday), Number(DayGross), Number(EntryPrice), Number(ExitPrice), Number(TradeGross), Csv(ExitName),\n                Date(HypotheticalEntryTime), Number(HypotheticalEntryPrice), Date(HypotheticalExitTime), Number(HypotheticalExitPrice),\n                Csv(HypotheticalExitReason), Number(HypotheticalGrossPnl), Number(HypotheticalMfe), Number(HypotheticalMae)\n            };\n'''
+          research = replace_once(research, csv_tail_old, csv_tail_new, 'shadow csv tail')
+
+          number_anchor = '''        private static string Number(double value)\n        {\n            return double.IsNaN(value) || double.IsInfinity(value) ? string.Empty : value.ToString("0.########", CultureInfo.InvariantCulture);\n        }\n'''
+          number_replacement = '''        private static string Date(DateTime value)\n        {\n            return value == Core.Globals.MinDate\n                ? string.Empty\n                : value.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);\n        }\n\n        private static string Number(double value)\n        {\n            return double.IsNaN(value) || double.IsInfinity(value) ? string.Empty : value.ToString("0.########", CultureInfo.InvariantCulture);\n        }\n'''
+          research = replace_once(research, number_anchor, number_replacement, 'date formatter')
+
+          state_anchor = '''        private string researchTelemetryPath = string.Empty;\n        private bool researchTelemetryFaulted;\n\n        private void InitializeResearchTelemetry()\n'''
+          state_replacement = '''        private string researchTelemetryPath = string.Empty;\n        private bool researchTelemetryFaulted;\n\n        private sealed class NinjexOvernightEdgeShadowTrade\n        {\n            public NinjexOvernightEdgeResearchRow Snapshot;\n            public PendingDirection Direction;\n            public DateTime SignalTime;\n            public bool Entered;\n            public DateTime EntryTime = Core.Globals.MinDate;\n            public double EntryPrice = double.NaN;\n            public DateTime MaxHoldExitTime = Core.Globals.MinDate;\n            public double MfeDollars;\n            public double MaeDollars;\n        }\n\n        private readonly List<NinjexOvernightEdgeShadowTrade> researchShadowTrades =\n            new List<NinjexOvernightEdgeShadowTrade>();\n\n        private void InitializeResearchTelemetry()\n'''
+          research = replace_once(research, state_anchor, state_replacement, 'shadow state')
+
+          reset_old = '''            pendingResearchSignal = null;\n            activeResearchSignal = null;\n        }\n'''
+          reset_new = '''            pendingResearchSignal = null;\n            activeResearchSignal = null;\n            researchShadowTrades.Clear();\n        }\n'''
+          research = replace_once(research, reset_old, reset_new, 'shadow reset')
+
+          occurrence_old = '''            row.CandidateOccurrenceToday = IncrementResearchCounter(researchCandidateCounts, signalName);\n            row.QualifiedCountSameTimestamp = qualifiedCount;\n'''
+          occurrence_new = '''            row.CandidateOccurrenceToday = IncrementResearchCounter(researchCandidateCounts, signalName);\n            row.CandidateId = BuildResearchCandidateId(\n                signalTime,\n                signalName,\n                row.CandidateOccurrenceToday);\n            row.QualifiedCountSameTimestamp = qualifiedCount;\n'''
+          research = replace_once(research, occurrence_old, occurrence_new, 'candidate id assignment')
+
+          write_candidate_old = '''            WriteResearchRow(row);\n            researchSignalSnapshots[ResearchSignalKey(signalTime, signalName)] = row.Clone();\n        }\n\n        private void AttachPendingResearchSignal(DateTime signalTime, string signalName)\n'''
+          write_candidate_new = '''            WriteResearchRow(row);\n            researchSignalSnapshots[ResearchSignalKey(signalTime, signalName)] = row.Clone();\n\n            if (qualified)\n            {\n                RegisterResearchShadowCandidate(\n                    row,\n                    direction,\n                    signalTime);\n            }\n        }\n\n        private void AttachPendingResearchSignal(DateTime signalTime, string signalName)\n'''
+          research = replace_once(research, write_candidate_old, write_candidate_new, 'shadow registration')
+
+          write_row_anchor = '''        private void WriteResearchRow(NinjexOvernightEdgeResearchRow row)\n        {\n'''
+          shadow_methods = r'''        private void RegisterResearchShadowCandidate(
+            NinjexOvernightEdgeResearchRow candidate,
+            PendingDirection direction,
+            DateTime signalTime)
+        {
+            if (candidate == null
+                || !EnableResearchTelemetry
+                || researchTelemetryFaulted)
+            {
+                return;
+            }
+
+            researchShadowTrades.Add(
+                new NinjexOvernightEdgeShadowTrade
+                {
+                    Snapshot = candidate.Clone(),
+                    Direction = direction,
+                    SignalTime = signalTime
+                });
+        }
+
+        private void ProcessResearchShadowTick(DateTime time, double price)
+        {
+            if (!EnableResearchTelemetry
+                || researchTelemetryFaulted
+                || researchShadowTrades.Count == 0
+                || !IsFinite(price))
+            {
+                return;
+            }
+
+            var timeValue = ToTimeValue(time);
+            var pointValue = Instrument == null
+                ? 0.0
+                : Instrument.MasterInstrument.PointValue;
+            var quantity = Math.Max(1, OrderQuantity);
+
+            for (var i = researchShadowTrades.Count - 1; i >= 0; i--)
+            {
+                var shadow = researchShadowTrades[i];
+
+                if (!shadow.Entered)
+                {
+                    if (time.Date > shadow.SignalTime.Date
+                        || timeValue >= EntryEndTime)
+                    {
+                        WriteResearchShadowNoEntry(
+                            shadow,
+                            time,
+                            "EntryWindowClosed");
+                        researchShadowTrades.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (time < shadow.SignalTime)
+                        continue;
+
+                    shadow.Entered = true;
+                    shadow.EntryTime = time;
+                    shadow.EntryPrice = price;
+                    shadow.MaxHoldExitTime =
+                        MaxHoldMinutes > 0
+                            ? shadow.SignalTime.AddMinutes(MaxHoldMinutes)
+                            : Core.Globals.MinDate;
+
+                    var entryRow = shadow.Snapshot.Clone();
+                    entryRow.EventType = "ShadowEntry";
+                    entryRow.EventTime = time;
+                    entryRow.HypotheticalEntryTime = time;
+                    entryRow.HypotheticalEntryPrice = price;
+                    WriteResearchRow(entryRow);
+                    continue;
+                }
+
+                var favorablePoints = shadow.Direction == PendingDirection.Long
+                    ? price - shadow.EntryPrice
+                    : shadow.EntryPrice - price;
+                var adversePoints = shadow.Direction == PendingDirection.Long
+                    ? shadow.EntryPrice - price
+                    : price - shadow.EntryPrice;
+
+                if (favorablePoints > 0)
+                    shadow.MfeDollars = Math.Max(shadow.MfeDollars, favorablePoints * pointValue * quantity);
+                if (adversePoints > 0)
+                    shadow.MaeDollars = Math.Max(shadow.MaeDollars, adversePoints * pointValue * quantity);
+
+                var stopPrice = shadow.Direction == PendingDirection.Long
+                    ? shadow.EntryPrice - StopLossTicks * TickSize
+                    : shadow.EntryPrice + StopLossTicks * TickSize;
+                var targetPrice = shadow.Direction == PendingDirection.Long
+                    ? shadow.EntryPrice + ProfitTargetTicks * TickSize
+                    : shadow.EntryPrice - ProfitTargetTicks * TickSize;
+
+                var stopHit = shadow.Direction == PendingDirection.Long
+                    ? price <= stopPrice
+                    : price >= stopPrice;
+                var targetHit = shadow.Direction == PendingDirection.Long
+                    ? price >= targetPrice
+                    : price <= targetPrice;
+
+                string exitReason = null;
+                var exitPrice = double.NaN;
+
+                // Protective orders are already working after the hypothetical
+                // entry, so resolve them before strategy-driven time/EOD exits.
+                if (stopHit)
+                {
+                    exitReason = "StopLoss";
+                    exitPrice = stopPrice;
+                }
+                else if (targetHit)
+                {
+                    exitReason = "ProfitTarget";
+                    exitPrice = targetPrice;
+                }
+                else if (timeValue >= FlattenTime)
+                {
+                    exitReason = "FlattenTime";
+                    exitPrice = price;
+                }
+                else if (shadow.MaxHoldExitTime != Core.Globals.MinDate
+                    && time >= shadow.MaxHoldExitTime)
+                {
+                    exitReason = "MaxHold";
+                    exitPrice = price;
+                }
+
+                if (exitReason == null)
+                    continue;
+
+                WriteResearchShadowExit(
+                    shadow,
+                    time,
+                    exitPrice,
+                    exitReason,
+                    pointValue,
+                    quantity);
+                researchShadowTrades.RemoveAt(i);
+            }
+        }
+
+        private void WriteResearchShadowNoEntry(
+            NinjexOvernightEdgeShadowTrade shadow,
+            DateTime time,
+            string reason)
+        {
+            var row = shadow.Snapshot.Clone();
+            row.EventType = "ShadowNoEntry";
+            row.EventTime = time;
+            row.HypotheticalExitTime = time;
+            row.HypotheticalExitReason = reason ?? string.Empty;
+            WriteResearchRow(row);
+        }
+
+        private void WriteResearchShadowExit(
+            NinjexOvernightEdgeShadowTrade shadow,
+            DateTime time,
+            double exitPrice,
+            string exitReason,
+            double pointValue,
+            int quantity)
+        {
+            var points = shadow.Direction == PendingDirection.Long
+                ? exitPrice - shadow.EntryPrice
+                : shadow.EntryPrice - exitPrice;
+
+            var row = shadow.Snapshot.Clone();
+            row.EventType = "ShadowExit";
+            row.EventTime = time;
+            row.HypotheticalEntryTime = shadow.EntryTime;
+            row.HypotheticalEntryPrice = shadow.EntryPrice;
+            row.HypotheticalExitTime = time;
+            row.HypotheticalExitPrice = exitPrice;
+            row.HypotheticalExitReason = exitReason ?? string.Empty;
+            row.HypotheticalGrossPnl = points * pointValue * quantity;
+            row.HypotheticalMfe = shadow.MfeDollars;
+            row.HypotheticalMae = shadow.MaeDollars;
+            WriteResearchRow(row);
+        }
+
+        private static string BuildResearchCandidateId(
+            DateTime signalTime,
+            string signalName,
+            int occurrence)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0:yyyyMMddHHmmssfff}|{1}|{2}",
+                signalTime,
+                signalName ?? string.Empty,
+                occurrence);
+        }
+
+'''
+          if write_row_anchor not in research:
+              raise RuntimeError('write row anchor not found')
+          research = research.replace(write_row_anchor, shadow_methods + write_row_anchor, 1)
+
+          core_path.write_text(core, encoding='utf-8-sig')
+          research_path.write_text(research, encoding='utf-8')
+          PY
+
+          rm .github/workflows/apply-stale-shadow.yml
+
+          git diff --check
+          git status --short
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add stale-series guard and shadow research outcomes"
+          git push origin HEAD:feature/stale-guard-shadow-research
