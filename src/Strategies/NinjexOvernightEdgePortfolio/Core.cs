@@ -66,7 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.1";
+        private const string StrategyVersion = "1.2.2-debug-rth";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -170,6 +170,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private double rthOpen =
             double.NaN;
+
+        //
+        // RTH-open diagnostics. These fields do not affect trading logic.
+        // They capture the first few 1-tick Last events at/after 09:30 so
+        // live, locally-recorded Playback, downloaded Replay, and historical
+        // data can be compared directly.
+        //
+        private DateTime rthDiagnosticDate =
+            Core.Globals.MinDate;
+
+        private int rthDiagnosticTickCount;
+
+        private DateTime firstRthTickTime =
+            Core.Globals.MinDate;
+
+        private double firstRthTickPrice =
+            double.NaN;
+
+        private const int RthDiagnosticTickLimit = 5;
 
         #endregion
 
@@ -356,6 +375,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Indicators
                 //
                 AtrPeriod = 14;
+                EnableEMAFilter = true;
                 EmaFastPeriod = 9;
                 EmaSlowPeriod = 21;
 
@@ -408,6 +428,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Diagnostics
                 //
                 EnableDiagnostics = true;
+
+                // Blank = normal strategy behaviour.
+                // Recommended diagnostic format is yyyy-MM-dd=price so an
+                // override cannot accidentally leak into another session.
+                DebugRthOpenOverride = string.Empty;
             }
             else if (State == State.Configure)
             {
@@ -454,7 +479,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Mode={1} BaselineLong={2} BaselineShort={3} " +
                     "Stop={4}t Target={5}t " +
                     "MaxHold={6}m " +
-                    "MaxTrades={7} MaxWinners={8} MaxLosses={9}",
+                    "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
+                    "DebugRthOpen='{10}'",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -464,7 +490,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxHoldMinutes,
                     MaxTradesPerDay,
                     MaxWinnersPerDay,
-                    MaxLossesPerDay);
+                    MaxLossesPerDay,
+                    DebugRthOpenOverride ?? string.Empty);
             }
         }
 
@@ -670,6 +697,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var signalTime =
                 Times[SignalSeriesIndex][1];
 
+            var currentBarTime =
+                Times[SignalSeriesIndex][0];
+
             var currentBarOpen =
                 Opens[SignalSeriesIndex][0];
 
@@ -705,6 +735,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             UpdateRthReferenceLevels(
                 signalTime,
                 timeValue,
+                currentBarTime,
                 currentBarOpen,
                 close);
 
@@ -1055,6 +1086,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && close < premarketLow;
 
             var useFastEmaFilter =
+                EnableEMAFilter &&
                 PortfolioMode
                 == NinjexOvernightEdgePortfolioMode
                     .FourModelResearchFiltered;
@@ -1194,6 +1226,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void UpdateRthReferenceLevels(
             DateTime signalTime,
             int timeValue,
+            DateTime currentBarTime,
             double currentBarOpen,
             double completedClose)
         {
@@ -1244,15 +1277,77 @@ namespace NinjaTrader.NinjaScript.Strategies
                 rthOpenDate =
                     signalTime.Date;
 
-                rthOpen =
+                var capturedBarOpen =
                     currentBarOpen;
+
+                var appliedRthOpen =
+                    capturedBarOpen;
+
+                double debugOverridePrice;
+                string debugOverrideReason;
+
+                var debugOverrideApplied =
+                    TryGetDebugRthOpenOverride(
+                        signalTime.Date,
+                        out debugOverridePrice,
+                        out debugOverrideReason);
+
+                if (debugOverrideApplied)
+                {
+                    appliedRthOpen =
+                        debugOverridePrice;
+                }
+
+                rthOpen =
+                    appliedRthOpen;
+
+                var firstTickTimeText =
+                    firstRthTickTime
+                        == Core.Globals.MinDate
+                        ? "<not-captured-yet>"
+                        : firstRthTickTime.ToString(
+                            "HH:mm:ss.fff",
+                            System.Globalization.CultureInfo.InvariantCulture);
+
+                var firstTickPriceText =
+                    IsFinite(firstRthTickPrice)
+                        ? firstRthTickPrice.ToString(
+                            "0.########",
+                            System.Globalization.CultureInfo.InvariantCulture)
+                        : "<not-captured-yet>";
+
+                Diagnostic(
+                    signalTime,
+                    "RTH OPEN DIAG " +
+                    "Date={0:yyyy-MM-dd} " +
+                    "CompletedBarStamp={1:HH:mm:ss.fff} " +
+                    "CurrentBarStamp={2:HH:mm:ss.fff} " +
+                    "CapturedBarOpen={3} AppliedOpen={4} " +
+                    "OverrideApplied={5} OverrideSetting='{6}' " +
+                    "OverrideReason={7} " +
+                    "FirstRthTickTime={8} FirstRthTickPrice={9} " +
+                    "State={10}",
+                    rthOpenDate,
+                    signalTime,
+                    currentBarTime,
+                    capturedBarOpen,
+                    rthOpen,
+                    debugOverrideApplied,
+                    DebugRthOpenOverride ?? string.Empty,
+                    debugOverrideReason,
+                    firstTickTimeText,
+                    firstTickPriceText,
+                    State);
 
                 Diagnostic(
                     signalTime,
                     "RTH OPEN READY " +
-                    "Date={0:yyyy-MM-dd} Open={1}",
+                    "Date={0:yyyy-MM-dd} Open={1} Source={2}",
                     rthOpenDate,
-                    rthOpen);
+                    rthOpen,
+                    debugOverrideApplied
+                        ? "DebugOverride"
+                        : "Captured1mOpen");
             }
 
 
@@ -1475,6 +1570,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             var timeValue =
                 ToTimeValue(
                     time);
+
+
+            LogRthOpenTickDiagnostic(
+                time,
+                price);
 
 
             //
@@ -1787,6 +1887,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             activeTradingDate =
                 date;
+
+            rthDiagnosticDate =
+                date;
+
+            rthDiagnosticTickCount = 0;
+
+            firstRthTickTime =
+                Core.Globals.MinDate;
+
+            firstRthTickPrice =
+                double.NaN;
 
             tradesToday = 0;
             winnersToday = 0;
@@ -2480,6 +2591,214 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+        private void LogRthOpenTickDiagnostic(
+            DateTime time,
+            double price)
+        {
+            if (!EnableDiagnostics
+                || !IsFinite(price))
+            {
+                return;
+            }
+
+
+            if (rthDiagnosticDate
+                != time.Date)
+            {
+                rthDiagnosticDate =
+                    time.Date;
+
+                rthDiagnosticTickCount = 0;
+
+                firstRthTickTime =
+                    Core.Globals.MinDate;
+
+                firstRthTickPrice =
+                    double.NaN;
+            }
+
+
+            var marketOpenDateTime =
+                DateTimeForTimeValue(
+                    time.Date,
+                    MarketOpenTime);
+
+            // Only sample the first minute of RTH. This prevents a strategy
+            // started later in the day from incorrectly labelling its first
+            // observed tick as the RTH opening tick.
+            if (time < marketOpenDateTime
+                || time >= marketOpenDateTime.AddMinutes(1)
+                || rthDiagnosticTickCount
+                    >= RthDiagnosticTickLimit)
+            {
+                return;
+            }
+
+
+            rthDiagnosticTickCount++;
+
+            if (rthDiagnosticTickCount == 1)
+            {
+                firstRthTickTime =
+                    time;
+
+                firstRthTickPrice =
+                    price;
+            }
+
+
+            Diagnostic(
+                time,
+                "RTH TICK DIAG " +
+                "Date={0:yyyy-MM-dd} Tick={1}/{2} " +
+                "Price={3} FirstTick={4} State={5}",
+                time.Date,
+                rthDiagnosticTickCount,
+                RthDiagnosticTickLimit,
+                price,
+                rthDiagnosticTickCount == 1,
+                State);
+        }
+
+
+        private bool TryGetDebugRthOpenOverride(
+            DateTime tradingDate,
+            out double overridePrice,
+            out string reason)
+        {
+            overridePrice =
+                double.NaN;
+
+            reason =
+                "Blank";
+
+            var setting =
+                (DebugRthOpenOverride
+                 ?? string.Empty).Trim();
+
+            if (setting.Length == 0)
+                return false;
+
+
+            var priceText =
+                setting;
+
+            var equalsIndex =
+                setting.IndexOf('=');
+
+            if (equalsIndex >= 0)
+            {
+                var dateText =
+                    setting.Substring(
+                        0,
+                        equalsIndex).Trim();
+
+                priceText =
+                    setting.Substring(
+                        equalsIndex + 1).Trim();
+
+                DateTime configuredDate;
+
+                if (!DateTime.TryParseExact(
+                        dateText,
+                        "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None,
+                        out configuredDate))
+                {
+                    reason =
+                        "InvalidDate";
+
+                    return false;
+                }
+
+
+                if (configuredDate.Date
+                    != tradingDate.Date)
+                {
+                    reason =
+                        string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "DateMismatch({0:yyyy-MM-dd})",
+                            configuredDate.Date);
+
+                    return false;
+                }
+            }
+
+
+            double parsedPrice;
+
+            var parsed =
+                double.TryParse(
+                    priceText,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out parsedPrice);
+
+            if (!parsed)
+            {
+                parsed =
+                    double.TryParse(
+                        priceText,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.CurrentCulture,
+                        out parsedPrice);
+            }
+
+
+            if (!parsed
+                || !IsFinite(parsedPrice)
+                || parsedPrice <= 0)
+            {
+                reason =
+                    "InvalidPrice";
+
+                return false;
+            }
+
+
+            if (TickSize > 0)
+            {
+                parsedPrice =
+                    Math.Round(
+                        parsedPrice / TickSize)
+                    * TickSize;
+            }
+
+
+            overridePrice =
+                parsedPrice;
+
+            reason =
+                "Applied";
+
+            return true;
+        }
+
+
+        private static DateTime DateTimeForTimeValue(
+            DateTime date,
+            int timeValue)
+        {
+            var hour =
+                timeValue / 10000;
+
+            var minute =
+                (timeValue / 100) % 100;
+
+            var second =
+                timeValue % 100;
+
+
+            return
+                date.Date
+                    .AddHours(hour)
+                    .AddMinutes(minute)
+                    .AddSeconds(second);
+        }
+
+
         private void Diagnostic(
             DateTime time,
             string format,
@@ -2693,13 +3012,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             set;
         } = 14;
 
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable EMA Filter",
+            GroupName = "3. Indicators",
+            Order = 1)]
+        public bool EnableEMAFilter
+        {
+            get;
+            set;
+        }
 
         [NinjaScriptProperty]
         [Range(1, 240)]
         [Display(
             Name = "EMA Fast Period",
             GroupName = "3. Indicators",
-            Order = 1)]
+            Order = 2)]
         public int EmaFastPeriod
         {
             get;
@@ -2712,7 +3041,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "EMA Slow Period",
             GroupName = "3. Indicators",
-            Order = 2)]
+            Order = 3)]
         public int EmaSlowPeriod
         {
             get;
@@ -2725,7 +3054,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "Long Max Minutes From Open",
             GroupName = "4. Long Model",
-            Order = 0)]
+            Order = 4)]
         public int LongMaxMinutesFromOpen
         {
             get;
@@ -2952,6 +3281,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             GroupName = "8. Diagnostics",
             Order = 0)]
         public bool EnableDiagnostics
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Debug RTH Open Override",
+            Description = "Diagnostic only. Leave blank for normal behaviour. Recommended format: yyyy-MM-dd=price (example: 2026-09-24=7734.25). A price-only value is also accepted but applies to every processed date, so date-qualified format is safer.",
+            GroupName = "8. Diagnostics",
+            Order = 1)]
+        public string DebugRthOpenOverride
         {
             get;
             set;
