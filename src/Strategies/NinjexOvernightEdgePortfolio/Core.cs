@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using NinjaTrader.Cbi;
@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.5-live-state-recovery";
+        private const string StrategyVersion = "1.2.6-playback-restart-simulation";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -459,6 +459,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableDiagnostics = true;
                 EnableResearchTelemetry = false;
 
+                // Test-only. Leave false for normal / official Market Replay.
+                // When explicitly enabled, Playback exercises the same durable
+                // daily-state restart recovery used by genuine live accounts.
+                EnablePlaybackRestartRecoverySimulation = false;
+
                 // Disabled by default. Verified overrides are intended only
                 // for forensic Replay/Historical reconstruction when a live
                 // RTH open discrepancy has been independently confirmed.
@@ -513,7 +518,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "MaxHold={6}m " +
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
                     "VerifiedRthOpenOverrides={10} " +
-                    "ResearchTelemetry={11} ResearchPath='{12}'",
+                    "ResearchTelemetry={11} ResearchPath='{12}' " +
+                    "PlaybackRestartRecoverySimulation={13}",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -526,7 +532,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxLossesPerDay,
                     EnableVerifiedRthOpenOverrides,
                     EnableResearchTelemetry,
-                    researchTelemetryPath);
+                    researchTelemetryPath,
+                    EnablePlaybackRestartRecoverySimulation);
             }
             else if (State == State.Realtime)
             {
@@ -1646,9 +1653,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 time.Date,
                 time);
 
-            // Live-only restart safety. Playback/Historical return immediately.
-            // On a live reconnect this restores authoritative daily counters
-            // before any pending signal can become an order.
+            // Restart-safe daily risk state. Historical always returns immediately.
+            // Playback also returns immediately unless the explicit restart-
+            // simulation diagnostic switch is enabled. Genuine live accounts
+            // always use recovery before a pending signal can become an order.
             EnsureLiveDailyStateReady(time);
 
 
@@ -1861,7 +1869,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // Daily caps are a live safety boundary. After NT/VPS/strategy
             // restart, never evaluate them against historical reconstruction.
-            // Playback and Historical are deliberately excluded by the helper.
+            // Historical is always excluded. Playback participates only when
+            // the explicit restart-recovery simulation switch is enabled.
             if (!EnsureLiveDailyStateReady(time))
             {
                 if (logReason)
@@ -3370,6 +3379,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             GroupName = "8. Diagnostics",
             Order = 1)]
         public bool EnableVerifiedRthOpenOverrides
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Playback Restart Recovery Simulation",
+            Description = "Test-only. When enabled, Playback persists/restores daily trade counters across strategy disable/re-enable using the same recovery path as live. Leave false for normal and official Market Replay runs.",
+            GroupName = "8. Diagnostics",
+            Order = 2)]
+        public bool EnablePlaybackRestartRecoverySimulation
         {
             get;
             set;
