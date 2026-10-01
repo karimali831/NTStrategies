@@ -1,0 +1,53 @@
+name: Temporary tighten live state recovery
+
+on:
+  push:
+    branches:
+      - fix/overnight-edge-live-state-core
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[live-state-tightened]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/overnight-edge-live-state-core
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/Strategies/NinjexOvernightEdgePortfolio/LiveDailyState.cs')
+          text = p.read_text(encoding='utf-8-sig')
+
+          old = '''                if (TryRebuildLiveDailyStateFromAccountExecutions(\n                        tradingDate,\n                        out accountState,\n                        out accountError))\n                {\n                    if (accountState.Trades > persisted.Trades)\n                    {\n                        ApplyRecoveredLiveDailyState(\n                            accountState,\n                            eventTime,\n                            "AccountExecutionsNewer");\n\n                        PersistLiveDailyState(\n                            eventTime,\n                            false,\n                            "RecoveredFromNewerExecutions");\n\n                        return true;\n                    }\n\n                    if (accountState.Trades == persisted.Trades\n                        && accountState.Trades > 0\n                        && !LiveDailyStatesEquivalent(\n                            persisted,\n                            accountState))\n                    {\n                        return FailClosedLiveDailyState(\n                            eventTime,\n                            "PersistedAccountMismatch");\n                    }\n                }\n\n                ApplyRecoveredLiveDailyState('''
+
+          new = '''                if (TryRebuildLiveDailyStateFromAccountExecutions(\n                        tradingDate,\n                        out accountState,\n                        out accountError))\n                {\n                    if (accountState.Trades > persisted.Trades)\n                    {\n                        ApplyRecoveredLiveDailyState(\n                            accountState,\n                            eventTime,\n                            "AccountExecutionsNewer");\n\n                        PersistLiveDailyState(\n                            eventTime,\n                            false,\n                            "RecoveredFromNewerExecutions");\n\n                        return true;\n                    }\n\n                    if (accountState.Trades == persisted.Trades\n                        && accountState.Trades > 0\n                        && !LiveDailyStatesEquivalent(\n                            persisted,\n                            accountState))\n                    {\n                        return FailClosedLiveDailyState(\n                            eventTime,\n                            "PersistedAccountMismatch");\n                    }\n                }\n                else if (!CanSafelyUsePersistedSnapshotAfterAccountRecoveryFailure(\n                             accountError))\n                {\n                    return FailClosedLiveDailyState(\n                        eventTime,\n                        "AccountRecovery:" + accountError);\n                }\n\n                ApplyRecoveredLiveDailyState('''
+
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          anchor = '''        private static bool LiveDailyStatesEquivalent(\n            LiveDailyStateSnapshot left,\n            LiveDailyStateSnapshot right)\n        {'''
+
+          helper = '''        private static bool CanSafelyUsePersistedSnapshotAfterAccountRecoveryFailure(\n            string error)\n        {\n            if (string.IsNullOrEmpty(error))\n                return false;\n\n            // A completed durable snapshot is intentionally allowed to remain\n            // authoritative while connection/execution collections are still\n            // repopulating after NT reconnect. Structural trade-state errors\n            // (open trade, overlap, signal mismatch, quantity mismatch) are\n            // never ignored and therefore fail closed.\n            return string.Equals(\n                       error,\n                       "AccountUnavailable",\n                       StringComparison.Ordinal)\n                   || string.Equals(\n                       error,\n                       "OrderConnectionNotConnected",\n                       StringComparison.Ordinal)\n                   || string.Equals(\n                       error,\n                       "InstrumentUnavailable",\n                       StringComparison.Ordinal)\n                   || error.StartsWith(\n                       "AccountExecutionsReadError:",\n                       StringComparison.Ordinal);\n        }\n\n'''
+
+          assert anchor in text
+          text = text.replace(anchor, helper + anchor, 1)
+          p.write_text(text, encoding='utf-8')
+
+          csproj = Path('NTStrategies.csproj')
+          proj = csproj.read_text(encoding='utf-8-sig')
+          csproj.write_text(proj, encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Strategies/NinjexOvernightEdgePortfolio/LiveDailyState.cs NTStrategies.csproj
+          git commit -m "[live-state-tightened] Fail closed on structural recovery mismatch" || exit 0
+          git push origin HEAD:fix/overnight-edge-live-state-core
