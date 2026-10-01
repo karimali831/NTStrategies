@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.4-research-telemetry";
+        private const string StrategyVersion = "1.2.5-live-state-recovery";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -527,6 +527,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EnableVerifiedRthOpenOverrides,
                     EnableResearchTelemetry,
                     researchTelemetryPath);
+            }
+            else if (State == State.Realtime)
+            {
+                ResetLiveDailyStateRecoveryOnRealtimeTransition();
             }
             else if (State == State.Terminated)
             {
@@ -1642,6 +1646,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 time.Date,
                 time);
 
+            // Live-only restart safety. Playback/Historical return immediately.
+            // On a live reconnect this restores authoritative daily counters
+            // before any pending signal can become an order.
+            EnsureLiveDailyStateReady(time);
+
 
             var timeValue =
                 ToTimeValue(
@@ -1850,6 +1859,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool logReason,
             bool allowExistingPendingEntry)
         {
+            // Daily caps are a live safety boundary. After NT/VPS/strategy
+            // restart, never evaluate them against historical reconstruction.
+            // Playback and Historical are deliberately excluded by the helper.
+            if (!EnsureLiveDailyStateReady(time))
+            {
+                if (logReason)
+                {
+                    Diagnostic(
+                        time,
+                        "TRADE BLOCK Reason=LiveDailyStateRecovery");
+                }
+
+                return false;
+            }
+
+
             if (Position.MarketPosition
                     != MarketPosition.Flat
                 || entryOrderPending
@@ -2141,6 +2166,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             : Core.Globals.MinDate;
 
                     tradesToday++;
+
+                    PersistLiveDailyState(
+                        time,
+                        true,
+                        "EntryFill");
                 }
 
 
@@ -2267,6 +2297,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             else if (activeTradeGrossPnl < 0)
                 lossesToday++;
+
+            PersistLiveDailyState(
+                time,
+                false,
+                "TradeComplete");
 
             RecordResearchTradeExit(
                 time,
