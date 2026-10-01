@@ -188,6 +188,38 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string researchTelemetryPath = string.Empty;
         private bool researchTelemetryFaulted;
 
+        // Live daily risk-state recovery. These fields are independent of the
+        // optional research CSV; the existing research hooks are simply safe
+        // integration points already called by V1's execution path.
+        private const int LiveDailyRecoveryGraceMilliseconds = 5000;
+        private const string LiveDailySnapshotVersion = "1";
+        private bool liveDailyRecoveryApplicable;
+        private bool liveDailyRecoveryStarted;
+        private bool liveDailyRecoveryComplete = true;
+        private bool liveDailyRecoveryBlockLogged;
+        private DateTime liveDailyRecoveryDate = Core.Globals.MinDate;
+        private DateTime liveDailyRecoveryNotBeforeUtc = Core.Globals.MinDate;
+        private string liveDailyStatePath = string.Empty;
+
+        private sealed class LiveDailyStateSnapshot
+        {
+            public DateTime TradingDate = Core.Globals.MinDate;
+            public int Trades;
+            public int Winners;
+            public int Losses;
+            public double GrossPnl;
+        }
+
+        private sealed class LiveRecoveryOpenTrade
+        {
+            public string EntrySignal = string.Empty;
+            public PendingDirection Direction = PendingDirection.None;
+            public int OpenQuantity;
+            public int EntryQuantity;
+            public double EntryPriceQuantity;
+            public double GrossPnl;
+        }
+
         private void InitializeResearchTelemetry()
         {
             DisposeResearchTelemetry();
@@ -254,12 +286,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CaptureResearchPreviousFiveMinuteContext(double previousEmaFast, double previousEmaSlow)
         {
-            // Live daily risk-state recovery is intentionally independent of
-            // research telemetry. This hook runs on completed 5-minute context
-            // before the entry window and gives a normal live start time to
-            // restore/persist its counters before any signal can be submitted.
-            EnsureLiveDailyStateRecoveryForSignal(
-                GetCurrentStrategyTimeForRecovery());
+            // Runs even when research telemetry is disabled. In real time this
+            // normally restores the daily counters before the 09:35 entry window.
+            EnsureLiveDailyStateRecoveryForSignal(GetCurrentStrategyTimeForRecovery());
 
             researchPreviousEmaFast = previousEmaFast;
             researchPreviousEmaSlow = previousEmaSlow;
@@ -269,9 +298,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
             int minutesFromOpen, double overnightWidthTicks)
         {
-            // This method is called immediately before CanTakeNewTrade() for
-            // the production four-model portfolio. Recover live counters even
-            // when research telemetry itself is disabled.
+            // Called immediately before Core.CanTakeNewTrade() in production
+            // FourModel modes. This is the fail-closed restart safety gate even
+            // when EnableResearchTelemetry is false.
             EnsureLiveDailyStateRecoveryForSignal(signalTime);
 
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
@@ -410,11 +439,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RecordResearchEntryFill(DateTime time, double entryPrice)
         {
-            // Persist daily live risk state independently of research output.
             // Core increments tradesToday immediately before this callback.
-            PersistLiveDailyStateSnapshot(
-                time,
-                "EntryFill");
+            PersistLiveDailyStateSnapshot(time, "EntryFill");
 
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
@@ -441,9 +467,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void RecordResearchTradeExit(DateTime time, string exitName, double exitPrice)
         {
             // Core has already updated winnersToday/lossesToday/grossPnlToday.
-            PersistLiveDailyStateSnapshot(
-                time,
-                "TradeComplete");
+            PersistLiveDailyStateSnapshot(time, "TradeComplete");
 
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
@@ -537,6 +561,528 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var invalid in Path.GetInvalidFileNameChars())
                 result = result.Replace(invalid, '_');
             return result.Replace(' ', '_');
+        }
+
+        // ---------------------------------------------------------------------
+        // Restart-safe live daily portfolio state
+        // ---------------------------------------------------------------------
+
+        private void EnsureLiveDailyStateRecoveryForSignal(DateTime eventTime)
+        {
+            if (State != State.Realtime)
+                return;
+
+            if (!liveDailyRecoveryStarted
+                || liveDailyRecoveryDate != eventTime.Date)
+            {
+                BeginLiveDailyStateRecovery(eventTime);
+            }
+
+            if (liveDailyRecoveryComplete)
+                return;
+
+            if (DateTime.UtcNow < liveDailyRecoveryNotBeforeUtc)
+            {
+                FailClosedLiveDailyState(eventTime, "WaitingForAccountExecutions");
+                return;
+            }
+
+            LiveDailyStateSnapshot recovered;
+            string error;
+
+            if (!TryRebuildLiveDailyStateFromAccountExecutions(eventTime.Date, out recovered, out error))
+            {
+                FailClosedLiveDailyState(
+                    eventTime,
+                    string.IsNullOrEmpty(error) ? "AccountExecutionRecoveryFailed" : error);
+                return;
+            }
+
+            ApplyRecoveredLiveDailyState(recovered, eventTime, "AccountExecutions");
+            PersistLiveDailyStateSnapshot(eventTime, "RecoveryAccountExecutions");
+        }
+
+        private void BeginLiveDailyStateRecovery(DateTime eventTime)
+        {
+            liveDailyRecoveryStarted = true;
+            liveDailyRecoveryApplicable = ShouldUseLiveDailyStateRecovery();
+            liveDailyRecoveryComplete = !liveDailyRecoveryApplicable;
+            liveDailyRecoveryBlockLogged = false;
+            liveDailyRecoveryDate = eventTime.Date;
+            liveDailyStatePath = BuildLiveDailyStatePath();
+
+            if (!liveDailyRecoveryApplicable)
+                return;
+
+            LiveDailyStateSnapshot persisted;
+            if (TryReadLiveDailyStateSnapshot(eventTime.Date, out persisted))
+            {
+                LiveDailyStateSnapshot accountState;
+                string accountError;
+
+                if (TryRebuildLiveDailyStateFromAccountExecutions(eventTime.Date, out accountState, out accountError))
+                {
+                    if (accountState.Trades > persisted.Trades)
+                    {
+                        ApplyRecoveredLiveDailyState(accountState, eventTime, "AccountExecutionsNewer");
+                        PersistLiveDailyStateSnapshot(eventTime, "RecoveryAccountExecutionsNewer");
+                        return;
+                    }
+
+                    if (accountState.Trades == persisted.Trades
+                        && !LiveDailyStatesEquivalent(persisted, accountState))
+                    {
+                        Diagnostic(
+                            eventTime,
+                            "LIVE DAILY STATE RECOVERY FAILED Reason=PersistedAccountMismatch " +
+                            "Persisted=T{0}/W{1}/L{2}/Pnl{3:0.00} " +
+                            "Account=T{4}/W{5}/L{6}/Pnl{7:0.00}",
+                            persisted.Trades, persisted.Winners, persisted.Losses, persisted.GrossPnl,
+                            accountState.Trades, accountState.Winners, accountState.Losses, accountState.GrossPnl);
+                        return;
+                    }
+                }
+
+                // Never downgrade a durable snapshot merely because broker
+                // executions are still repopulating after reconnect.
+                ApplyRecoveredLiveDailyState(persisted, eventTime, "PersistedSnapshot");
+                return;
+            }
+
+            // First run after this feature is installed, or a fresh trading day:
+            // allow the broker execution collection time to populate, and block
+            // every new live entry until recovery completes.
+            liveDailyRecoveryNotBeforeUtc = DateTime.UtcNow.AddMilliseconds(LiveDailyRecoveryGraceMilliseconds);
+
+            Diagnostic(
+                eventTime,
+                "LIVE DAILY STATE RECOVERY PENDING Date={0:yyyy-MM-dd} Reason=NoPersistedSnapshot",
+                eventTime.Date);
+
+            FailClosedLiveDailyState(eventTime, "WaitingForAccountExecutions");
+        }
+
+        private void FailClosedLiveDailyState(DateTime eventTime, string reason)
+        {
+            // Core.CanTakeNewTrade() runs immediately after the four-model
+            // candidate hook. Make every enabled daily cap appear reached until
+            // authoritative state replaces these sentinel values.
+            if (MaxTradesPerDay > 0)
+                tradesToday = Math.Max(tradesToday, MaxTradesPerDay);
+            if (MaxWinnersPerDay > 0)
+                winnersToday = Math.Max(winnersToday, MaxWinnersPerDay);
+            if (MaxLossesPerDay > 0)
+                lossesToday = Math.Max(lossesToday, MaxLossesPerDay);
+
+            if (liveDailyRecoveryBlockLogged)
+                return;
+
+            liveDailyRecoveryBlockLogged = true;
+            Diagnostic(
+                eventTime,
+                "TRADE BLOCK Reason=LiveDailyStateRecovery Detail={0} Date={1:yyyy-MM-dd}",
+                reason ?? string.Empty,
+                eventTime.Date);
+        }
+
+        private void ApplyRecoveredLiveDailyState(
+            LiveDailyStateSnapshot snapshot,
+            DateTime eventTime,
+            string source)
+        {
+            if (snapshot == null)
+                return;
+
+            activeTradingDate = snapshot.TradingDate.Date;
+            tradesToday = snapshot.Trades;
+            winnersToday = snapshot.Winners;
+            lossesToday = snapshot.Losses;
+            grossPnlToday = snapshot.GrossPnl;
+            liveDailyRecoveryDate = snapshot.TradingDate.Date;
+            liveDailyRecoveryComplete = true;
+            liveDailyRecoveryBlockLogged = false;
+
+            Diagnostic(
+                eventTime,
+                "LIVE DAILY STATE RECOVERED Source={0} Date={1:yyyy-MM-dd} " +
+                "Trades={2} Winners={3} Losses={4} GrossPnl={5:0.00}",
+                source ?? string.Empty,
+                snapshot.TradingDate,
+                snapshot.Trades,
+                snapshot.Winners,
+                snapshot.Losses,
+                snapshot.GrossPnl);
+        }
+
+        private void PersistLiveDailyStateSnapshot(DateTime eventTime, string reason)
+        {
+            if (!liveDailyRecoveryApplicable
+                || State != State.Realtime
+                || activeTradingDate == Core.Globals.MinDate)
+                return;
+
+            try
+            {
+                if (string.IsNullOrEmpty(liveDailyStatePath))
+                    liveDailyStatePath = BuildLiveDailyStatePath();
+                if (string.IsNullOrEmpty(liveDailyStatePath))
+                    return;
+
+                var directory = Path.GetDirectoryName(liveDailyStatePath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
+                var lines = new[]
+                {
+                    "Version=" + LiveDailySnapshotVersion,
+                    "TradingDate=" + activeTradingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    "Account=" + GetLiveRecoveryAccountName(),
+                    "Instrument=" + GetLiveRecoveryInstrumentName(),
+                    "Trades=" + tradesToday.ToString(CultureInfo.InvariantCulture),
+                    "Winners=" + winnersToday.ToString(CultureInfo.InvariantCulture),
+                    "Losses=" + lossesToday.ToString(CultureInfo.InvariantCulture),
+                    "GrossPnl=" + grossPnlToday.ToString("0.########", CultureInfo.InvariantCulture),
+                    "UpdatedUtc=" + DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                    "Reason=" + (reason ?? string.Empty)
+                };
+
+                var tempPath = liveDailyStatePath + ".tmp";
+                File.WriteAllLines(tempPath, lines);
+
+                if (File.Exists(liveDailyStatePath))
+                {
+                    try
+                    {
+                        File.Replace(tempPath, liveDailyStatePath, null);
+                    }
+                    catch
+                    {
+                        File.Copy(tempPath, liveDailyStatePath, true);
+                        File.Delete(tempPath);
+                    }
+                }
+                else
+                {
+                    File.Move(tempPath, liveDailyStatePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Diagnostic(
+                    eventTime,
+                    "LIVE DAILY STATE PERSIST ERROR Reason={0} Message={1}",
+                    reason ?? string.Empty,
+                    ex.Message);
+            }
+        }
+
+        private bool TryReadLiveDailyStateSnapshot(DateTime tradingDate, out LiveDailyStateSnapshot snapshot)
+        {
+            snapshot = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(liveDailyStatePath) || !File.Exists(liveDailyStatePath))
+                    return false;
+
+                var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var line in File.ReadAllLines(liveDailyStatePath))
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    var separator = line.IndexOf('=');
+                    if (separator <= 0)
+                        continue;
+                    values[line.Substring(0, separator)] = line.Substring(separator + 1);
+                }
+
+                string version, dateText, account, instrument, tradesText, winnersText, lossesText, grossText;
+                if (!values.TryGetValue("Version", out version)
+                    || version != LiveDailySnapshotVersion
+                    || !values.TryGetValue("TradingDate", out dateText)
+                    || !values.TryGetValue("Account", out account)
+                    || !values.TryGetValue("Instrument", out instrument)
+                    || !values.TryGetValue("Trades", out tradesText)
+                    || !values.TryGetValue("Winners", out winnersText)
+                    || !values.TryGetValue("Losses", out lossesText)
+                    || !values.TryGetValue("GrossPnl", out grossText))
+                    return false;
+
+                DateTime date;
+                int trades, winners, losses;
+                double gross;
+
+                if (!DateTime.TryParseExact(dateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+                    || !int.TryParse(tradesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out trades)
+                    || !int.TryParse(winnersText, NumberStyles.Integer, CultureInfo.InvariantCulture, out winners)
+                    || !int.TryParse(lossesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out losses)
+                    || !double.TryParse(grossText, NumberStyles.Float, CultureInfo.InvariantCulture, out gross))
+                    return false;
+
+                if (date.Date != tradingDate.Date
+                    || !string.Equals(account, GetLiveRecoveryAccountName(), StringComparison.Ordinal)
+                    || !string.Equals(instrument, GetLiveRecoveryInstrumentName(), StringComparison.OrdinalIgnoreCase)
+                    || trades < 0 || winners < 0 || losses < 0 || winners + losses > trades)
+                    return false;
+
+                snapshot = new LiveDailyStateSnapshot
+                {
+                    TradingDate = date.Date,
+                    Trades = trades,
+                    Winners = winners,
+                    Losses = losses,
+                    GrossPnl = gross
+                };
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool TryRebuildLiveDailyStateFromAccountExecutions(
+            DateTime tradingDate,
+            out LiveDailyStateSnapshot snapshot,
+            out string error)
+        {
+            snapshot = new LiveDailyStateSnapshot { TradingDate = tradingDate.Date };
+            error = string.Empty;
+
+            if (Account == null)
+            {
+                error = "AccountUnavailable";
+                return false;
+            }
+
+            if (Account.Connection == null || Account.Connection.Status != ConnectionStatus.Connected)
+            {
+                error = "OrderConnectionNotConnected";
+                return false;
+            }
+
+            if (Instrument == null)
+            {
+                error = "InstrumentUnavailable";
+                return false;
+            }
+
+            var relevant = new List<Execution>();
+            try
+            {
+                lock (Account.Executions)
+                {
+                    foreach (var execution in Account.Executions)
+                    {
+                        if (execution == null || execution.Order == null || execution.Instrument == null
+                            || execution.Quantity <= 0 || execution.Time.Date != tradingDate.Date
+                            || !string.Equals(execution.Instrument.FullName, Instrument.FullName, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        var fromEntry = execution.Order.FromEntrySignal ?? string.Empty;
+                        if (IsEntrySignalName(execution.Order.Name)
+                            || IsEntrySignalName(fromEntry)
+                            || IsKnownLiveRecoveryExitName(execution.Order.Name))
+                            relevant.Add(execution);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                error = "AccountExecutionsReadError:" + ex.Message;
+                return false;
+            }
+
+            relevant.Sort(delegate(Execution left, Execution right)
+            {
+                var compare = left.Time.CompareTo(right.Time);
+                if (compare != 0)
+                    return compare;
+                return string.Compare(left.ExecutionId ?? string.Empty, right.ExecutionId ?? string.Empty, StringComparison.Ordinal);
+            });
+
+            var openTrade = new LiveRecoveryOpenTrade();
+            var pointValue = Instrument.MasterInstrument.PointValue;
+
+            foreach (var execution in relevant)
+            {
+                var order = execution.Order;
+
+                if (IsEntrySignalName(order.Name))
+                {
+                    var direction = IsLongEntrySignalName(order.Name) ? PendingDirection.Long : PendingDirection.Short;
+
+                    if (openTrade.OpenQuantity <= 0)
+                    {
+                        openTrade = new LiveRecoveryOpenTrade
+                        {
+                            EntrySignal = order.Name,
+                            Direction = direction
+                        };
+                        snapshot.Trades++;
+                    }
+                    else if (!string.Equals(openTrade.EntrySignal, order.Name, StringComparison.Ordinal)
+                             || openTrade.Direction != direction)
+                    {
+                        error = "OverlappingStrategyEntries";
+                        return false;
+                    }
+
+                    openTrade.OpenQuantity += execution.Quantity;
+                    openTrade.EntryQuantity += execution.Quantity;
+                    openTrade.EntryPriceQuantity += execution.Price * execution.Quantity;
+                    continue;
+                }
+
+                var fromEntrySignal = order.FromEntrySignal ?? string.Empty;
+                var looksLikeExit = IsEntrySignalName(fromEntrySignal) || IsKnownLiveRecoveryExitName(order.Name);
+                if (!looksLikeExit)
+                    continue;
+
+                if (openTrade.OpenQuantity <= 0 || openTrade.EntryQuantity <= 0)
+                {
+                    error = "ExitWithoutRecoverableEntry";
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(fromEntrySignal)
+                    && IsEntrySignalName(fromEntrySignal)
+                    && !string.Equals(fromEntrySignal, openTrade.EntrySignal, StringComparison.Ordinal))
+                {
+                    error = "ExitEntrySignalMismatch";
+                    return false;
+                }
+
+                if (execution.Quantity > openTrade.OpenQuantity)
+                {
+                    error = "ExitQuantityExceedsRecoveredPosition";
+                    return false;
+                }
+
+                var averageEntry = openTrade.EntryPriceQuantity / openTrade.EntryQuantity;
+                var points = openTrade.Direction == PendingDirection.Long
+                    ? execution.Price - averageEntry
+                    : averageEntry - execution.Price;
+
+                openTrade.GrossPnl += points * pointValue * execution.Quantity;
+                openTrade.OpenQuantity -= execution.Quantity;
+
+                if (openTrade.OpenQuantity == 0)
+                {
+                    snapshot.GrossPnl += openTrade.GrossPnl;
+                    if (openTrade.GrossPnl > 0)
+                        snapshot.Winners++;
+                    else if (openTrade.GrossPnl < 0)
+                        snapshot.Losses++;
+                    openTrade = new LiveRecoveryOpenTrade();
+                }
+            }
+
+            if (openTrade.OpenQuantity > 0)
+            {
+                error = "RecoveredStrategyTradeStillOpen";
+                return false;
+            }
+
+            if (snapshot.Winners + snapshot.Losses > snapshot.Trades)
+            {
+                error = "RecoveredCounterInvariantFailed";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool LiveDailyStatesEquivalent(LiveDailyStateSnapshot left, LiveDailyStateSnapshot right)
+        {
+            return left != null && right != null
+                   && left.TradingDate.Date == right.TradingDate.Date
+                   && left.Trades == right.Trades
+                   && left.Winners == right.Winners
+                   && left.Losses == right.Losses
+                   && Math.Abs(left.GrossPnl - right.GrossPnl) < 0.01;
+        }
+
+        private bool ShouldUseLiveDailyStateRecovery()
+        {
+            if (State != State.Realtime || Account == null)
+                return false;
+
+            try
+            {
+                var accountName = Account.Name ?? string.Empty;
+                if (accountName.StartsWith("Playback", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                var connectionName = Account.Connection != null && Account.Connection.Options != null
+                    ? Account.Connection.Options.Name
+                    : string.Empty;
+
+                if (!string.IsNullOrEmpty(connectionName)
+                    && connectionName.IndexOf("Playback", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return false;
+            }
+            catch
+            {
+                // If metadata is temporarily unavailable on a real-time strategy,
+                // prefer the safer recovery path.
+            }
+
+            return true;
+        }
+
+        private static bool IsKnownLiveRecoveryExitName(string orderName)
+        {
+            return string.Equals(orderName, "Stop loss", StringComparison.Ordinal)
+                   || string.Equals(orderName, "Profit target", StringComparison.Ordinal)
+                   || string.Equals(orderName, LongEodExitSignal, StringComparison.Ordinal)
+                   || string.Equals(orderName, ShortEodExitSignal, StringComparison.Ordinal)
+                   || string.Equals(orderName, LongTimeExitSignal, StringComparison.Ordinal)
+                   || string.Equals(orderName, ShortTimeExitSignal, StringComparison.Ordinal);
+        }
+
+        private DateTime GetCurrentStrategyTimeForRecovery()
+        {
+            try
+            {
+                if (CurrentBars != null && CurrentBars.Length > TickSeriesIndex && CurrentBars[TickSeriesIndex] >= 0)
+                    return Times[TickSeriesIndex][0];
+                if (CurrentBars != null && CurrentBars.Length > SignalSeriesIndex && CurrentBars[SignalSeriesIndex] >= 0)
+                    return Times[SignalSeriesIndex][0];
+                if (CurrentBars != null && CurrentBars.Length > ContextSeriesIndex && CurrentBars[ContextSeriesIndex] >= 0)
+                    return Times[ContextSeriesIndex][0];
+            }
+            catch
+            {
+                // Fall back only when strategy data timestamps are unavailable.
+            }
+            return DateTime.Now;
+        }
+
+        private string BuildLiveDailyStatePath()
+        {
+            try
+            {
+                var directory = Path.Combine(Core.Globals.UserDataDir, "NinjexState", "OvernightEdgePortfolio");
+                var fileName = "daily_state_"
+                    + SanitizeFileName(GetLiveRecoveryAccountName()) + "_"
+                    + SanitizeFileName(GetLiveRecoveryInstrumentName()) + ".state";
+                return Path.Combine(directory, fileName);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private string GetLiveRecoveryAccountName()
+        {
+            return Account == null ? string.Empty : Account.Name ?? string.Empty;
+        }
+
+        private string GetLiveRecoveryInstrumentName()
+        {
+            return Instrument == null ? string.Empty : Instrument.FullName ?? string.Empty;
         }
 
         [NinjaScriptProperty]
