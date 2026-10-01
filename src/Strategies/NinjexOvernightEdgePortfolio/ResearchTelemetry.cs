@@ -254,6 +254,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CaptureResearchPreviousFiveMinuteContext(double previousEmaFast, double previousEmaSlow)
         {
+            // Live daily risk-state recovery is intentionally independent of
+            // research telemetry. This hook runs on completed 5-minute context
+            // before the entry window and gives a normal live start time to
+            // restore/persist its counters before any signal can be submitted.
+            EnsureLiveDailyStateRecoveryForSignal(
+                GetCurrentStrategyTimeForRecovery());
+
             researchPreviousEmaFast = previousEmaFast;
             researchPreviousEmaSlow = previousEmaSlow;
         }
@@ -262,6 +269,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
             int minutesFromOpen, double overnightWidthTicks)
         {
+            // This method is called immediately before CanTakeNewTrade() for
+            // the production four-model portfolio. Recover live counters even
+            // when research telemetry itself is disabled.
+            EnsureLiveDailyStateRecoveryForSignal(signalTime);
+
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
@@ -398,6 +410,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RecordResearchEntryFill(DateTime time, double entryPrice)
         {
+            // Persist daily live risk state independently of research output.
+            // Core increments tradesToday immediately before this callback.
+            PersistLiveDailyStateSnapshot(
+                time,
+                "EntryFill");
+
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
@@ -422,6 +440,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RecordResearchTradeExit(DateTime time, string exitName, double exitPrice)
         {
+            // Core has already updated winnersToday/lossesToday/grossPnlToday.
+            PersistLiveDailyStateSnapshot(
+                time,
+                "TradeComplete");
+
             if (!EnableResearchTelemetry || researchTelemetryFaulted)
                 return;
 
