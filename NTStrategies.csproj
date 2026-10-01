@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
     <PropertyGroup>
@@ -169,6 +169,7 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Core.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\LiveDailyState.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchTelemetry.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchShadow.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\V2.cs" />
