@@ -49,10 +49,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Ensures the daily portfolio counters are authoritative before live
-        /// entries can be evaluated. Historical processing and Playback are
-        /// deliberately ignored: uninterrupted Market Replay remains identical
-        /// to Run 4 / Run 5 and never reads or writes persistent live state.
+        /// Ensures the daily portfolio counters are authoritative before
+        /// entries can be evaluated. Historical processing is always ignored.
+        /// Playback is ignored by default so official Market Replay remains
+        /// identical to Run 4 / Run 5; it participates only when the explicit
+        /// restart-recovery simulation switch is enabled.
         /// </summary>
         private bool EnsureLiveDailyStateReady(DateTime eventTime)
         {
@@ -770,20 +771,43 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
+            bool isPlayback;
+            if (!TryDetectPlaybackRecoveryContext(out isPlayback))
+            {
+                // If connection metadata is temporarily unavailable on a
+                // genuine live strategy, prefer the safer recovery path.
+                return true;
+            }
+
+            if (isPlayback)
+                return EnablePlaybackRestartRecoverySimulation;
+
+            return true;
+        }
+
+        private bool TryDetectPlaybackRecoveryContext(
+            out bool isPlayback)
+        {
+            isPlayback = false;
+
             try
             {
                 var accountName =
-                    Account.Name ?? string.Empty;
+                    Account == null
+                        ? string.Empty
+                        : Account.Name ?? string.Empty;
 
                 if (accountName.StartsWith(
                         "Playback",
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    return false;
+                    isPlayback = true;
+                    return true;
                 }
 
                 var connectionName =
-                    Account.Connection != null
+                    Account != null
+                    && Account.Connection != null
                     && Account.Connection.Options != null
                         ? Account.Connection.Options.Name
                         : string.Empty;
@@ -793,16 +817,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                         "Playback",
                         StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    return false;
+                    isPlayback = true;
                 }
+
+                return true;
             }
             catch
             {
-                // If connection metadata is temporarily unavailable on a
-                // genuinely real-time strategy, prefer the safer recovery path.
+                return false;
             }
-
-            return true;
         }
 
         private static bool IsKnownLiveRecoveryExitName(
