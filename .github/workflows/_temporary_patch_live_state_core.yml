@@ -1,0 +1,93 @@
+name: Temporary patch live state recovery into Core
+
+on:
+  push:
+    branches:
+      - fix/overnight-edge-live-state-core
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[core-live-state-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/overnight-edge-live-state-core
+
+      - name: Restore research files and patch Core
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout bde1ca39366695e5c2843d32cd148908adc7c350 -- \
+            src/Strategies/NinjexOvernightEdgePortfolio/ResearchTelemetry.cs \
+            src/Strategies/NinjexOvernightEdgePortfolio/ResearchShadow.cs
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/Strategies/NinjexOvernightEdgePortfolio/Core.cs')
+          text = p.read_text(encoding='utf-8-sig')
+
+          old = 'private const string StrategyVersion = "1.2.4-research-telemetry";'
+          new = 'private const string StrategyVersion = "1.2.5-live-state-recovery";'
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '''            else if (State == State.Terminated)\n            {\n                DisposeResearchTelemetry();\n            }'''
+          new = '''            else if (State == State.Realtime)\n            {\n                ResetLiveDailyStateRecoveryOnRealtimeTransition();\n            }\n            else if (State == State.Terminated)\n            {\n                DisposeResearchTelemetry();\n            }'''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '''            EnsureTradingDate(\n                time.Date,\n                time);\n\n\n            var timeValue ='''
+          new = '''            EnsureTradingDate(\n                time.Date,\n                time);\n\n            // Live-only restart safety. Playback/Historical return immediately.\n            // On a live reconnect this restores authoritative daily counters\n            // before any pending signal can become an order.\n            EnsureLiveDailyStateReady(time);\n\n\n            var timeValue ='''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '''        {\n            if (Position.MarketPosition\n                    != MarketPosition.Flat'''
+          new = '''        {\n            // Daily caps are a live safety boundary. After NT/VPS/strategy\n            // restart, never evaluate them against historical reconstruction.\n            // Playback and Historical are deliberately excluded by the helper.\n            if (!EnsureLiveDailyStateReady(time))\n            {\n                if (logReason)\n                {\n                    Diagnostic(\n                        time,\n                        "TRADE BLOCK Reason=LiveDailyStateRecovery");\n                }\n\n                return false;\n            }\n\n\n            if (Position.MarketPosition\n                    != MarketPosition.Flat'''
+          # This opening pattern is unique to CanTakeNewTrade in this file.
+          marker = '''        private bool CanTakeNewTrade(\n            DateTime time,\n            bool logReason,\n            bool allowExistingPendingEntry)\n'''
+          idx = text.index(marker)
+          tail = text[idx:]
+          assert old in tail
+          tail = tail.replace(old, new, 1)
+          text = text[:idx] + tail
+
+          old = '''                    tradesToday++;\n                }'''
+          new = '''                    tradesToday++;\n\n                    PersistLiveDailyState(\n                        time,\n                        true,\n                        "EntryFill");\n                }'''
+          # Unique in entry-fill counting block.
+          idx = text.index('protected override void OnExecutionUpdate')
+          tail = text[idx:]
+          assert old in tail
+          tail = tail.replace(old, new, 1)
+          text = text[:idx] + tail
+
+          old = '''            else if (activeTradeGrossPnl < 0)\n                lossesToday++;\n\n            RecordResearchTradeExit('''
+          new = '''            else if (activeTradeGrossPnl < 0)\n                lossesToday++;\n\n            PersistLiveDailyState(\n                time,\n                false,\n                "TradeComplete");\n\n            RecordResearchTradeExit('''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          p.write_text(text, encoding='utf-8-sig')
+
+          csproj = Path('NTStrategies.csproj')
+          proj = csproj.read_text(encoding='utf-8-sig')
+          include = '        <Compile Include="src\\Strategies\\NinjexOvernightEdgePortfolio\\LiveDailyState.cs" />\n'
+          anchor = '        <Compile Include="src\\Strategies\\NinjexOvernightEdgePortfolio\\Core.cs" />\n'
+          assert anchor in proj
+          if include not in proj:
+              proj = proj.replace(anchor, anchor + include, 1)
+          csproj.write_text(proj, encoding='utf-8-sig')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Strategies/NinjexOvernightEdgePortfolio/Core.cs \
+                  src/Strategies/NinjexOvernightEdgePortfolio/ResearchTelemetry.cs \
+                  src/Strategies/NinjexOvernightEdgePortfolio/ResearchShadow.cs \
+                  NTStrategies.csproj
+          git commit -m "[core-live-state-patched] Move restart recovery into Core" || exit 0
+          git push origin HEAD:fix/overnight-edge-live-state-core
