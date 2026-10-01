@@ -141,6 +141,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             "PersistedAccountMismatch");
                     }
                 }
+                else if (!CanSafelyUsePersistedSnapshotAfterAccountRecoveryFailure(
+                             accountError))
+                {
+                    return FailClosedLiveDailyState(
+                        eventTime,
+                        "AccountRecovery:" + accountError);
+                }
 
                 ApplyRecoveredLiveDailyState(
                     persisted,
@@ -709,6 +716,34 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             snapshot.OpenTrade = false;
             return true;
+        }
+
+        private static bool CanSafelyUsePersistedSnapshotAfterAccountRecoveryFailure(
+            string error)
+        {
+            if (string.IsNullOrEmpty(error))
+                return false;
+
+            // A completed durable snapshot is intentionally allowed to remain
+            // authoritative while connection/execution collections are still
+            // repopulating after NT reconnect. Structural trade-state errors
+            // (open trade, overlap, signal mismatch, quantity mismatch) are
+            // never ignored and therefore fail closed.
+            return string.Equals(
+                       error,
+                       "AccountUnavailable",
+                       StringComparison.Ordinal)
+                   || string.Equals(
+                       error,
+                       "OrderConnectionNotConnected",
+                       StringComparison.Ordinal)
+                   || string.Equals(
+                       error,
+                       "InstrumentUnavailable",
+                       StringComparison.Ordinal)
+                   || error.StartsWith(
+                       "AccountExecutionsReadError:",
+                       StringComparison.Ordinal);
         }
 
         private static bool LiveDailyStatesEquivalent(
