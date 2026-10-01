@@ -1,0 +1,84 @@
+name: Temporary patch Playback restart simulation
+
+on:
+  push:
+    branches:
+      - fix/overnight-edge-playback-restart-simulation
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[playback-restart-sim-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/overnight-edge-playback-restart-simulation
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core_path = Path('src/Strategies/NinjexOvernightEdgePortfolio/Core.cs')
+          core = core_path.read_text(encoding='utf-8-sig')
+
+          core = core.replace(
+              'private const string StrategyVersion = "1.2.5-live-state-recovery";',
+              'private const string StrategyVersion = "1.2.6-playback-restart-simulation";',
+              1)
+
+          old_defaults = '''                EnableDiagnostics = true;\n                EnableResearchTelemetry = false;\n\n                // Disabled by default. Verified overrides are intended only'''
+          new_defaults = '''                EnableDiagnostics = true;\n                EnableResearchTelemetry = false;\n\n                // Test-only. Leave false for normal / official Market Replay.\n                // When explicitly enabled, Playback exercises the same durable\n                // daily-state restart recovery used by genuine live accounts.\n                EnablePlaybackRestartRecoverySimulation = false;\n\n                // Disabled by default. Verified overrides are intended only'''
+          assert old_defaults in core
+          core = core.replace(old_defaults, new_defaults, 1)
+
+          old_ready = '''                    "VerifiedRthOpenOverrides={10} " +\n                    "ResearchTelemetry={11} ResearchPath='{12}'",'''
+          new_ready = '''                    "VerifiedRthOpenOverrides={10} " +\n                    "ResearchTelemetry={11} ResearchPath='{12}' " +\n                    "PlaybackRestartRecoverySimulation={13}",'''
+          assert old_ready in core
+          core = core.replace(old_ready, new_ready, 1)
+
+          old_ready_args = '''                    EnableVerifiedRthOpenOverrides,\n                    EnableResearchTelemetry,\n                    researchTelemetryPath);'''
+          new_ready_args = '''                    EnableVerifiedRthOpenOverrides,\n                    EnableResearchTelemetry,\n                    researchTelemetryPath,\n                    EnablePlaybackRestartRecoverySimulation);'''
+          assert old_ready_args in core
+          core = core.replace(old_ready_args, new_ready_args, 1)
+
+          core = core.replace(
+              '''            // Live-only restart safety. Playback/Historical return immediately.\n            // On a live reconnect this restores authoritative daily counters\n            // before any pending signal can become an order.''',
+              '''            // Restart-safe daily risk state. Historical always returns immediately.\n            // Playback also returns immediately unless the explicit restart-\n            // simulation diagnostic switch is enabled. Genuine live accounts\n            // always use recovery before a pending signal can become an order.''',
+              1)
+
+          core = core.replace(
+              '''            // Daily caps are a live safety boundary. After NT/VPS/strategy\n            // restart, never evaluate them against historical reconstruction.\n            // Playback and Historical are deliberately excluded by the helper.''',
+              '''            // Daily caps are a live safety boundary. After NT/VPS/strategy\n            // restart, never evaluate them against historical reconstruction.\n            // Historical is always excluded. Playback participates only when\n            // the explicit restart-recovery simulation switch is enabled.''',
+              1)
+
+          property_anchor = '''        public bool EnableVerifiedRthOpenOverrides\n        {\n            get;\n            set;\n        }\n\n        #endregion'''
+          property_replacement = '''        public bool EnableVerifiedRthOpenOverrides\n        {\n            get;\n            set;\n        }\n\n\n        [NinjaScriptProperty]\n        [Display(\n            Name = "Enable Playback Restart Recovery Simulation",\n            Description = "Test-only. When enabled, Playback persists/restores daily trade counters across strategy disable/re-enable using the same recovery path as live. Leave false for normal and official Market Replay runs.",\n            GroupName = "8. Diagnostics",\n            Order = 2)]\n        public bool EnablePlaybackRestartRecoverySimulation\n        {\n            get;\n            set;\n        }\n\n        #endregion'''
+          assert property_anchor in core
+          core = core.replace(property_anchor, property_replacement, 1)
+          core_path.write_text(core, encoding='utf-8')
+
+          live_path = Path('src/Strategies/NinjexOvernightEdgePortfolio/LiveDailyState.cs')
+          live = live_path.read_text(encoding='utf-8-sig')
+
+          live = live.replace(
+              '''        /// Ensures the daily portfolio counters are authoritative before live\n        /// entries can be evaluated. Historical processing and Playback are\n        /// deliberately ignored: uninterrupted Market Replay remains identical\n        /// to Run 4 / Run 5 and never reads or writes persistent live state.''',
+              '''        /// Ensures the daily portfolio counters are authoritative before\n        /// entries can be evaluated. Historical processing is always ignored.\n        /// Playback is ignored by default so official Market Replay remains\n        /// identical to Run 4 / Run 5; it participates only when the explicit\n        /// restart-recovery simulation switch is enabled.''',
+              1)
+
+          start = live.index('        private bool ShouldUseLiveDailyStateRecovery()')
+          end = live.index('        private static bool IsKnownLiveRecoveryExitName(', start)
+          replacement = '''        private bool ShouldUseLiveDailyStateRecovery()\n        {\n            if (State != State.Realtime\n                || Account == null)\n            {\n                return false;\n            }\n\n            bool isPlayback;\n            if (!TryDetectPlaybackRecoveryContext(out isPlayback))\n            {\n                // If connection metadata is temporarily unavailable on a\n                // genuine live strategy, prefer the safer recovery path.\n                return true;\n            }\n\n            if (isPlayback)\n                return EnablePlaybackRestartRecoverySimulation;\n\n            return true;\n        }\n\n        private bool TryDetectPlaybackRecoveryContext(\n            out bool isPlayback)\n        {\n            isPlayback = false;\n\n            try\n            {\n                var accountName =\n                    Account == null\n                        ? string.Empty\n                        : Account.Name ?? string.Empty;\n\n                if (accountName.StartsWith(\n                        "Playback",\n                        StringComparison.OrdinalIgnoreCase))\n                {\n                    isPlayback = true;\n                    return true;\n                }\n\n                var connectionName =\n                    Account != null\n                    && Account.Connection != null\n                    && Account.Connection.Options != null\n                        ? Account.Connection.Options.Name\n                        : string.Empty;\n\n                if (!string.IsNullOrEmpty(connectionName)\n                    && connectionName.IndexOf(\n                        "Playback",\n                        StringComparison.OrdinalIgnoreCase) >= 0)\n                {\n                    isPlayback = true;\n                }\n\n                return true;\n            }\n            catch\n            {\n                return false;\n            }\n        }\n\n'''
+          live = live[:start] + replacement + live[end:]
+          live_path.write_text(live, encoding='utf-8')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Strategies/NinjexOvernightEdgePortfolio/Core.cs src/Strategies/NinjexOvernightEdgePortfolio/LiveDailyState.cs
+          git commit -m "[playback-restart-sim-patched] Add opt-in Playback restart recovery simulation"
+          git push origin HEAD:fix/overnight-edge-playback-restart-simulation
