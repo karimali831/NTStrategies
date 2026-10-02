@@ -162,10 +162,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             // from NinjaTrader's live account execution collection.
             LiveDailyStateSnapshot rebuilt;
             string rebuildError;
-            if (TryRebuildLiveDailyStateFromAccountExecutions(
+            var rebuiltAvailable =
+                TryRebuildLiveDailyStateFromAccountExecutions(
                     tradingDate,
                     out rebuilt,
-                    out rebuildError)
+                    out rebuildError);
+
+            if (rebuiltAvailable
                 && rebuilt.Trades > 0)
             {
                 ApplyRecoveredLiveDailyState(
@@ -181,10 +184,37 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
 
-            // A strategy that has been running before the entry window can
-            // safely establish the day's zero baseline. Once the entry window
-            // has opened, an absent snapshot plus zero visible executions is
-            // ambiguous after a restart, so fail closed rather than assume zero.
+            // In explicit Playback restart-simulation mode, the very first
+            // enable may intentionally begin after the normal 09:35 entry
+            // window. If the current Playback account/session was read
+            // successfully and contains zero strategy executions, that is a
+            // trustworthy fresh 0/0/0 baseline for the simulation. Genuine
+            // live accounts deliberately do NOT get this relaxation.
+            bool isPlaybackSimulation;
+            if (rebuiltAvailable
+                && rebuilt.Trades == 0
+                && EnablePlaybackRestartRecoverySimulation
+                && TryDetectPlaybackRecoveryContext(
+                    out isPlaybackSimulation)
+                && isPlaybackSimulation)
+            {
+                ApplyRecoveredLiveDailyState(
+                    rebuilt,
+                    eventTime,
+                    "PlaybackSimulationZero");
+
+                PersistLiveDailyState(
+                    eventTime,
+                    false,
+                    "PlaybackSimulationZero");
+
+                return true;
+            }
+
+            // A genuine live strategy that has been running before the entry
+            // window can safely establish the day's zero baseline. Once the
+            // entry window has opened, an absent snapshot plus zero visible
+            // executions remains ambiguous live and therefore fails closed.
             if (ToTimeValue(eventTime) < EntryStartTime)
             {
                 var zero = new LiveDailyStateSnapshot
