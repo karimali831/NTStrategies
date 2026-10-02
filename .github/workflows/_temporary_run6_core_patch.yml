@@ -1,0 +1,88 @@
+name: Temporary Run6 core patch
+on:
+  push:
+    branches: [feat/overnight-edge-run6-research]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[run6-core-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/overnight-edge-run6-research
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('src/Strategies/NinjexOvernightEdgePortfolio/Core.cs')
+          s=p.read_text(encoding='utf-8-sig')
+          s=s.replace('private const string StrategyVersion = "1.2.8-restart-recovery";','private const string StrategyVersion = "1.3.0-run6-research";',1)
+          s=s.replace('EnableVerifiedRthOpenOverrides','MirrorVerifiedLiveExecutions')
+          s=s.replace('VerifiedRthOpenOverrides={10}','MirrorVerifiedLiveExecutions={10}')
+          s=s.replace('Name = "Enable Verified RTH Open Overrides"','Name = "Mirror Verified Live Executions"')
+          s=s.replace('Description = "Applies only date-keyed RTH-open corrections that were independently verified from live data. Disabled by default. Run 5 (2025-09-16 through 2026-09-11) has no override dates."','Description = "Replay/Historical forensic mode. Applies only date/time corrections independently verified from live evidence (currently 2026-09-24 RTH open and 2026-09-30 PMH bracket). Disabled by default."')
+
+          table='''        private static readonly Dictionary<DateTime, RthOpenOverrideEntry>\n            VerifiedRthOpenOverrides =\n                new Dictionary<DateTime, RthOpenOverrideEntry>\n                {\n                    {\n                        new DateTime(2026, 9, 24),\n                        new RthOpenOverrideEntry(\n                            7734.25,\n                            "Observed live strategy log; downloaded Replay/Historical used 7734.00")\n                    }\n                };\n'''
+          assert table in s
+          s=s.replace(table,table+'''\n        private sealed class VerifiedLiveBracketOverrideEntry\n        {\n            public VerifiedLiveBracketOverrideEntry(string signal, double verifiedEntryPrice, double stopPrice, double targetPrice, string source)\n            {\n                Signal = signal ?? string.Empty;\n                VerifiedEntryPrice = verifiedEntryPrice;\n                StopPrice = stopPrice;\n                TargetPrice = targetPrice;\n                Source = source ?? string.Empty;\n            }\n\n            public readonly string Signal;\n            public readonly double VerifiedEntryPrice;\n            public readonly double StopPrice;\n            public readonly double TargetPrice;\n            public readonly string Source;\n        }\n\n        private static readonly Dictionary<DateTime, VerifiedLiveBracketOverrideEntry> VerifiedLiveBracketOverrides =\n            new Dictionary<DateTime, VerifiedLiveBracketOverrideEntry>\n            {\n                {\n                    new DateTime(2026, 9, 30, 10, 26, 0),\n                    new VerifiedLiveBracketOverrideEntry(\n                        PremarketHighEntrySignal,\n                        7770.00,\n                        7775.00,\n                        7760.00,\n                        "Verified live ES 12-26 PMH: entry 7770.00, stop 7775.00, target 7760.00; Replay filled 7770.25 and targeted 7760.25")\n                }\n            };\n''',1)
+
+          defaults='''                PremarketLowMinimumAtr5mTicks = 20.0;\n\n\n                //\n                // Risk\n'''
+          assert defaults in s
+          s=s.replace(defaults,'''                PremarketLowMinimumAtr5mTicks = 20.0;\n\n                // Run-6 hypotheses. Disabled by default.\n                EnablePmhSlowEmaDistanceFilter = false;\n                PmhMaximumSlowEmaDistanceTicks = 60.0;\n                EnableSelectivePdcPmhThirdTradeAfterTwoLosses = false;\n\n\n                //\n                // Risk\n''',1)
+
+          pmh='''            var premarketHighQualified =\n                premarketHighSweep\n                && minutesFromOpen >= 0\n                && minutesFromOpen\n                    <= PremarketHighMaximumMinutesFromOpen\n                && IsFinite(last5mAtrTicks)\n                && last5mAtrTicks\n                    >= PremarketHighMinimumAtr5mTicks;\n'''
+          assert pmh in s
+          s=s.replace(pmh,'''            var pmhSlowEmaDistanceTicks =\n                TickSize > 0 && IsFinite(last5mEmaSlow)\n                    ? Math.Abs(close - last5mEmaSlow) / TickSize\n                    : double.NaN;\n\n            var pmhSlowEmaDistanceOk =\n                !EnablePmhSlowEmaDistanceFilter\n                || (IsFinite(pmhSlowEmaDistanceTicks)\n                    && pmhSlowEmaDistanceTicks <= PmhMaximumSlowEmaDistanceTicks);\n\n            var premarketHighQualified =\n                premarketHighSweep\n                && minutesFromOpen >= 0\n                && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen\n                && IsFinite(last5mAtrTicks)\n                && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks\n                && pmhSlowEmaDistanceOk;\n''',1)
+
+          rth='''            var rthOpenQualified =\n                rthOpenCross\n                && minutesFromOpen\n                    >= RthOpenMinimumMinutesFromOpen\n                && IsFinite(premarketWidthTicks)\n                && premarketWidthTicks\n                    >= RthOpenMinimumPremarketWidthTicks;\n'''
+          assert rth in s
+          s=s.replace(rth,'''            var rthOpenQualified =\n                rthOpenCross\n                && minutesFromOpen >= RthOpenMinimumMinutesFromOpen\n                && IsFinite(premarketWidthTicks)\n                && premarketWidthTicks >= RthOpenMinimumPremarketWidthTicks\n                && !IsSelectiveThirdTradeAfterTwoLossesWindow();\n''',1)
+
+          pml='''            var premarketLowQualified =\n                premarketLowCross\n                && IsFinite(last5mAtrTicks)\n                && last5mAtrTicks\n                    >= PremarketLowMinimumAtr5mTicks\n                && fastEmaOk;\n'''
+          assert pml in s
+          s=s.replace(pml,'''            var premarketLowQualified =\n                premarketLowCross\n                && IsFinite(last5mAtrTicks)\n                && last5mAtrTicks >= PremarketLowMinimumAtr5mTicks\n                && fastEmaOk\n                && !IsSelectiveThirdTradeAfterTwoLossesWindow();\n''',1)
+
+          gate='''            if (!CanTakeNewTrade(\n                    signalTime,\n                    true,\n                    false))\n            {\n                return;\n            }\n'''
+          assert gate in s
+          s=s.replace(gate,'''            if (!CanTakeNewTrade(\n                    signalTime,\n                    true,\n                    false)\n                && !CanEvaluateSelectiveThirdTradeSignal(signalTime))\n            {\n                return;\n            }\n''',1)
+
+          maxloss='''            if (MaxLossesPerDay > 0\n                && lossesToday >= MaxLossesPerDay)\n            {\n'''
+          assert maxloss in s
+          s=s.replace(maxloss,'''            if (MaxLossesPerDay > 0\n                && lossesToday >= MaxLossesPerDay\n                && !CanBypassMaxLossesForSelectiveThirdTrade())\n            {\n''',1)
+
+          helper='''            return true;\n        }\n\n\n        private void EnsureTradingDate(\n'''
+          assert helper in s
+          s=s.replace(helper,'''            return true;\n        }\n\n        private bool IsSelectiveThirdTradeAfterTwoLossesWindow()\n        {\n            return EnableSelectivePdcPmhThirdTradeAfterTwoLosses\n                && PortfolioMode != NinjexOvernightEdgePortfolioMode.BaselineAB\n                && tradesToday == 2\n                && MaxLossesPerDay > 0\n                && lossesToday >= MaxLossesPerDay\n                && (MaxTradesPerDay <= 0 || tradesToday < MaxTradesPerDay)\n                && (MaxWinnersPerDay <= 0 || winnersToday < MaxWinnersPerDay);\n        }\n\n        private bool CanEvaluateSelectiveThirdTradeSignal(DateTime time)\n        {\n            if (!IsSelectiveThirdTradeAfterTwoLossesWindow())\n                return false;\n            if (!EnsureLiveDailyStateReady(time)\n                || Position.MarketPosition != MarketPosition.Flat\n                || entryOrderPending\n                || manualExitPending\n                || pendingDirection != PendingDirection.None)\n                return false;\n            Diagnostic(time, "TRADE GATE SelectiveThirdAfterTwoLosses EligibleModels=PDC,PMH Trades={0} Losses={1}", tradesToday, lossesToday);\n            return true;\n        }\n\n        private bool CanBypassMaxLossesForSelectiveThirdTrade()\n        {\n            if (!IsSelectiveThirdTradeAfterTwoLossesWindow())\n                return false;\n            return string.Equals(pendingEntrySignal, PriorCloseEntrySignal, StringComparison.Ordinal)\n                || string.Equals(pendingEntrySignal, PremarketHighEntrySignal, StringComparison.Ordinal);\n        }\n\n\n        private void EnsureTradingDate(\n''',1)
+
+          bracket='''            SetStopLoss(\n                signalName,\n                CalculationMode.Ticks,\n                StopLossTicks,\n                false);\n\n            SetProfitTarget(\n                signalName,\n                CalculationMode.Ticks,\n                ProfitTargetTicks);\n'''
+          assert bracket in s
+          s=s.replace(bracket,'''            VerifiedLiveBracketOverrideEntry verifiedLiveBracket;\n            var verifiedLiveBracketApplied =\n                TryGetVerifiedLiveBracketOverride(pendingSignalTime, signalName, out verifiedLiveBracket);\n\n            if (verifiedLiveBracketApplied)\n            {\n                SetStopLoss(signalName, CalculationMode.Price, verifiedLiveBracket.StopPrice, false);\n                SetProfitTarget(signalName, CalculationMode.Price, verifiedLiveBracket.TargetPrice);\n                Diagnostic(\n                    time,\n                    "VERIFIED LIVE BRACKET MIRROR Signal={0} SignalTime={1:yyyy-MM-dd HH:mm:ss} VerifiedEntry={2} Stop={3} Target={4} Source='{5}'",\n                    signalName, pendingSignalTime, verifiedLiveBracket.VerifiedEntryPrice,\n                    verifiedLiveBracket.StopPrice, verifiedLiveBracket.TargetPrice, verifiedLiveBracket.Source);\n            }\n            else\n            {\n                SetStopLoss(signalName, CalculationMode.Ticks, StopLossTicks, false);\n                SetProfitTarget(signalName, CalculationMode.Ticks, ProfitTargetTicks);\n            }\n''',1)
+
+          lookup='        private bool TryGetVerifiedRthOpenOverride(\n'
+          assert lookup in s
+          s=s.replace(lookup,'''        private bool TryGetVerifiedLiveBracketOverride(\n            DateTime signalTime,\n            string signalName,\n            out VerifiedLiveBracketOverrideEntry entry)\n        {\n            entry = null;\n            if (!MirrorVerifiedLiveExecutions)\n                return false;\n\n            VerifiedLiveBracketOverrideEntry candidate;\n            if (!VerifiedLiveBracketOverrides.TryGetValue(signalTime, out candidate))\n                return false;\n            if (!string.Equals(candidate.Signal, signalName, StringComparison.Ordinal))\n                return false;\n\n            entry = candidate;\n            return true;\n        }\n\n\n''' + lookup,1)
+
+          prop='''        [NinjaScriptProperty]\n        [Display(\n            Name = "Enable Diagnostics",\n'''
+          assert prop in s
+          s=s.replace(prop,'''        [NinjaScriptProperty]\n        [Display(\n            Name = "Enable PMH Slow EMA Distance Filter",\n            Description = "Run-6 hypothesis. PMH requires absolute close-to-5m-slow-EMA distance <= configured maximum.",\n            GroupName = "6. Run 6 Research",\n            Order = 0)]\n        public bool EnablePmhSlowEmaDistanceFilter { get; set; }\n\n        [NinjaScriptProperty]\n        [Range(0.0, 500.0)]\n        [Display(\n            Name = "PMH Max Slow EMA Distance Ticks",\n            Description = "Initial research value 60 ticks. Test a broad 50-70 plateau rather than optimizing one exact value.",\n            GroupName = "6. Run 6 Research",\n            Order = 1)]\n        public double PmhMaximumSlowEmaDistanceTicks { get; set; }\n\n        [NinjaScriptProperty]\n        [Display(\n            Name = "Enable Selective PDC/PMH Third Trade After Two Losses",\n            Description = "Run-6 hypothesis. After exactly two trades and two losses, allows only a third PDC or PMH trade. RTH/PML remain blocked.",\n            GroupName = "6. Run 6 Research",\n            Order = 2)]\n        public bool EnableSelectivePdcPmhThirdTradeAfterTwoLosses { get; set; }\n\n\n''' + prop,1)
+
+          p.write_text(s,encoding='utf-8')
+
+          rt=Path('src/Strategies/NinjexOvernightEdgePortfolio/ResearchTelemetry.cs')
+          t=rt.read_text(encoding='utf-8-sig')
+          t=t.replace('''            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk;''','''            var pmhSlowEmaDistanceTicks = TickSize > 0 && IsFinite(last5mEmaSlow)\n                ? Math.Abs(close - last5mEmaSlow) / TickSize : double.NaN;\n            var pmhSlowEmaDistanceOk = !EnablePmhSlowEmaDistanceFilter\n                || (IsFinite(pmhSlowEmaDistanceTicks) && pmhSlowEmaDistanceTicks <= PmhMaximumSlowEmaDistanceTicks);\n            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk && pmhSlowEmaDistanceOk;''',1)
+          t=t.replace('var rthQualified = rthCross && rthTimeOk && rthWidthOk;','var rthQualified = rthCross && rthTimeOk && rthWidthOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();',1)
+          t=t.replace('var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;','var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();',1)
+          t=t.replace('TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks);','TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmhSlowEmaDistanceOk);',1)
+          rt.write_text(t,encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Strategies/NinjexOvernightEdgePortfolio/Core.cs src/Strategies/NinjexOvernightEdgePortfolio/ResearchTelemetry.cs
+          git commit -m "[run6-core-patched] Add verified live mirror and Run6 hypotheses"
+          git push origin HEAD:feat/overnight-edge-run6-research
