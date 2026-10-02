@@ -495,6 +495,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //
                 EnableDiagnostics = true;
                 EnableResearchTelemetry = false;
+                EnableResearchPerturbationScenarios = false;
 
                 // Safety function. Persist and restore the authoritative
                 // daily trade counters across strategy/NT/VPS restarts. Applies

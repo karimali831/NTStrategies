@@ -71,6 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             RegisterNewResearchShadowCandidates();
+            ProcessResearchPerturbationTick(time, price);
 
             if (activeResearchShadows.Count == 0)
                 return;
