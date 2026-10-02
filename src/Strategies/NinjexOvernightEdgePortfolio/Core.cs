@@ -502,9 +502,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // to genuine live trading and Playback live-restart simulation.
                 EnableRestartRecovery = true;
 
-                // Disabled by default. Verified overrides are intended only
-                // for forensic Replay/Historical reconstruction when a live
-                // RTH open discrepancy has been independently confirmed.
+                // Disabled by default. Forensic Replay/Historical mirror
+                // for independently verified live discrepancies only.
                 MirrorVerifiedLiveExecutions = false;
             }
             else if (State == State.Configure)
@@ -557,7 +556,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
                     "MirrorVerifiedLiveExecutions={10} " +
                     "ResearchTelemetry={11} ResearchPath='{12}' " +
-                    "RestartRecovery={13}",
+                    "RestartRecovery={13} " +
+                    "PmhSlowEmaFilter={14} PmhMaxSlowEmaDist={15:0.0}t " +
+                    "SelectiveThirdPdcPmhAfterTwoLosses={16} " +
+                    "PerturbationScenarios={17}",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -571,7 +573,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MirrorVerifiedLiveExecutions,
                     EnableResearchTelemetry,
                     researchTelemetryPath,
-                    EnableRestartRecovery);
+                    EnableRestartRecovery,
+                    EnablePmhSlowEmaDistanceFilter,
+                    PmhMaximumSlowEmaDistanceTicks,
+                    EnableSelectivePdcPmhThirdTradeAfterTwoLosses,
+                    EnableResearchPerturbationScenarios);
             }
             else if (State == State.Realtime)
             {
