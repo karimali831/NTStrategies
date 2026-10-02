@@ -51,9 +51,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// Ensures the daily portfolio counters are authoritative before
         /// entries can be evaluated. Historical processing is always ignored.
-        /// Playback is ignored by default so official Market Replay remains
-        /// identical to Run 4 / Run 5; it participates only when the explicit
-        /// restart-recovery simulation switch is enabled.
+        /// When restart recovery is enabled, both genuine live trading and
+        /// Playback State.Realtime use the same durable recovery path.
         /// </summary>
         private bool EnsureLiveDailyStateReady(DateTime eventTime)
         {
@@ -193,7 +192,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool isPlaybackSimulation;
             if (rebuiltAvailable
                 && rebuilt.Trades == 0
-                && EnablePlaybackRestartRecoverySimulation
+                && EnableRestartRecovery
                 && TryDetectPlaybackRecoveryContext(
                     out isPlaybackSimulation)
                 && isPlaybackSimulation)
@@ -795,24 +794,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool ShouldUseLiveDailyStateRecovery()
         {
-            if (State != State.Realtime
-                || Account == null)
-            {
-                return false;
-            }
-
-            bool isPlayback;
-            if (!TryDetectPlaybackRecoveryContext(out isPlayback))
-            {
-                // If connection metadata is temporarily unavailable on a
-                // genuine live strategy, prefer the safer recovery path.
-                return true;
-            }
-
-            if (isPlayback)
-                return EnablePlaybackRestartRecoverySimulation;
-
-            return true;
+            return
+                EnableRestartRecovery
+                && State == State.Realtime
+                && Account != null;
         }
 
         private bool TryDetectPlaybackRecoveryContext(

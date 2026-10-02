@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.7-playback-zero-baseline";
+        private const string StrategyVersion = "1.2.8-restart-recovery";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -459,10 +459,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableDiagnostics = true;
                 EnableResearchTelemetry = false;
 
-                // Test-only. Leave false for normal / official Market Replay.
-                // When explicitly enabled, Playback exercises the same durable
-                // daily-state restart recovery used by genuine live accounts.
-                EnablePlaybackRestartRecoverySimulation = false;
+                // Safety function. Persist and restore the authoritative
+                // daily trade counters across strategy/NT/VPS restarts. Applies
+                // to genuine live trading and Playback live-restart simulation.
+                EnableRestartRecovery = true;
 
                 // Disabled by default. Verified overrides are intended only
                 // for forensic Replay/Historical reconstruction when a live
@@ -519,7 +519,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
                     "VerifiedRthOpenOverrides={10} " +
                     "ResearchTelemetry={11} ResearchPath='{12}' " +
-                    "PlaybackRestartRecoverySimulation={13}",
+                    "RestartRecovery={13}",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -533,7 +533,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EnableVerifiedRthOpenOverrides,
                     EnableResearchTelemetry,
                     researchTelemetryPath,
-                    EnablePlaybackRestartRecoverySimulation);
+                    EnableRestartRecovery);
             }
             else if (State == State.Realtime)
             {
@@ -1654,9 +1654,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 time);
 
             // Restart-safe daily risk state. Historical always returns immediately.
-            // Playback also returns immediately unless the explicit restart-
-            // simulation diagnostic switch is enabled. Genuine live accounts
-            // always use recovery before a pending signal can become an order.
+            // When enabled, genuine live and Playback State.Realtime both use
+            // the same durable recovery path before a new entry can be submitted.
             EnsureLiveDailyStateReady(time);
 
 
@@ -1867,10 +1866,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool logReason,
             bool allowExistingPendingEntry)
         {
-            // Daily caps are a live safety boundary. After NT/VPS/strategy
+            // Daily caps are a restart-safe boundary. After NT/VPS/strategy
             // restart, never evaluate them against historical reconstruction.
-            // Historical is always excluded. Playback participates only when
-            // the explicit restart-recovery simulation switch is enabled.
+            // Historical is always excluded; live and Playback State.Realtime
+            // use recovery whenever EnableRestartRecovery is enabled.
             if (!EnsureLiveDailyStateReady(time))
             {
                 if (logReason)
@@ -3387,11 +3386,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
-            Name = "Enable Playback Restart Recovery Simulation",
-            Description = "Test-only. When enabled, Playback persists/restores daily trade counters across strategy disable/re-enable using the same recovery path as live. Leave false for normal and official Market Replay runs.",
-            GroupName = "8. Diagnostics",
-            Order = 2)]
-        public bool EnablePlaybackRestartRecoverySimulation
+            Name = "Enable Restart Recovery",
+            Description = "Safety function. Persists and restores the authoritative daily trade counters across strategy, NinjaTrader, or VPS restarts. Applies to live trading and Playback restart simulation.",
+            GroupName = "7. Risk",
+            Order = 7)]
+        public bool EnableRestartRecovery
         {
             get;
             set;
