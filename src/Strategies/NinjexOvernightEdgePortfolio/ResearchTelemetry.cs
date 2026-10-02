@@ -279,18 +279,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             var pmhSweep = IsFinite(premarketHigh) && high > premarketHigh && close < premarketHigh;
             var pmhTimeOk = minutesFromOpen >= 0 && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen;
             var pmhAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
-            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk;
+            var pmhSlowEmaDistanceTicks = TickSize > 0 && IsFinite(last5mEmaSlow)
+                ? Math.Abs(close - last5mEmaSlow) / TickSize : double.NaN;
+            var pmhSlowEmaDistanceOk = !EnablePmhSlowEmaDistanceFilter
+                || (IsFinite(pmhSlowEmaDistanceTicks) && pmhSlowEmaDistanceTicks <= PmhMaximumSlowEmaDistanceTicks);
+            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk && pmhSlowEmaDistanceOk;
 
             var rthCross = IsFinite(rthOpen) && rthOpenDate == signalTime.Date && previousClose >= rthOpen && close < rthOpen;
             var rthTimeOk = minutesFromOpen >= RthOpenMinimumMinutesFromOpen;
             var rthWidthOk = IsFinite(premarketWidthTicks) && premarketWidthTicks >= RthOpenMinimumPremarketWidthTicks;
-            var rthQualified = rthCross && rthTimeOk && rthWidthOk;
+            var rthQualified = rthCross && rthTimeOk && rthWidthOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();
 
             var pmlCross = IsFinite(premarketLow) && previousClose >= premarketLow && close < premarketLow;
             var pmlAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketLowMinimumAtr5mTicks;
             var useFastEmaFilter = EnableEMAFilter && PortfolioMode == NinjexOvernightEdgePortfolioMode.FourModelResearchFiltered;
             var pmlEmaOk = !useFastEmaFilter || (IsFinite(last5mEmaFast) && close > last5mEmaFast);
-            var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;
+            var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();
 
             var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
             var selectedSignal = priorQualified ? PriorCloseEntrySignal
@@ -309,7 +313,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PremarketHighModelName, PremarketHighEntrySignal, PendingDirection.Short, pmhQualified, selectedSignal == PremarketHighEntrySignal,
                     portfolioEligible, blockReason, qualifiedCount, null, pmhTimeOk, null, null, pmhAtrOk,
-                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
+                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmhSlowEmaDistanceOk);
 
             if (rthCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,

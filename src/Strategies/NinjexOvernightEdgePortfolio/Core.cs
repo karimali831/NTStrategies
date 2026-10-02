@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.8-restart-recovery";
+        private const string StrategyVersion = "1.3.0-run6-research";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -218,6 +218,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                             "Observed live strategy log; downloaded Replay/Historical used 7734.00")
                     }
                 };
+
+        private sealed class VerifiedLiveBracketOverrideEntry
+        {
+            public VerifiedLiveBracketOverrideEntry(string signal, double verifiedEntryPrice, double stopPrice, double targetPrice, string source)
+            {
+                Signal = signal ?? string.Empty;
+                VerifiedEntryPrice = verifiedEntryPrice;
+                StopPrice = stopPrice;
+                TargetPrice = targetPrice;
+                Source = source ?? string.Empty;
+            }
+
+            public readonly string Signal;
+            public readonly double VerifiedEntryPrice;
+            public readonly double StopPrice;
+            public readonly double TargetPrice;
+            public readonly string Source;
+        }
+
+        private static readonly Dictionary<DateTime, VerifiedLiveBracketOverrideEntry> VerifiedLiveBracketOverrides =
+            new Dictionary<DateTime, VerifiedLiveBracketOverrideEntry>
+            {
+                {
+                    new DateTime(2026, 9, 30, 10, 26, 0),
+                    new VerifiedLiveBracketOverrideEntry(
+                        PremarketHighEntrySignal,
+                        7770.00,
+                        7775.00,
+                        7760.00,
+                        "Verified live ES 12-26 PMH: entry 7770.00, stop 7775.00, target 7760.00; Replay filled 7770.25 and targeted 7760.25")
+                }
+            };
 
         #endregion
 
@@ -436,6 +468,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 PremarketLowMinimumAtr5mTicks = 20.0;
 
+                // Run-6 hypotheses. Disabled by default.
+                EnablePmhSlowEmaDistanceFilter = false;
+                PmhMaximumSlowEmaDistanceTicks = 60.0;
+                EnableSelectivePdcPmhThirdTradeAfterTwoLosses = false;
+
 
                 //
                 // Risk
@@ -467,7 +504,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Disabled by default. Verified overrides are intended only
                 // for forensic Replay/Historical reconstruction when a live
                 // RTH open discrepancy has been independently confirmed.
-                EnableVerifiedRthOpenOverrides = false;
+                MirrorVerifiedLiveExecutions = false;
             }
             else if (State == State.Configure)
             {
@@ -517,7 +554,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Stop={4}t Target={5}t " +
                     "MaxHold={6}m " +
                     "MaxTrades={7} MaxWinners={8} MaxLosses={9} " +
-                    "VerifiedRthOpenOverrides={10} " +
+                    "MirrorVerifiedLiveExecutions={10} " +
                     "ResearchTelemetry={11} ResearchPath='{12}' " +
                     "RestartRecovery={13}",
                     StrategyVersion,
@@ -530,7 +567,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxTradesPerDay,
                     MaxWinnersPerDay,
                     MaxLossesPerDay,
-                    EnableVerifiedRthOpenOverrides,
+                    MirrorVerifiedLiveExecutions,
                     EnableResearchTelemetry,
                     researchTelemetryPath,
                     EnableRestartRecovery);
@@ -846,7 +883,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!CanTakeNewTrade(
                     signalTime,
                     true,
-                    false))
+                    false)
+                && !CanEvaluateSelectiveThirdTradeSignal(signalTime))
             {
                 return;
             }
@@ -1096,14 +1134,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && high > premarketHigh
                 && close < premarketHigh;
 
+            var pmhSlowEmaDistanceTicks =
+                TickSize > 0 && IsFinite(last5mEmaSlow)
+                    ? Math.Abs(close - last5mEmaSlow) / TickSize
+                    : double.NaN;
+
+            var pmhSlowEmaDistanceOk =
+                !EnablePmhSlowEmaDistanceFilter
+                || (IsFinite(pmhSlowEmaDistanceTicks)
+                    && pmhSlowEmaDistanceTicks <= PmhMaximumSlowEmaDistanceTicks);
+
             var premarketHighQualified =
                 premarketHighSweep
                 && minutesFromOpen >= 0
-                && minutesFromOpen
-                    <= PremarketHighMaximumMinutesFromOpen
+                && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen
                 && IsFinite(last5mAtrTicks)
-                && last5mAtrTicks
-                    >= PremarketHighMinimumAtr5mTicks;
+                && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks
+                && pmhSlowEmaDistanceOk;
 
 
             if (premarketHighSweep)
@@ -1133,11 +1180,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var rthOpenQualified =
                 rthOpenCross
-                && minutesFromOpen
-                    >= RthOpenMinimumMinutesFromOpen
+                && minutesFromOpen >= RthOpenMinimumMinutesFromOpen
                 && IsFinite(premarketWidthTicks)
-                && premarketWidthTicks
-                    >= RthOpenMinimumPremarketWidthTicks;
+                && premarketWidthTicks >= RthOpenMinimumPremarketWidthTicks
+                && !IsSelectiveThirdTradeAfterTwoLossesWindow();
 
 
             if (rthOpenCross)
@@ -1185,9 +1231,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             var premarketLowQualified =
                 premarketLowCross
                 && IsFinite(last5mAtrTicks)
-                && last5mAtrTicks
-                    >= PremarketLowMinimumAtr5mTicks
-                && fastEmaOk;
+                && last5mAtrTicks >= PremarketLowMinimumAtr5mTicks
+                && fastEmaOk
+                && !IsSelectiveThirdTradeAfterTwoLossesWindow();
 
 
             if (premarketLowCross)
@@ -1415,7 +1461,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     capturedBarOpen,
                     rthOpen,
                     verifiedOverrideApplied,
-                    EnableVerifiedRthOpenOverrides,
+                    MirrorVerifiedLiveExecutions,
                     verifiedOverrideReason,
                     verifiedOverrideSource,
                     firstTickTimeText,
@@ -1802,16 +1848,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             // NinjaTrader anchors the protective orders to the actual
             // execution fill rather than the pre-submission observed tick.
             //
-            SetStopLoss(
-                signalName,
-                CalculationMode.Ticks,
-                StopLossTicks,
-                false);
+            VerifiedLiveBracketOverrideEntry verifiedLiveBracket;
+            var verifiedLiveBracketApplied =
+                TryGetVerifiedLiveBracketOverride(pendingSignalTime, signalName, out verifiedLiveBracket);
 
-            SetProfitTarget(
-                signalName,
-                CalculationMode.Ticks,
-                ProfitTargetTicks);
+            if (verifiedLiveBracketApplied)
+            {
+                SetStopLoss(signalName, CalculationMode.Price, verifiedLiveBracket.StopPrice, false);
+                SetProfitTarget(signalName, CalculationMode.Price, verifiedLiveBracket.TargetPrice);
+                Diagnostic(
+                    time,
+                    "VERIFIED LIVE BRACKET MIRROR Signal={0} SignalTime={1:yyyy-MM-dd HH:mm:ss} VerifiedEntry={2} Stop={3} Target={4} Source='{5}'",
+                    signalName, pendingSignalTime, verifiedLiveBracket.VerifiedEntryPrice,
+                    verifiedLiveBracket.StopPrice, verifiedLiveBracket.TargetPrice, verifiedLiveBracket.Source);
+            }
+            else
+            {
+                SetStopLoss(signalName, CalculationMode.Ticks, StopLossTicks, false);
+                SetProfitTarget(signalName, CalculationMode.Ticks, ProfitTargetTicks);
+            }
 
 
             entryOrderPending = true;
@@ -1942,7 +1997,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             if (MaxLossesPerDay > 0
-                && lossesToday >= MaxLossesPerDay)
+                && lossesToday >= MaxLossesPerDay
+                && !CanBypassMaxLossesForSelectiveThirdTrade())
             {
                 if (logReason)
                 {
@@ -1959,6 +2015,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
             return true;
+        }
+
+        private bool IsSelectiveThirdTradeAfterTwoLossesWindow()
+        {
+            return EnableSelectivePdcPmhThirdTradeAfterTwoLosses
+                && PortfolioMode != NinjexOvernightEdgePortfolioMode.BaselineAB
+                && tradesToday == 2
+                && MaxLossesPerDay > 0
+                && lossesToday >= MaxLossesPerDay
+                && (MaxTradesPerDay <= 0 || tradesToday < MaxTradesPerDay)
+                && (MaxWinnersPerDay <= 0 || winnersToday < MaxWinnersPerDay);
+        }
+
+        private bool CanEvaluateSelectiveThirdTradeSignal(DateTime time)
+        {
+            if (!IsSelectiveThirdTradeAfterTwoLossesWindow())
+                return false;
+            if (!EnsureLiveDailyStateReady(time)
+                || Position.MarketPosition != MarketPosition.Flat
+                || entryOrderPending
+                || manualExitPending
+                || pendingDirection != PendingDirection.None)
+                return false;
+            Diagnostic(time, "TRADE GATE SelectiveThirdAfterTwoLosses EligibleModels=PDC,PMH Trades={0} Losses={1}", tradesToday, lossesToday);
+            return true;
+        }
+
+        private bool CanBypassMaxLossesForSelectiveThirdTrade()
+        {
+            if (!IsSelectiveThirdTradeAfterTwoLossesWindow())
+                return false;
+            return string.Equals(pendingEntrySignal, PriorCloseEntrySignal, StringComparison.Ordinal)
+                || string.Equals(pendingEntrySignal, PremarketHighEntrySignal, StringComparison.Ordinal);
         }
 
 
@@ -2803,6 +2892,26 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+        private bool TryGetVerifiedLiveBracketOverride(
+            DateTime signalTime,
+            string signalName,
+            out VerifiedLiveBracketOverrideEntry entry)
+        {
+            entry = null;
+            if (!MirrorVerifiedLiveExecutions)
+                return false;
+
+            VerifiedLiveBracketOverrideEntry candidate;
+            if (!VerifiedLiveBracketOverrides.TryGetValue(signalTime, out candidate))
+                return false;
+            if (!string.Equals(candidate.Signal, signalName, StringComparison.Ordinal))
+                return false;
+
+            entry = candidate;
+            return true;
+        }
+
+
         private bool TryGetVerifiedRthOpenOverride(
             DateTime tradingDate,
             out double overridePrice,
@@ -2818,7 +2927,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             reason =
                 "Disabled";
 
-            if (!EnableVerifiedRthOpenOverrides)
+            if (!MirrorVerifiedLiveExecutions)
                 return false;
 
 
@@ -3361,6 +3470,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
+            Name = "Enable PMH Slow EMA Distance Filter",
+            Description = "Run-6 hypothesis. PMH requires absolute close-to-5m-slow-EMA distance <= configured maximum.",
+            GroupName = "6. Run 6 Research",
+            Order = 0)]
+        public bool EnablePmhSlowEmaDistanceFilter { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.0, 500.0)]
+        [Display(
+            Name = "PMH Max Slow EMA Distance Ticks",
+            Description = "Initial research value 60 ticks. Test a broad 50-70 plateau rather than optimizing one exact value.",
+            GroupName = "6. Run 6 Research",
+            Order = 1)]
+        public double PmhMaximumSlowEmaDistanceTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Selective PDC/PMH Third Trade After Two Losses",
+            Description = "Run-6 hypothesis. After exactly two trades and two losses, allows only a third PDC or PMH trade. RTH/PML remain blocked.",
+            GroupName = "6. Run 6 Research",
+            Order = 2)]
+        public bool EnableSelectivePdcPmhThirdTradeAfterTwoLosses { get; set; }
+
+
+        [NinjaScriptProperty]
+        [Display(
             Name = "Enable Diagnostics",
             GroupName = "8. Diagnostics",
             Order = 0)]
@@ -3373,11 +3508,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
-            Name = "Enable Verified RTH Open Overrides",
-            Description = "Applies only date-keyed RTH-open corrections that were independently verified from live data. Disabled by default. Run 5 (2025-09-16 through 2026-09-11) has no override dates.",
+            Name = "Mirror Verified Live Executions",
+            Description = "Replay/Historical forensic mode. Applies only date/time corrections independently verified from live evidence (currently 2026-09-24 RTH open and 2026-09-30 PMH bracket). Disabled by default.",
             GroupName = "8. Diagnostics",
             Order = 1)]
-        public bool EnableVerifiedRthOpenOverrides
+        public bool MirrorVerifiedLiveExecutions
         {
             get;
             set;
