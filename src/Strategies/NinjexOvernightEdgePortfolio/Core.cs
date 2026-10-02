@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.6-playback-restart-simulation";
+        private const string StrategyVersion = "1.2.7-playback-zero-baseline";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
