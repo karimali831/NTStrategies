@@ -1,0 +1,38 @@
+name: Temporary Run6 QA patch
+on:
+  push:
+    branches: [feat/overnight-edge-run6-research]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[run6-qa-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/overnight-edge-run6-research
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/Strategies/NinjexOvernightEdgePortfolio/Core.cs')
+          s=p.read_text(encoding='utf-8-sig')
+          old='''            return EnableSelectivePdcPmhThirdTradeAfterTwoLosses\n                && PortfolioMode != NinjexOvernightEdgePortfolioMode.BaselineAB\n                && tradesToday == 2\n                && MaxLossesPerDay > 0\n                && lossesToday >= MaxLossesPerDay\n                && (MaxTradesPerDay <= 0 || tradesToday < MaxTradesPerDay)\n                && (MaxWinnersPerDay <= 0 || winnersToday < MaxWinnersPerDay);\n'''
+          new='''            return EnableSelectivePdcPmhThirdTradeAfterTwoLosses\n                && PortfolioMode != NinjexOvernightEdgePortfolioMode.BaselineAB\n                && tradesToday == 2\n                && lossesToday == 2\n                && MaxLossesPerDay == 2\n                && (MaxTradesPerDay <= 0 || tradesToday < MaxTradesPerDay)\n                && (MaxWinnersPerDay <= 0 || winnersToday < MaxWinnersPerDay);\n'''
+          assert old in s
+          s=s.replace(old,new,1)
+
+          olddiag='''                    "MinutesFromOpen={4} MaxMinutes={5} " +\n                    "ATR5={6:0.0}t MinATR={7:0.0}t",\n                    premarketHighQualified,\n                    premarketHigh,\n                    high,\n                    close,\n                    minutesFromOpen,\n                    PremarketHighMaximumMinutesFromOpen,\n                    last5mAtrTicks,\n                    PremarketHighMinimumAtr5mTicks);\n'''
+          newdiag='''                    "MinutesFromOpen={4} MaxMinutes={5} " +\n                    "ATR5={6:0.0}t MinATR={7:0.0}t " +\n                    "SlowEmaDist={8:0.0}t MaxSlowEmaDist={9:0.0}t FilterEnabled={10}",\n                    premarketHighQualified,\n                    premarketHigh,\n                    high,\n                    close,\n                    minutesFromOpen,\n                    PremarketHighMaximumMinutesFromOpen,\n                    last5mAtrTicks,\n                    PremarketHighMinimumAtr5mTicks,\n                    pmhSlowEmaDistanceTicks,\n                    PmhMaximumSlowEmaDistanceTicks,\n                    EnablePmhSlowEmaDistanceFilter);\n'''
+          assert olddiag in s
+          s=s.replace(olddiag,newdiag,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Strategies/NinjexOvernightEdgePortfolio/Core.cs
+          git commit -m "[run6-qa-patched] Tighten selective third rule and PMH diagnostics"
+          git push origin HEAD:feat/overnight-edge-run6-research
