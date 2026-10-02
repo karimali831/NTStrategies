@@ -172,6 +172,7 @@
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\LiveDailyState.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchTelemetry.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchShadow.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchPerturbation.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\V2.cs" />
         <Compile Include="src\Strategies\NinjexOvernightLowRejectionTest\Core.cs" />
         <Compile Include="src\Strategies\NinjexPremarketRange\Execution\Candidate.cs" />

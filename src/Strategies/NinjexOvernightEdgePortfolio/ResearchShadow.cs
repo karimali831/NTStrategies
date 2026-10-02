@@ -58,8 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             if (!EnableResearchTelemetry
-                || researchTelemetryFaulted
-                || researchShadowOutputFaulted)
+                || researchTelemetryFaulted)
             {
                 return;
             }
@@ -68,6 +67,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             var price = marketDataUpdate.Price;
 
             if (!IsFinite(price))
+                return;
+
+            // Perturbation research is intentionally independent of the
+            // shadow CSV sink. A shadow-output fault must not stop it.
+            ProcessResearchPerturbationTick(time, price);
+
+            if (researchShadowOutputFaulted)
                 return;
 
             RegisterNewResearchShadowCandidates();
