@@ -1161,7 +1161,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "FOUR CHECK Model=PMH-Rejection " +
                     "Qualified={0} PMH={1} High={2} Close={3} " +
                     "MinutesFromOpen={4} MaxMinutes={5} " +
-                    "ATR5={6:0.0}t MinATR={7:0.0}t",
+                    "ATR5={6:0.0}t MinATR={7:0.0}t " +
+                    "SlowEmaDist={8:0.0}t MaxSlowEmaDist={9:0.0}t FilterEnabled={10}",
                     premarketHighQualified,
                     premarketHigh,
                     high,
@@ -1169,7 +1170,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     minutesFromOpen,
                     PremarketHighMaximumMinutesFromOpen,
                     last5mAtrTicks,
-                    PremarketHighMinimumAtr5mTicks);
+                    PremarketHighMinimumAtr5mTicks,
+                    pmhSlowEmaDistanceTicks,
+                    PmhMaximumSlowEmaDistanceTicks,
+                    EnablePmhSlowEmaDistanceFilter);
             }
 
 
@@ -2023,8 +2027,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             return EnableSelectivePdcPmhThirdTradeAfterTwoLosses
                 && PortfolioMode != NinjexOvernightEdgePortfolioMode.BaselineAB
                 && tradesToday == 2
-                && MaxLossesPerDay > 0
-                && lossesToday >= MaxLossesPerDay
+                && lossesToday == 2
+                && MaxLossesPerDay == 2
                 && (MaxTradesPerDay <= 0 || tradesToday < MaxTradesPerDay)
                 && (MaxWinnersPerDay <= 0 || winnersToday < MaxWinnersPerDay);
         }
