@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.3.1-pdc-early-pm-width";
+        private const string StrategyVersion = "1.3.2-overnight-breakout-research";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
