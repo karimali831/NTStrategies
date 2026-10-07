@@ -42,7 +42,8 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///
     /// Four-model portfolio:
     ///     - LONG prior-day-close reclaim, 1-minute range <= 30 ticks,
-    ///       Overnight width >= 200 ticks.
+    ///       Overnight width >= 200 ticks. During the first 60 minutes,
+    ///       Premarket width must be >= 140 ticks by default.
     ///     - SHORT premarket-high sweep/rejection in the first 120 minutes,
     ///       completed 5-minute ATR >= 30 ticks.
     ///     - SHORT RTH-open breakdown from 120 minutes after the open,
@@ -67,7 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.3.0-run6-research";
+        private const string StrategyVersion = "1.3.1-pdc-early-pm-width";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -459,6 +460,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //
                 PriorCloseMaximumRangeTicks = 30.0;
                 PriorCloseMinimumOvernightWidthTicks = 200.0;
+                EnablePdcEarlyPremarketWidthFilter = true;
+                PdcEarlyMaximumMinutesFromOpen = 60;
+                PdcEarlyMinimumPremarketWidthTicks = 140.0;
 
                 PremarketHighMaximumMinutesFromOpen = 120;
                 PremarketHighMinimumAtr5mTicks = 30.0;
@@ -559,7 +563,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "RestartRecovery={13} " +
                     "PmhSlowEmaFilter={14} PmhMaxSlowEmaDist={15:0.0}t " +
                     "SelectiveThirdPdcPmhAfterTwoLosses={16} " +
-                    "PerturbationScenarios={17}",
+                    "PerturbationScenarios={17} " +
+                    "PdcEarlyPmFilter={18} PdcEarlyMaxMinutes={19} PdcEarlyMinPmWidth={20:0.0}t",
                     StrategyVersion,
                     PortfolioMode,
                     EnableLongModel,
@@ -577,7 +582,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EnablePmhSlowEmaDistanceFilter,
                     PmhMaximumSlowEmaDistanceTicks,
                     EnableSelectivePdcPmhThirdTradeAfterTwoLosses,
-                    EnableResearchPerturbationScenarios);
+                    EnableResearchPerturbationScenarios,
+                    EnablePdcEarlyPremarketWidthFilter,
+                    PdcEarlyMaximumMinutesFromOpen,
+                    PdcEarlyMinimumPremarketWidthTicks);
             }
             else if (State == State.Realtime)
             {
@@ -1106,6 +1114,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && previousClose <= priorDayClose
                 && close > priorDayClose;
 
+            var pdcEarlyWindow =
+                minutesFromOpen >= 0
+                && minutesFromOpen <= PdcEarlyMaximumMinutesFromOpen;
+
+            var pdcEarlyPremarketWidthOk =
+                !EnablePdcEarlyPremarketWidthFilter
+                || !pdcEarlyWindow
+                || (IsFinite(premarketWidthTicks)
+                    && premarketWidthTicks >= PdcEarlyMinimumPremarketWidthTicks);
+
             var priorCloseQualified =
                 priorCloseCross
                 && IsFinite(range1mTicks)
@@ -1113,7 +1131,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     <= PriorCloseMaximumRangeTicks
                 && IsFinite(overnightWidthTicks)
                 && overnightWidthTicks
-                    >= PriorCloseMinimumOvernightWidthTicks;
+                    >= PriorCloseMinimumOvernightWidthTicks
+                && pdcEarlyPremarketWidthOk;
 
 
             if (priorCloseCross)
@@ -1124,7 +1143,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Qualified={0} PDC={1} " +
                     "PrevClose={2} Close={3} " +
                     "Range1m={4:0.0}t MaxRange={5:0.0}t " +
-                    "ONWidth={6:0.0}t MinONWidth={7:0.0}t",
+                    "ONWidth={6:0.0}t MinONWidth={7:0.0}t " +
+                    "MinutesFromOpen={8} EarlyPmFilter={9} " +
+                    "PMWidth={10:0.0}t MinEarlyPMWidth={11:0.0}t EarlyPmOk={12}",
                     priorCloseQualified,
                     priorDayClose,
                     previousClose,
@@ -1132,7 +1153,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     range1mTicks,
                     PriorCloseMaximumRangeTicks,
                     overnightWidthTicks,
-                    PriorCloseMinimumOvernightWidthTicks);
+                    PriorCloseMinimumOvernightWidthTicks,
+                    minutesFromOpen,
+                    EnablePdcEarlyPremarketWidthFilter,
+                    premarketWidthTicks,
+                    PdcEarlyMinimumPremarketWidthTicks,
+                    pdcEarlyPremarketWidthOk);
             }
 
 
@@ -3319,11 +3345,52 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
+        [Display(
+            Name = "Enable PDC Early Premarket Width Filter",
+            Description = "When enabled, PDC signals during the configured early-RTH window require the premarket range width to meet the configured minimum.",
+            GroupName = "6. Four Model",
+            Order = 2)]
+        public bool EnablePdcEarlyPremarketWidthFilter
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0, 390)]
+        [Display(
+            Name = "PDC Early Maximum Minutes From Open",
+            Description = "PDC signals at or before this many minutes from the RTH open are subject to the early premarket-width filter.",
+            GroupName = "6. Four Model",
+            Order = 3)]
+        public int PdcEarlyMaximumMinutesFromOpen
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Range(0.0, 5000.0)]
+        [Display(
+            Name = "PDC Early Minimum Premarket Width Ticks",
+            Description = "Minimum premarket range width required for PDC entries inside the configured early-RTH window.",
+            GroupName = "6. Four Model",
+            Order = 4)]
+        public double PdcEarlyMinimumPremarketWidthTicks
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
         [Range(0, 390)]
         [Display(
             Name = "PMH Maximum Minutes From Open",
             GroupName = "6. Four Model",
-            Order = 2)]
+            Order = 5)]
         public int PremarketHighMaximumMinutesFromOpen
         {
             get;
@@ -3336,7 +3403,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "PMH Minimum ATR5 Ticks",
             GroupName = "6. Four Model",
-            Order = 3)]
+            Order = 6)]
         public double PremarketHighMinimumAtr5mTicks
         {
             get;
@@ -3349,7 +3416,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "RTH Open Minimum Minutes From Open",
             GroupName = "6. Four Model",
-            Order = 4)]
+            Order = 7)]
         public int RthOpenMinimumMinutesFromOpen
         {
             get;
@@ -3362,7 +3429,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "RTH Open Minimum Premarket Width Ticks",
             GroupName = "6. Four Model",
-            Order = 5)]
+            Order = 8)]
         public double RthOpenMinimumPremarketWidthTicks
         {
             get;
@@ -3376,7 +3443,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Name = "PML Minimum ATR5 Ticks",
             Description = "FourModelResearchFiltered additionally requires raw 1-minute close above the completed 5-minute EMA Fast.",
             GroupName = "6. Four Model",
-            Order = 6)]
+            Order = 9)]
         public double PremarketLowMinimumAtr5mTicks
         {
             get;
