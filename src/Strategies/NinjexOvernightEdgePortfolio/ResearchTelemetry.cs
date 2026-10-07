@@ -177,6 +177,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public partial class NinjexOvernightEdgePortfolio
     {
+        private const string OvernightHighBreakResearchSignal = "ONH-BREAK-L";
+        private const string OvernightLowBreakResearchSignal = "ONL-BREAK-S";
+        private const string OvernightHighBreakResearchModel = "Overnight-high breakout (research only)";
+        private const string OvernightLowBreakResearchModel = "Overnight-low breakdown (research only)";
+
         private INinjexOvernightEdgeResearchSink researchSink = new NinjexOvernightEdgeNullResearchSink();
         private readonly Dictionary<string, int> researchCandidateCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> researchTradeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -272,7 +277,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             var priorCloseCross = IsFinite(priorDayClose) && priorDayCloseDate < signalTime.Date && previousClose <= priorDayClose && close > priorDayClose;
             var priorRangeOk = IsFinite(range1mTicks) && range1mTicks <= PriorCloseMaximumRangeTicks;
             var priorWidthOk = IsFinite(overnightWidthTicks) && overnightWidthTicks >= PriorCloseMinimumOvernightWidthTicks;
-            var priorQualified = priorCloseCross && priorRangeOk && priorWidthOk;
+            var pdcEarlyWindow = minutesFromOpen >= 0 && minutesFromOpen <= PdcEarlyMaximumMinutesFromOpen;
+            var priorPremarketWidthOk = !EnablePdcEarlyPremarketWidthFilter
+                || !pdcEarlyWindow
+                || (IsFinite(premarketWidthTicks) && premarketWidthTicks >= PdcEarlyMinimumPremarketWidthTicks);
+            var priorQualified = priorCloseCross && priorRangeOk && priorWidthOk && priorPremarketWidthOk;
 
             var pmhSweep = IsFinite(premarketHigh) && high > premarketHigh && close < premarketHigh;
             var pmhTimeOk = minutesFromOpen >= 0 && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen;
@@ -294,6 +303,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             var pmlEmaOk = !useFastEmaFilter || (IsFinite(last5mEmaFast) && close > last5mEmaFast);
             var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();
 
+            // Observational fifth-model research only. These completed 1-minute
+            // close-through events never participate in portfolio priority and
+            // never arm or submit real orders. CandidateOccurrenceToday lets
+            // analysis distinguish the first break from later re-breaks.
+            var overnightHighBreak =
+                IsFinite(overnightHigh)
+                && previousClose <= overnightHigh
+                && close > overnightHigh;
+
+            var overnightLowBreak =
+                IsFinite(overnightLow)
+                && previousClose >= overnightLow
+                && close < overnightLow;
+
             var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
             var selectedSignal = priorQualified ? PriorCloseEntrySignal
                 : pmhQualified ? PremarketHighEntrySignal
@@ -304,7 +327,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (priorCloseCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PriorCloseModelName, PriorCloseEntrySignal, PendingDirection.Long, priorQualified, selectedSignal == PriorCloseEntrySignal,
-                    IsResearchSignalPortfolioEligible(PriorCloseEntrySignal), GetResearchPortfolioBlockReasonForSignal(PriorCloseEntrySignal, false), qualifiedCount, priorRangeOk, null, priorWidthOk, null, null,
+                    IsResearchSignalPortfolioEligible(PriorCloseEntrySignal), GetResearchPortfolioBlockReasonForSignal(PriorCloseEntrySignal, false), qualifiedCount, priorRangeOk, null, priorWidthOk, priorPremarketWidthOk, null,
                     TickSize > 0 ? (close - priorDayClose) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
             if (pmhSweep)
@@ -324,6 +347,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PremarketLowModelName, PremarketLowEntrySignal, PendingDirection.Short, pmlQualified, selectedSignal == PremarketLowEntrySignal,
                     IsResearchSignalPortfolioEligible(PremarketLowEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketLowEntrySignal, false), qualifiedCount, null, null, null, null, pmlAtrOk,
                     TickSize > 0 ? (premarketLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmlEmaOk);
+
+            if (overnightHighBreak)
+                WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
+                    OvernightHighBreakResearchModel, OvernightHighBreakResearchSignal, PendingDirection.Long, true, false,
+                    false, "ResearchOnly", 1, null, true, null, null, null,
+                    TickSize > 0 ? (close - overnightHigh) / TickSize : double.NaN, range1mTicks, bodyTicks);
+
+            if (overnightLowBreak)
+                WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
+                    OvernightLowBreakResearchModel, OvernightLowBreakResearchSignal, PendingDirection.Short, true, false,
+                    false, "ResearchOnly", 1, null, true, null, null, null,
+                    TickSize > 0 ? (overnightLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
+        }
+
+        private static bool IsOvernightBreakoutResearchSignal(string signalName)
+        {
+            return string.Equals(signalName, OvernightHighBreakResearchSignal, StringComparison.Ordinal)
+                || string.Equals(signalName, OvernightLowBreakResearchSignal, StringComparison.Ordinal);
         }
 
         private void WriteCandidateResearchRow(
