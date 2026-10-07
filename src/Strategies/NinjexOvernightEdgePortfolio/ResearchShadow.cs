@@ -252,6 +252,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ? shadow.SignalTime.AddMinutes(MaxHoldMinutes)
                         : Core.Globals.MinDate;
 
+                if (IsOvernightBreakoutResearchSignal(shadow.Snapshot == null ? string.Empty : shadow.Snapshot.Signal))
+                {
+                    RegisterResearchPerturbationCandidate(
+                        shadow.Snapshot,
+                        time,
+                        price,
+                        shadow.MaxHoldExitTime);
+                }
+
                 // The entry tick establishes zero excursion. Protective levels
                 // become active after this causal entry rather than retroactively
                 // evaluating the same tick.
