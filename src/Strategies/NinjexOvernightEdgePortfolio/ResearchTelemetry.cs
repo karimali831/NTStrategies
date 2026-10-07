@@ -349,16 +349,46 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSize > 0 ? (premarketLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmlEmaOk);
 
             if (overnightHighBreak)
+            {
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     OvernightHighBreakResearchModel, OvernightHighBreakResearchSignal, PendingDirection.Long, true, false,
                     false, "ResearchOnly", 1, null, true, null, null, null,
                     TickSize > 0 ? (close - overnightHigh) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
+                Diagnostic(
+                    signalTime,
+                    "RESEARCH CHECK Model=ONH-Breakout Signal={0} ONH={1} PrevClose={2} Close={3} BreakDepth={4:0.0}t MinutesFromOpen={5} ATR5={6:0.0}t ONWidth={7:0.0}t PMWidth={8:0.0}t",
+                    OvernightHighBreakResearchSignal,
+                    overnightHigh,
+                    previousClose,
+                    close,
+                    TickSize > 0 ? (close - overnightHigh) / TickSize : double.NaN,
+                    minutesFromOpen,
+                    last5mAtrTicks,
+                    overnightWidthTicks,
+                    premarketWidthTicks);
+            }
+
             if (overnightLowBreak)
+            {
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     OvernightLowBreakResearchModel, OvernightLowBreakResearchSignal, PendingDirection.Short, true, false,
                     false, "ResearchOnly", 1, null, true, null, null, null,
                     TickSize > 0 ? (overnightLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
+
+                Diagnostic(
+                    signalTime,
+                    "RESEARCH CHECK Model=ONL-Breakdown Signal={0} ONL={1} PrevClose={2} Close={3} BreakDepth={4:0.0}t MinutesFromOpen={5} ATR5={6:0.0}t ONWidth={7:0.0}t PMWidth={8:0.0}t",
+                    OvernightLowBreakResearchSignal,
+                    overnightLow,
+                    previousClose,
+                    close,
+                    TickSize > 0 ? (overnightLow - close) / TickSize : double.NaN,
+                    minutesFromOpen,
+                    last5mAtrTicks,
+                    overnightWidthTicks,
+                    premarketWidthTicks);
+            }
         }
 
         private static bool IsOvernightBreakoutResearchSignal(string signalName)
