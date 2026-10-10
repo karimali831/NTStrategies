@@ -86,8 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        private string GetActiveEntrySignalForExit(
-            PendingDirection direction)
+        private string GetActiveEntrySignalForExit()
         {
             // A strategy-managed position should always have an active entry
             // signal. Empty fallback exits the strategy position without
