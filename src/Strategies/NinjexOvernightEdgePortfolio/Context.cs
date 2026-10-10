@@ -1,4 +1,5 @@
 using System;
+using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
