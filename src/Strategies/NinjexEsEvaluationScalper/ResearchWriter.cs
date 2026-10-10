@@ -19,13 +19,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             Open("manifest", "Key,Value", false);
             Open("sessions", "Time,State,Event,RealizedNet", false);
             Open("quality", "Time,State,Event,Detail", false);
-            Open("candidates", "Time,State,Id,Model,Direction,LevelName,Level,SignalPrice,StructuralStop,StopTicks,Quantity,Vwap,AtrTicks,Decision", false);
+            Open("candidates", "Time,State,Id,Model,Direction,LevelName,Level,SignalPrice,StructuralStop,StopTicks,Quantity,Vwap,AtrTicks,Decision,ConfirmationTime,Ema9,Ema21,Trend15AsOf,Trend15Ready,Trend15Direction,Trend30AsOf,Trend30Ready,Trend30Direction,Trend60AsOf,Trend60Ready,Trend60Direction", false);
             Open("shadows", "SignalTime,EndTime,CandidateId,Model,StopTicks,RewardRisk,Outcome,EndMoveTicks,MfeTicks,MaeTicks,Assumptions", false);
-            Open("context", "Time,Vwap,AtrTicks,LevelsAsOf", false);
+            Open("context", "Time,Vwap,AtrTicks,LevelsAsOf,Ema9,Ema21,Trend15AsOf,Trend15Ready,Trend15Direction,Trend15Strength,Trend30AsOf,Trend30Ready,Trend30Direction,Trend30Strength,Trend60AsOf,Trend60Ready,Trend60Direction,Trend60Strength", false);
+            Open("minutes", "Start,End,State,Open,High,Low,Close,Volume,Complete", true);
+            Open("timeframes", "PeriodMinutes,End,State,Open,High,Low,Close,Volume,Complete", false);
             Open("orders", "Time,State,OrderId,Name,OrderState,Quantity,Filled,AverageFill,Limit,Stop,Error,Comment", false);
-            Open("fills", "Time,State,ExecutionId,OrderId,Name,Action,Price,Quantity,RealizedNet,OpenQuantity", false);
+            Open("fills", "Time,State,ExecutionId,OrderId,Name,Action,Price,Quantity,RealizedNet,OpenQuantity,ObservationTime", false);
             Open("trades", "EntryTime,ExitTime,Signal,Model,Direction,AverageEntry,LastExit,Gross,Fees,Net,MfeUSD,MaeUSD", false);
-            Open("equity", "Time,State,RealizedNet,UnrealizedGross,LiquidationNet,OpenQuantity,Signal", true);
+            Open("equity", "Time,State,RealizedNet,UnrealizedGross,LiquidationNet,OpenQuantity,Signal,Sequence,ExecutionTime", true);
             if (raw) Open("ticks", "Time,Price,Volume,OpenQuantity", true);
         }
         private void Open(string name, string header, bool compressed)

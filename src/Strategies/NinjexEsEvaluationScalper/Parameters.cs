@@ -50,10 +50,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         public string OutputFolder { get; set; }
         [NinjaScriptProperty, Display(Name="Stop at evaluation boundary (disable for continuous research)", GroupName="Evaluation scalper", Order=23)]
         public bool EnforceEvaluationLimits { get; set; }
+        [NinjaScriptProperty, Display(Name="UseConfirmedEntries", GroupName="Context and confirmation", Order=0)]
+        public bool UseConfirmedEntries { get; set; }
+        [NinjaScriptProperty, Display(Name="UseRollingLevelEntries", GroupName="Context and confirmation", Order=1)]
+        public bool UseRollingLevelEntries { get; set; }
+        [NinjaScriptProperty, Range(0,3), Display(Name="TrendFilterMode", GroupName="Context and confirmation", Order=2)]
+        public int TrendFilterMode { get; set; }
+        [NinjaScriptProperty, Range(0,2), Display(Name="StopAtrMultiplier", GroupName="Context and confirmation", Order=3)]
+        public double StopAtrMultiplier { get; set; }
+        [NinjaScriptProperty, Range(0,10), Display(Name="ReclaimHoldSeconds", GroupName="Context and confirmation", Order=4)]
+        public int ReclaimHoldSeconds { get; set; }
+        [NinjaScriptProperty, Range(120,900), Display(Name="QuietSessionGapSeconds", GroupName="Context and confirmation", Order=5)]
+        public int QuietSessionGapSeconds { get; set; }
+        [NinjaScriptProperty, Display(Name="ExportEveryTickEquity", GroupName="Context and confirmation", Order=6)]
+        public bool ExportEveryTickEquity { get; set; }
         private string ParameterSummary()
         {
             return string.Join(";", new object[] {
-"EnforceEvaluationLimits=" + EnforceEvaluationLimits.ToString(),"Contracts=" + Contracts.ToString(),"RiskPerTrade=" + RiskPerTrade.ToString(),"MinStopTicks=" + MinStopTicks.ToString(),"MaxStopTicks=" + MaxStopTicks.ToString(),"RewardRisk=" + RewardRisk.ToString(),"DailyLossLimit=" + DailyLossLimit.ToString(),"DailyProfitLimit=" + DailyProfitLimit.ToString(),"MaxTradesPerDay=" + MaxTradesPerDay.ToString(),"CooldownSeconds=" + CooldownSeconds.ToString(),"MaxHoldSeconds=" + MaxHoldSeconds.ToString(),"SweepTicks=" + SweepTicks.ToString(),"ReclaimTicks=" + ReclaimTicks.ToString(),"BreakoutTicks=" + BreakoutTicks.ToString(),"RetestTicks=" + RetestTicks.ToString(),"ConfirmTicks=" + ConfirmTicks.ToString(),"SetupExpirySeconds=" + SetupExpirySeconds.ToString(),"CommissionPerSide=" + CommissionPerSide.ToString(),"ExportRawTicks=" + ExportRawTicks.ToString(),"AllowLiveAccounts=" + AllowLiveAccounts.ToString(),"FirstTradeDate=" + FirstTradeDate.ToString(),"LastTradeDate=" + LastTradeDate.ToString(),"OutputFolder=" + OutputFolder.ToString() });
+"ExportEveryTickEquity=" + ExportEveryTickEquity.ToString(),"UseConfirmedEntries=" + UseConfirmedEntries.ToString(),"UseRollingLevelEntries=" + UseRollingLevelEntries.ToString(),"TrendFilterMode=" + TrendFilterMode.ToString(),"StopAtrMultiplier=" + StopAtrMultiplier.ToString(),"ReclaimHoldSeconds=" + ReclaimHoldSeconds.ToString(),"QuietSessionGapSeconds=" + QuietSessionGapSeconds.ToString(),"EnforceEvaluationLimits=" + EnforceEvaluationLimits.ToString(),"Contracts=" + Contracts.ToString(),"RiskPerTrade=" + RiskPerTrade.ToString(),"MinStopTicks=" + MinStopTicks.ToString(),"MaxStopTicks=" + MaxStopTicks.ToString(),"RewardRisk=" + RewardRisk.ToString(),"DailyLossLimit=" + DailyLossLimit.ToString(),"DailyProfitLimit=" + DailyProfitLimit.ToString(),"MaxTradesPerDay=" + MaxTradesPerDay.ToString(),"CooldownSeconds=" + CooldownSeconds.ToString(),"MaxHoldSeconds=" + MaxHoldSeconds.ToString(),"SweepTicks=" + SweepTicks.ToString(),"ReclaimTicks=" + ReclaimTicks.ToString(),"BreakoutTicks=" + BreakoutTicks.ToString(),"RetestTicks=" + RetestTicks.ToString(),"ConfirmTicks=" + ConfirmTicks.ToString(),"SetupExpirySeconds=" + SetupExpirySeconds.ToString(),"CommissionPerSide=" + CommissionPerSide.ToString(),"ExportRawTicks=" + ExportRawTicks.ToString(),"AllowLiveAccounts=" + AllowLiveAccounts.ToString(),"FirstTradeDate=" + FirstTradeDate.ToString(),"LastTradeDate=" + LastTradeDate.ToString(),"OutputFolder=" + OutputFolder.ToString() });
         }
     }
 }

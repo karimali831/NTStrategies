@@ -83,6 +83,7 @@
         <Compile Include="src\Strategies\NinjexEsEvaluationScalper\Parameters.cs" />
         <Compile Include="src\Strategies\NinjexEsEvaluationScalper\ResearchWriter.cs" />
         <Compile Include="src\Strategies\NinjexEsEvaluationScalper\SignalEngine.cs" />
+        <Compile Include="src\Strategies\NinjexEsEvaluationScalper\TimeframeContext.cs" />
         <Compile Include="src\Strategies\NinjexEsEvaluationScalper\ShadowResearch.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\AcceptanceContextTracker.cs" />
         <Compile Include="src\AddOns\NinjexPremarketRange\Analysis\BreakoutEventDetector.cs" />

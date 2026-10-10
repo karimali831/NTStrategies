@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript;
@@ -45,6 +46,20 @@ internal static class EsEvaluationOrderTests
         entry.OrderState=OrderState.PartFilled;partial.EntryWorking(entry);partial.Fill(entry,100,1);partial.Fill(exit,99,1);
         Assert((bool)Get(partial,"pendingEntry") && partial.CancelRequests==1,"Unfinished entry must be cancelled and stay latched after early exit");
         partial.EntryCancelled(entry);Assert(!(bool)Get(partial,"pendingEntry"),"Cancellation clears pending remainder");partial.Finish();
+        var eq=new EvaluationHarness();eq.Init();
+        T.GetField("lastObserved",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(eq,new DateTime(2025,9,16,10,0,0));
+        var write=T.GetMethod("WriteEquity",BindingFlags.NonPublic|BindingFlags.Instance);
+        foreach(double value in new[]{0.0,0,10,-20,0})write.Invoke(eq,new object[]{new DateTime(2025,9,16,10,0,1),0.0,value,value});
+        T.GetField("lastObserved",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(eq,new DateTime(2025,9,16,10,1,0));
+        write.Invoke(eq,new object[]{new DateTime(2025,9,16,10,1,1),0.0,0.0,0.0});
+        string eqPath=((EvaluationResearchWriter)Get(eq,"research")).DirectoryPath;eq.Finish();
+        using(var gzip=new GZipStream(File.OpenRead(Path.Combine(eqPath,"equity.csv.gz")),CompressionMode.Decompress))
+        using(var reader=new StreamReader(gzip))
+        {
+            string content=reader.ReadToEnd();
+            Assert(content.Split(new[]{'\n'},StringSplitOptions.RemoveEmptyEntries).Length==6,"Equity suppression dropped an extreme or heartbeat");
+            Assert(!content.Contains("10:00:01.0000000\",\"Realtime"),"Execution clock replaced observation clock");
+        }
         Directory.Delete(root,true);
         Console.WriteLine("PASS: managed context/brackets, partial fills/fees, weighted entry, partial exits, rejection lock");
     }

@@ -9,6 +9,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         internal string Model, LevelName;
         internal int Direction;
         internal double Level, Stop;
+        internal DateTime ConfirmationTime;
     }
     // Pure ordered Last-tick processor. No NinjaTrader, orders or IO dependencies.
     internal sealed class EvaluationSignalEngine
@@ -18,16 +19,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             internal string Name;
             internal double Price;
             internal int SweepSide, BreakSide;
-            internal bool Retested, Swept;
+            internal bool Retested, Swept, SweepConfirmed;
+            internal DateTime ConfirmationTime, HoldSince;
             internal double Extreme;
             internal DateTime SweepTime, BreakTime, Used;
         }
         private sealed class Minute
         {
             internal DateTime Time;
-            internal double High, Low, Close;
+            internal double Open, High, Low, Close, Volume;
+            internal DateTime First, Last;
+            internal bool Suspect;
         }
         private readonly double tick;
+        private readonly EvaluationEngineOptions options;
+        internal readonly EvaluationTrendFrame Trend15=new EvaluationTrendFrame(15), Trend30=new EvaluationTrendFrame(30), Trend60=new EvaluationTrendFrame(60);
+        internal Action<EvaluationMinute> MinuteClosed;
+        internal Action<int,DateTime,double,double,double,double,double,bool> TrendBarClosed;
+        internal double Ema9 { get { return ema9; } }
+        internal double Ema21 { get { return ema21; } }
         private readonly int sweep, reclaim, breakout, tolerance, confirm, expiry;
         private readonly List<Level> levels = new List<Level>();
         private readonly Queue<Minute> recent = new Queue<Minute>();
@@ -45,8 +55,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         internal double Vwap { get { return totalVolume > 0 ? weightedPrice / totalVolume : double.NaN; } }
         internal double AtrTicks { get { return minutes >= 14 ? atr / tick : double.NaN; } }
         internal EvaluationSignalEngine(double tickSize, int sweepTicks, int reclaimTicks, int breakoutTicks,
-            int retestTicks, int confirmTicks, int expirySeconds)
+            int retestTicks, int confirmTicks, int expirySeconds, EvaluationEngineOptions engineOptions=null)
         {
+            options=engineOptions ?? new EvaluationEngineOptions();
             tick = tickSize; sweep = sweepTicks; reclaim = reclaimTicks; breakout = breakoutTicks;
             tolerance = retestTicks; confirm = confirmTicks; expiry = expirySeconds;
         }
@@ -69,12 +80,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             var output = new List<EvaluationCandidate>();
             if (lastTime != default(DateTime) && time < lastTime)
             { quality("OutOfOrder", lastTime.ToString("o")); return output; }
-            if (lastTime != default(DateTime) && time - lastTime > TimeSpan.FromSeconds(60) &&
-                (time.TimeOfDay < new TimeSpan(16,0,0)))
+            if (lastTime != default(DateTime))
             {
-                quality("TickGap", (time-lastTime).TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                if (time.TimeOfDay < new TimeSpan(9,30,0)) { overnightGood = false; premarketGood = false; }
-                foreach (var l in levels) { l.SweepSide = l.BreakSide = 0; }
+                double gap=(time-lastTime).TotalSeconds;
+                var todGap=time.TimeOfDay;
+                bool rth=todGap>=new TimeSpan(9,30,0) && todGap<new TimeSpan(16,0,0);
+                bool sameEth=(lastTime.Hour>=18?lastTime.Date.AddDays(1):lastTime.Date)==(time.Hour>=18?time.Date.AddDays(1):time.Date);
+                if(sameEth && gap>(rth?60:options.QuietGapSeconds))
+                {
+                    quality(rth?"RthTickGap":"QuietSessionGap",gap.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    if(minute!=null)minute.Suspect=true;
+                    if(!rth){overnightGood=false;if(todGap>=new TimeSpan(8,0,0))premarketGood=false;}
+                    foreach(var l in levels){l.SweepSide=l.BreakSide=0;l.SweepConfirmed=false;}
+                }
             }
             if (time.Date != day)
             {
@@ -108,7 +126,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     rthFirst = time;
                     if (overnightGood && overnightStart.Date == time.Date.AddDays(-1)) { Put("ONH", onHigh); Put("ONL", onLow); }
-                    else quality("OvernightUnavailable", "Require prior 18:00 ET warm-up without observed >60s gaps");
+                    else quality("OvernightUnavailable", "Require prior 18:00 ET warm-up without suspicious quiet-session gaps");
                     if (premarketGood) { Put("PMH", pmHigh); Put("PML", pmLow); }
                 }
                 rthLast = time; rthHigh = Math.Max(rthHigh,price); rthLow = Math.Min(rthLow,price); rthClose = price;
@@ -121,6 +139,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (minute != null)
                 {
+                    var completed=new EvaluationMinute { Start=minute.Time,End=minute.Time.AddMinutes(1),Open=minute.Open,High=minute.High,Low=minute.Low,Close=minute.Close,Volume=minute.Volume,
+                        Complete=!minute.Suspect && minute.First<=minute.Time.AddSeconds(15) && (bucket-minute.Time).TotalMinutes==1 };
+                    if(MinuteClosed!=null)MinuteClosed(completed);
+                    Action<int,DateTime,double,double,double,double,double,bool> export=TrendBarClosed ?? ((a,b,c,d,e,f,g,h)=>{});
+                    Trend15.Accept(completed,export);Trend30.Accept(completed,export);Trend60.Accept(completed,export);
+                    if(options.ConfirmedEntries && completed.Complete)ConfirmSetups(completed);
                     if ((bucket-minute.Time).TotalMinutes == 1)
                     {
                         double tr = Math.Max(minute.High-minute.Low, Math.Max(Math.Abs(minute.High-previousClose),Math.Abs(minute.Low-previousClose)));
@@ -135,9 +159,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (recent.Count != 5) levels.RemoveAll(x => x.Name == "RollingH" || x.Name == "RollingL");
                 if (recent.Count == 5)
                 { Put("RollingH",recent.Max(x=>x.High)); Put("RollingL",recent.Min(x=>x.Low)); }
-                minute = new Minute { Time=bucket, High=price, Low=price, Close=price };
+                minute = new Minute { Time=bucket, First=time, Last=time, Open=price, High=price, Low=price, Close=price };
             }
-            minute.High = Math.Max(minute.High,price); minute.Low = Math.Min(minute.Low,price); minute.Close = price;
+            minute.High = Math.Max(minute.High,price); minute.Low = Math.Min(minute.Low,price); minute.Close = price; minute.Last=time;minute.Volume+=volume;
             if (InWindow(time) && minutes >= 14 && rthFirst != default(DateTime) && rthFirst.TimeOfDay <= new TimeSpan(9,31,0))
             {
                 foreach (var l in levels)
@@ -148,15 +172,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (l.SweepSide == 0)
                     {
                         if (lastPrice >= l.Price && price < l.Price)
-                        { l.SweepSide=1; l.Extreme=price; l.SweepTime=time; l.Swept=false; }
+                        { l.SweepSide=1; l.Extreme=price; l.SweepTime=time; l.Swept=false;l.SweepConfirmed=false;l.HoldSince=default(DateTime); }
                         else if (lastPrice <= l.Price && price > l.Price)
-                        { l.SweepSide=-1; l.Extreme=price; l.SweepTime=time; l.Swept=false; }
+                        { l.SweepSide=-1; l.Extreme=price; l.SweepTime=time; l.Swept=false;l.SweepConfirmed=false;l.HoldSince=default(DateTime); }
                     }
                     if (l.SweepSide != 0)
                     {
                         l.Extreme = l.SweepSide>0 ? Math.Min(l.Extreme,price) : Math.Max(l.Extreme,price);
                         if (l.SweepSide*(l.Extreme-l.Price) <= -sweep*tick) l.Swept=true;
-                        if (l.Swept && l.SweepSide*(price-l.Price) >= reclaim*tick)
+                        if(options.ConfirmedEntries && l.SweepConfirmed)
+                        {
+                            if(l.SweepSide*(price-l.Price)<reclaim*tick)l.HoldSince=default(DateTime);
+                            else if(l.HoldSince==default(DateTime))l.HoldSince=time;
+                        }
+                        bool confirmed=!options.ConfirmedEntries || (l.SweepConfirmed && l.HoldSince!=default(DateTime) && (time-l.HoldSince).TotalSeconds>=options.ReclaimHoldSeconds);
+                        if (l.Swept && confirmed && l.SweepSide*(price-l.Price) >= (reclaim+(options.ConfirmedEntries?confirm:0))*tick)
                         {
                             output.Add(New(l,"SweepReclaim",l.SweepSide,l.Extreme-l.SweepSide*2*tick));
                             l.SweepSide=l.BreakSide=0; l.Used=time; continue;
@@ -164,9 +194,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     if (l.BreakSide == 0)
                     {
-                        if (lastPrice < l.Price+breakout*tick && price >= l.Price+breakout*tick)
+                        if (!options.ConfirmedEntries && lastPrice < l.Price+breakout*tick && price >= l.Price+breakout*tick)
                         { l.BreakSide=1; l.BreakTime=time; l.Extreme=price; l.Retested=false; }
-                        else if (lastPrice > l.Price-breakout*tick && price <= l.Price-breakout*tick)
+                        else if (!options.ConfirmedEntries && lastPrice > l.Price-breakout*tick && price <= l.Price-breakout*tick)
                         { l.BreakSide=-1; l.BreakTime=time; l.Extreme=price; l.Retested=false; }
                     }
                     else
@@ -192,7 +222,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastTime=time; lastPrice=price;
             return output;
         }
+        private void ConfirmSetups(EvaluationMinute m)
+        {
+            double range=m.High-m.Low,body=Math.Abs(m.Close-m.Open);
+            if(range<=0 || minutes<14)return;
+            foreach(var l in levels)
+            {
+                if(l.BreakSide!=0 && m.End-l.BreakTime>TimeSpan.FromSeconds(expiry)){l.BreakSide=0;l.Retested=false;}
+                if(l.SweepSide!=0 && m.End-l.SweepTime>TimeSpan.FromSeconds(expiry)){l.SweepSide=0;l.SweepConfirmed=false;}
+                int d=l.SweepSide;
+                if(d!=0 && l.Swept && m.End-l.SweepTime<=TimeSpan.FromSeconds(expiry))
+                {
+                    double wick=d>0?Math.Min(m.Open,m.Close)-m.Low:m.High-Math.Max(m.Open,m.Close);
+                    double closePosition=d>0?(m.Close-m.Low)/range:(m.High-m.Close)/range;
+                    bool touched=d>0?m.Low<=l.Price-sweep*tick:m.High>=l.Price+sweep*tick;
+                    if(touched && wick/range>=.35 && closePosition>=.65 && d*(m.Close-l.Price)>=reclaim*tick)
+                    {l.SweepConfirmed=true;l.ConfirmationTime=m.End;l.HoldSince=default(DateTime);}
+                }
+                int impulseDirection=Math.Sign(m.Close-m.Open);
+                bool impulse=body>=Math.Max(breakout*tick,options.ImpulseAtrFraction*atr) && body/range>=.60;
+                if(l.BreakSide==0 && impulse && impulseDirection!=0)
+                {
+                    int side=impulseDirection;
+                    bool crossed=side>0?m.Low<=l.Price+tolerance*tick:m.High>=l.Price-tolerance*tick;
+                    if(crossed && side*(m.Close-l.Price)>=breakout*tick)
+                    {l.BreakSide=side;l.BreakTime=m.End;l.Extreme=m.Close;l.Retested=false;l.ConfirmationTime=m.End;}
+                }
+            }
+        }
         private EvaluationCandidate New(Level l,string model,int direction,double stop)
-        { return new EvaluationCandidate { Id=++id, Model=model, Direction=direction, LevelName=l.Name, Level=l.Price, Stop=stop }; }
+        { return new EvaluationCandidate { Id=++id, Model=model, Direction=direction, LevelName=l.Name, Level=l.Price, Stop=stop, ConfirmationTime=l.ConfirmationTime }; }
     }
 }

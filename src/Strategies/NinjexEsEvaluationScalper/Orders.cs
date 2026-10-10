@@ -74,11 +74,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (pendingEntry && workingEntry != null) CancelOrder(workingEntry);
                 }
             }
-            research.Write("fills", time, State, executionId, orderId, name, action, price, quantity, realized, filledQuantity);
+            research.Write("fills", time, State, executionId, orderId, name, action, price, quantity, realized, filledQuantity,lastObserved);
             // Capture realized equity even if no next tick arrives after the final exit.
-            research.Write("equity", time, State, realized, filledQuantity * activeDirection * (price-averageEntry) * Instrument.MasterInstrument.PointValue,
-                realized + filledQuantity * activeDirection * (price-averageEntry) * Instrument.MasterInstrument.PointValue - filledQuantity * CommissionPerSide,
-                filledQuantity, activeSignal ?? "");
+            WriteEquity(time, realized, filledQuantity * activeDirection * (price-averageEntry) * Instrument.MasterInstrument.PointValue,
+                realized + filledQuantity * activeDirection * (price-averageEntry) * Instrument.MasterInstrument.PointValue - filledQuantity * CommissionPerSide);
         }
     }
 }
