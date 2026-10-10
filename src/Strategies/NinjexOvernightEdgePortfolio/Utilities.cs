@@ -4,8 +4,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightEdgePortfolio
     {
-        #region Helpers
-
         private double GetOvernightWidthTicks()
         {
             if (!IsFinite(overnightHigh)
@@ -202,8 +200,5 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Name,
                     message));
         }
-
-        #endregion
-
     }
 }

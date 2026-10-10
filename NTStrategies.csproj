@@ -179,9 +179,9 @@
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\LiveDailyState.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Orders.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Parameters.cs" />
-        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchTelemetry.cs" />
-        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchShadow.cs" />
-        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\ResearchPerturbation.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchPerturbation.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchShadow.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchTelemetry.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Signals.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Utilities.cs" />

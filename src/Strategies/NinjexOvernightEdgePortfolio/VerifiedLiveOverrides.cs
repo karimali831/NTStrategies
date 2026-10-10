@@ -105,10 +105,5 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return true;
         }
-
-
-
-
-
     }
 }

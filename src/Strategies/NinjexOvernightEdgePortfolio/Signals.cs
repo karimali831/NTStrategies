@@ -4,8 +4,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightEdgePortfolio
     {
-        #region 1-minute signal detection
-
         private void ProcessSignalSeries()
         {
             if (CurrentBars[SignalSeriesIndex] < 2)
@@ -658,8 +656,5 @@ namespace NinjaTrader.NinjaScript.Strategies
                 winnersToday,
                 MaxWinnersPerDay);
         }
-
-        #endregion
-
     }
 }

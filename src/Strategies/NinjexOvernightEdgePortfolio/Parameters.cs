@@ -4,8 +4,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightEdgePortfolio
     {
-        #region Properties
-
         [NinjaScriptProperty]
         [Range(0, 235959)]
         [Display(
@@ -449,9 +447,5 @@ namespace NinjaTrader.NinjaScript.Strategies
             get;
             set;
         }
-
-
-        #endregion
-
     }
 }

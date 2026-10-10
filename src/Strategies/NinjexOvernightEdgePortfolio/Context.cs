@@ -5,8 +5,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightEdgePortfolio
     {
-        #region 5-minute context / overnight range
-
         private void ProcessContextSeries()
         {
             if (CurrentBars[ContextSeriesIndex]
@@ -174,8 +172,5 @@ namespace NinjaTrader.NinjaScript.Strategies
             last5mEmaSlow =
                 emaSlow5m[1];
         }
-
-        #endregion
-
     }
 }

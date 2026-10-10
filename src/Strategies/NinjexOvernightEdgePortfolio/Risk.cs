@@ -5,8 +5,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightEdgePortfolio
     {
-        #region Portfolio risk / daily state
-
         private bool CanTakeNewTrade(
             DateTime time,
             bool allowExistingPendingEntry)
@@ -92,8 +90,5 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "NEW TRADING DATE {0:yyyy-MM-dd}",
                 activeTradingDate);
         }
-
-        #endregion
-
     }
 }
