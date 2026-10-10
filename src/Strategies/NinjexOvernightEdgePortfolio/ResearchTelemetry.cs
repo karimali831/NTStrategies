@@ -273,8 +273,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var priorRangeOk = IsFinite(range1mTicks) && range1mTicks <= PriorCloseMaximumRangeTicks;
             var priorWidthOk = IsFinite(overnightWidthTicks) && overnightWidthTicks >= PriorCloseMinimumOvernightWidthTicks;
             var pdcEarlyWindow = minutesFromOpen >= 0 && minutesFromOpen <= PdcEarlyMaximumMinutesFromOpen;
-            var priorPremarketWidthOk = !EnablePdcEarlyPremarketWidthFilter
-                || !pdcEarlyWindow
+            var priorPremarketWidthOk = !pdcEarlyWindow
                 || (IsFinite(premarketWidthTicks) && premarketWidthTicks >= PdcEarlyMinimumPremarketWidthTicks);
             var priorQualified = priorCloseCross && priorRangeOk && priorWidthOk && priorPremarketWidthOk;
 
@@ -290,8 +289,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var pmlCross = IsFinite(premarketLow) && previousClose >= premarketLow && close < premarketLow;
             var pmlAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketLowMinimumAtr5mTicks;
-            var useFastEmaFilter = EnableEMAFilter;
-            var pmlEmaOk = !useFastEmaFilter || (IsFinite(last5mEmaFast) && close > last5mEmaFast);
+            var pmlEmaOk = IsFinite(last5mEmaFast) && close > last5mEmaFast;
             var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;
 
             var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
@@ -304,25 +302,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (priorCloseCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PriorCloseModelName, PriorCloseEntrySignal, PendingDirection.Long, priorQualified, selectedSignal == PriorCloseEntrySignal,
-                    IsResearchSignalPortfolioEligible(PriorCloseEntrySignal), GetResearchPortfolioBlockReasonForSignal(PriorCloseEntrySignal, false), qualifiedCount, priorRangeOk, null, priorWidthOk, priorPremarketWidthOk, null,
+                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, priorRangeOk, null, priorWidthOk, priorPremarketWidthOk, null,
                     TickSize > 0 ? (close - priorDayClose) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
             if (pmhSweep)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PremarketHighModelName, PremarketHighEntrySignal, PendingDirection.Short, pmhQualified, selectedSignal == PremarketHighEntrySignal,
-                    IsResearchSignalPortfolioEligible(PremarketHighEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketHighEntrySignal, false), qualifiedCount, null, pmhTimeOk, null, null, pmhAtrOk,
+                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, null, pmhTimeOk, null, null, pmhAtrOk,
                     TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
             if (rthCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     RthOpenModelName, RthOpenEntrySignal, PendingDirection.Short, rthQualified, selectedSignal == RthOpenEntrySignal,
-                    IsResearchSignalPortfolioEligible(RthOpenEntrySignal), GetResearchPortfolioBlockReasonForSignal(RthOpenEntrySignal, false), qualifiedCount, null, rthTimeOk, null, rthWidthOk, null,
+                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, null, rthTimeOk, null, rthWidthOk, null,
                     TickSize > 0 ? (rthOpen - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
             if (pmlCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PremarketLowModelName, PremarketLowEntrySignal, PendingDirection.Short, pmlQualified, selectedSignal == PremarketLowEntrySignal,
-                    IsResearchSignalPortfolioEligible(PremarketLowEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketLowEntrySignal, false), qualifiedCount, null, null, null, null, pmlAtrOk,
+                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, null, null, null, null, pmlAtrOk,
                     TickSize > 0 ? (premarketLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmlEmaOk);
         }
 
@@ -490,14 +488,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
         }
 
-        private bool IsResearchSignalPortfolioEligible(string signalName)
+        private bool IsResearchPortfolioEligible()
         {
             return string.IsNullOrEmpty(
-                GetResearchPortfolioBlockReasonForSignal(signalName, false));
+                GetResearchPortfolioBlockReason(false));
         }
 
-        private string GetResearchPortfolioBlockReasonForSignal(
-            string signalName,
+        private string GetResearchPortfolioBlockReason(
             bool allowExistingPendingEntry)
         {
             if (Position.MarketPosition != MarketPosition.Flat || entryOrderPending || manualExitPending
