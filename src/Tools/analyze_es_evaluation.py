@@ -37,15 +37,24 @@ def equity_stream(folders):
             raise ValueError('Cannot stitch contract runs with an open strategy position')
         offset = last_realized
         first = True
+        last_sequence=0
         for row in rows(path):
             if row['State'] != 'Realtime':
                 continue
             t = stamp(row['Time'])
+            if 'Sequence' in row:
+                sequence=int(row['Sequence'])
+                if sequence<=last_sequence: raise ValueError('Non-increasing equity observation sequence')
+                last_sequence=sequence
             if first and last_time is not None and t <= last_time:
                 raise ValueError('Overlapping run timestamps; use disjoint replay allocations')
             first = False
             if last_time is not None and t < last_time:
-                raise ValueError('Out-of-order equity records')
+                # v1 Playback execution clocks rounded up to the next second.
+                # Preserve written observation order; never sort prices/fills into a new path.
+                if (last_time-t).total_seconds()>1 or 'Sequence' in row:
+                    raise ValueError('Out-of-order equity records beyond legacy one-second callback rounding')
+                t=last_time
             realized = offset + float(row['RealizedNet'])
             equity = offset + float(row['LiquidationNet'])
             qty = int(row['OpenQuantity'])
@@ -105,7 +114,7 @@ def analyze(folders, output, model='intraday', closed_dates=()):
         for r in rows(folder / 'quality.csv'):
             if r['State'] == 'Realtime':
                 quality[r['Event']] += 1
-                if r['Event'] in {'TickGap', 'OutOfOrder', 'EvaluationLocked', 'OrderFault'}:
+                if r['Event'] in {'RthTickGap', 'OutOfOrder', 'EvaluationLocked', 'OrderFault'} or (r['Event']=='TickGap' and time(9,30)<=stamp(r['Time']).time()<time(16)):
                     suspect.add(stamp(r['Time']).date())
                     if r['Event'] in {'OrderFault', 'EvaluationLocked'}:
                         lock_dates.append(stamp(r['Time']).date())
@@ -185,6 +194,7 @@ def analyze(folders, output, model='intraday', closed_dates=()):
                             'Generic uncapped trailing high-water model, not a claim about any firm rules.',
                             'Fees are configured estimates; fills carry replay/simulator assumptions.',
                             'First/last window ticks and gap checks cannot prove complete market data.',
+                            'Legacy callback clock reversals <=1 second are clamped in recorded order; larger reversals fail.',
                             'Candidates/shadows are research diagnostics and never actual pass-rate evidence.']}
     (output / ('summary_' + model + '.json')).write_text(json.dumps(result, indent=2))
     return result

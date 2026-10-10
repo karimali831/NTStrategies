@@ -61,6 +61,23 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(values[2][1],495)
             self.assertEqual(values[-1][1],600)
 
+    def test_legacy_execution_clock_rounding_preserves_recorded_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            a=self.make_run(root,'run',[(datetime(2025,9,15,9,35,24),-5,1),
+                                      (datetime(2025,9,15,9,35,23,292000),-5,1),
+                                      (datetime(2025,9,15,9,35,24,100000),-5,1)])
+            result=list(m.equity_stream([a]))
+            self.assertEqual(result[0][0],result[1][0])
+            self.assertLess(result[1][0],result[2][0])
+
+    def test_larger_clock_reversal_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            a=self.make_run(root,'run',[(datetime(2025,9,15,9,35,24),0,0),
+                                      (datetime(2025,9,15,9,35,22),0,0)])
+            with self.assertRaises(ValueError): list(m.equity_stream([a]))
+
     def test_overlapping_contract_runs_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
