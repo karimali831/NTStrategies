@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         ///
         /// Qualified four-model candidates are taken from the existing telemetry
         /// snapshots, including candidates blocked by a live position or daily cap.
-        /// Each candidate is then scored independently with the official Run 4
+        /// Each candidate is then scored independently with the validated Run 8
         /// mechanics: first causal tick, fixed stop/target, 60-minute max hold and
         /// 16:00 flatten.
         /// </summary>
