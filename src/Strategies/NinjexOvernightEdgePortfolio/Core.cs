@@ -28,7 +28,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///     - SHORT RTH-open breakdown from 120 minutes after the open,
     ///       Premarket width >= 140 ticks.
     ///     - SHORT premarket-low breakdown, completed 5-minute ATR >= 20 ticks.
-    ///       Requires close > completed 5-minute EMA(9) when the EMA filter is enabled.
+    ///       Requires close > completed 5-minute EMA(9).
     ///
     /// Execution:
     ///     - First causal tick after the completed 1-minute signal.
