@@ -314,7 +314,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Indicators
                 //
                 AtrPeriod = 14;
-                EnableEMAFilter = true;
                 EmaFastPeriod = 9;
                 EmaSlowPeriod = 21;
 
@@ -324,7 +323,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //
                 PriorCloseMaximumRangeTicks = 30.0;
                 PriorCloseMinimumOvernightWidthTicks = 200.0;
-                EnablePdcEarlyPremarketWidthFilter = true;
                 PdcEarlyMaximumMinutesFromOpen = 60;
                 PdcEarlyMinimumPremarketWidthTicks = 140.0;
 
@@ -412,9 +410,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Diagnostic(
                     DateTime.Now,
                     "READY Version={0} Stop={1}t Target={2}t MaxHold={3}m " +
-                    "Caps={4}/{5}/{6} PdcEarlyFilter={7} PdcEarlyMaxMinutes={8} " +
-                    "PdcEarlyMinPmWidth={9:0.0}t MirrorVerifiedLive={10} " +
-                    "ResearchTelemetry={11} Perturbation={12} RestartRecovery={13}",
+                    "Caps={4}/{5}/{6} PdcEarlyMaxMinutes={7} " +
+                    "PdcEarlyMinPmWidth={8:0.0}t MirrorVerifiedLive={9} " +
+                    "ResearchTelemetry={10} Perturbation={11} RestartRecovery={12}",
                     StrategyVersion,
                     StopLossTicks,
                     ProfitTargetTicks,
@@ -422,7 +420,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxTradesPerDay,
                     MaxWinnersPerDay,
                     MaxLossesPerDay,
-                    EnablePdcEarlyPremarketWidthFilter,
                     PdcEarlyMaximumMinutesFromOpen,
                     PdcEarlyMinimumPremarketWidthTicks,
                     MirrorVerifiedLiveExecutions,
