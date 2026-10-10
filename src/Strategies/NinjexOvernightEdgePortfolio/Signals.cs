@@ -144,8 +144,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && minutesFromOpen <= PdcEarlyMaximumMinutesFromOpen;
 
             var pdcEarlyPremarketWidthOk =
-                !EnablePdcEarlyPremarketWidthFilter
-                || !pdcEarlyWindow
+                !pdcEarlyWindow
                 || (IsFinite(premarketWidthTicks)
                     && premarketWidthTicks >= PdcEarlyMinimumPremarketWidthTicks);
 
@@ -169,8 +168,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "PrevClose={2} Close={3} " +
                     "Range1m={4:0.0}t MaxRange={5:0.0}t " +
                     "ONWidth={6:0.0}t MinONWidth={7:0.0}t " +
-                    "MinutesFromOpen={8} EarlyPmFilter={9} " +
-                    "PMWidth={10:0.0}t MinEarlyPMWidth={11:0.0}t EarlyPmOk={12}",
+                    "MinutesFromOpen={8} " +
+                    "PMWidth={9:0.0}t MinEarlyPMWidth={10:0.0}t EarlyPmOk={11}",
                     priorCloseQualified,
                     priorDayClose,
                     previousClose,
@@ -180,7 +179,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     overnightWidthTicks,
                     PriorCloseMinimumOvernightWidthTicks,
                     minutesFromOpen,
-                    EnablePdcEarlyPremarketWidthFilter,
                     premarketWidthTicks,
                     PdcEarlyMinimumPremarketWidthTicks,
                     pdcEarlyPremarketWidthOk);
@@ -257,19 +255,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && previousClose >= premarketLow
                 && close < premarketLow;
 
-            var useFastEmaFilter =
-                EnableEMAFilter;
-
-            //
-            // The archived research result is based on raw close > EMA(9).
-            // Earlier prose called this "below" after direction-normalizing
-            // the short feature; raw-price NinjaScript must use the relation
-            // below to reproduce the 274-trade research portfolio.
-            //
+            // Validated Run 8 PML rule: raw close must remain above EMA(9).
             var fastEmaOk =
-                !useFastEmaFilter
-                || (IsFinite(last5mEmaFast)
-                    && close > last5mEmaFast);
+                IsFinite(last5mEmaFast)
+                && close > last5mEmaFast;
 
             var premarketLowQualified =
                 premarketLowCross
@@ -286,17 +275,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Qualified={0} PML={1} " +
                     "PrevClose={2} Close={3} " +
                     "ATR5={4:0.0}t MinATR={5:0.0}t " +
-                    "EMAFilter={6} EMA5Fast={7} CloseAboveEMA={8}",
+                    "EMA5Fast={6} CloseAboveEMA={7}",
                     premarketLowQualified,
                     premarketLow,
                     previousClose,
                     close,
                     last5mAtrTicks,
                     PremarketLowMinimumAtr5mTicks,
-                    useFastEmaFilter,
                     last5mEmaFast,
-                    IsFinite(last5mEmaFast)
-                        && close > last5mEmaFast);
+                    fastEmaOk);
             }
 
 
@@ -397,10 +384,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             double currentBarOpen,
             double completedClose)
         {
-            // Preserve the Run 2 reference boundary for the controlled loss-limit
-            // comparison: only completed bars strictly before FlattenTime count.
-            // With FlattenTime=160000 and complete minute data, the final
-            // reference is the 15:59 close, not the official 16:00 RTH close.
+            // Use only completed RTH minutes strictly before FlattenTime.
+            // With FlattenTime=16:00, the prior-day reference is the 15:59 close.
             if (timeValue < MarketOpenTime
                 || timeValue >= FlattenTime)
             {
