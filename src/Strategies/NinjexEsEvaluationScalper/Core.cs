@@ -73,7 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 engine.MinuteClosed = m => research.Write("minutes",m.Start,m.End,State,m.Open,m.High,m.Low,m.Close,m.Volume,m.Complete);
                 engine.TrendBarClosed = (period,end,open,high,low,close,volume,complete) => research.Write("timeframes",period,end,State,open,high,low,close,volume,complete);
                 shadows = new EvaluationShadowResearch(research, TickSize);
-                research.Write("manifest", "Version", "1.1.0");
+                research.Write("manifest", "Version", "1.1.1");
                 research.Write("manifest", "PlatformZone", zone);
                 research.Write("manifest", "Instrument", Instrument.FullName);
                 research.Write("manifest", "PointValue", Instrument.MasterInstrument.PointValue);

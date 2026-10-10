@@ -14,9 +14,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private DateTime bucket, lastMinute;
         private int count, bars;
         private double open, high, low, close, volume, fast, slow, atr, previousClose;
-        private bool complete;
+        private bool complete, latestValid;
         internal DateTime AsOf { get; private set; }
-        internal bool Ready { get { return bars >= 13; } }
+        internal bool Ready { get { return bars >= 13 && latestValid; } }
         internal int Direction { get; private set; }
         internal double Strength { get; private set; }
         internal bool IsCurrent(DateTime now) { return Ready && AsOf<=now && now-AsOf<=TimeSpan.FromMinutes(period+1); }
@@ -27,6 +27,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime b=m.Start.Date.AddMinutes((minuteOfDay/period)*period);
             if(count==0 || b!=bucket)
             {
+                if(count>0) InvalidateLatest();
                 bucket=b;count=0;open=m.Open;high=m.High;low=m.Low;volume=0;
                 complete=m.Start==b;
             }
@@ -42,12 +43,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double oldFast=fast;
                 if(bars==0){fast=slow=close;atr=tr;}
                 else{fast+=(2.0/6)*(close-fast);slow+=(2.0/14)*(close-slow);atr+=(tr-atr)/14;}
-                previousClose=close;bars++;AsOf=m.End;
+                previousClose=close;bars++;AsOf=m.End;latestValid=true;
                 Strength=atr>0?(fast-slow)/atr:0;
                 Direction=Ready && Math.Abs(Strength)>=.10 && Math.Sign(fast-slow)==Math.Sign(fast-oldFast) && Math.Sign(close-fast)==Math.Sign(fast-slow)?Math.Sign(fast-slow):0;
             }
-            else{bars=0;Direction=0;Strength=0;AsOf=default(DateTime);}
+            else InvalidateLatest();
             count=0;
+        }
+        private void InvalidateLatest()
+        {
+            // Invalid observations cannot update indicators. Keep valid-bar warm-up,
+            // but expose no usable trend until another complete frame closes.
+            latestValid=false;Direction=0;Strength=0;
         }
     }
     internal sealed class EvaluationEngineOptions
