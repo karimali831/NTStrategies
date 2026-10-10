@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         ///
         /// Qualified four-model candidates are taken from the existing telemetry
         /// snapshots, including candidates blocked by a live position or daily cap.
-        /// Each candidate is then scored independently with the official Run 4
+        /// Each candidate is then scored independently with the validated Run 8
         /// mechanics: first causal tick, fixed stop/target, 60-minute max hold and
         /// 16:00 flatten.
         /// </summary>
@@ -251,15 +251,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxHoldMinutes > 0
                         ? shadow.SignalTime.AddMinutes(MaxHoldMinutes)
                         : Core.Globals.MinDate;
-
-                if (IsOvernightBreakoutResearchSignal(shadow.Snapshot == null ? string.Empty : shadow.Snapshot.Signal))
-                {
-                    RegisterResearchPerturbationCandidate(
-                        shadow.Snapshot,
-                        time,
-                        price,
-                        shadow.MaxHoldExitTime);
-                }
 
                 // The entry tick establishes zero excursion. Protective levels
                 // become active after this causal entry rather than retroactively

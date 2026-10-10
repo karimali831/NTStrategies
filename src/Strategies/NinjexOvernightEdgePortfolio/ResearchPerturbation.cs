@@ -99,58 +99,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             activeResearchPerturbationBatches.Add(batch);
         }
 
-        private void RegisterResearchPerturbationCandidate(
-            NinjexOvernightEdgeResearchRow snapshot,
-            DateTime entryTime,
-            double entryPrice,
-            DateTime maxHoldExitTime)
-        {
-            if (!EnableResearchTelemetry
-                || !EnableResearchPerturbationScenarios
-                || researchTelemetryFaulted
-                || researchPerturbationOutputFaulted
-                || snapshot == null
-                || !IsOvernightBreakoutResearchSignal(snapshot.Signal)
-                || !IsFinite(entryPrice))
-            {
-                return;
-            }
-
-            var direction = string.Equals(
-                    snapshot.Direction,
-                    PendingDirection.Long.ToString(),
-                    StringComparison.Ordinal)
-                ? PendingDirection.Long
-                : PendingDirection.Short;
-
-            var batch = new ResearchPerturbationBatch
-            {
-                TradeId = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "RC|{0:yyyyMMddHHmmssfff}|{1}|{2}",
-                    entryTime,
-                    snapshot.Signal ?? string.Empty,
-                    snapshot.CandidateOccurrenceToday),
-                Snapshot = snapshot.Clone(),
-                Direction = direction,
-                EntryTime = entryTime,
-                ActualEntryPrice = entryPrice,
-                MaxHoldExitTime = maxHoldExitTime,
-
-                // Research-only candidate: there is intentionally no actual
-                // strategy exit to wait for. Mark the batch write-ready once
-                // every hypothetical scenario has completed.
-                ActualExitKnown = true
-            };
-
-            AddEntryShiftScenarios(batch);
-            AddTargetScenarios(batch);
-            AddBreakEvenScenarios(batch, false);
-            AddBreakEvenScenarios(batch, true);
-
-            activeResearchPerturbationBatches.Add(batch);
-        }
-
         private void AddEntryShiftScenarios(ResearchPerturbationBatch batch)
         {
             var shifts = new[] { -2, -1, 0, 1, 2 };
@@ -537,12 +485,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     var scenario = batch.Scenarios[index];
 
-                    var hasActualExit =
-                        batch.ActualExitKnown
-                        && batch.ActualExitTime != Core.Globals.MinDate;
-
                     var secondsVsActual =
-                        hasActualExit
+                        batch.ActualExitKnown
                             ? (scenario.ExitTime - batch.ActualExitTime).TotalSeconds
                             : double.NaN;
 
@@ -579,7 +523,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             NumberPerturbation(scenario.MfeTicks),
                             NumberPerturbation(scenario.MaeTicks),
                             BoolPerturbation(
-                                hasActualExit
+                                batch.ActualExitKnown
                                 && scenario.ExitTime > batch.ActualExitTime),
                             NumberPerturbation(secondsVsActual)));
                 }
