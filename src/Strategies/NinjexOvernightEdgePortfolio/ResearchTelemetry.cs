@@ -177,11 +177,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public partial class NinjexOvernightEdgePortfolio
     {
-        private const string OvernightHighBreakResearchSignal = "ONH-BREAK-L";
-        private const string OvernightLowBreakResearchSignal = "ONL-BREAK-S";
-        private const string OvernightHighBreakResearchModel = "Overnight-high breakout (research only)";
-        private const string OvernightLowBreakResearchModel = "Overnight-low breakdown (research only)";
-
         private INinjexOvernightEdgeResearchSink researchSink = new NinjexOvernightEdgeNullResearchSink();
         private readonly Dictionary<string, int> researchCandidateCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> researchTradeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -286,36 +281,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             var pmhSweep = IsFinite(premarketHigh) && high > premarketHigh && close < premarketHigh;
             var pmhTimeOk = minutesFromOpen >= 0 && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen;
             var pmhAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
-            var pmhSlowEmaDistanceTicks = TickSize > 0 && IsFinite(last5mEmaSlow)
-                ? Math.Abs(close - last5mEmaSlow) / TickSize : double.NaN;
-            var pmhSlowEmaDistanceOk = !EnablePmhSlowEmaDistanceFilter
-                || (IsFinite(pmhSlowEmaDistanceTicks) && pmhSlowEmaDistanceTicks <= PmhMaximumSlowEmaDistanceTicks);
-            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk && pmhSlowEmaDistanceOk;
+            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk;
 
             var rthCross = IsFinite(rthOpen) && rthOpenDate == signalTime.Date && previousClose >= rthOpen && close < rthOpen;
             var rthTimeOk = minutesFromOpen >= RthOpenMinimumMinutesFromOpen;
             var rthWidthOk = IsFinite(premarketWidthTicks) && premarketWidthTicks >= RthOpenMinimumPremarketWidthTicks;
-            var rthQualified = rthCross && rthTimeOk && rthWidthOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();
+            var rthQualified = rthCross && rthTimeOk && rthWidthOk;
 
             var pmlCross = IsFinite(premarketLow) && previousClose >= premarketLow && close < premarketLow;
             var pmlAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketLowMinimumAtr5mTicks;
-            var useFastEmaFilter = EnableEMAFilter && PortfolioMode == NinjexOvernightEdgePortfolioMode.FourModelResearchFiltered;
+            var useFastEmaFilter = EnableEMAFilter;
             var pmlEmaOk = !useFastEmaFilter || (IsFinite(last5mEmaFast) && close > last5mEmaFast);
-            var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk && !IsSelectiveThirdTradeAfterTwoLossesWindow();
-
-            // Observational fifth-model research only. These completed 1-minute
-            // close-through events never participate in portfolio priority and
-            // never arm or submit real orders. CandidateOccurrenceToday lets
-            // analysis distinguish the first break from later re-breaks.
-            var overnightHighBreak =
-                IsFinite(overnightHigh)
-                && previousClose <= overnightHigh
-                && close > overnightHigh;
-
-            var overnightLowBreak =
-                IsFinite(overnightLow)
-                && previousClose >= overnightLow
-                && close < overnightLow;
+            var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;
 
             var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
             var selectedSignal = priorQualified ? PriorCloseEntrySignal
@@ -334,7 +311,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PremarketHighModelName, PremarketHighEntrySignal, PendingDirection.Short, pmhQualified, selectedSignal == PremarketHighEntrySignal,
                     IsResearchSignalPortfolioEligible(PremarketHighEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketHighEntrySignal, false), qualifiedCount, null, pmhTimeOk, null, null, pmhAtrOk,
-                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmhSlowEmaDistanceOk);
+                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
 
             if (rthCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
@@ -347,55 +324,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PremarketLowModelName, PremarketLowEntrySignal, PendingDirection.Short, pmlQualified, selectedSignal == PremarketLowEntrySignal,
                     IsResearchSignalPortfolioEligible(PremarketLowEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketLowEntrySignal, false), qualifiedCount, null, null, null, null, pmlAtrOk,
                     TickSize > 0 ? (premarketLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmlEmaOk);
-
-            if (overnightHighBreak)
-            {
-                WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
-                    OvernightHighBreakResearchModel, OvernightHighBreakResearchSignal, PendingDirection.Long, true, false,
-                    false, "ResearchOnly", 1, null, true, null, null, null,
-                    TickSize > 0 ? (close - overnightHigh) / TickSize : double.NaN, range1mTicks, bodyTicks);
-
-                Diagnostic(
-                    signalTime,
-                    "RESEARCH CHECK Model=ONH-Breakout Signal={0} ONH={1} PrevClose={2} Close={3} BreakDepth={4:0.0}t MinutesFromOpen={5} ATR5={6:0.0}t ONWidth={7:0.0}t PMWidth={8:0.0}t",
-                    OvernightHighBreakResearchSignal,
-                    overnightHigh,
-                    previousClose,
-                    close,
-                    TickSize > 0 ? (close - overnightHigh) / TickSize : double.NaN,
-                    minutesFromOpen,
-                    last5mAtrTicks,
-                    overnightWidthTicks,
-                    premarketWidthTicks);
-            }
-
-            if (overnightLowBreak)
-            {
-                WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
-                    OvernightLowBreakResearchModel, OvernightLowBreakResearchSignal, PendingDirection.Short, true, false,
-                    false, "ResearchOnly", 1, null, true, null, null, null,
-                    TickSize > 0 ? (overnightLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
-
-                Diagnostic(
-                    signalTime,
-                    "RESEARCH CHECK Model=ONL-Breakdown Signal={0} ONL={1} PrevClose={2} Close={3} BreakDepth={4:0.0}t MinutesFromOpen={5} ATR5={6:0.0}t ONWidth={7:0.0}t PMWidth={8:0.0}t",
-                    OvernightLowBreakResearchSignal,
-                    overnightLow,
-                    previousClose,
-                    close,
-                    TickSize > 0 ? (overnightLow - close) / TickSize : double.NaN,
-                    minutesFromOpen,
-                    last5mAtrTicks,
-                    overnightWidthTicks,
-                    premarketWidthTicks);
-            }
-        }
-
-        private static bool IsOvernightBreakoutResearchSignal(string signalName)
-        {
-            return string.Equals(signalName, OvernightHighBreakResearchSignal, StringComparison.Ordinal)
-                || string.Equals(signalName, OvernightLowBreakResearchSignal, StringComparison.Ordinal);
-        }
 
         private void WriteCandidateResearchRow(
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
@@ -554,16 +482,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradingDate = time.Date,
                 Instrument = Instrument == null ? string.Empty : Instrument.FullName,
                 StrategyVersion = StrategyVersion,
-                PortfolioMode = PortfolioMode.ToString(),
+                PortfolioMode = "Run8FourModel",
                 Model = modelName ?? string.Empty,
                 Signal = signalName ?? string.Empty,
                 Direction = direction.ToString()
             };
-        }
-
-        private string GetResearchPortfolioBlockReason(bool allowExistingPendingEntry)
-        {
-            return GetResearchPortfolioBlockReasonForSignal(string.Empty, allowExistingPendingEntry);
         }
 
         private bool IsResearchSignalPortfolioEligible(string signalName)
@@ -584,13 +507,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (MaxWinnersPerDay > 0 && winnersToday >= MaxWinnersPerDay)
                 return "MaxWinners";
             if (MaxLossesPerDay > 0 && lossesToday >= MaxLossesPerDay)
-            {
-                if (IsSelectiveThirdTradeAfterTwoLossesWindow()
-                    && (string.Equals(signalName, PriorCloseEntrySignal, StringComparison.Ordinal)
-                        || string.Equals(signalName, PremarketHighEntrySignal, StringComparison.Ordinal)))
-                    return string.Empty;
                 return "MaxLosses";
-            }
             return string.Empty;
         }
 
@@ -621,7 +538,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [System.ComponentModel.DataAnnotations.Display(
             Name = "Enable Research Telemetry",
             Description = "Writes candidate-signal and trade research rows to the NinjaTrader user-data NinjexResearch\\OvernightEdgePortfolio folder. Observational only; does not change entry/exit logic.",
-            GroupName = "8. Diagnostics",
+            GroupName = "5. Diagnostics",
             Order = 2)]
         public bool EnableResearchTelemetry
         {
@@ -633,7 +550,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [System.ComponentModel.DataAnnotations.Display(
             Name = "Enable Research Perturbation Scenarios",
             Description = "Research-only tick-level scenarios for entry fill sensitivity, target distance and break-even policies. Requires Research Telemetry. Never submits or changes real orders.",
-            GroupName = "8. Diagnostics",
+            GroupName = "5. Diagnostics",
             Order = 3)]
         public bool EnableResearchPerturbationScenarios
         {
