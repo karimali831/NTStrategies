@@ -436,15 +436,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     capturedBarOpen;
 
                 double verifiedOverridePrice;
-                string verifiedOverrideSource;
-                string verifiedOverrideReason;
 
                 var verifiedOverrideApplied =
                     TryGetVerifiedRthOpenOverride(
                         signalTime.Date,
-                        out verifiedOverridePrice,
-                        out verifiedOverrideSource,
-                        out verifiedOverrideReason);
+                        out verifiedOverridePrice);
 
                 if (verifiedOverrideApplied)
                 {
