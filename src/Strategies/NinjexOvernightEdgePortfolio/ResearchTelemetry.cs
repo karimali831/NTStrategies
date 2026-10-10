@@ -324,6 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PremarketLowModelName, PremarketLowEntrySignal, PendingDirection.Short, pmlQualified, selectedSignal == PremarketLowEntrySignal,
                     IsResearchSignalPortfolioEligible(PremarketLowEntrySignal), GetResearchPortfolioBlockReasonForSignal(PremarketLowEntrySignal, false), qualifiedCount, null, null, null, null, pmlAtrOk,
                     TickSize > 0 ? (premarketLow - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmlEmaOk);
+        }
 
         private void WriteCandidateResearchRow(
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
