@@ -535,28 +535,5 @@ namespace NinjaTrader.NinjaScript.Strategies
             return result.Replace(' ', '_');
         }
 
-        [NinjaScriptProperty]
-        [System.ComponentModel.DataAnnotations.Display(
-            Name = "Enable Research Telemetry",
-            Description = "Writes candidate-signal and trade research rows to the NinjaTrader user-data NinjexResearch\\OvernightEdgePortfolio folder. Observational only; does not change entry/exit logic.",
-            GroupName = "5. Diagnostics",
-            Order = 2)]
-        public bool EnableResearchTelemetry
-        {
-            get;
-            set;
-        }
-
-        [NinjaScriptProperty]
-        [System.ComponentModel.DataAnnotations.Display(
-            Name = "Enable Research Perturbation Scenarios",
-            Description = "Research-only tick-level scenarios for entry fill sensitivity, target distance and break-even policies. Requires Research Telemetry. Never submits or changes real orders.",
-            GroupName = "5. Diagnostics",
-            Order = 3)]
-        public bool EnableResearchPerturbationScenarios
-        {
-            get;
-            set;
-        }
     }
 }
