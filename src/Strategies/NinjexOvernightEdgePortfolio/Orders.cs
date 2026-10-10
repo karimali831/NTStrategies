@@ -616,8 +616,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     LongEodExitSignal,
-                    GetActiveEntrySignalForExit(
-                        PendingDirection.Long));
+                    GetActiveEntrySignalForExit());
 
                 return;
             }
@@ -638,8 +637,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     ShortEodExitSignal,
-                    GetActiveEntrySignalForExit(
-                        PendingDirection.Short));
+                    GetActiveEntrySignalForExit());
             }
         }
 
@@ -673,8 +671,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     LongTimeExitSignal,
-                    GetActiveEntrySignalForExit(
-                        PendingDirection.Long));
+                    GetActiveEntrySignalForExit());
 
                 return true;
             }
@@ -696,8 +693,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TickSeriesIndex,
                     Position.Quantity,
                     ShortTimeExitSignal,
-                    GetActiveEntrySignalForExit(
-                        PendingDirection.Short));
+                    GetActiveEntrySignalForExit());
 
                 return true;
             }
