@@ -1,4 +1,4 @@
-# Ninjex ES Evaluation Scalper v1.1
+# Ninjex ES Evaluation Scalper v1.1.1
 
 Research baseline for **$3,000 net profit before $2,000 trailing drawdown within 21 calendar days**, targeting a >=50% rolling-start pass rate. That target is **unvalidated** until the replay results are analyzed. It is a frequent retail scalper, not exchange HFT. The existing Overnight Edge strategy is untouched.
 
@@ -97,7 +97,7 @@ Missing weekdays and short sessions are flagged, not quietly treated as complete
 
 ## Direction modes and research status
 
-Higher timeframes are aggregated from the same ordered tick stream, using completed minutes only. EMA5/13 separation, EMA5 slope and close versus EMA5 must agree, with separation >=0.10 of that frame's ATR. Thirteen valid bars are required for readiness, and stale frames do not qualify as current. Incomplete bars are exported with a false completeness flag and reset directional readiness. These are deterministic research definitions, not an optimized or validated edge.
+Higher timeframes are aggregated from the same ordered tick stream, using completed minutes only. EMA5/13 separation, EMA5 slope and close versus EMA5 must agree, with separation >=0.10 of that frame's ATR. Thirteen valid observed bars are required for readiness, and stale frames do not qualify as current. Incomplete or abandoned bars invalidate directional readiness without erasing indicator history from valid bars. Invalid bars never update EMA/ATR; the next complete bar can restore readiness after warm-up. No missing candles are synthesized. Incomplete bars that reach their closing boundary are exported with a false completeness flag. These are deterministic research definitions, not an optimized or validated edge.
 
 - `TrendFilterMode=0`: record direction but do not filter entries.
 - `TrendFilterMode=1` (**default**): veto an entry if both current 15- and 30-minute trends oppose it. Unavailable/neutral trends are recorded and do not veto. The 60-minute frame is recorded for analysis.
@@ -108,4 +108,11 @@ Higher timeframes are aggregated from the same ordered tick stream, using comple
 
 The first uploaded baseline's fill/fee ledger reconciled, with no order errors and a flat ending. It showed losses in both families, excessive use of the minimum stop and poor rolling-level results. Simple stop/reward changes and VWAP-slope filters did not establish a stable positive edge across earlier/later diagnostic partitions. The original raw Last export covered the entry windows rather than full ETH; it cannot reconstruct complete 15/30/60-minute price candles throughout the day. v1.1 adds those bars so the next replay can test context properly. Candle confirmations, the mild trend veto and volatility stops are **research hypotheses requiring fresh actual-fill replay**, not claims that the pass-rate goal is solved.
 
-Before the uninterrupted run, use the documented four-session smoke test with v1.1, including at least one full overnight warm-up. Confirm version, new parameters, readable finalized gzip files, monotonically increasing equity sequence, OHLCV/timeframe exports, and actual protected trades. Then run the entire disjoint contract allocation through the latest available completed session. November 10 in the initial upload ended around 14:09, so it is an incomplete final session for the normal-window baseline.
+Before the uninterrupted run, use the documented four-session smoke test with v1.1.1, including at least one full overnight warm-up. Confirm version, new parameters, readable finalized gzip files, monotonically increasing equity sequence, OHLCV/timeframe exports, and actual protected trades. Then run the entire disjoint contract allocation through the latest available completed session. November 10 in the initial upload ended around 14:09, so it is an incomplete final session for the normal-window baseline.
+
+
+### v1.1.1 readiness repair and smoke audit
+
+The September 16–19, 2025 Playback upload contained 23 closed trades, -$570 net after $220 estimated fees, no order errors, flat termination and a monotonic equity sequence. Its September 15 observations were historical warm-up. Four sessions cannot estimate the three-week evaluation pass probability.
+
+The audit found that every incomplete higher-timeframe candle erased the entire EMA/ATR warm-up. This left 60-minute context unavailable at all 43 realtime candidates. v1.1.1 keeps history from valid observed candles, invalidates current direction for incomplete/abandoned frames, and resumes after the next complete frame. A C# replay of the uploaded minute candles increased current ready 15/30/60-minute context at those same candidate times from 27/15/0 to 43/43/36, with no future as-of timestamps. This checks context availability only; actual entries and P&L must be rerun because the repaired default trend veto can change decisions. Risk settings and entry confirmations are unchanged. Regression fixtures and the full adapter compile against platform test doubles passed; native NinjaTrader compilation and Playback remain required for v1.1.1.

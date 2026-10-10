@@ -38,6 +38,22 @@ internal static class EsEvaluationRefinementTests
         // Incomplete higher-timeframe bar must invalidate its directional readiness.
         for(int i=0;i<15;i++)f15.Accept(new EvaluationMinute{Start=start.AddHours(14).AddMinutes(i),End=start.AddHours(14).AddMinutes(i+1),Open=140,High=141,Low=139,Close=140,Complete=i!=3},(a,b,c,d,e,f,g,h)=>Check(!h,"Incomplete bar accepted"));
         Check(!f15.Ready && f15.Direction==0,"Invalid candle retained trend readiness");
+        // One complete frame restores warmed history; invalid prices must not enter EMA/ATR.
+        var reference=new EvaluationTrendFrame(15);
+        for(int i=0;i<14*60;i++)reference.Accept(new EvaluationMinute{Start=start.AddMinutes(i),End=start.AddMinutes(i+1),Open=100+i*.05,High=101+i*.05,Low=99+i*.05,Close=100.5+i*.05,Complete=true},export);
+        for(int i=0;i<15;i++)
+        {
+            var m=new EvaluationMinute{Start=start.AddHours(14).AddMinutes(15+i),End=start.AddHours(14).AddMinutes(16+i),Open=145,High=146,Low=144,Close=145,Complete=true};
+            f15.Accept(m,export);reference.Accept(m,export);
+        }
+        Check(f15.Ready && f15.Direction==reference.Direction && Math.Abs(f15.Strength-reference.Strength)<1e-12,"Invalid frame erased or contaminated valid trend history");
+        for(int i=0;i<60;i++)f60.Accept(new EvaluationMinute{Start=start.AddHours(14).AddMinutes(i),End=start.AddHours(14).AddMinutes(i+1),Open=10000,High=10001,Low=9999,Close=10000,Complete=i!=3},(a,b,c,d,e,f,g,h)=>{});
+        Check(!f60.Ready && f60.Direction==0,"Invalid hourly frame retained readiness");
+        for(int i=0;i<60;i++)f60.Accept(new EvaluationMinute{Start=start.AddHours(15).AddMinutes(i),End=start.AddHours(15).AddMinutes(i+1),Open=150,High=151,Low=149,Close=150,Complete=true},export);
+        Check(f60.Ready && f60.IsCurrent(start.AddHours(16)),"Hourly history failed to resume after one valid frame");
+        f60.Accept(new EvaluationMinute{Start=start.AddHours(16),End=start.AddHours(16).AddMinutes(1),Open=150,High=151,Low=149,Close=150,Complete=true},export);
+        f60.Accept(new EvaluationMinute{Start=start.AddHours(17),End=start.AddHours(17).AddMinutes(1),Open=150,High=151,Low=149,Close=150,Complete=true},export);
+        Check(!f60.Ready && f60.Direction==0,"Abandoned hourly bucket retained readiness");
         var e1=Warm();DateTime t=new DateTime(2025,9,16,9,35,1);int early=0;
         foreach(double p in new[]{100.0,99.75,99.5,99.25,100,100.25,101}){early+=e1.Accept(t,p,1,(a,b)=>{}).Count;t=t.AddSeconds(1);}
         Check(early==0,"Tick reclaim bypassed completed rejection candle");
