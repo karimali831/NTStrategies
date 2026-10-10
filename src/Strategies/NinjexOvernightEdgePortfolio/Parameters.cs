@@ -149,22 +149,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         } = 14;
 
         [NinjaScriptProperty]
-        [Display(
-            Name = "Enable EMA Filter",
-            GroupName = "2. Indicators",
-            Order = 1)]
-        public bool EnableEMAFilter
-        {
-            get;
-            set;
-        }
-
-        [NinjaScriptProperty]
         [Range(1, 240)]
         [Display(
             Name = "EMA Fast Period",
             GroupName = "2. Indicators",
-            Order = 2)]
+            Order = 1)]
         public int EmaFastPeriod
         {
             get;
@@ -177,7 +166,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "EMA Slow Period",
             GroupName = "2. Indicators",
-            Order = 3)]
+            Order = 2)]
         public int EmaSlowPeriod
         {
             get;
@@ -212,25 +201,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [NinjaScriptProperty]
-        [Display(
-            Name = "Enable PDC Early Premarket Width Filter",
-            Description = "When enabled, PDC signals during the configured early-RTH window require the premarket range width to meet the configured minimum.",
-            GroupName = "3. Entry Models",
-            Order = 2)]
-        public bool EnablePdcEarlyPremarketWidthFilter
-        {
-            get;
-            set;
-        }
-
-
-        [NinjaScriptProperty]
         [Range(0, 390)]
         [Display(
             Name = "PDC Early Maximum Minutes From Open",
-            Description = "PDC signals at or before this many minutes from the RTH open are subject to the early premarket-width filter.",
+            Description = "PDC signals at or before this many minutes from the RTH open require the configured minimum premarket width.",
             GroupName = "3. Entry Models",
-            Order = 3)]
+            Order = 2)]
         public int PdcEarlyMaximumMinutesFromOpen
         {
             get;
@@ -244,7 +220,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Name = "PDC Early Minimum Premarket Width Ticks",
             Description = "Minimum premarket range width required for PDC entries inside the configured early-RTH window.",
             GroupName = "3. Entry Models",
-            Order = 4)]
+            Order = 3)]
         public double PdcEarlyMinimumPremarketWidthTicks
         {
             get;
@@ -257,7 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "PMH Maximum Minutes From Open",
             GroupName = "3. Entry Models",
-            Order = 5)]
+            Order = 4)]
         public int PremarketHighMaximumMinutesFromOpen
         {
             get;
@@ -270,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "PMH Minimum ATR5 Ticks",
             GroupName = "3. Entry Models",
-            Order = 6)]
+            Order = 5)]
         public double PremarketHighMinimumAtr5mTicks
         {
             get;
@@ -283,7 +259,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "RTH Open Minimum Minutes From Open",
             GroupName = "3. Entry Models",
-            Order = 7)]
+            Order = 6)]
         public int RthOpenMinimumMinutesFromOpen
         {
             get;
@@ -296,7 +272,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(
             Name = "RTH Open Minimum Premarket Width Ticks",
             GroupName = "3. Entry Models",
-            Order = 8)]
+            Order = 7)]
         public double RthOpenMinimumPremarketWidthTicks
         {
             get;
@@ -308,9 +284,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0.0, 1000.0)]
         [Display(
             Name = "PML Minimum ATR5 Ticks",
-            Description = "When EMA filtering is enabled, PML requires raw 1-minute close above the completed 5-minute EMA Fast.",
+            Description = "PML requires raw 1-minute close above the completed 5-minute EMA Fast.",
             GroupName = "3. Entry Models",
-            Order = 9)]
+            Order = 8)]
         public double PremarketLowMinimumAtr5mTicks
         {
             get;
