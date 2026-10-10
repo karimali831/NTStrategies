@@ -53,8 +53,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string signalName)
         {
             return
-                signalName == LongEntrySignal
-                || signalName == PriorCloseEntrySignal;
+                signalName == PriorCloseEntrySignal;
         }
 
 
@@ -62,8 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string signalName)
         {
             return
-                signalName == ShortEntrySignal
-                || signalName == PremarketHighEntrySignal
+                signalName == PremarketHighEntrySignal
                 || signalName == RthOpenEntrySignal
                 || signalName == PremarketLowEntrySignal;
         }
@@ -72,12 +70,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private static string GetModelNameForEntrySignal(
             string signalName)
         {
-            if (signalName == LongEntrySignal)
-                return BaselineLongModelName;
-
-            if (signalName == ShortEntrySignal)
-                return BaselineShortModelName;
-
             if (signalName == PriorCloseEntrySignal)
                 return PriorCloseModelName;
 
@@ -90,7 +82,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (signalName == PremarketLowEntrySignal)
                 return PremarketLowModelName;
 
-
             return "Unknown";
         }
 
@@ -98,14 +89,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string GetActiveEntrySignalForExit(
             PendingDirection direction)
         {
-            if (!string.IsNullOrEmpty(activeEntrySignal))
-                return activeEntrySignal;
-
-
+            // A strategy-managed position should always have an active entry
+            // signal. Empty fallback exits the strategy position without
+            // inventing a model-specific FromEntrySignal.
             return
-                direction == PendingDirection.Long
-                    ? LongEntrySignal
-                    : ShortEntrySignal;
+                !string.IsNullOrEmpty(activeEntrySignal)
+                    ? activeEntrySignal
+                    : string.Empty;
         }
 
 
