@@ -7,16 +7,12 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         private sealed class RthOpenOverrideEntry
         {
-            public RthOpenOverrideEntry(
-                double price,
-                string source)
+            public RthOpenOverrideEntry(double price)
             {
                 Price = price;
-                Source = source ?? string.Empty;
             }
 
             public readonly double Price;
-            public readonly string Source;
         }
 
         // Only independently verified live-vs-stored-data discrepancies belong
@@ -27,9 +23,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     {
                         new DateTime(2026, 9, 24),
-                        new RthOpenOverrideEntry(
-                            7734.25,
-                            "Observed live strategy log; downloaded Replay/Historical used 7734.00")
+                        new RthOpenOverrideEntry(7734.25)
                     }
                 };
 
@@ -88,60 +82,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool TryGetVerifiedRthOpenOverride(
             DateTime tradingDate,
-            out double overridePrice,
-            out string source,
-            out string reason)
+            out double overridePrice)
         {
-            overridePrice =
-                double.NaN;
-
-            source =
-                string.Empty;
-
-            reason =
-                "Disabled";
+            overridePrice = double.NaN;
 
             if (!MirrorVerifiedLiveExecutions)
                 return false;
 
-
             RthOpenOverrideEntry entry;
-
-            if (!VerifiedRthOpenOverrides.TryGetValue(
-                    tradingDate.Date,
-                    out entry))
-            {
-                reason =
-                    "NoVerifiedOverride";
-
-                return false;
-            }
-
-
-            if (entry == null
+            if (!VerifiedRthOpenOverrides.TryGetValue(tradingDate.Date, out entry)
+                || entry == null
                 || !IsFinite(entry.Price)
                 || entry.Price <= 0)
             {
-                reason =
-                    "InvalidVerifiedOverride";
-
                 return false;
             }
-
 
             overridePrice =
                 TickSize > 0
                     ? Math.Round(entry.Price / TickSize) * TickSize
                     : entry.Price;
 
-            source =
-                entry.Source ?? string.Empty;
-
-            reason =
-                "Applied";
-
             return true;
         }
+
+
 
 
 
