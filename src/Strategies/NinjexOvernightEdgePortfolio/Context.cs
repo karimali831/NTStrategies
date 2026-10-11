@@ -61,17 +61,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ProcessContextSeries()
         {
-            if (CurrentBars[ContextSeriesIndex]
-                < Math.Max(
-                    Math.Max(
-                        Math.Max(
-                            AtrPeriod,
-                            EmaFastPeriod),
-                        EmaSlowPeriod),
-                    30) + 2)
-            {
+            // The range engines need the very first completed five-minute bar,
+            // even while ATR/EMA indicators are warming up. [1] is only valid
+            // after the primary series has advanced to its second bar.
+            if (CurrentBars[ContextSeriesIndex] < 1)
                 return;
-            }
 
             if (!IsFirstTickOfBar)
                 return;
@@ -203,6 +197,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     premarketRangeReady);
             }
 
+
+            // Defer the ATR/EMA context cache until the original warm-up
+            // threshold has been reached. Do not block the independent
+            // overnight/premarket range engines during that warm-up.
+            if (CurrentBars[ContextSeriesIndex]
+                < Math.Max(
+                    Math.Max(
+                        Math.Max(
+                            AtrPeriod,
+                            EmaFastPeriod),
+                        EmaSlowPeriod),
+                    30) + 2)
+            {
+                return;
+            }
 
             //
             // Preserve the previous completed EMA values for observational
