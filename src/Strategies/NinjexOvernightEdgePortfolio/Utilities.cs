@@ -178,27 +178,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             string format,
             params object[] args)
         {
-            if (!EnableDiagnostics)
+            // File diagnostics are independent of the NinjaScript Output toggle.
+            if (!EnableDiagnostics && !EnableFileLogging)
                 return;
 
-
             var message =
-                args == null
-                || args.Length == 0
+                args == null || args.Length == 0
                     ? format
                     : string.Format(
                         System.Globalization.CultureInfo.InvariantCulture,
                         format,
                         args);
 
+            var line = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{0:yyyy-MM-dd HH:mm:ss.fff} | {1} | {2}",
+                time, Name, message);
 
-            Print(
-                string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    "{0:yyyy-MM-dd HH:mm:ss.fff} | {1} | {2}",
-                    time,
-                    Name,
-                    message));
+            if (EnableFileLogging)
+                AppendDiagnosticFile(time, line);
+
+            if (EnableDiagnostics)
+                Print(line);
         }
     }
 }
