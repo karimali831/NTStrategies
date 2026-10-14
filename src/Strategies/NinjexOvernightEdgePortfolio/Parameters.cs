@@ -401,6 +401,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(
+            Name = "Enable Daily File Logging",
+            Description = "Append diagnostics to daily UTF-8 log files in NinjaTrader user data\\NinjexLogs\\OvernightEdgePortfolio. Independent of NinjaScript Output; creates separate files per strategy run/contract/account.",
+            GroupName = "5. Diagnostics",
+            Order = 4)]
+        public bool EnableFileLogging
+        {
+            get;
+            set;
+        }
+
+
+        [NinjaScriptProperty]
+        [Display(
             Name = "Mirror Verified Live Executions",
             Description = "Replay/Historical forensic mode. Applies only date/time corrections independently verified from live evidence (currently 2026-09-24 RTH open and 2026-09-30 PMH bracket). Disabled by default.",
             GroupName = "5. Diagnostics",
