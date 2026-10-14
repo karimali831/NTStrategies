@@ -176,6 +176,7 @@
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOpeningVolumeProfileBreakout\TradeLogger.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Context.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\DailyFileLogging.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Core.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\LiveDailyState.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Orders.cs" />
