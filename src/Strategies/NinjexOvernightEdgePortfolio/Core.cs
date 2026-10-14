@@ -354,6 +354,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Diagnostics
                 //
                 EnableDiagnostics = true;
+                EnableFileLogging = true;
                 EnableResearchTelemetry = false;
                 EnableResearchPerturbationScenarios = false;
 
@@ -434,6 +435,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Terminated)
             {
                 DisposeResearchTelemetry();
+                CloseDiagnosticFile();
             }
         }
 
