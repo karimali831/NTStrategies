@@ -2,6 +2,7 @@ using System;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -15,7 +16,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const string LongSignal = "ORFvgLong";
         private const string ShortSignal = "ORFvgShort";
 
-        private NinjexFirstFiveMinuteRange firstFive;
+        private NinjexFirstFiveRangeEngine firstFiveRange;
         private ATR atr14;
         private ADX adx14;
         private DateTime tradingDate = DateTime.MinValue;
@@ -78,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (zone != "Eastern Standard Time" && zone != "America/New_York" && zone != "US/Eastern")
                     throw new InvalidOperationException("Set NinjaTrader's platform time zone to Eastern (ET). No time conversion is performed.");
 
-                firstFive = NinjexFirstFiveMinuteRange(false);
+                firstFiveRange = new NinjexFirstFiveRangeEngine();
                 atr14 = ATR(14);
                 adx14 = ADX(14);
             }
@@ -98,11 +99,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (now.Date != tradingDate)
                 BeginTradingDay(now.Date);
 
+            // Always feed the range engine the completed 09:31-09:35 bars,
+            // including bars before entries are eligible.
+            firstFiveRange.Accept(now, High[0], Low[0], 1);
+
             if (ToTime(now) < 93500 || ToTime(now) > EntryEndTime)
                 return;
 
-            orHigh = firstFive.OpeningHigh[0];
-            orLow = firstFive.OpeningLow[0];
+            orHigh = firstFiveRange.Ready ? firstFiveRange.High : double.NaN;
+            orLow = firstFiveRange.Ready ? firstFiveRange.Low : double.NaN;
             if (double.IsNaN(orHigh) || double.IsNaN(orLow) || orHigh <= orLow)
             {
                 WriteDiagnostic("RANGE_NOT_READY", 0, null, "Incomplete/missing 09:30-09:35 ET minute data.");
