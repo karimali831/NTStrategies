@@ -8,7 +8,7 @@
 - **Set NinjaTrader platform time zone to Eastern (ET)**. The code does **not** convert timestamps. ET means EST in winter and EDT in summer.
 - Ensure minute data cover all five 09:31–09:35 ET bar-close timestamps. ETH or RTH sessions can work if their minute data include this interval.
 - Compile through NinjaTrader's NinjaScript editor (or existing NTStrategies project with NinjaTrader references). No secondary data series, Tick Replay, or order-flow data are used.
-- The strategy silently instantiates the range indicator with its lines disabled. Add `NinjexFirstFiveMinuteRange` to the chart separately and leave **Show Lines = true** for visuals.
+- The strategy and standalone indicator both consume the **same** `NinjexFirstFiveRangeEngine` range-calculation class; the strategy does **not** draw any lines. Add `NinjexFirstFiveMinuteRange` to the chart separately and leave **Show Lines = true** for visuals.
 
 ## Rules
 
@@ -51,3 +51,7 @@ Events include `SESSION_RESET`, `RANGE_READY`, `RANGE_NOT_READY`, `BAR`, `BODY_B
 6. Compare Strategy Analyzer standard fill resolution with Replay if fill quality matters. One-minute OHLC cannot prove which of stop and target traded first within a candle. Tick Replay is not required for signal formation.
 
 This is a research baseline, not a claim of profitable or execution-proven performance.
+
+## Pure engine regression test
+
+`tests/FirstFiveRangeEngineTests.cs` contains a standalone executable smoke test with no NinjaTrader assembly dependency. Compile that file and `src/Shared/NinjexFirstFiveRangeEngine.cs` together using a .NET Framework C# compiler; tests cover full/missing 1-minute ranges, single 5-minute candle, no post-09:35 drift and ET date rollover. These tests are **provided but not executed here** because no C# compiler is available in the current environment.
