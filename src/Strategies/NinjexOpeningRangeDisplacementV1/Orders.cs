@@ -93,7 +93,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + "; Quantity=" + quantity
                 + "; OrderState=" + execution.Order.OrderState
                 + "; InitialStop=" + pendingStop.ToString(CultureInfo.InvariantCulture)
-                + "; RiskTicks=" + (actualRisk / TickSize).ToString("0.##", CultureInfo.InvariantCulture), time);
+                + "; RiskTicks=" + (actualRisk / TickSize).ToString("0.##", CultureInfo.InvariantCulture)
+                + "; RiskPerContractUSD=" + (actualRisk * Instrument.MasterInstrument.PointValue).ToString("0.00", CultureInfo.InvariantCulture)
+                + "; IntendedTotalRiskUSD=" + (actualRisk * Instrument.MasterInstrument.PointValue * TradingQuantity).ToString("0.00", CultureInfo.InvariantCulture), time);
 
             // A large next-bar gap can invalidate an otherwise valid candle-based stop.
             // Close immediately; do not replace the stop with an arbitrary tick offset.
