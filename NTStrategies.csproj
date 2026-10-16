@@ -122,6 +122,13 @@
         <Compile Include="src\API\TradeApiReporter.cs" />
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
+        <Compile Include="src\Shared\NinjexFirstFiveRangeEngine.cs" />
+        <Compile Include="src\Indicators\NinjexFirstFiveMinuteRange\NinjexFirstFiveMinuteRange.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Core.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Setup.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Orders.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Diagnostics.cs" />
+        <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Parameters.cs" />
         <Compile Include="src\Indicators\NinjexOpeningVolumeProfile\NinjexOpeningVolumeProfile.cs" />
         <Content Include="src\Indicators\EMA\Templates\Default.xml" />
         <Compile Include="src\Indicators\NinjexPinBarDots\NinjexPinBarDots.cs" />
