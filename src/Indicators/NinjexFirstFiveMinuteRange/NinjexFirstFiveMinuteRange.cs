@@ -5,6 +5,7 @@ using System.Windows.Media;
 using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Ninjex;
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
@@ -12,12 +13,8 @@ namespace NinjaTrader.NinjaScript.Indicators
     // Apply to a 1-minute or 5-minute chart; platform/chart timestamps MUST already be ET.
     public class NinjexFirstFiveMinuteRange : Indicator
     {
-        private DateTime sessionDate = DateTime.MinValue;
-        private int pieces;
-        private double high;
-        private double low;
-        private bool ready;
-        private int completedAtBar;
+        private NinjexFirstFiveRangeEngine rangeEngine;
+        private int completedAtBar = -1;
 
         protected override void OnStateChange()
         {
@@ -39,63 +36,31 @@ namespace NinjaTrader.NinjaScript.Indicators
                 if (BarsPeriod.BarsPeriodType != BarsPeriodType.Minute
                     || (BarsPeriod.Value != 1 && BarsPeriod.Value != 5))
                     throw new InvalidOperationException("NinjexFirstFiveMinuteRange requires a 1-minute or 5-minute chart.");
+                rangeEngine = new NinjexFirstFiveRangeEngine();
             }
         }
 
         protected override void OnBarUpdate()
         {
-            DateTime end = Time[0];
-            if (sessionDate != end.Date)
-            {
-                sessionDate = end.Date;
-                pieces = 0;
-                ready = false;
-                high = double.MinValue;
-                low = double.MaxValue;
-                completedAtBar = -1;
-            }
+            bool wasReady = rangeEngine.Ready;
+            rangeEngine.Accept(Time[0], High[0], Low[0], BarsPeriod.Value);
+            OpeningHigh[0] = rangeEngine.Ready ? rangeEngine.High : double.NaN;
+            OpeningLow[0] = rangeEngine.Ready ? rangeEngine.Low : double.NaN;
 
-            OpeningHigh[0] = double.NaN;
-            OpeningLow[0] = double.NaN;
-
-            DateTime first = sessionDate.AddHours(9).AddMinutes(30);
-            DateTime last = first.AddMinutes(5);
-            bool isPart = BarsPeriod.Value == 1
-                ? end > first && end <= last
-                : end == last;
-
-            if (!ready && isPart)
-            {
-                high = Math.Max(high, High[0]);
-                low = Math.Min(low, Low[0]);
-                pieces++;
-            }
-
-            int required = BarsPeriod.Value == 1 ? 5 : 1;
-            if (!ready && end >= last && pieces == required
-                && high > low)
-            {
-                ready = true;
-                completedAtBar = CurrentBar;
-            }
-
-            // A missing opening bar intentionally leaves the level unavailable.
-            // Never infer a range from incomplete / late market data.
-            if (!ready)
+            if (!rangeEngine.Ready)
                 return;
-
-            OpeningHigh[0] = high;
-            OpeningLow[0] = low;
+            if (!wasReady)
+                completedAtBar = CurrentBar;
 
             if (ShowLevels)
             {
-                string key = sessionDate.ToString("yyyyMMdd");
+                string key = rangeEngine.ActiveDate.ToString("yyyyMMdd");
                 int barsAgo = CurrentBar - completedAtBar;
                 Draw.Line(this, "NX5_ORH_" + key, false,
-                    barsAgo, high, 0, high,
+                    barsAgo, rangeEngine.High, 0, rangeEngine.High,
                     Brushes.DodgerBlue, DashStyleHelper.Solid, 2);
                 Draw.Line(this, "NX5_ORL_" + key, false,
-                    barsAgo, low, 0, low,
+                    barsAgo, rangeEngine.Low, 0, rangeEngine.Low,
                     Brushes.OrangeRed, DashStyleHelper.Solid, 2);
             }
         }
