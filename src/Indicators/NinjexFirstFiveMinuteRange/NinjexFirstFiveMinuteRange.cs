@@ -43,13 +43,14 @@ namespace NinjaTrader.NinjaScript.Indicators
         protected override void OnBarUpdate()
         {
             bool wasReady = rangeEngine.Ready;
+            DateTime previousDate = rangeEngine.ActiveDate;
             rangeEngine.Accept(Time[0], High[0], Low[0], BarsPeriod.Value);
             OpeningHigh[0] = rangeEngine.Ready ? rangeEngine.High : double.NaN;
             OpeningLow[0] = rangeEngine.Ready ? rangeEngine.Low : double.NaN;
 
             if (!rangeEngine.Ready)
                 return;
-            if (!wasReady)
+            if (!wasReady || previousDate != rangeEngine.ActiveDate)
                 completedAtBar = CurrentBar;
 
             if (ShowLevels)
