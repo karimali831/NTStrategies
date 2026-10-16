@@ -144,7 +144,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             orHigh = orLow = double.NaN;
             submittedToday = 0;
             // Never erase an outstanding order/bracket merely due to a calendar rollover.
-            WriteDiagnostic("SESSION_RESET", 0, null, "New ET calendar date; daily breakout state reset.");
+            WriteDiagnostic("SESSION_RESET", 0, null,
+                "StrategyVersion=" + Version
+                + "; Range=09:30-09:35 ET"
+                + "; EntryWindow=" + EntryStartTime + "-" + EntryEndTime
+                + "; Quantity=" + TradingQuantity
+                + "; RR=" + RiskRewardRatio
+                + "; MinFvgTicks=" + MinFvgTicks
+                + "; MaxTradesPerDay=" + MaxTradesPerDay
+                + "; ATRFilter=" + EnableAtrFilter + "; MinAtrTicks=" + MinAtrTicks
+                + "; ADXFilter=" + EnableAdxFilter + "; MinAdx=" + MinAdx
+                + "; BodyAtrFilter=" + EnableBodyAtrFilter
+                + "; MinBodyAtr=" + MinBreakoutBodyAtr
+                + "; TickSize=" + TickSize
+                + "; PointValue=" + Instrument.MasterInstrument.PointValue
+                + "; TradingHours=" + Bars.TradingHours.Name);
         }
 
         private bool InEntryWindow()
