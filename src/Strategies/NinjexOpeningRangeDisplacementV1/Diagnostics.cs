@@ -40,12 +40,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + "_" + instanceId + ".csv");
         }
 
-        private void WriteDiagnostic(string kind, int direction, BreakoutAttempt attempt, string detail)
+        private void WriteDiagnostic(string kind, int direction, BreakoutAttempt attempt, string detail, DateTime? eventTime = null)
         {
             if (!EnableFileLogging && !EnablePrintDiagnostics)
                 return;
 
-            DateTime timestamp = CurrentBar >= 0 ? Time[0] : DateTime.Now;
+            DateTime timestamp = eventTime.HasValue ? eventTime.Value : (CurrentBar >= 0 ? Time[0] : DateTime.Now);
             double atr = CurrentBar >= 14 && atr14 != null ? GetAtrTicks() : double.NaN;
             double adx = CurrentBar >= 28 && adx14 != null ? GetAdx() : double.NaN;
             double bodyTicks = CurrentBar >= 0 ? Math.Abs(Close[0] - Open[0]) / TickSize : double.NaN;
