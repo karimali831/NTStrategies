@@ -56,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + "; Stop=" + pendingStop.ToString(CultureInfo.InvariantCulture)
                 + "; ProvisionalTarget=" + pendingTarget.ToString(CultureInfo.InvariantCulture)
                 + "; FvgTicks=" + gapTicks.ToString("0.##", CultureInfo.InvariantCulture)
-                + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture), time);
+                + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture));
 
             if (direction > 0)
                 EnterLong(TradingQuantity, LongSignal);
@@ -112,7 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "ActualFill=" + fill.ToString(CultureInfo.InvariantCulture)
                     + "; Stop=" + pendingStop.ToString(CultureInfo.InvariantCulture)
                     + "; Target=" + pendingTarget.ToString(CultureInfo.InvariantCulture)
-                    + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture));
+                    + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture), time);
             }
 
             if (execution.Order.OrderState == OrderState.Filled)
