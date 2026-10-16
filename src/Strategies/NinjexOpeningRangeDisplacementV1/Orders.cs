@@ -56,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + "; Stop=" + pendingStop.ToString(CultureInfo.InvariantCulture)
                 + "; ProvisionalTarget=" + pendingTarget.ToString(CultureInfo.InvariantCulture)
                 + "; FvgTicks=" + gapTicks.ToString("0.##", CultureInfo.InvariantCulture)
-                + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture));
+                + "; R=" + RiskRewardRatio.ToString(CultureInfo.InvariantCulture), time);
 
             if (direction > 0)
                 EnterLong(TradingQuantity, LongSignal);
@@ -78,7 +78,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 WriteDiagnostic("EXIT_EXECUTION", 0, null,
                     "Order=" + name + "; Fill=" + price.ToString(CultureInfo.InvariantCulture)
-                    + "; Quantity=" + quantity + "; Position=" + marketPosition);
+                    + "; Quantity=" + quantity + "; Position=" + marketPosition, time);
                 return;
             }
 
@@ -93,13 +93,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + "; Quantity=" + quantity
                 + "; OrderState=" + execution.Order.OrderState
                 + "; InitialStop=" + pendingStop.ToString(CultureInfo.InvariantCulture)
-                + "; RiskTicks=" + (actualRisk / TickSize).ToString("0.##", CultureInfo.InvariantCulture));
+                + "; RiskTicks=" + (actualRisk / TickSize).ToString("0.##", CultureInfo.InvariantCulture), time);
 
             // A large next-bar gap can invalidate an otherwise valid candle-based stop.
             // Close immediately; do not replace the stop with an arbitrary tick offset.
             if (actualRisk < TickSize * 0.999999)
             {
-                WriteDiagnostic("INVALID_GAP_FILL", direction, null, "Fill reached/passed candle-anchored stop: flattening.");
+                WriteDiagnostic("INVALID_GAP_FILL", direction, null, "Fill reached/passed candle-anchored stop: flattening.", time);
                 if (isLong) ExitLong("InvalidGapStop", LongSignal);
                 else ExitShort("InvalidGapStop", ShortSignal);
             }
@@ -130,10 +130,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             string name = order.Name ?? "";
             if (orderState == OrderState.Rejected)
                 WriteDiagnostic("ORDER_REJECTED", name == LongSignal ? 1 : name == ShortSignal ? -1 : 0, null,
-                    "Order=" + name + "; Error=" + error + "; Comment=" + comment);
+                    "Order=" + name + "; Error=" + error + "; Comment=" + comment, time);
             else if (orderState == OrderState.Cancelled)
                 WriteDiagnostic("ORDER_CANCELLED", name == LongSignal ? 1 : name == ShortSignal ? -1 : 0, null,
-                    "Order=" + name + "; Filled=" + filled + "; Comment=" + comment);
+                    "Order=" + name + "; Filled=" + filled + "; Comment=" + comment, time);
 
             if ((name == LongSignal || name == ShortSignal)
                 && (orderState == OrderState.Rejected || orderState == OrderState.Cancelled))
