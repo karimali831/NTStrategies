@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOpeningRangeDisplacementV1 : Strategy
     {
-        internal const string Version = "1.0.0";
+        internal const string Version = "1.0.1";
         private const string LongSignal = "ORFvgLong";
         private const string ShortSignal = "ORFvgShort";
 
@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = 0;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
-                StopTargetHandling = StopTargetHandling.PerEntryExecution;
+                IsUnmanaged = true; // Explicit per-fill OCO handling; cannot mix managed order methods.
                 StartBehavior = StartBehavior.WaitUntilFlat;
                 RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
                 IsExitOnSessionCloseStrategy = true;
@@ -143,6 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             reportedOpeningRange = false;
             orHigh = orLow = double.NaN;
             submittedToday = 0;
+            pausedToday = false;
             // Never erase an outstanding order/bracket merely due to a calendar rollover.
             WriteDiagnostic("SESSION_RESET", 0, null,
                 "StrategyVersion=" + Version
