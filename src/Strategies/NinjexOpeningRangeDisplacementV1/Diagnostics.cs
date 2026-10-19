@@ -9,8 +9,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         private readonly object logSync = new object();
         private readonly string instanceId = Guid.NewGuid().ToString("N").Substring(0, 12);
-        private StreamWriter fileWriter;
-        private string currentFile = "";
+        private readonly System.Collections.Generic.Dictionary<string, StreamWriter> fileWriters =
+            new System.Collections.Generic.Dictionary<string, StreamWriter>(StringComparer.Ordinal);
+        private DateTime firstLogDate = DateTime.MinValue;
         private bool fileFailed;
         private bool fileErrorReported;
 
@@ -29,15 +30,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             return input.Replace(' ', '_');
         }
 
-        private string FileFor(DateTime date)
+        private static string ChannelFor(string kind)
+        {
+            if (kind == "BAR")
+                return "research";
+            if (kind.Contains("EXECUTION") || kind.StartsWith("ORDER_", StringComparison.Ordinal)
+                || kind.StartsWith("BRACKET_", StringComparison.Ordinal)
+                || kind == "EXIT_PNL" || kind == "TRADE_COMPLETE"
+                || kind == "INVALID_GAP_FILL" || kind == "EMERGENCY_EXIT_SUBMITTED")
+                return "executions";
+            return "signals";
+        }
+
+        private string FileFor(string channel)
         {
             string folder = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,
                 "NinjexLogs", "NinjexOpeningRangeDisplacementV1");
             string instrument = SafePathPart(Instrument == null ? null : Instrument.FullName);
             string account = SafePathPart(Account == null ? null : Account.Name);
             return Path.Combine(folder, "NinjexOpeningRangeDisplacementV1_v" + Version
-                + "_" + instrument + "_" + account + "_" + date.ToString("yyyyMMdd")
-                + "_" + instanceId + ".csv");
+                + "_" + instrument + "_" + account + "_"
+                + firstLogDate.ToString("yyyyMMdd") + "_" + instanceId
+                + "_" + channel + ".csv");
         }
 
         private void WriteDiagnostic(string kind, int direction, BreakoutAttempt attempt, string detail, DateTime? eventTime = null)
@@ -94,21 +108,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
-                    string desired = FileFor(timestamp);
-                    if (!string.Equals(desired, currentFile, StringComparison.OrdinalIgnoreCase)
-                        || fileWriter == null)
+                    if (firstLogDate == DateTime.MinValue)
+                        firstLogDate = timestamp.Date;
+                    string channel = ChannelFor(kind);
+                    StreamWriter writer;
+                    if (!fileWriters.TryGetValue(channel, out writer))
                     {
-                        CloseDiagnosticFileWriter();
-                        Directory.CreateDirectory(Path.GetDirectoryName(desired));
-                        var stream = new FileStream(desired, FileMode.Append,
+                        string path = FileFor(channel);
+                        Directory.CreateDirectory(Path.GetDirectoryName(path));
+                        var stream = new FileStream(path, FileMode.Append,
                             FileAccess.Write, FileShare.ReadWrite);
-                        fileWriter = new StreamWriter(stream, new UTF8Encoding(false));
-                        fileWriter.AutoFlush = true;
-                        currentFile = desired;
+                        writer = new StreamWriter(stream, new UTF8Encoding(false));
+                        writer.AutoFlush = true;
+                        fileWriters.Add(channel, writer);
                         if (stream.Length == 0)
-                            fileWriter.WriteLine("TimeET,Version,Instrument,Account,State,Event,Direction,ORHigh,ORLow,Open,High,Low,Close,ATR14Ticks,ADX14,BodyTicks,CandleTicks,BodyATR,BodyFraction,BreakTimeET,BreakoutStop,BreakoutATR14Ticks,BreakoutADX14,BreakoutBodyATR,IsRetest,Detail");
+                            writer.WriteLine("TimeET,Version,Instrument,Account,State,Event,Direction,ORHigh,ORLow,Open,High,Low,Close,ATR14Ticks,ADX14,BodyTicks,CandleTicks,BodyATR,BodyFraction,BreakTimeET,BreakoutStop,BreakoutATR14Ticks,BreakoutADX14,BreakoutBodyATR,IsRetest,Detail");
                     }
-                    fileWriter.WriteLine(line);
+                    writer.WriteLine(line);
                 }
                 catch (Exception ex)
                 {
@@ -124,7 +140,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(message);
                             Log(message, NinjaTrader.Cbi.LogLevel.Warning);
                         }
-                        catch { /* Diagnostic failure must not interfere with managed stops. */ }
+                        catch { /* Never allow diagnostics to interfere with execution safety. */ }
                     }
                 }
             }
@@ -132,13 +148,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CloseDiagnosticFileWriter()
         {
-            if (fileWriter != null)
+            foreach (StreamWriter writer in fileWriters.Values)
             {
-                try { fileWriter.Flush(); fileWriter.Dispose(); }
+                try { writer.Flush(); writer.Dispose(); }
                 catch { }
             }
-            fileWriter = null;
-            currentFile = "";
+            fileWriters.Clear();
         }
 
         private void CloseDiagnosticFile()
