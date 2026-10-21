@@ -123,6 +123,7 @@
         <Compile Include="src\API\TrailingDdApiReporter.cs" />
         <Compile Include="src\Indicators\NinjexFairValueGap\NinjexFairValueGap.cs" />
         <Compile Include="src\Shared\NinjexFirstFiveRangeEngine.cs" />
+        <Compile Include="src\Shared\NinjexOpeningBracketMath.cs" />
         <Compile Include="src\Indicators\NinjexFirstFiveMinuteRange\NinjexFirstFiveMinuteRange.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Core.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeDisplacementV1\Setup.cs" />
