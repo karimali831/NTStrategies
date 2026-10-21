@@ -21,6 +21,8 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// - Protective-order watchdog (if stop/target missing or rejected -> flatten)
     /// - Intrabar unrealized PnL kill-switch (via 1-tick data series)
     /// - Exit on session close enabled
+    /// - US equities cash-open entry schedule fixed to 09:30 America/New_York
+    ///   with automatic EST/EDT transitions independent of platform time zone
     ///
     /// Hardened:
     /// - Duplicate instance detection (same strategy + same account + same instrument)
@@ -79,6 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool DuplicateFlattenInstrument { get; set; } = true;
 
         // ========== 02 – Session / Time Filters ==========
+        // All offsets below are relative to 09:30 New York time (US cash open),
+        // NOT to the start of the selected NinjaTrader Trading Hours template.
         [NinjaScriptProperty]
         [Display(Name = "Min minutes from open", Order = 2, GroupName = "02-Session")]
         public int MinMinutesFromOpen { get; set; } = 20;
@@ -259,7 +263,31 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ADX adx;
         private ATR atr;
 
-        // ===== Session / state =====
+        // ===== Time zone / session state =====
+        // NinjaTrader timestamps Time[0] in its configured APPLICATION time zone,
+        // which can be London, New York, etc., regardless of the PC time zone.
+        // This strategy converts all time-sensitive decisions to New York time.
+        private static readonly TimeZoneInfo EasternTimeZone =
+            TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        private TimeZoneInfo platformTimeZone;
+        private static readonly TimeSpan CashOpenEastern = new TimeSpan(9, 30, 0);
+
+        private DateTime ToEastern(DateTime platformTimestamp)
+        {
+            // NinjaTrader's bar and execution timestamps represent a wall clock in
+            // Core.Globals.GeneralOptions.TimeZoneInfo. Force Unspecified so
+            // ConvertTime never silently assumes the Windows PC time zone.
+            DateTime wallClock = DateTime.SpecifyKind(platformTimestamp, DateTimeKind.Unspecified);
+            TimeZoneInfo sourceZone = platformTimeZone ?? Core.Globals.GeneralOptions.TimeZoneInfo;
+            return TimeZoneInfo.ConvertTime(wallClock, sourceZone, EasternTimeZone);
+        }
+
+        private DateTime EasternBarTime(int barsAgo)
+        {
+            return ToEastern(Time[barsAgo]);
+        }
+
+        // Session open always means 09:30 ET, not the first ETH/RTH template bar.
         private DateTime sessionStart = DateTime.MinValue;
         private DateTime prevSessionDate = DateTime.MinValue;
 
@@ -334,6 +362,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.DataLoaded)
             {
+                // Capture NinjaTrader's configured zone (not Windows/UK local time).
+                platformTimeZone = Core.Globals.GeneralOptions.TimeZoneInfo;
+                if (DebugMode)
+                    Print(string.Format(
+                        "[TIMEZONE] NinjaTrader={0} | Trading logic=America/New_York (ET, DST-aware) | Cash open=09:30 ET | Entry window={1:00}:{2:00}-{3:00}:{4:00} ET",
+                        platformTimeZone.Id,
+                        (9 * 60 + 30 + MinMinutesFromOpen) / 60,
+                        (9 * 60 + 30 + MinMinutesFromOpen) % 60,
+                        (9 * 60 + 30 + MaxMinutesFromOpen) / 60,
+                        (9 * 60 + 30 + MaxMinutesFromOpen) % 60));
+
                 emaFast = EMA(EMAFast);
                 emaSlow = EMA(EMASlow);
                 adx = ADX(ADXPeriod);
@@ -464,7 +503,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print(string.Format(
                             "[PROTECTIVE REJECT -> FLATTEN] {0:yyyy-MM-dd HH:mm:ss.fff} Name={1} State={2} Err={3} Msg={4}",
-                            time, order.Name, orderState, error, comment));
+                            ToEastern(time), order.Name, orderState, error, comment));
                     }
 
                     CancelWorkingOrders();
@@ -480,7 +519,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 Print(string.Format(
                     "[ORDER REJECTED] {0:yyyy-MM-dd HH:mm:ss.fff} Name={1}, Action={2}, Type={3}, Qty={4}, Stop={5}, Limit={6}, Bid={7}, Ask={8}, ErrorCode={9}, Msg={10}",
-                    time, order.Name, order.OrderAction, order.OrderType, quantity, stopPrice, limitPrice, bid, ask, error, comment));
+                    ToEastern(time), order.Name, order.OrderAction, order.OrderType, quantity, stopPrice, limitPrice, bid, ask, error, comment));
             }
         }
 
@@ -515,18 +554,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (isLongEntry || isShortEntry)
             {
                 entryBarIdx = CurrentBar;
-                lastEntryExecutionTime = time;
+                lastEntryExecutionTime = ToEastern(time);
 
                 entryPriceHard = execution.Price;
-                entryFillTime = time;
+                entryFillTime = ToEastern(time);
                 hardStopTriggered = false;
 
                 protectiveSeenSinceEntry = false;
 
                 if (DebugMode)
                 {
-                    Print(string.Format("[ENTRY FILL] {0:yyyy-MM-dd HH:mm:ss.fff} name={1} price={2} qty={3} emergencyTicks={4}",
-                        time, name, execution.Price, execution.Quantity, EmergencyStopTicks));
+                    Print(string.Format("[ENTRY FILL ET] {0:yyyy-MM-dd HH:mm:ss.fff} name={1} price={2} qty={3} emergencyTicks={4}",
+                        ToEastern(time), name, execution.Price, execution.Quantity, EmergencyStopTicks));
 
                     lastDiagTime = DateTime.MinValue;
                 }
@@ -604,7 +643,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             lastEntryTag = string.Empty;
             entrySeq = 0;
 
-            sessionStart = time;
+            // Always anchor to the New York 09:30 cash open, even on ETH charts
+            // or when playback/historical processing starts mid-session.
+            sessionStart = time.Date + CashOpenEastern;
             prevSessionDate = time.Date;
             lastEntryExecutionTime = DateTime.MinValue;
 
@@ -693,7 +734,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             var sig = Sig();
-            var now = Time[sig];
+            var now = EasternBarTime(sig);
 
             if (sessionStart == DateTime.MinValue)
             {
@@ -710,10 +751,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                bool newSessionByNT = Bars.IsFirstBarOfSession;
+                // Do not use Bars.IsFirstBarOfSession here: on CME ETH it
+                // resets at 18:00 ET and would incorrectly restart risk limits.
                 bool newDayByDate = (prevSessionDate != DateTime.MinValue && now.Date != prevSessionDate);
 
-                if (newSessionByNT || newDayByDate)
+                if (newDayByDate)
                 {
                     if (prevSessionDate != DateTime.MinValue && DebugMode)
                     {
@@ -728,7 +770,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            int minFromOpen = (int)Math.Floor(Time[sig].Subtract(sessionStart).TotalMinutes);
+            int minFromOpen = (int)Math.Floor(now.Subtract(sessionStart).TotalMinutes);
 
             PrintDiagnostics(minFromOpen);
 
@@ -766,7 +808,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (MinMinutesBetweenTrades > 0 && lastEntryExecutionTime != DateTime.MinValue)
             {
-                double minsSinceLast = Time[sig].Subtract(lastEntryExecutionTime).TotalMinutes;
+                double minsSinceLast = now.Subtract(lastEntryExecutionTime).TotalMinutes;
                 if (minsSinceLast < MinMinutesBetweenTrades)
                 {
                     ManageBreakEven();
@@ -899,8 +941,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (DebugMode)
                 {
                     Print(string.Format(
-                        "[HARD STOP] {0:yyyy-MM-dd HH:mm:ss} pos={1} entry={2:F2} adverseTicks={3:F1} >= {4} -> FLATTEN",
-                        Time[0], Position.MarketPosition, entryPriceHard, adverseTicks, EmergencyStopTicks));
+                        "[HARD STOP ET] {0:yyyy-MM-dd HH:mm:ss} pos={1} entry={2:F2} adverseTicks={3:F1} >= {4} -> FLATTEN",
+                        EasternBarTime(0), Position.MarketPosition, entryPriceHard, adverseTicks, EmergencyStopTicks));
                 }
 
                 CancelWorkingOrders();
@@ -920,7 +962,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (entryFillTime == DateTime.MinValue)
                 return;
 
-            double secsSinceEntry = (Time[0] - entryFillTime).TotalSeconds;
+            double secsSinceEntry = (EasternBarTime(0) - entryFillTime).TotalSeconds;
             if (secsSinceEntry < ProtectiveWatchdogSeconds)
                 return;
 
@@ -929,8 +971,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (DebugMode)
                 {
                     Print(string.Format(
-                        "[WATCHDOG] {0:yyyy-MM-dd HH:mm:ss} No protective stop/target seen within {1}s after entry -> FLATTEN",
-                        Time[0], ProtectiveWatchdogSeconds));
+                        "[WATCHDOG ET] {0:yyyy-MM-dd HH:mm:ss} No protective stop/target seen within {1}s after entry -> FLATTEN",
+                        EasternBarTime(0), ProtectiveWatchdogSeconds));
                 }
 
                 CancelWorkingOrders();
@@ -1264,8 +1306,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (DebugMode)
                     {
                         Print(string.Format(
-                            "[BE MOVE] {0:yyyy-MM-dd HH:mm:ss} pos={1} entry={2} newStop={3} upTicks={4} (trigger={5})",
-                            Time[0], Position.MarketPosition, entryPrice, newStop, upTicks, BE_TriggerTicks));
+                            "[BE MOVE ET] {0:yyyy-MM-dd HH:mm:ss} pos={1} entry={2} newStop={3} upTicks={4} (trigger={5})",
+                            EasternBarTime(0), Position.MarketPosition, entryPrice, newStop, upTicks, BE_TriggerTicks));
                     }
 
                     SetStopLoss(lastEntryTag, CalculationMode.Price, newStop, false);
@@ -1301,8 +1343,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 dayLocked = DayLocked.MaxLossReached;
 
                 if (DebugMode)
-                    Print(string.Format("[DAILY KILL] {0:yyyy-MM-dd HH:mm:ss} totalToday={1:C2} <= -{2:C2} -> LOCK DAY{3}",
-                        Time[0], totalToday, dailyKill,
+                    Print(string.Format("[DAILY KILL ET] {0:yyyy-MM-dd HH:mm:ss} totalToday={1:C2} <= -{2:C2} -> LOCK DAY{3}",
+                        EasternBarTime(0), totalToday, dailyKill,
                         Position.MarketPosition != MarketPosition.Flat ? " + FLATTEN" : ""));
 
                 if (Position.MarketPosition != MarketPosition.Flat)
@@ -1330,8 +1372,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 dayLocked = DayLocked.DailyProfitReached;
 
                 if (DebugMode)
-                    Print(string.Format("[DAY LOCK - PROFIT] {0:yyyy-MM-dd HH:mm:ss} realizedToday={1:C2} >= {2:C2} -> LOCK DAY{3}",
-                        Time[0], realizedToday, limit,
+                    Print(string.Format("[DAY LOCK - PROFIT ET] {0:yyyy-MM-dd HH:mm:ss} realizedToday={1:C2} >= {2:C2} -> LOCK DAY{3}",
+                        EasternBarTime(0), realizedToday, limit,
                         Position.MarketPosition != MarketPosition.Flat ? " + FLATTEN" : ""));
 
                 if (Position.MarketPosition != MarketPosition.Flat)
@@ -1408,8 +1450,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (DebugMode)
                 {
                     Print(string.Format(
-                        "[CONSISTENCY LOCK] {0:yyyy-MM-dd HH:mm:ss} realizedToday={1:C2} > maxAllowed={2:C2} (mode={3}, pct={4:P0}, profitBeforeToday={5:C2}) -> LOCK DAY{6}",
-                        Time[0], realizedToday, maxToday, ConsistencyRule, pct, profitBeforeToday,
+                        "[CONSISTENCY LOCK ET] {0:yyyy-MM-dd HH:mm:ss} realizedToday={1:C2} > maxAllowed={2:C2} (mode={3}, pct={4:P0}, profitBeforeToday={5:C2}) -> LOCK DAY{6}",
+                        EasternBarTime(0), realizedToday, maxToday, ConsistencyRule, pct, profitBeforeToday,
                         Position.MarketPosition != MarketPosition.Flat ? " + FLATTEN" : ""));
                 }
 
@@ -1445,13 +1487,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int GetEntryQty(int sig)
         {
-            DayOfWeek d = Time[sig].DayOfWeek;
+            DayOfWeek d = EasternBarTime(sig).DayOfWeek;
             return GetContractsForDay(d);
         }
 
         private int GetEffectiveContractsToday(int sig)
         {
-            return GetContractsForDay(Time[sig].DayOfWeek);
+            return GetContractsForDay(EasternBarTime(sig).DayOfWeek);
         }
 
         private bool IsExcludedAccountForDupLock()
@@ -1470,7 +1512,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (sessionStart == DateTime.MinValue) return false;
             
 		
-		    int minFromOpen = (int)Math.Floor(Time[Sig()].Subtract(sessionStart).TotalMinutes);
+		    int minFromOpen = (int)Math.Floor(EasternBarTime(Sig()).Subtract(sessionStart).TotalMinutes);
 		
 		    // mid-break block
 		    if (MidBreakEndMin > MidBreakStartMin)
@@ -1588,7 +1630,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             var effContracts = GetEffectiveContractsToday(Sig());
 
-            var diagTime = Time[Sig()];
+            var diagTime = EasternBarTime(Sig());
             if ((diagTime - lastDiagTime).TotalSeconds < diagThrottleSeconds)
                 return;
 
@@ -1668,20 +1710,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!timeWindowOk)
             {
                 Print(string.Format(
-                    "Out of time window: {0:yyyy-MM-dd HH:mm:ss} (minFromOpen={1}, inMainWindow={2}, midBreak={3})\n",
-                    Time[sig], minFromOpen, inMainWindow, inMidBreak));
+                    "Out of time window (ET): {0:yyyy-MM-dd HH:mm:ss} (minFromOpen={1}, inMainWindow={2}, midBreak={3})\n",
+                    diagTime, minFromOpen, inMainWindow, inMidBreak));
                 return;
             }
 
             Print(string.Format(
-                "[DIAG] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
+                "[DIAG ET] {0:yyyy-MM-dd HH:mm:ss} - Acc: {1} (Default Contracts: {2} - Effective Contracts: {7})\n" +
                 "  a) PnL/DD/Trades Lock: {8}  (realizedToday={9:C2}, unrealizedNow={10:C2}, totalToday={11:C2}, dayLocked={12}, tradesToday={14})\n" +
                 "  b) Other blocks/filters: {15}\n" +
                 "  c) adxOk={16}, adx={17:F2}, min={18}, max={19}, volBlocked={20}\n" +
                 "  d) MaxDailyLoss={21:C0}, LossRemaining={22:C0}, MaxDailyProfit={30:C0}, ProfitRemaining={13:C0}\n" +
                 "  e) {23} Entry {24} ({25}, pulledBack={26}, reclaimed={27}, confirm={28}, confirmFail={29})\n" +
                 "-------------------------------------------------------------------------------------------------------\n",
-                Time[sig],
+                diagTime,
                 accountName,
                 Contracts,
                 timeWindowOk,
