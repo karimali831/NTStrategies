@@ -29,7 +29,7 @@ Folder: Documents\NinjaTrader 8\NinjexResearch\OvernightEdgePortfolio
 | File prefix | Contents |
 | --- | --- |
 | overnight_edge_bars_ | Complete closed 1m OHLCV, 03:00–16:05 ET; reference levels and 5m cache timestamps |
-| overnight_edge_context_ | Completed 5m OHLCV, ATR and EMAs; context bar time and rollover-observation time |
+| overnight_edge_context_ | Completed 5m OHLCV, ATR and EMAs; context bar time and next 5m bar-end timestamp |
 | overnight_edge_sessions_ | RTH/premarket bar coverage and day totals, including zero-trade days |
 | overnight_edge_research_ | Existing candidate and trade rows, now with RunId, signal and 5m timing columns |
 | overnight_edge_shadow_ | Existing qualified counterfactual outcomes, with expanded research row fields |

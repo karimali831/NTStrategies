@@ -63,7 +63,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 researchContextWriter = NewResearchCsvWriter(
                     Path.Combine(directory, prefix + "context_" + instrumentName + "_" + researchRunId + ".csv"),
-                    "RunId,Instrument,BarEndET,ObservedOn5mBarET,Open,High,Low,Close,Volume," +
+                    "RunId,Instrument,BarEndET,Next5mBarEndET,Open,High,Low,Close,Volume," +
                     "ATR5Ticks,EMA5Fast,EMA5Slow,ProcessingState");
 
                 researchSessionsWriter = NewResearchCsvWriter(
@@ -167,7 +167,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         private void CaptureResearchSessionFiveMinuteBar(
-            DateTime barEnd, DateTime observedOnBarEnd,
+            DateTime barEnd, DateTime nextBarEnd,
             double open, double high, double low, double close, long volume)
         {
             if (!EnableResearchSessionExport || researchSessionExportFaulted)
@@ -185,7 +185,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         CsvSession(researchRunId),
                         CsvSession(Instrument == null ? string.Empty : Instrument.FullName),
                         TimeSession(barEnd),
-                        TimeSession(observedOnBarEnd),
+                        TimeSession(nextBarEnd),
                         NumberSession(open), NumberSession(high), NumberSession(low),
                         NumberSession(close), volume.ToString(CultureInfo.InvariantCulture),
                         NumberSession(last5mAtrTicks),

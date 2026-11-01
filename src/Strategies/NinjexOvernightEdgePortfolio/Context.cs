@@ -239,7 +239,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             last5mEmaSlow =
                 emaSlow5m[1];
 
-            // Capture the completed context bar and its observed rollover.
+            // Capture the completed context bar and the next 5m bar's end stamp.
             CaptureResearchSessionFiveMinuteBar(
                 barTime,
                 Times[ContextSeriesIndex][0],
