@@ -460,5 +460,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             get;
             set;
         }
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Research Session Export",
+            Description = "Observational 1-minute candles, 5-minute context and daily coverage, including zero-trade days. Does not alter entries or orders.",
+            GroupName = "5. Diagnostics",
+            Order = 5)]
+        public bool EnableResearchSessionExport
+        {
+            get;
+            set;
+        }
     }
 }

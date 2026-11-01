@@ -65,6 +65,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     winnersToday,
                     lossesToday,
                     grossPnlToday);
+
+                // Save the completed session before resetting trade counters.
+                FlushResearchSessionSummary();
             }
 
 

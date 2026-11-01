@@ -64,7 +64,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             "MinutesFromOpen,ATR5Ticks,EMA5Fast,EMA5Slow,EMA5FastDistanceTicks,EMA5SlowDistanceTicks,EMA5FastSlopeTicks,EMA5SlowSlopeTicks," +
             "OvernightHigh,OvernightLow,OvernightWidthTicks,PremarketHigh,PremarketLow,PremarketWidthTicks,PriorDayClose,RthOpen," +
             "TimeFilterOk,ATRFilterOk,RangeFilterOk,OvernightWidthFilterOk,PremarketWidthFilterOk,EMAFilterOk," +
-            "TradesToday,WinnersToday,LossesToday,DayGross,EntryPrice,ExitPrice,TradeGross,ExitName";
+            "TradesToday,WinnersToday,LossesToday,DayGross,EntryPrice,ExitPrice,TradeGross,ExitName," +
+            "RunId,Context5mBarEndET,SignalBarEndET,EntryExecutionTimeET,ProcessingState," +
+            "PmhSweepTicks,PmhUpperWickTicks,OpeningGapTicks";
 
         public string EventType;
         public DateTime EventTime;
@@ -121,6 +123,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double ExitPrice = double.NaN;
         public double TradeGross = double.NaN;
         public string ExitName;
+        public string RunId;
+        public DateTime Context5mBarEndTime = Core.Globals.MinDate;
+        public DateTime SignalBarEndTime = Core.Globals.MinDate;
+        public DateTime EntryExecutionTime = Core.Globals.MinDate;
+        public string ProcessingState;
+        public double PmhSweepTicks = double.NaN;
+        public double PmhUpperWickTicks = double.NaN;
+        public double OpeningGapTicks = double.NaN;
 
         public NinjexOvernightEdgeResearchRow Clone()
         {
@@ -144,7 +154,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Number(Ema5FastSlopeTicks), Number(Ema5SlowSlopeTicks), Number(OvernightHigh), Number(OvernightLow), Number(OvernightWidthTicks),
                 Number(PremarketHigh), Number(PremarketLow), Number(PremarketWidthTicks), Number(PriorDayClose), Number(RthOpen),
                 Bool(TimeFilterOk), Bool(AtrFilterOk), Bool(RangeFilterOk), Bool(OvernightWidthFilterOk), Bool(PremarketWidthFilterOk), Bool(EmaFilterOk),
-                Int(TradesToday), Int(WinnersToday), Int(LossesToday), Number(DayGross), Number(EntryPrice), Number(ExitPrice), Number(TradeGross), Csv(ExitName)
+                Int(TradesToday), Int(WinnersToday), Int(LossesToday), Number(DayGross), Number(EntryPrice), Number(ExitPrice), Number(TradeGross), Csv(ExitName),
+                Csv(RunId),
+                Context5mBarEndTime == Core.Globals.MinDate ? string.Empty : Context5mBarEndTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
+                SignalBarEndTime == Core.Globals.MinDate ? string.Empty : SignalBarEndTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
+                EntryExecutionTime == Core.Globals.MinDate ? string.Empty : EntryExecutionTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
+                Csv(ProcessingState),
+                Number(PmhSweepTicks), Number(PmhUpperWickTicks), Number(OpeningGapTicks)
             };
 
             return string.Join(",", values);
@@ -349,6 +365,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             row.SignalRangeTicks = range1mTicks;
             row.SignalBodyTicks = bodyTicks;
             row.BreakDepthTicks = breakDepthTicks;
+            if (signalName == PremarketHighEntrySignal && TickSize > 0)
+            {
+                row.PmhSweepTicks = (high - premarketHigh) / TickSize;
+                row.PmhUpperWickTicks = (high - Math.Max(signalOpen, close)) / TickSize;
+            }
+            row.OpeningGapTicks = TickSize > 0 && IsFinite(rthOpen) && IsFinite(priorDayClose)
+                ? (rthOpen - priorDayClose) / TickSize
+                : double.NaN;
             row.MinutesFromOpen = minutesFromOpen;
             row.Atr5Ticks = last5mAtrTicks;
             row.Ema5Fast = last5mEmaFast;
@@ -407,6 +431,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             activeResearchSignal.EventType = "TradeEntry";
             activeResearchSignal.EventTime = time;
+            activeResearchSignal.EntryExecutionTime = time;
+            activeResearchSignal.ProcessingState = State.ToString();
+            if (pendingResearchSignal == null && submittedSignalTime != Core.Globals.MinDate)
+                activeResearchSignal.SignalBarEndTime = submittedSignalTime;
             activeResearchSignal.TradingDate = time.Date;
             activeResearchSignal.Model = activeModelName;
             activeResearchSignal.Signal = activeEntrySignal;
@@ -436,6 +464,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             row.EventType = "TradeExit";
             row.EventTime = time;
+            row.ProcessingState = State.ToString();
             row.TradingDate = time.Date;
             row.ExitPrice = exitPrice;
             row.TradeGross = activeTradeGrossPnl;
@@ -484,7 +513,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PortfolioMode = "Run8FourModel",
                 Model = modelName ?? string.Empty,
                 Signal = signalName ?? string.Empty,
-                Direction = direction.ToString()
+                Direction = direction.ToString(),
+                RunId = researchRunId,
+                Context5mBarEndTime = last5mTime,
+                SignalBarEndTime = time,
+                ProcessingState = State.ToString()
             };
         }
 
