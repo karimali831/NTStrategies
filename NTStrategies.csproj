@@ -192,6 +192,7 @@
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchPerturbation.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchShadow.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchTelemetry.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchSessionExport.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Risk.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Signals.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Utilities.cs" />

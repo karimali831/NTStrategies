@@ -525,7 +525,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             BoolPerturbation(
                                 batch.ActualExitKnown
                                 && scenario.ExitTime > batch.ActualExitTime),
-                            NumberPerturbation(secondsVsActual)));
+                            NumberPerturbation(secondsVsActual),
+                            CsvPerturbation(researchRunId)));
                 }
 
                 File.AppendAllLines(
@@ -585,7 +586,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     + "ScenarioFamily,ScenarioName,AdverseEntryShiftTicks,StopTicks,TargetTicks,"
                     + "BreakEvenConfigured,BreakEvenConditionMet,BreakEvenTriggerTicks,BreakEvenPlusTicks,"
                     + "BreakEvenActivated,HypotheticalEntryPrice,HypotheticalExitTime,HypotheticalExitPrice,"
-                    + "HypotheticalExitReason,HypotheticalGrossPnl,MfeTicks,MaeTicks,ExitedAfterActual,SecondsVsActualExit"
+                    + "HypotheticalExitReason,HypotheticalGrossPnl,MfeTicks,MaeTicks,ExitedAfterActual,SecondsVsActualExit,RunId"
                     + Environment.NewLine);
 
                 Diagnostic(

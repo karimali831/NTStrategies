@@ -57,6 +57,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 currentBarOpen,
                 close);
 
+            // Observational export runs before the trade-window and model gates.
+            CaptureResearchSessionMinuteBar(
+                signalTime,
+                signalOpen,
+                high,
+                low,
+                close,
+                Volumes[SignalSeriesIndex][1]);
 
             if (timeValue < EntryStartTime
                 || timeValue >= EntryEndTime)

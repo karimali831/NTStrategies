@@ -357,6 +357,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableFileLogging = true;
                 EnableResearchTelemetry = false;
                 EnableResearchPerturbationScenarios = false;
+                EnableResearchSessionExport = false;
 
                 // Safety function. Persist and restore the authoritative
                 // daily trade counters across strategy/NT/VPS restarts. Applies
@@ -406,6 +407,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Closes[ContextSeriesIndex],
                         EmaSlowPeriod);
 
+                InitializeResearchSessionExport();
                 InitializeResearchTelemetry();
 
                 Diagnostic(
@@ -435,6 +437,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Terminated)
             {
                 DisposeResearchTelemetry();
+                DisposeResearchSessionExport();
                 CloseDiagnosticFile();
             }
         }
