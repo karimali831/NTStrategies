@@ -472,5 +472,57 @@ namespace NinjaTrader.NinjaScript.Strategies
             get;
             set;
         }
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Failed PMH Continuation Research",
+            Description = "Shadow-only PMH continuation longs. Requires Research Telemetry; never submits orders or modifies Run 8 signals.",
+            GroupName = "5. Diagnostics",
+            Order = 6)]
+        public bool EnableFailedPmhContinuationResearch { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 30)]
+        [Display(
+            Name = "Failed PMH Confirmation Minutes",
+            Description = "Maximum number of minutes after a qualified PMH rejection to confirm a bullish reclaim.",
+            GroupName = "6. Failed PMH Research",
+            Order = 0)]
+        public int FailedPmhConfirmationMinutes { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 5)]
+        [Display(
+            Name = "Failed PMH Consecutive Closes",
+            Description = "How many consecutive completed 1-minute closes must hold above PMH plus reclaim ticks.",
+            GroupName = "6. Failed PMH Research",
+            Order = 1)]
+        public int FailedPmhConfirmCloses { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "Failed PMH Reclaim Ticks",
+            Description = "Minimum ticks above premarket high on each confirming one-minute close.",
+            GroupName = "6. Failed PMH Research",
+            Order = 2)]
+        public int FailedPmhReclaimTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Failed PMH Require Bullish EMA Context",
+            Description = "Requires EMA(9) > EMA(21) and PMH rejection close >= EMA(9), both from completed five-minute context.",
+            GroupName = "6. Failed PMH Research",
+            Order = 3)]
+        public bool FailedPmhRequireBullishEma { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 240)]
+        [Display(
+            Name = "Failed PMH Max Shadow Hold Minutes",
+            Description = "Maximum hypothetical holding time from the confirmed long's first causal tick.",
+            GroupName = "6. Failed PMH Research",
+            Order = 4)]
+        public int FailedPmhMaxHoldMinutes { get; set; }
+
     }
 }
