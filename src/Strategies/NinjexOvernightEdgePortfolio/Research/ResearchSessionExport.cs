@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CaptureResearchSessionMinuteBar(
             DateTime barEnd, double open, double high, double low,
-            double close, long volume)
+            double close, double volume)
         {
             if (!EnableResearchSessionExport || researchSessionExportFaulted)
                 return;
@@ -142,7 +142,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         DaySession(barEnd),
                         TimeSession(barEnd),
                         NumberSession(open), NumberSession(high), NumberSession(low),
-                        NumberSession(close), volume.ToString(CultureInfo.InvariantCulture),
+                        NumberSession(close), NumberSession(volume),
                         NumberSession(last5mAtrTicks),
                         NumberSession(last5mEmaFast),
                         NumberSession(last5mEmaSlow),
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CaptureResearchSessionFiveMinuteBar(
             DateTime barEnd, DateTime nextBarEnd,
-            double open, double high, double low, double close, long volume)
+            double open, double high, double low, double close, double volume)
         {
             if (!EnableResearchSessionExport || researchSessionExportFaulted)
                 return;
@@ -187,7 +187,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         TimeSession(barEnd),
                         TimeSession(nextBarEnd),
                         NumberSession(open), NumberSession(high), NumberSession(low),
-                        NumberSession(close), volume.ToString(CultureInfo.InvariantCulture),
+                        NumberSession(close), NumberSession(volume),
                         NumberSession(last5mAtrTicks),
                         NumberSession(last5mEmaFast),
                         NumberSession(last5mEmaSlow),
