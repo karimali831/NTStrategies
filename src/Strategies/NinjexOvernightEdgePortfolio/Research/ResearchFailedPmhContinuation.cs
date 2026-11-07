@@ -17,6 +17,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public NinjexOvernightEdgeResearchRow Parent;
             public string Id;
             public double Level;
+            public bool BullishContextPassed;
             public int ConsecutiveCloses;
             public DateTime ConfirmationTime = Core.Globals.MinDate;
             public double ConfirmationClose = double.NaN;
@@ -135,7 +136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             || age > FailedPmhConfirmationMinutes
                             || ToTimeValue(barEnd) >= EntryEndTime)
                         {
-                            WriteFailedPmhCandidate(candidate, false,
+                            WriteFailedPmhCandidate(candidate,
                                 "ConfirmationExpired", barEnd);
                             failedPmhAwaiting.RemoveAt(i);
                             continue;
@@ -159,12 +160,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // candle. Count only one long signal per confirmation bar.
                         if (!failedPmhConfirmedTimes.Add(barEnd))
                         {
-                            WriteFailedPmhCandidate(candidate, true,
+                            WriteFailedPmhCandidate(candidate,
                                 "DuplicateConfirmationBar", barEnd);
                         }
                         else
                         {
-                            WriteFailedPmhCandidate(candidate, true,
+                            WriteFailedPmhCandidate(candidate,
                                 "Confirmed", barEnd);
                             AddFailedPmhTrade(candidate, "Run8_20_40", 20, 40);
                             AddFailedPmhTrade(candidate, "Research_15_50", 15, 50);
@@ -200,9 +201,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         && snapshot.Ema5Fast > snapshot.Ema5Slow
                         && snapshot.Ema5FastDistanceTicks >= 0;
 
+                    candidateNew.BullishContextPassed = bullishContext;
+
                     if (FailedPmhRequireBullishEma && !bullishContext)
                     {
-                        WriteFailedPmhCandidate(candidateNew, false,
+                        WriteFailedPmhCandidate(candidateNew,
                             "FilteredBullishContext", barEnd);
                         return;
                     }
@@ -341,7 +344,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         private void WriteFailedPmhCandidate(
-            FailedPmhCandidate candidate, bool passed, string status, DateTime observedAt)
+            FailedPmhCandidate candidate, string status, DateTime observedAt)
         {
             if (failedPmhResearchFaulted)
                 return;
@@ -362,7 +365,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 NumberFailedPmh(s.Ema5Slow),
                 NumberFailedPmh(s.Ema5FastSlopeTicks),
                 NumberFailedPmh(s.Ema5FastDistanceTicks),
-                passed ? "1" : "0",
+                candidate.BullishContextPassed ? "1" : "0",
                 CsvFailedPmh(status),
                 DateFailedPmh(candidate.ConfirmationTime),
                 NumberFailedPmh(candidate.ConfirmationClose),
@@ -422,7 +425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 try
                 {
                     foreach (var candidate in failedPmhAwaiting)
-                        WriteFailedPmhCandidate(candidate, false,
+                        WriteFailedPmhCandidate(candidate,
                             "IncompleteAtTermination", Core.Globals.MinDate);
                     failedPmhAwaiting.Clear();
 
