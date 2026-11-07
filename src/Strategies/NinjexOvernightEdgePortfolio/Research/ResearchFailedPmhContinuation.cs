@@ -303,6 +303,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
+            // Never invent an overnight or next-session fill if Playback
+            // supplied no 16:00 Last tick. The outcome remains unscored.
+            if (time.Date != trade.EntryTime.Date)
+            {
+                WriteFailedPmhTrade(trade, Core.Globals.MinDate,
+                    double.NaN, "MissingSessionCloseTick");
+                return true;
+            }
+
             var pointValue = Instrument == null
                 ? 0.0
                 : Instrument.MasterInstrument.PointValue;
