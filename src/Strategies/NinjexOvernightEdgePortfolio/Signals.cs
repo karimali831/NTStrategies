@@ -101,6 +101,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 minutesFromOpen,
                 overnightWidthTicks);
 
+            // Research-only continuation model: observes qualified PMH signals
+            // before daily caps without submitting or modifying real orders.
+            ProcessFailedPmhContinuationBar(signalTime, close);
 
             if (!CanTakeNewTrade(
                     signalTime,

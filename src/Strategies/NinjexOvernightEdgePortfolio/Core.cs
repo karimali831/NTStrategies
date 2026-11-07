@@ -358,6 +358,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableResearchTelemetry = false;
                 EnableResearchPerturbationScenarios = false;
                 EnableResearchSessionExport = false;
+                EnableFailedPmhContinuationResearch = false;
+                FailedPmhConfirmationMinutes = 10;
+                FailedPmhConfirmCloses = 2;
+                FailedPmhReclaimTicks = 2;
+                FailedPmhRequireBullishEma = true;
+                FailedPmhMaxHoldMinutes = 60;
 
                 // Safety function. Persist and restore the authoritative
                 // daily trade counters across strategy/NT/VPS restarts. Applies
@@ -409,6 +415,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 InitializeResearchSessionExport();
                 InitializeResearchTelemetry();
+                InitializeFailedPmhContinuationResearch();
 
                 Diagnostic(
                     DateTime.Now,
@@ -436,6 +443,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
+                DisposeFailedPmhContinuationResearch();
                 DisposeResearchTelemetry();
                 DisposeResearchSessionExport();
                 CloseDiagnosticFile();
