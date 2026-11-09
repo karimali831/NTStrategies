@@ -364,11 +364,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FailedPmhV2ReclaimTicks = 2;
                 FailedPmhV2ReclaimCloses = 2;
                 FailedPmhV2RetestMinutes = 10;
-                FailedPmhV2RetestTouchTicks = 4;
-                FailedPmhV2MaxBreachTicks = 4;
-                FailedPmhV2FollowThroughMinutes = 5;
-                FailedPmhV2FollowThroughTicks = 1;
-                FailedPmhV2MinEmaSpreadTicks = 4;
+                FailedPmhV2RetestTouchTicks = 6;
+                FailedPmhV2MaxBreachTicks = 6;
+                FailedPmhV2FollowThroughMinutes = 7;
+                FailedPmhV2FollowThroughTicks = 0;
+                FailedPmhV2MinEmaSpreadTicks = 0;
                 FailedPmhV2MinFastSlopeTicks = 0;
                 FailedPmhV2AtrStopFactor = 0.60;
                 FailedPmhV2StructureBufferTicks = 2;
