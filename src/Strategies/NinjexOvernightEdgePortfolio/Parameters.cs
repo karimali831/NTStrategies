@@ -524,5 +524,201 @@ namespace NinjaTrader.NinjaScript.Strategies
             Order = 4)]
         public int FailedPmhMaxHoldMinutes { get; set; }
 
+        // Independent PMH V2 retest/hold research. Existing Run 8 + PMH V1 unchanged.
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable Failed PMH V2 Retest Research",
+            Description = "Opt-in separate shadow research; requires Research Telemetry. Does not submit orders.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 0)]
+        public bool EnableFailedPmhV2Research
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 30)]
+        [Display(
+            Name = "V2 Reclaim Window Minutes",
+            Description = "Maximum minutes after original PMH rejection to close back above PMH.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 1)]
+        public int FailedPmhV2ReclaimMinutes
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "V2 Reclaim Buffer Ticks",
+            Description = "Required ticks above PMH for every reclaim close.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 2)]
+        public int FailedPmhV2ReclaimTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 5)]
+        [Display(
+            Name = "V2 Consecutive Reclaim Closes",
+            Description = "Consecutive completed one-minute closes needed before the retest stage.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 3)]
+        public int FailedPmhV2ReclaimCloses
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 30)]
+        [Display(
+            Name = "V2 Retest Window Minutes",
+            Description = "Maximum minutes after reclaim in which PMH must be retested and held.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 4)]
+        public int FailedPmhV2RetestMinutes
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "V2 Retest Touch Tolerance Ticks",
+            Description = "Low must reach PMH plus this tolerance; retest candle must close >= PMH.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 5)]
+        public int FailedPmhV2RetestTouchTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "V2 Maximum Wick Breach Ticks",
+            Description = "Retest/follow-through wick below PMH by more than this invalidates the candidate.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 6)]
+        public int FailedPmhV2MaxBreachTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 30)]
+        [Display(
+            Name = "V2 Follow-Through Window Minutes",
+            Description = "Maximum minutes after retest for a separate bullish confirmation candle.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 7)]
+        public int FailedPmhV2FollowThroughMinutes
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "V2 Follow-Through Break Ticks",
+            Description = "Bullish confirming close must clear retest high by this many ticks.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 8)]
+        public int FailedPmhV2FollowThroughTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(
+            Name = "V2 Minimum EMA Spread Ticks",
+            Description = "Parent completed five-minute EMA(9) must exceed EMA(21) by this spread.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 9)]
+        public double FailedPmhV2MinEmaSpreadTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(-100, 100)]
+        [Display(
+            Name = "V2 Minimum EMA Fast Slope Ticks",
+            Description = "Parent completed five-minute EMA(9) slope, in ticks over one context update.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 10)]
+        public double FailedPmhV2MinFastSlopeTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0.1, 2)]
+        [Display(
+            Name = "V2 ATR Stop Multiplier",
+            Description = "Shadow ATR stop in ticks = ceiling(confirmation ATR ticks times multiplier), bounded 12 to max stop.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 11)]
+        public double FailedPmhV2AtrStopFactor
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(0, 20)]
+        [Display(
+            Name = "V2 Retest Structure Stop Buffer Ticks",
+            Description = "Extra ticks below retest low for structural stop, bounded by max stop.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 12)]
+        public int FailedPmhV2StructureBufferTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(12, 100)]
+        [Display(
+            Name = "V2 Maximum Shadow Stop Ticks",
+            Description = "Maximum ATR/structure stop in ticks (not a live-order risk rule).",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 13)]
+        public int FailedPmhV2MaxStopTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 240)]
+        [Display(
+            Name = "V2 Max Shadow Hold Minutes",
+            Description = "Hypothetical maximum hold after causal entry, also subject to 16:00 flatten.",
+            GroupName = "7. Failed PMH V2 Research",
+            Order = 14)]
+        public int FailedPmhV2MaxHoldMinutes
+        {
+            get;
+            set;
+        }
+
+
     }
 }
