@@ -57,6 +57,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 currentBarOpen,
                 close);
 
+            // V2 advances from completed bars even when the original portfolio
+            // is blocked by an active position, daily cap, or entry filter.
+            AdvanceFailedPmhV2CompletedBar(
+                signalTime, signalOpen, high, low, close);
+
             // Observational export runs before the trade-window and model gates.
             CaptureResearchSessionMinuteBar(
                 signalTime,
@@ -104,6 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Research-only continuation model: observes qualified PMH signals
             // before daily caps without submitting or modifying real orders.
             ProcessFailedPmhContinuationBar(signalTime, close);
+            RegisterFailedPmhV2Parent(signalTime);
 
             if (!CanTakeNewTrade(
                     signalTime,

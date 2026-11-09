@@ -73,6 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // shadow CSV sink. A shadow-output fault must not stop it.
             ProcessResearchPerturbationTick(time, price);
             ProcessFailedPmhContinuationTick(time, price);
+            ProcessFailedPmhV2Tick(time, price);
 
             if (researchShadowOutputFaulted)
                 return;
