@@ -359,6 +359,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableResearchPerturbationScenarios = false;
                 EnableResearchSessionExport = false;
                 EnableFailedPmhContinuationResearch = false;
+                EnableFailedPmhV2Research = false;
+                FailedPmhV2ReclaimMinutes = 10;
+                FailedPmhV2ReclaimTicks = 2;
+                FailedPmhV2ReclaimCloses = 2;
+                FailedPmhV2RetestMinutes = 10;
+                FailedPmhV2RetestTouchTicks = 4;
+                FailedPmhV2MaxBreachTicks = 4;
+                FailedPmhV2FollowThroughMinutes = 5;
+                FailedPmhV2FollowThroughTicks = 1;
+                FailedPmhV2MinEmaSpreadTicks = 4;
+                FailedPmhV2MinFastSlopeTicks = 0;
+                FailedPmhV2AtrStopFactor = 0.60;
+                FailedPmhV2StructureBufferTicks = 2;
+                FailedPmhV2MaxStopTicks = 30;
+                FailedPmhV2MaxHoldMinutes = 60;
                 FailedPmhConfirmationMinutes = 10;
                 FailedPmhConfirmCloses = 2;
                 FailedPmhReclaimTicks = 2;
@@ -416,6 +431,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 InitializeResearchSessionExport();
                 InitializeResearchTelemetry();
                 InitializeFailedPmhContinuationResearch();
+                InitializeFailedPmhV2Research();
 
                 Diagnostic(
                     DateTime.Now,
@@ -443,6 +459,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
+                DisposeFailedPmhV2Research();
                 DisposeFailedPmhContinuationResearch();
                 DisposeResearchTelemetry();
                 DisposeResearchSessionExport();
