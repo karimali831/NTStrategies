@@ -1014,10 +1014,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private static string CsvPmhRegime(string value)
         {
-            return """
+            return "\""
                    + (value ?? string.Empty)
-                       .Replace(""", """")
-                   + """;
+                       .Replace("\"", "\"\"")
+                   + "\"";
         }
     }
 }
