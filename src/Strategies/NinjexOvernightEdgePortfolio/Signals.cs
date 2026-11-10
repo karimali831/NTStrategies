@@ -57,6 +57,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 currentBarOpen,
                 close);
 
+            // Integrated PMH evaluation advances its own causal reclaim/retest
+            // state before the current bar can register a new parent signal.
+            PreparePmhRegimeEvaluationCompletedBar(
+                signalTime, signalOpen, high, low, close);
+
             // V2 advances from completed bars even when the original portfolio
             // is blocked by an active position, daily cap, or entry filter.
             AdvanceFailedPmhV2CompletedBar(
@@ -110,11 +115,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             // before daily caps without submitting or modifying real orders.
             ProcessFailedPmhContinuationBar(signalTime, close);
             RegisterFailedPmhV2Parent(signalTime);
+            RegisterPmhRegimeParentIfQualified(
+                signalTime,
+                high,
+                close,
+                minutesFromOpen);
 
             if (!CanTakeNewTrade(
                     signalTime,
                     false))
             {
+                RecordPmhRegimeReadyBlocked(
+                    signalTime,
+                    GetPmhRegimePortfolioBlockReason());
                 return;
             }
 
@@ -205,12 +218,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && high > premarketHigh
                 && close < premarketHigh;
 
-            var premarketHighQualified =
+            var premarketHighBaseQualified =
                 premarketHighSweep
                 && minutesFromOpen >= 0
                 && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen
                 && IsFinite(last5mAtrTicks)
                 && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
+
+            var premarketHighQualified =
+                IsPmhRegimeStrictShortQualified(
+                    premarketHighBaseQualified,
+                    close);
 
 
             if (premarketHighSweep)
@@ -220,7 +238,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "FOUR CHECK Model=PMH-Rejection " +
                     "Qualified={0} PMH={1} High={2} Close={3} " +
                     "MinutesFromOpen={4} MaxMinutes={5} " +
-                    "ATR5={6:0.0}t MinATR={7:0.0}t",
+                    "ATR5={6:0.0}t MinATR={7:0.0}t " +
+                    "BaseQualified={8} RegimeMode={9}",
                     premarketHighQualified,
                     premarketHigh,
                     high,
@@ -228,7 +247,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     minutesFromOpen,
                     PremarketHighMaximumMinutesFromOpen,
                     last5mAtrTicks,
-                    PremarketHighMinimumAtr5mTicks);
+                    PremarketHighMinimumAtr5mTicks,
+                    premarketHighBaseQualified,
+                    EnablePmhRegimeSplitEvaluation);
             }
 
 
@@ -305,6 +326,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var qualifiedCount =
                 (priorCloseQualified ? 1 : 0)
                 + (premarketHighQualified ? 1 : 0)
+                + (EnablePmhRegimeSplitEvaluation && pmhRegimeLongReady ? 1 : 0)
                 + (rthOpenQualified ? 1 : 0)
                 + (premarketLowQualified ? 1 : 0);
 
@@ -313,7 +335,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Diagnostic(
                     signalTime,
                     "FOUR PRIORITY Multiple={0} " +
-                    "Order=PDC,PMH,RTHOpen,PML",
+                    "Order=PDC,PMHShort,PMHContLong,RTHOpen,PML",
                     qualifiedCount);
             }
 
@@ -354,6 +376,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     minutesFromOpen,
                     overnightWidthTicks);
 
+                return;
+            }
+
+
+            if (TryArmPmhRegimeContinuationLong(
+                    signalTime,
+                    high,
+                    low,
+                    close,
+                    minutesFromOpen,
+                    overnightWidthTicks))
+            {
                 return;
             }
 
@@ -602,6 +636,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             int minutesFromOpen,
             double overnightWidthTicks)
         {
+            ResetPendingPmhRegimeBracket();
+
             pendingDirection =
                 direction;
 
