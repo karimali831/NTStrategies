@@ -1,48 +1,48 @@
 // NinjexEsLevelCandidatePortfolio.cs
-// Version: 1.1.0-research2
+// Version: 1.2.0-research3
 //
-// Research2 goals:
-//   - ES 5-minute primary series, CME US Index Futures ETH, ET timestamps only.
-//   - NO timezone conversion.
-//   - Trade contextual candidates while shadow-tracking EVERY qualified signal, even while
-//     another position is open or daily portfolio limits have been reached.
-//   - Playback tick data is used for TELEMETRY ONLY (shadow-entry sequencing, MFE/MAE,
-//     and equity drawdown). Trading decisions remain strictly 5-minute OnBarClose.
-//   - Historical/Strategy Analyzer runs fall back to next-bar-open + 5-minute OHLC telemetry.
+// Research3 goals:
+//   - Validate the three Research3 winners: contextual RTH, contextual PDC and contextual PMH.
+//   - Validate a NEW ONH contextual hypothesis: ATR(14) 30..55 ticks AND RTH-PDC <= +40 ticks.
+//   - PDC baseline remains SHADOW ONLY; it can never submit an actual order.
+//   - The FIRST qualified signal for each trade model consumes that model for the trading day,
+//     whether the portfolio trades it or a portfolio/risk gate blocks it. Later same-day retests
+//     remain shadow-tracked but are never eligible for actual entry.
+//   - Shadow-track every qualified signal for 5/15/30/60m returns and MFE/MAE.
+//   - On each model's first qualified signal/day, simultaneously evaluate a counterfactual
+//     bracket matrix using Playback tick sequencing:
+//       stops 12/16/20/24 ticks x RR targets 1.5R/2.0R/2.5R,
+//       plus stops 12/16/20/24 ticks x fixed targets 20/30/40/50 ticks.
+//   - Playback ticks are TELEMETRY ONLY. Actual trading decisions remain 5-minute OnBarClose.
+//   - NO timezone conversion. NinjaTrader timestamps must be ET.
 //
-// Trade candidates (all ON by default):
-//   1) PDC-CONTEXT-SWEEP-RECLAIM-L
-//   2) RTH-CONTEXT-RECLAIM-L
+// Actual trade candidates (all ON by default):
+//   1) RTH-CONTEXT-RECLAIM-L
+//   2) PDC-CONTEXT-SWEEP-RECLAIM-L
 //   3) PMH-CONTEXT-REJECT-S
-//   4) ONH-ATR-RECLAIM-L
-//   5) PDC-BASE-SWEEP-RECLAIM-L (used when the contextual PDC filter does not qualify)
+//   4) ONH-CONTEXT-RECLAIM-L
 //
-// Shadow-only comparators (ON by default):
+// Shadow-only comparators:
+//   RAW-PDC-BASE-SWEEP-RECLAIM-L
 //   RAW-PMH-DELAYED-REJECT-S
 //   RAW-ONH-RECLAIM-L
 //   RAW-RTH-RECLAIM-L
 //
-// Research2 validation defaults deliberately use broader thresholds than the best-fit
-// Research1 subsets to reduce curve-fit risk:
-//   PDC context: RTH-PDC <= +80t, ONH-PMH <= 60t
-//   PMH context: rejection range >= 20t, before 12:30 ET, RTH-PDC <= +80t
-//   ONH context: 30 <= ATR(14) <= 50 ticks
-//   RTH context: RTH-PDC <= 0t, ONH-PMH <= 60t
-//
-// Initial risk is intentionally kept comparable to Research1:
+// Initial actual-trade risk intentionally remains comparable to Research3:
 //   1 ES, structural signal-bar stop clamped to 8..20 ticks, 2R target,
 //   max 3 trades/day, max 2 winners/day, max 2 losers/day,
 //   max 1 trade/model/day, max 1 trade/family/day, $500 realized daily loss lockout,
-//   and exactly 12 completed 5-minute bars max hold (60 minutes).
+//   and exactly 12 completed 5-minute bars max hold.
 //
 // Logs:
-//   Documents\NinjaTrader 8\NinjexLogs\EsLevelCandidatePortfolio\1.1.0-research2\<run>\events.log
+//   Documents\NinjaTrader 8\NinjexLogs\EsLevelCandidatePortfolio\1.2.0-research3\<run>\events.log
 //   ...\trades.csv     actual portfolio trades
-//   ...\signals.csv    every shadow signal + 5/15/30/60m forward telemetry
-//   ...\equity.csv     5-minute equity snapshots + Playback tick high-water / drawdown state
-//   ...\sessions.csv   RTH bar-count / reduced-session classification
+//   ...\signals.csv    every shadow signal + 5/15/30/60m + MFE/MAE telemetry
+//   ...\brackets.csv   first-signal/day counterfactual tick-sequenced stop/target matrix
+//   ...\equity.csv     5-minute equity + Playback tick high-water / drawdown state
+//   ...\sessions.csv   RTH session-length / reduced-session classification
 //
-// IMPORTANT: Signal time parameters refer to the START time of the 5-minute candle.
+// IMPORTANT: Signal-time parameters refer to the START time of the 5-minute candle.
 
 #region Using declarations
 using System;
@@ -76,13 +76,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public class NinjexEsLevelCandidatePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.1.0-research2";
+        private const string StrategyVersion = "1.2.0-research3";
 
         private const string SigPdcContext = "PDC-CONTEXT-SWEEP-RECLAIM-L";
         private const string SigRthContext = "RTH-CONTEXT-RECLAIM-L";
         private const string SigPmhContext = "PMH-CONTEXT-REJECT-S";
-        private const string SigOnhAtr = "ONH-ATR-RECLAIM-L";
-        private const string SigPdcBase = "PDC-BASE-SWEEP-RECLAIM-L";
+        private const string SigOnhContext = "ONH-CONTEXT-RECLAIM-L";
+        private const string RawPdc = "RAW-PDC-BASE-SWEEP-RECLAIM-L";
 
         private const string RawPmh = "RAW-PMH-DELAYED-REJECT-S";
         private const string RawOnh = "RAW-ONH-RECLAIM-L";
@@ -133,6 +133,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string ContextSnapshot;
         }
 
+        private sealed class BracketOutcome
+        {
+            public string BracketId;
+            public string TargetType;
+            public int StopTicks;
+            public double RewardRisk;
+            public int TargetTicks;
+            public bool OutcomeResolved;
+            public string Outcome;
+            public string ExitReason;
+            public DateTime OutcomeTime;
+            public double OutcomePrice;
+            public double OutcomePnlTicks;
+            public bool AmbiguousBoth;
+        }
+
         private sealed class ShadowObservation
         {
             public long Sequence;
@@ -159,6 +175,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public double OutcomePnlTicks;
             public bool AmbiguousBoth;
             public bool Finalized;
+            public List<BracketOutcome> Brackets;
         }
 
         private sealed class ActiveTradeContext
@@ -269,6 +286,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private StreamWriter eventWriter;
         private StreamWriter tradeWriter;
         private StreamWriter signalWriter;
+        private StreamWriter bracketWriter;
         private StreamWriter equityWriter;
         private StreamWriter sessionWriter;
         private string runId;
@@ -279,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description = "Research2 ES 5-minute PDC/PMH/ONH/RTH contextual portfolio with unbiased shadow telemetry.";
+                Description = "Research3 ES 5-minute contextual level portfolio with first-signal consumption and counterfactual bracket telemetry.";
                 Name = "NinjexEsLevelCandidatePortfolio";
                 Calculate = Calculate.OnBarClose;
 
@@ -300,12 +318,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = 50;
                 IsInstantiatedOnEachOptimizationIteration = true;
 
-                // Research2 trade candidates: all ON by default.
+                // Research3 trade candidates: all ON by default.
                 EnablePdcContextLong = true;
                 EnableRthContextLong = true;
                 EnablePmhContextShort = true;
-                EnableOnhAtrLong = true;
-                EnablePdcBaseLong = true;
+                EnableOnhContextLong = true;
+                EnableRawPdcBaseShadow = true;
                 EnableRawComparatorShadowSignals = true;
 
                 // Base signal windows (START time of 5-minute signal candle, ET).
@@ -320,7 +338,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RequiredBreakTicks = 1;
                 PmhOnhConfluenceToleranceTicks = 1;
 
-                // Research2 validation contexts (deliberately broader than best in-sample).
+                // Research3 validation contexts (deliberately broader than best in-sample).
                 PdcContextMaxRthVsPdcTicks = 80;
                 PdcContextMaxOnhMinusPmhTicks = 60;
 
@@ -329,7 +347,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PmhContextMaxRthVsPdcTicks = 80;
 
                 OnhContextMinAtrTicks = 30;
-                OnhContextMaxAtrTicks = 50;
+                OnhContextMaxAtrTicks = 55;
+                OnhContextMaxRthVsPdcTicks = 40;
 
                 RthContextMaxRthVsPdcTicks = 0;
                 RthContextMaxOnhMinusPmhTicks = 60;
@@ -363,6 +382,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ReducedSessionMaxRthBars = 70;
                 EnableFileLogging = true;
                 EnableEquityCsv = true;
+                EnableBracketMatrix = true;
                 PrintImportantEvents = true;
             }
             else if (State == State.Configure)
@@ -376,48 +396,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                 InitializeLogging();
 
                 LogEvent(TimeOrNow(), "RUN_START", "",
-                    string.Format(CultureInfo.InvariantCulture,
-                        "Version={0}; Instrument={1}; Bars={2} {3}; TradingHours={4}; Calculate={5}; Fill={6}; SlippageTicks={7}; " +
-                        "Models[PDCCTX={8},RTHCTX={9},PMHCTX={10},ONHATR={11},PDCBASE={12},RawShadow={13}]; " +
-                        "PDCContext[RTHvsPDC<={14},ONHminusPMH<={15}]; PMHContext[EndExclusive={16},Range>={17},RTHvsPDC<={18}]; " +
-                        "ONHContext[ATR={19}-{20}]; RTHContext[RTHvsPDC<={21},ONHminusPMH<={22}]; " +
-                        "StopMode={23}; MinStop={24}; MaxStop={25}; TargetMode={26}; RR={27:0.00}; MaxHoldBars={28}; " +
-                        "MaxTradesDay={29}; MaxWinsDay={30}; MaxLossesDay={31}; MaxModelDay={32}; MaxFamilyDay={33}; DailyLossLimit={34:0.00}",
-                        StrategyVersion,
-                        Instrument != null ? Instrument.FullName : "n/a",
-                        BarsPeriod != null ? BarsPeriod.Value : 0,
-                        BarsPeriod != null ? BarsPeriod.BarsPeriodType.ToString() : "n/a",
-                        TradingHours != null ? TradingHours.Name : "n/a",
-                        Calculate,
-                        OrderFillResolution,
-                        Slippage,
-                        EnablePdcContextLong,
-                        EnableRthContextLong,
-                        EnablePmhContextShort,
-                        EnableOnhAtrLong,
-                        EnablePdcBaseLong,
-                        EnableRawComparatorShadowSignals,
-                        PdcContextMaxRthVsPdcTicks,
-                        PdcContextMaxOnhMinusPmhTicks,
-                        PmhContextEndTimeExclusive,
-                        PmhContextMinSignalRangeTicks,
-                        PmhContextMaxRthVsPdcTicks,
-                        OnhContextMinAtrTicks,
-                        OnhContextMaxAtrTicks,
-                        RthContextMaxRthVsPdcTicks,
-                        RthContextMaxOnhMinusPmhTicks,
-                        StopMode,
-                        MinStopTicks,
-                        MaxStopTicks,
-                        TargetMode,
-                        RewardRisk,
-                        MaxHoldBars,
-                        MaxTradesPerDay,
-                        MaxWinnersPerDay,
-                        MaxLosersPerDay,
-                        MaxTradesPerModelPerDay,
-                        MaxTradesPerFamilyPerDay,
-                        DailyLossLimitCurrency));
+                    "Version=" + StrategyVersion +
+                    "; Instrument=" + (Instrument != null ? Instrument.FullName : "n/a") +
+                    "; Bars=" + (BarsPeriod != null ? BarsPeriod.Value.ToString(CultureInfo.InvariantCulture) : "0") +
+                    " " + (BarsPeriod != null ? BarsPeriod.BarsPeriodType.ToString() : "n/a") +
+                    "; TradingHours=" + (TradingHours != null ? TradingHours.Name : "n/a") +
+                    "; Calculate=" + Calculate +
+                    "; Fill=" + OrderFillResolution +
+                    "; SlippageTicks=" + Slippage +
+                    "; Models[PDCCTX=" + EnablePdcContextLong +
+                    ",RTHCTX=" + EnableRthContextLong +
+                    ",PMHCTX=" + EnablePmhContextShort +
+                    ",ONHCTX=" + EnableOnhContextLong +
+                    ",PDCBaseShadow=" + EnableRawPdcBaseShadow +
+                    ",RawShadow=" + EnableRawComparatorShadowSignals + "]" +
+                    "; FirstQualifiedConsumesModel=True" +
+                    "; PDCContext[RTHvsPDC<=" + PdcContextMaxRthVsPdcTicks +
+                    ",ONHminusPMH<=" + PdcContextMaxOnhMinusPmhTicks + "]" +
+                    "; PMHContext[EndExclusive=" + PmhContextEndTimeExclusive +
+                    ",Range>=" + PmhContextMinSignalRangeTicks +
+                    ",RTHvsPDC<=" + PmhContextMaxRthVsPdcTicks + "]" +
+                    "; ONHContext[ATR=" + OnhContextMinAtrTicks + "-" + OnhContextMaxAtrTicks +
+                    ",RTHvsPDC<=" + OnhContextMaxRthVsPdcTicks + "]" +
+                    "; RTHContext[RTHvsPDC<=" + RthContextMaxRthVsPdcTicks +
+                    ",ONHminusPMH<=" + RthContextMaxOnhMinusPmhTicks + "]" +
+                    "; StopMode=" + StopMode +
+                    "; MinStop=" + MinStopTicks +
+                    "; MaxStop=" + MaxStopTicks +
+                    "; TargetMode=" + TargetMode +
+                    "; RR=" + RewardRisk.ToString("0.00", CultureInfo.InvariantCulture) +
+                    "; MaxHoldBars=" + MaxHoldBars +
+                    "; MaxTradesDay=" + MaxTradesPerDay +
+                    "; MaxWinsDay=" + MaxWinnersPerDay +
+                    "; MaxLossesDay=" + MaxLosersPerDay +
+                    "; DailyLossLimit=" + DailyLossLimitCurrency.ToString("0.00", CultureInfo.InvariantCulture) +
+                    "; BracketMatrix=" + EnableBracketMatrix +
+                    "; Brackets=Stops[12,16,20,24]xRR[1.5,2.0,2.5]+FixedTargets[20,30,40,50]");
 
                 if (!configurationValid)
                     LogEvent(TimeOrNow(), "FATAL_CONFIG", "", "Strategy will not submit entries until configuration is corrected.");
@@ -461,7 +475,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             HandleTradingDateReset(tradingDate);
             UpdateReferenceLevels(signalBarStart, signalStartTime);
 
-            // IMPORTANT Research2 ordering:
+            // IMPORTANT Research3 ordering:
             // 1) Advance all previously-created shadow signals with this completed bar.
             // 2) Update actual-position telemetry / risk exits.
             // 3) Evaluate and register EVERY current signal, even if a trade is already open.
@@ -491,7 +505,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogEvent(Time[0], "SIGNAL_QUALIFIED", c.Id, FormatCandidate(c));
             }
 
-            List<CandidateSignal> tradeCandidates = candidates.Where(x => x.TradeCandidate).ToList();
+            // Research3: the first qualified signal consumes the model for this trading day.
+            // A blocked/arbitrated first signal remains shadow-tracked, but later retests can never
+            // become actual entries that day.
+            List<CandidateSignal> tradeCandidates = new List<CandidateSignal>();
+            foreach (CandidateSignal c in candidates.Where(x => x.TradeCandidate))
+            {
+                if (c.SignalOrdinalToday == 1)
+                    tradeCandidates.Add(c);
+                else
+                    MarkActualSkip(c, "ModelConsumedByFirstQualifiedSignal; FirstQualifiedOrdinal=1");
+            }
+
             if (tradeCandidates.Count == 0)
                 return;
 
@@ -511,8 +536,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // If contextual PDC and baseline PDC fire together, contextual supersedes baseline for ACTUAL trading.
-            // Both remain fully shadow-tracked.
+            // Generic family arbitration remains as a safety net. In Research3 there is only one
+            // actual-trade model per family; raw comparators are shadow-only.
             List<CandidateSignal> familyWinners = new List<CandidateSignal>();
             foreach (IGrouping<string, CandidateSignal> familyGroup in tradeCandidates.GroupBy(x => x.Family, StringComparer.OrdinalIgnoreCase))
             {
@@ -638,8 +663,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             return new[]
             {
-                SigPdcContext, SigRthContext, SigPmhContext, SigOnhAtr, SigPdcBase,
-                RawPmh, RawOnh, RawRth
+                SigPdcContext, SigRthContext, SigPmhContext, SigOnhContext,
+                RawPdc, RawPmh, RawOnh, RawRth
             };
         }
 
@@ -820,10 +845,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (pdcBase)
             {
-                if (EnablePdcBaseLong)
-                    result.Add(BuildCandidate(SigPdcBase, FamilyPdc, MarketPosition.Long, 50, true, false,
+                if (EnableRawPdcBaseShadow)
+                    result.Add(BuildCandidate(RawPdc, FamilyPdc, MarketPosition.Long, 900, false, false,
                         pdc, "PDC", signalBarStart, tradingDate,
-                        "Base PDC sweep/reclaim: PrevClose>=PDC; low swept below; 5m close reclaimed above."));
+                        "Raw PDC sweep/reclaim shadow comparator: PrevClose>=PDC; low swept below; 5m close reclaimed above."));
 
                 bool contextPass = rthVsPdc <= PdcContextMaxRthVsPdcTicks &&
                                    onhMinusPmh <= PdcContextMaxOnhMinusPmhTicks;
@@ -872,12 +897,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                         onh, "ONH", signalBarStart, tradingDate,
                         "Raw ONH reclaim comparator."));
 
-                bool contextPass = atrTicks >= OnhContextMinAtrTicks && atrTicks <= OnhContextMaxAtrTicks;
-                if (EnableOnhAtrLong && contextPass)
-                    result.Add(BuildCandidate(SigOnhAtr, FamilyOnh, MarketPosition.Long, 4, true, true,
+                bool contextPass = atrTicks >= OnhContextMinAtrTicks &&
+                                   atrTicks <= OnhContextMaxAtrTicks &&
+                                   rthVsPdc <= OnhContextMaxRthVsPdcTicks;
+                if (EnableOnhContextLong && contextPass)
+                    result.Add(BuildCandidate(SigOnhContext, FamilyOnh, MarketPosition.Long, 4, true, true,
                         onh, "ONH", signalBarStart, tradingDate,
-                        "ONH ATR context pass: ATRticks=" + Fmt(atrTicks) +
-                        " within [" + OnhContextMinAtrTicks + "," + OnhContextMaxAtrTicks + "]."));
+                        "ONH context pass: ATRticks=" + Fmt(atrTicks) +
+                        " within [" + OnhContextMinAtrTicks + "," + OnhContextMaxAtrTicks +
+                        "]; RTHvsPDC<=" + OnhContextMaxRthVsPdcTicks + "t."));
             }
 
             bool rthBase = signalStartTime >= RthStartTime &&
@@ -1041,7 +1069,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 OutcomePrice = double.NaN,
                 OutcomePnlTicks = double.NaN,
                 AmbiguousBoth = false,
-                Finalized = false
+                Finalized = false,
+                Brackets = EnableBracketMatrix && c.SignalOrdinalToday == 1
+                    ? BuildBracketMatrix()
+                    : new List<BracketOutcome>()
             };
 
             lock (shadowSync)
@@ -1072,6 +1103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     UpdateShadowExcursion(obs, price);
                     ResolveShadowOutcomeAtPrice(obs, time, price);
+                    ResolveBracketOutcomesAtPrice(obs, time, price);
                 }
             }
         }
@@ -1104,6 +1136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         UpdateShadowExcursion(obs, High[0]);
                         UpdateShadowExcursion(obs, Low[0]);
                         ResolveShadowOutcomeFromBar(obs, Time[0], High[0], Low[0]);
+                        ResolveBracketOutcomesFromBar(obs, Time[0], High[0], Low[0]);
                     }
 
                     SetForwardReturnIfDue(obs);
@@ -1120,6 +1153,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             obs.OutcomePnlTicks = DirectionalTicks(obs.Candidate.Direction, obs.EntryPrice, Close[0]);
                         }
 
+                        ResolveBracketTimeExits(obs, Time[0], Close[0]);
                         obs.Finalized = true;
                         finalize.Add(obs);
                     }
@@ -1230,6 +1264,155 @@ namespace NinjaTrader.NinjaScript.Strategies
             obs.AmbiguousBoth = ambiguous;
         }
 
+        private List<BracketOutcome> BuildBracketMatrix()
+        {
+            List<BracketOutcome> matrix = new List<BracketOutcome>(28);
+            int[] stops = { 12, 16, 20, 24 };
+            double[] rewardRisks = { 1.5, 2.0, 2.5 };
+            int[] fixedTargets = { 20, 30, 40, 50 };
+
+            foreach (int stop in stops)
+            {
+                foreach (double rr in rewardRisks)
+                {
+                    int target = Math.Max(1, (int)Math.Round(stop * rr, MidpointRounding.AwayFromZero));
+                    matrix.Add(new BracketOutcome
+                    {
+                        BracketId = "S" + stop + "_RR" + rr.ToString("0.0", CultureInfo.InvariantCulture) + "_T" + target,
+                        TargetType = "RR",
+                        StopTicks = stop,
+                        RewardRisk = rr,
+                        TargetTicks = target,
+                        OutcomeResolved = false,
+                        Outcome = "",
+                        ExitReason = "",
+                        OutcomeTime = DateTime.MinValue,
+                        OutcomePrice = double.NaN,
+                        OutcomePnlTicks = double.NaN,
+                        AmbiguousBoth = false
+                    });
+                }
+
+                foreach (int target in fixedTargets)
+                {
+                    matrix.Add(new BracketOutcome
+                    {
+                        BracketId = "S" + stop + "_FIXED_T" + target,
+                        TargetType = "FIXED",
+                        StopTicks = stop,
+                        RewardRisk = double.NaN,
+                        TargetTicks = target,
+                        OutcomeResolved = false,
+                        Outcome = "",
+                        ExitReason = "",
+                        OutcomeTime = DateTime.MinValue,
+                        OutcomePrice = double.NaN,
+                        OutcomePnlTicks = double.NaN,
+                        AmbiguousBoth = false
+                    });
+                }
+            }
+
+            return matrix;
+        }
+
+        private void ResolveBracketOutcomesAtPrice(ShadowObservation obs, DateTime time, double price)
+        {
+            if (obs == null || !obs.EntryInitialized || obs.Brackets == null || obs.Brackets.Count == 0)
+                return;
+
+            foreach (BracketOutcome bracket in obs.Brackets)
+            {
+                if (bracket.OutcomeResolved)
+                    continue;
+
+                double stopPrice = obs.Candidate.Direction == MarketPosition.Long
+                    ? obs.EntryPrice - bracket.StopTicks * TickSize
+                    : obs.EntryPrice + bracket.StopTicks * TickSize;
+                double targetPrice = obs.Candidate.Direction == MarketPosition.Long
+                    ? obs.EntryPrice + bracket.TargetTicks * TickSize
+                    : obs.EntryPrice - bracket.TargetTicks * TickSize;
+
+                bool stopHit = obs.Candidate.Direction == MarketPosition.Long ? price <= stopPrice : price >= stopPrice;
+                bool targetHit = obs.Candidate.Direction == MarketPosition.Long ? price >= targetPrice : price <= targetPrice;
+
+                if (stopHit)
+                    ResolveBracket(bracket, "STOP", "BRACKET_STOP_FIRST", time, stopPrice, -bracket.StopTicks, false);
+                else if (targetHit)
+                    ResolveBracket(bracket, "TARGET", "BRACKET_TARGET_FIRST", time, targetPrice, bracket.TargetTicks, false);
+            }
+        }
+
+        private void ResolveBracketOutcomesFromBar(ShadowObservation obs, DateTime time, double high, double low)
+        {
+            if (obs == null || !obs.EntryInitialized || obs.Brackets == null || obs.Brackets.Count == 0)
+                return;
+
+            foreach (BracketOutcome bracket in obs.Brackets)
+            {
+                if (bracket.OutcomeResolved)
+                    continue;
+
+                double stopPrice = obs.Candidate.Direction == MarketPosition.Long
+                    ? obs.EntryPrice - bracket.StopTicks * TickSize
+                    : obs.EntryPrice + bracket.StopTicks * TickSize;
+                double targetPrice = obs.Candidate.Direction == MarketPosition.Long
+                    ? obs.EntryPrice + bracket.TargetTicks * TickSize
+                    : obs.EntryPrice - bracket.TargetTicks * TickSize;
+
+                bool stopHit;
+                bool targetHit;
+                if (obs.Candidate.Direction == MarketPosition.Long)
+                {
+                    stopHit = low <= stopPrice;
+                    targetHit = high >= targetPrice;
+                }
+                else
+                {
+                    stopHit = high >= stopPrice;
+                    targetHit = low <= targetPrice;
+                }
+
+                if (stopHit && targetHit)
+                    ResolveBracket(bracket, "AMBIGUOUS", "BRACKET_BOTH_SAME_5M_BAR_CONSERVATIVE_STOP", time, stopPrice, -bracket.StopTicks, true);
+                else if (stopHit)
+                    ResolveBracket(bracket, "STOP", "BRACKET_STOP_FIRST", time, stopPrice, -bracket.StopTicks, false);
+                else if (targetHit)
+                    ResolveBracket(bracket, "TARGET", "BRACKET_TARGET_FIRST", time, targetPrice, bracket.TargetTicks, false);
+            }
+        }
+
+        private void ResolveBracketTimeExits(ShadowObservation obs, DateTime time, double closePrice)
+        {
+            if (obs == null || !obs.EntryInitialized || obs.Brackets == null)
+                return;
+
+            foreach (BracketOutcome bracket in obs.Brackets)
+            {
+                if (bracket.OutcomeResolved)
+                    continue;
+
+                bracket.OutcomeResolved = true;
+                bracket.Outcome = "TIME";
+                bracket.ExitReason = "BRACKET_TIME_EXIT";
+                bracket.OutcomeTime = time;
+                bracket.OutcomePrice = closePrice;
+                bracket.OutcomePnlTicks = DirectionalTicks(obs.Candidate.Direction, obs.EntryPrice, closePrice);
+                bracket.AmbiguousBoth = false;
+            }
+        }
+
+        private void ResolveBracket(BracketOutcome bracket, string outcome, string reason, DateTime time, double price, double pnlTicks, bool ambiguous)
+        {
+            bracket.OutcomeResolved = true;
+            bracket.Outcome = outcome;
+            bracket.ExitReason = reason;
+            bracket.OutcomeTime = time;
+            bracket.OutcomePrice = price;
+            bracket.OutcomePnlTicks = pnlTicks;
+            bracket.AmbiguousBoth = ambiguous;
+        }
+
         private double ShadowStopPrice(ShadowObservation obs)
         {
             return obs.Candidate.Direction == MarketPosition.Long
@@ -1283,6 +1466,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (IsFinite(obs.OutcomePnlTicks)) s.ShadowPnlTicks += obs.OutcomePnlTicks;
 
             WriteSignalCsv(obs, status);
+            WriteBracketCsv(obs, status);
         }
 
         private void FinalizeAllShadowObservations(string reason)
@@ -1692,8 +1876,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return string.Equals(name, SigPdcContext, StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(name, SigRthContext, StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(name, SigPmhContext, StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(name, SigOnhAtr, StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(name, SigPdcBase, StringComparison.OrdinalIgnoreCase);
+                   string.Equals(name, SigOnhContext, StringComparison.OrdinalIgnoreCase);
         }
 
         // -------------------- Equity and MFE/MAE telemetry --------------------
@@ -1903,6 +2086,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 eventWriter = OpenWriter(Path.Combine(runDirectory, "events.log"));
                 tradeWriter = OpenWriter(Path.Combine(runDirectory, "trades.csv"));
                 signalWriter = OpenWriter(Path.Combine(runDirectory, "signals.csv"));
+                bracketWriter = OpenWriter(Path.Combine(runDirectory, "brackets.csv"));
                 equityWriter = OpenWriter(Path.Combine(runDirectory, "equity.csv"));
                 sessionWriter = OpenWriter(Path.Combine(runDirectory, "sessions.csv"));
 
@@ -1920,6 +2104,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "StopTicks,TargetTicks,ATRticks,SignalRangeTicks,ClosePositionInBar,DirectionalCloseStrength,SignalOpen,SignalHigh,SignalLow,SignalClose,LevelName,Level,PDC,ONH,ONL,PMH,PML,RTHOpen," +
                     "RTHvsPDCticks,PMHvsONHticks,ONHminusPMHticks,PriorRthBarCount,PriorRthReducedSession,TickDriven,ContextSnapshot,Reason");
 
+                bracketWriter.WriteLine(
+                    "ShadowSequence,Status,Model,Family,TradingDate,SignalStart,SignalOrdinalToday,EntrySource,EntryTime,EntryPrice,TickDriven," +
+                    "BracketId,StopTicks,TargetType,RewardRisk,TargetTicks,Outcome,ExitReason,OutcomeTime,OutcomePrice,OutcomePnLTicks,OutcomePnLCurrencyPerContract,AmbiguousBoth," +
+                    "ATRticks,RTHvsPDCticks,ONHminusPMHticks,SignalRangeTicks,ContextSnapshot");
                 equityWriter.WriteLine("BarTime,TradingDate,RunRealizedGross,OpenUnrealizedAtClose,EquityAtClose,PeakEquityAtClose,DrawdownAtClose,MaxDrawdownAtClose,PlaybackTickTelemetrySeen,LastPlaybackEquity,PlaybackPeakEquity,PlaybackMaxDrawdown,Position,ActiveModel");
                 sessionWriter.WriteLine("RthDate,RthBars,ExpectedFullRthBars,ReducedThreshold,ReducedSession,LastRthClose");
 
@@ -1927,7 +2115,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                eventWriter = tradeWriter = signalWriter = equityWriter = sessionWriter = null;
+                eventWriter = tradeWriter = signalWriter = bracketWriter = equityWriter = sessionWriter = null;
                 if (!logFailurePrinted)
                 {
                     logFailurePrinted = true;
@@ -1950,9 +2138,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CloseWriter(eventWriter);
                 CloseWriter(tradeWriter);
                 CloseWriter(signalWriter);
+                CloseWriter(bracketWriter);
                 CloseWriter(equityWriter);
                 CloseWriter(sessionWriter);
-                eventWriter = tradeWriter = signalWriter = equityWriter = sessionWriter = null;
+                eventWriter = tradeWriter = signalWriter = bracketWriter = equityWriter = sessionWriter = null;
             }
         }
 
@@ -2096,6 +2285,63 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        private void WriteBracketCsv(ShadowObservation obs, string status)
+        {
+            if (!EnableFileLogging || !EnableBracketMatrix || bracketWriter == null ||
+                obs == null || obs.Candidate == null || obs.Brackets == null || obs.Brackets.Count == 0)
+                return;
+
+            CandidateSignal c = obs.Candidate;
+            lock (logSync)
+            {
+                try
+                {
+                    foreach (BracketOutcome bracket in obs.Brackets)
+                    {
+                        double pnlCurrency = IsFinite(bracket.OutcomePnlTicks)
+                            ? bracket.OutcomePnlTicks * TickSize * Instrument.MasterInstrument.PointValue
+                            : double.NaN;
+
+                        bracketWriter.WriteLine(string.Join(",", new[]
+                        {
+                            Csv(obs.Sequence.ToString(CultureInfo.InvariantCulture)),
+                            Csv(status),
+                            Csv(c.Id),
+                            Csv(c.Family),
+                            Csv(c.TradingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                            Csv(c.SignalBarStart.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                            Csv(c.SignalOrdinalToday.ToString(CultureInfo.InvariantCulture)),
+                            Csv(obs.EntrySource),
+                            Csv(obs.EntryTime == DateTime.MinValue ? "" : obs.EntryTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)),
+                            Csv(Fmt(obs.EntryPrice)),
+                            Csv(obs.TickDriven.ToString()),
+                            Csv(bracket.BracketId),
+                            Csv(bracket.StopTicks.ToString(CultureInfo.InvariantCulture)),
+                            Csv(bracket.TargetType),
+                            Csv(IsFinite(bracket.RewardRisk) ? bracket.RewardRisk.ToString("0.0", CultureInfo.InvariantCulture) : ""),
+                            Csv(bracket.TargetTicks.ToString(CultureInfo.InvariantCulture)),
+                            Csv(bracket.Outcome),
+                            Csv(bracket.ExitReason),
+                            Csv(bracket.OutcomeTime == DateTime.MinValue ? "" : bracket.OutcomeTime.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)),
+                            Csv(Fmt(bracket.OutcomePrice)),
+                            Csv(Fmt(bracket.OutcomePnlTicks)),
+                            Csv(Fmt(pnlCurrency)),
+                            Csv(bracket.AmbiguousBoth.ToString()),
+                            Csv(Fmt(c.AtrTicks)),
+                            Csv(Fmt(c.RthVsPdcTicks)),
+                            Csv(Fmt(c.OnhMinusPmhTicks)),
+                            Csv(Fmt(c.SignalRangeTicks)),
+                            Csv(c.ContextSnapshot)
+                        }));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ReportLoggingFailure("brackets.csv", ex);
+                }
+            }
+        }
+
         private void WriteEquityCsv(DateTime barTime, double equityAtClose)
         {
             if (!EnableFileLogging || !EnableEquityCsv || equityWriter == null)
@@ -2197,10 +2443,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             LogEvent(time, "DAILY_SUMMARY", "",
                 string.Format(CultureInfo.InvariantCulture,
                     "Reason={0}; TradingDate={1:yyyy-MM-dd}; Trades={2}; Wins={3}; Losses={4}; DailyGross={5:0.00}; " +
-                    "PDCCTX={6}; RTHCTX={7}; PMHCTX={8}; ONHATR={9}; PDCBASE={10}; PlaybackMaxDD={11:0.00}; BarCloseMaxDD={12:0.00}",
+                    "RTHCTX={6}; PDCCTX={7}; PMHCTX={8}; ONHCTX={9}; PlaybackMaxDD={10:0.00}; BarCloseMaxDD={11:0.00}",
                     reason, currentTradingDate, tradesToday, winnersToday, losersToday, dailyRealizedGross,
-                    GetModelTradesToday(SigPdcContext), GetModelTradesToday(SigRthContext), GetModelTradesToday(SigPmhContext),
-                    GetModelTradesToday(SigOnhAtr), GetModelTradesToday(SigPdcBase), maxDrawdownPlayback, maxDrawdownAtBarClose));
+                    GetModelTradesToday(SigRthContext), GetModelTradesToday(SigPdcContext),
+                    GetModelTradesToday(SigPmhContext), GetModelTradesToday(SigOnhContext),
+                    maxDrawdownPlayback, maxDrawdownAtBarClose));
         }
 
         private void LogRunSummary(DateTime time)
@@ -2240,12 +2487,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool EnablePmhContextShort { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Enable ONH ATR long", GroupName = "01. Models", Order = 4)]
-        public bool EnableOnhAtrLong { get; set; }
+        [Display(Name = "Enable ONH contextual long", GroupName = "01. Models", Order = 4)]
+        public bool EnableOnhContextLong { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Enable PDC baseline long", GroupName = "01. Models", Order = 5)]
-        public bool EnablePdcBaseLong { get; set; }
+        [Display(Name = "Shadow PDC baseline comparator", GroupName = "01. Models", Order = 5)]
+        public bool EnableRawPdcBaseShadow { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Shadow raw PMH/ONH/RTH comparators", GroupName = "01. Models", Order = 6)]
@@ -2328,12 +2575,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(-500, 500)]
-        [Display(Name = "RTH context max RTH-PDC ticks", GroupName = "04. Context Filters", Order = 8)]
+        [Display(Name = "ONH context max RTH-PDC ticks", GroupName = "04. Context Filters", Order = 8)]
+        public int OnhContextMaxRthVsPdcTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(-500, 500)]
+        [Display(Name = "RTH context max RTH-PDC ticks", GroupName = "04. Context Filters", Order = 9)]
         public int RthContextMaxRthVsPdcTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 500)]
-        [Display(Name = "RTH context max ONH-PMH ticks", GroupName = "04. Context Filters", Order = 9)]
+        [Display(Name = "RTH context max ONH-PMH ticks", GroupName = "04. Context Filters", Order = 10)]
         public int RthContextMaxOnhMinusPmhTicks { get; set; }
 
         [NinjaScriptProperty]
@@ -2443,7 +2695,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool EnableEquityCsv { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Print important events", GroupName = "07. Research", Order = 6)]
+        [Display(Name = "Enable bracket matrix CSV", Description = "Tracks 28 counterfactual stop/target combinations on the first signal of each model/day.", GroupName = "07. Research", Order = 6)]
+        public bool EnableBracketMatrix { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Print important events", GroupName = "07. Research", Order = 7)]
         public bool PrintImportantEvents { get; set; }
 
         #endregion
