@@ -51,7 +51,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             string signalName)
         {
             return
-                signalName == PriorCloseEntrySignal;
+                signalName == PriorCloseEntrySignal
+                || signalName == PmhContinuationEntrySignal;
         }
 
 
@@ -73,6 +74,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (signalName == PremarketHighEntrySignal)
                 return PremarketHighModelName;
+
+            if (signalName == PmhContinuationEntrySignal)
+                return PmhContinuationModelName;
 
             if (signalName == RthOpenEntrySignal)
                 return RthOpenModelName;
