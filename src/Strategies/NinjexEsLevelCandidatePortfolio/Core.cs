@@ -2,7 +2,7 @@
 // Version: 1.2.0-research3
 //
 // Research3 goals:
-//   - Validate the three Research3 winners: contextual RTH, contextual PDC and contextual PMH.
+//   - Validate the three Research2 winners: contextual RTH, contextual PDC and contextual PMH.
 //   - Validate a NEW ONH contextual hypothesis: ATR(14) 30..55 ticks AND RTH-PDC <= +40 ticks.
 //   - PDC baseline remains SHADOW ONLY; it can never submit an actual order.
 //   - The FIRST qualified signal for each trade model consumes that model for the trading day,
@@ -28,7 +28,7 @@
 //   RAW-ONH-RECLAIM-L
 //   RAW-RTH-RECLAIM-L
 //
-// Initial actual-trade risk intentionally remains comparable to Research3:
+// Initial actual-trade risk intentionally remains comparable to Research2:
 //   1 ES, structural signal-bar stop clamped to 8..20 ticks, 2R target,
 //   max 3 trades/day, max 2 winners/day, max 2 losers/day,
 //   max 1 trade/model/day, max 1 trade/family/day, $500 realized daily loss lockout,
@@ -353,7 +353,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RthContextMaxRthVsPdcTicks = 0;
                 RthContextMaxOnhMinusPmhTicks = 60;
 
-                // Initial risk: kept comparable to Research1.
+                // Initial risk: kept comparable to Research2.
                 Contracts = 1;
                 StopMode = NinjexInitialStopMode.SignalBarExtremeCapped;
                 StopBufferTicks = 1;
@@ -2663,7 +2663,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(1, 10)]
-        [Display(Name = "Max trades per family per day", Description = "Prevents PDC baseline + contextual from both trading on the same day.", GroupName = "06. Daily Limits", Order = 5)]
+        [Display(Name = "Max trades per family per day", Description = "Safety cap; Research3 has one actual-trade model per level family.", GroupName = "06. Daily Limits", Order = 5)]
         public int MaxTradesPerFamilyPerDay { get; set; }
 
         [NinjaScriptProperty]
