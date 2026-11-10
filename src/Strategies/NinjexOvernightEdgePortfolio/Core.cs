@@ -360,6 +360,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableResearchSessionExport = false;
                 EnableFailedPmhContinuationResearch = false;
                 EnableFailedPmhV2Research = false;
+                EnablePmhRegimeSplitEvaluation = false;
+                PmhRegimeShortMaximumAtrTicks = 45.0;
+                PmhRegimeShortMaximumFastEmaDistanceTicks = 0.0;
                 FailedPmhV2ReclaimMinutes = 10;
                 FailedPmhV2ReclaimTicks = 2;
                 FailedPmhV2ReclaimCloses = 2;
@@ -429,6 +432,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         EmaSlowPeriod);
 
                 InitializeResearchSessionExport();
+                InitializePmhRegimeEvaluation();
                 InitializeResearchTelemetry();
                 InitializeFailedPmhContinuationResearch();
                 InitializeFailedPmhV2Research();
@@ -455,10 +459,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Realtime)
             {
+                ValidatePmhRegimeEvaluationEnvironment(DateTime.Now);
                 ResetLiveDailyStateRecoveryOnRealtimeTransition();
             }
             else if (State == State.Terminated)
             {
+                DisposePmhRegimeEvaluation();
                 DisposeFailedPmhV2Research();
                 DisposeFailedPmhContinuationResearch();
                 DisposeResearchTelemetry();
