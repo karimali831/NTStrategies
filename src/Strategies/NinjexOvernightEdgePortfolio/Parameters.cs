@@ -720,5 +720,45 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+        // Integrated Playback-only PMH regime split evaluation.
+        [NinjaScriptProperty]
+        [Display(
+            Name = "Enable PMH Regime Split Evaluation",
+            Description = "Playback-only integrated evaluation. Replaces unrestricted PMH orders with strict PMH shorts plus confirmed PMH continuation longs. Fails closed on non-Playback accounts.",
+            GroupName = "8. Integrated PMH Regime Evaluation",
+            Order = 0)]
+        public bool EnablePmhRegimeSplitEvaluation
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(30.0, 200.0)]
+        [Display(
+            Name = "PMH Short Maximum ATR5 Ticks",
+            Description = "Integrated PMH short requires completed 5-minute ATR below this value. Default 45.",
+            GroupName = "8. Integrated PMH Regime Evaluation",
+            Order = 1)]
+        public double PmhRegimeShortMaximumAtrTicks
+        {
+            get;
+            set;
+        }
+
+        [NinjaScriptProperty]
+        [Range(-100.0, 100.0)]
+        [Display(
+            Name = "PMH Short Maximum Fast EMA Distance Ticks",
+            Description = "Maximum signal-close distance above completed EMA(9). Default 0 requires close at or below EMA(9).",
+            GroupName = "8. Integrated PMH Regime Evaluation",
+            Order = 2)]
+        public double PmhRegimeShortMaximumFastEmaDistanceTicks
+        {
+            get;
+            set;
+        }
+
+
     }
 }
