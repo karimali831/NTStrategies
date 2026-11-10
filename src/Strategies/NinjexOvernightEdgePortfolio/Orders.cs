@@ -29,6 +29,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // the same durable recovery path before a new entry can be submitted.
             EnsureLiveDailyStateReady(time);
 
+            // Track actual strategy open-equity on every Playback tick. This
+            // measures intratrade drawdown, not only closed-trade drawdown.
+            RecordPmhRegimeEquityTick(time, price);
+
 
             var timeValue =
                 ToTimeValue(
@@ -155,6 +159,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            int resolvedStopTicks;
+            int resolvedTargetTicks;
+
+            if (!TryResolvePmhRegimeEntryBracket(
+                    time,
+                    observedMarketPrice,
+                    signalName,
+                    out resolvedStopTicks,
+                    out resolvedTargetTicks))
+            {
+                ClearPendingEntry(
+                    time,
+                    "InvalidPmhRegimeBracket");
+                return;
+            }
+
             submittedSignalTime =
                 pendingSignalTime;
 
@@ -183,8 +203,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                SetStopLoss(signalName, CalculationMode.Ticks, StopLossTicks, false);
-                SetProfitTarget(signalName, CalculationMode.Ticks, ProfitTargetTicks);
+                SetStopLoss(signalName, CalculationMode.Ticks, resolvedStopTicks, false);
+                SetProfitTarget(signalName, CalculationMode.Ticks, resolvedTargetTicks);
             }
 
 
@@ -204,8 +224,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 direction,
                 observedMarketPrice,
                 pendingSignalTime,
-                StopLossTicks,
-                ProfitTargetTicks,
+                resolvedStopTicks,
+                resolvedTargetTicks,
                 OrderQuantity);
 
 
@@ -394,7 +414,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RecordResearchEntryFill(
                         time,
                         GetActiveAverageEntryPrice());
+
+                    RecordPmhRegimeEntryFill(
+                        time,
+                        GetActiveAverageEntryPrice());
                 }
+
+                ResetPendingPmhRegimeBracket();
 
 
                 Diagnostic(
@@ -511,6 +537,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 time,
                 false,
                 "TradeComplete");
+
+            RecordPmhRegimeTradeCompleted(
+                time,
+                exitPrice,
+                activeTradeGrossPnl);
 
             RecordResearchTradeExit(
                 time,
@@ -762,6 +793,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double.NaN;
 
             pendingMinutesFromOpen = 0;
+
+            ResetPendingPmhRegimeBracket();
 
             ClearPendingResearchSignal();
         }
