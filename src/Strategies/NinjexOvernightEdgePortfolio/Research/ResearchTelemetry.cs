@@ -510,7 +510,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradingDate = time.Date,
                 Instrument = Instrument == null ? string.Empty : Instrument.FullName,
                 StrategyVersion = StrategyVersion,
-                PortfolioMode = "Run8FourModel",
+                PortfolioMode = EnablePmhRegimeSplitEvaluation
+                    ? "PmhRegimeIntegratedEvaluation"
+                    : "Run8FourModel",
                 Model = modelName ?? string.Empty,
                 Signal = signalName ?? string.Empty,
                 Direction = direction.ToString(),
