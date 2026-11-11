@@ -48,6 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Exact strategy-equity path, updated on every delivered 1-tick BIP.
         private double pmhRegimeCumulativeRealized;
+        private DateTime pmhRegimeActiveEntryFillTime = Core.Globals.MinDate;
         private double pmhRegimePeakEquity;
         private double pmhRegimeMaxIntratradeDrawdown;
         private DateTime pmhRegimeMaxDrawdownTime = Core.Globals.MinDate;
@@ -64,6 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             pmhRegimeEvaluationBlocked = false;
             pmhRegimeEvaluationBlockReason = string.Empty;
             pmhRegimeCumulativeRealized = 0.0;
+            pmhRegimeActiveEntryFillTime = Core.Globals.MinDate;
             pmhRegimePeakEquity = 0.0;
             pmhRegimeMaxIntratradeDrawdown = 0.0;
             pmhRegimeMaxDrawdownTime = Core.Globals.MinDate;
@@ -717,6 +719,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (activeTradeCounted
                 && Position.MarketPosition != MarketPosition.Flat)
             {
+                // Playback can deliver a cached BIP-2 tick callback after the
+                // execution callback even when that tick's own timestamp is
+                // slightly earlier than the entry fill. Never let a pre-fill
+                // tick contribute to open equity or drawdown.
+                if (pmhRegimeActiveEntryFillTime != Core.Globals.MinDate
+                    && time < pmhRegimeActiveEntryFillTime)
+                {
+                    return;
+                }
+
                 var averageEntry = GetActiveAverageEntryPrice();
 
                 if (IsFinite(averageEntry))
@@ -767,6 +779,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 tradeGross.ToString(
                     "0.00",
                     CultureInfo.InvariantCulture));
+
+            pmhRegimeActiveEntryFillTime = Core.Globals.MinDate;
         }
 
         private void RecordPmhRegimeEntryFill(
@@ -775,6 +789,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (!EnablePmhRegimeSplitEvaluation)
                 return;
+
+            pmhRegimeActiveEntryFillTime = time;
 
             WritePmhRegimeEvent(
                 time,
