@@ -1,0 +1,15 @@
+date_et,entry_minute_et,replay_signal,replay_entry,replay_exit,replay_exit_name,replay_gross_usd,live_entry,live_exit,live_gross_usd,live_commission_usd,live_net_usd,status,evidence_note
+2026-10-01,10:41,PML-BREAK-S,7704.50,7694.50,Profit target,500,7704.25,7694.25,500,3.10,496.90,matched,Both live fill prices are one tick lower; realized gross is identical
+2026-10-01,12:39,PML-BREAK-S,7703.25,7693.25,Profit target,500,7703.25,7693.25,500,3.10,496.90,matched,Identical fills
+2026-10-01,13:15,,,,,,7704,7709,-250,3.10,-253.10,live_only,Account report has no strategy attribution; after two earlier winners; requires order provenance
+2026-10-02,10:19,PMH-REJECT-S,7802.50,7807.50,Stop loss,-250,7802.50,7807.50,-250,3.10,-253.10,matched,Identical fills
+2026-10-02,10:31,PMH-REJECT-S,7800.50,7805.50,Stop loss,-250,7800.50,7805.50,-250,3.10,-253.10,matched,Identical fills
+2026-10-15,10:39,PMH-REJECT-S,7754.50,7759.50,Stop loss,-250,7754.50,7760,-275,3.10,-278.10,matched,Live stop execution is two ticks worse; original dated production log confirms stop-loss exit
+2026-10-16,10:52,PML-BREAK-S,7789.50,7779.50,Profit target,500,7789.75,7779.75,500,3.10,496.90,matched,Both live fill prices are one tick higher; realized gross is identical
+2026-10-20,10:04,PMH-REJECT-S,7746.75,7751.75,Stop loss,-250,7746.75,7752,-262.50,3.10,-265.60,matched,Live stop execution is one tick worse; production log confirms stop-loss exit
+2026-10-22,11:26,PML-BREAK-S,7708,7698,Profit target,500,7707.75,7697.75,500,3.10,496.90,matched,Both live fill prices are one tick lower; realized gross is identical
+2026-10-22,12:06,PML-BREAK-S,7708.50,7713.50,Stop loss,-250,7708.75,7713.75,-250,3.10,-253.10,matched,Both live fill prices are one tick higher; realized gross is identical
+2026-10-23,15:56,RTHOPEN-BREAK-S,7660.50,7661,Stop loss,-25,7660.50,7662,-75,3.10,-78.10,matched,Original production log confirms EOD-S flatten at 16:00 ET; replay trade grid labels stop loss; not proven stop slippage
+2026-10-26,09:50,PMH-REJECT-S,7690.75,7695.75,Stop loss,-250,,,,,,replay_only,No account execution; log files bearing this date were created Oct 27 and Oct 30 and cannot establish live execution
+2026-10-26,09:57,PMH-REJECT-S,7693.50,7698.50,Stop loss,-250,,,,,,replay_only,No account execution; retrospective logs do not prove live strategy uptime
+2026-10-29,15:36,PML-BREAK-S,7742.25,7747.25,Stop loss,-250,7742.50,7747.50,-250,3.10,-253.10,matched,Both live fill prices are one tick higher; realized gross is identical
