@@ -198,7 +198,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         1,
                         (int)Math.Ceiling(
                             Math.Abs(
-                                observedMarketPrice
+                                verifiedLiveBracket.VerifiedEntryPrice
                                 - verifiedLiveBracket.StopPrice)
                             / TickSize));
             }
