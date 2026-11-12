@@ -14,11 +14,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnsureLiveDailyStateReady(time))
                 return false;
 
-            // Integrated PMH regime evaluation may submit real Playback orders,
-            // so fail closed unless the active account/connection is Playback.
-            if (!CanSubmitPmhRegimeEvaluationOrders(time))
-                return false;
-
             if (Position.MarketPosition != MarketPosition.Flat
                 || entryOrderPending
                 || manualExitPending
