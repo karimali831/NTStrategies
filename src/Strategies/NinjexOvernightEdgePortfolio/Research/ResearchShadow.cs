@@ -72,8 +72,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Perturbation research is intentionally independent of the
             // shadow CSV sink. A shadow-output fault must not stop it.
             ProcessResearchPerturbationTick(time, price);
-            ProcessFailedPmhContinuationTick(time, price);
-            ProcessFailedPmhV2Tick(time, price);
 
             if (researchShadowOutputFaulted)
                 return;
