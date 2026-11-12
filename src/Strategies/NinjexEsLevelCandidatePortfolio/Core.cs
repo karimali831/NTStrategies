@@ -1,9 +1,9 @@
 // NinjexEsLevelCandidatePortfolio.cs
-// Version: 1.2.0-research3
+// Version: 1.3.0-research4
 //
-// Research3 goals:
-//   - Validate the three Research2 winners: contextual RTH, contextual PDC and contextual PMH.
-//   - Validate a NEW ONH contextual hypothesis: ATR(14) 30..55 ticks AND RTH-PDC <= +40 ticks.
+// Research4 goals:
+//   - Preserve all four Research3-validated contextual entry models and filters unchanged.
+//   - Validate model-specific actual exit brackets selected from the Research3 Playback matrix.
 //   - PDC baseline remains SHADOW ONLY; it can never submit an actual order.
 //   - The FIRST qualified signal for each trade model consumes that model for the trading day,
 //     whether the portfolio trades it or a portfolio/risk gate blocks it. Later same-day retests
@@ -28,14 +28,18 @@
 //   RAW-ONH-RECLAIM-L
 //   RAW-RTH-RECLAIM-L
 //
-// Initial actual-trade risk intentionally remains comparable to Research2:
-//   1 ES, structural signal-bar stop clamped to 8..20 ticks, 2R target,
-//   max 3 trades/day, max 2 winners/day, max 2 losers/day,
-//   max 1 trade/model/day, max 1 trade/family/day, $500 realized daily loss lockout,
-//   and exactly 12 completed 5-minute bars max hold.
+// Research4 actual brackets (entry/context logic unchanged from Research3):
+//   RTH 24t stop / 40t target
+//   PDC 12t stop / 50t target
+//   PMH 16t stop / 50t target
+//   ONH 20t stop / 40t target
+// Generic structural-stop / RR settings remain available for raw/shadow comparators.
+// Daily controls remain unchanged: max 3 trades/day, max 2 winners/day, max 2 losers/day,
+// max 1 trade/model/day, max 1 trade/family/day, $500 realized daily loss lockout,
+// and exactly 12 completed 5-minute bars max hold.
 //
 // Logs:
-//   Documents\NinjaTrader 8\NinjexLogs\EsLevelCandidatePortfolio\1.2.0-research3\<run>\events.log
+//   Documents\NinjaTrader 8\NinjexLogs\EsLevelCandidatePortfolio\1.3.0-research4\<run>\events.log
 //   ...\trades.csv     actual portfolio trades
 //   ...\signals.csv    every shadow signal + 5/15/30/60m + MFE/MAE telemetry
 //   ...\brackets.csv   first-signal/day counterfactual tick-sequenced stop/target matrix
@@ -76,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public class NinjexEsLevelCandidatePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.2.0-research3";
+        private const string StrategyVersion = "1.3.0-research4";
 
         private const string SigPdcContext = "PDC-CONTEXT-SWEEP-RECLAIM-L";
         private const string SigRthContext = "RTH-CONTEXT-RECLAIM-L";
@@ -297,7 +301,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description = "Research3 ES 5-minute contextual level portfolio with first-signal consumption and counterfactual bracket telemetry.";
+                Description = "Research4 ES 5-minute contextual portfolio with model-specific actual brackets and full Research3 telemetry.";
                 Name = "NinjexEsLevelCandidatePortfolio";
                 Calculate = Calculate.OnBarClose;
 
@@ -318,7 +322,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = 50;
                 IsInstantiatedOnEachOptimizationIteration = true;
 
-                // Research3 trade candidates: all ON by default.
+                // Research4 trade candidates: all ON by default.
                 EnablePdcContextLong = true;
                 EnableRthContextLong = true;
                 EnablePmhContextShort = true;
@@ -338,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RequiredBreakTicks = 1;
                 PmhOnhConfluenceToleranceTicks = 1;
 
-                // Research3 validation contexts (deliberately broader than best in-sample).
+                // Research3-validated context filters; intentionally unchanged in Research4.
                 PdcContextMaxRthVsPdcTicks = 80;
                 PdcContextMaxOnhMinusPmhTicks = 60;
 
@@ -353,7 +357,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RthContextMaxRthVsPdcTicks = 0;
                 RthContextMaxOnhMinusPmhTicks = 60;
 
-                // Initial risk: kept comparable to Research2.
+                // Generic/raw comparator risk; actual contextual trades use the Research4 brackets below.
                 Contracts = 1;
                 StopMode = NinjexInitialStopMode.SignalBarExtremeCapped;
                 StopBufferTicks = 1;
@@ -364,6 +368,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TargetMode = NinjexTargetMode.RewardRisk;
                 RewardRisk = 2.0;
                 FixedProfitTicks = 40;
+
+                // Research4 model-specific ACTUAL trade brackets.
+                RthActualStopTicks = 24;
+                RthActualTargetTicks = 40;
+                PdcActualStopTicks = 12;
+                PdcActualTargetTicks = 50;
+                PmhActualStopTicks = 16;
+                PmhActualTargetTicks = 50;
+                OnhActualStopTicks = 20;
+                OnhActualTargetTicks = 40;
 
                 MaxHoldBars = 12;
                 FlattenAtBarCloseTime = 155500;
@@ -425,6 +439,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "; MaxStop=" + MaxStopTicks +
                     "; TargetMode=" + TargetMode +
                     "; RR=" + RewardRisk.ToString("0.00", CultureInfo.InvariantCulture) +
+                    "; ActualBrackets[RTH=" + RthActualStopTicks + "/" + RthActualTargetTicks +
+                    ",PDC=" + PdcActualStopTicks + "/" + PdcActualTargetTicks +
+                    ",PMH=" + PmhActualStopTicks + "/" + PmhActualTargetTicks +
+                    ",ONH=" + OnhActualStopTicks + "/" + OnhActualTargetTicks + "]" +
                     "; MaxHoldBars=" + MaxHoldBars +
                     "; MaxTradesDay=" + MaxTradesPerDay +
                     "; MaxWinsDay=" + MaxWinnersPerDay +
@@ -475,7 +493,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             HandleTradingDateReset(tradingDate);
             UpdateReferenceLevels(signalBarStart, signalStartTime);
 
-            // IMPORTANT Research3 ordering:
+            // IMPORTANT Research4 ordering:
             // 1) Advance all previously-created shadow signals with this completed bar.
             // 2) Update actual-position telemetry / risk exits.
             // 3) Evaluate and register EVERY current signal, even if a trade is already open.
@@ -505,7 +523,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LogEvent(Time[0], "SIGNAL_QUALIFIED", c.Id, FormatCandidate(c));
             }
 
-            // Research3: the first qualified signal consumes the model for this trading day.
+            // Research4: the first qualified signal consumes the model for this trading day.
             // A blocked/arbitrated first signal remains shadow-tracked, but later retests can never
             // become actual entries that day.
             List<CandidateSignal> tradeCandidates = new List<CandidateSignal>();
@@ -536,7 +554,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // Generic family arbitration remains as a safety net. In Research3 there is only one
+            // Generic family arbitration remains as a safety net. In Research4 there is only one
             // actual-trade model per family; raw comparators are shadow-only.
             List<CandidateSignal> familyWinners = new List<CandidateSignal>();
             foreach (IGrouping<string, CandidateSignal> familyGroup in tradeCandidates.GroupBy(x => x.Family, StringComparer.OrdinalIgnoreCase))
@@ -948,6 +966,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             int stopTicks = CalculateInitialStopTicks(direction);
             int targetTicks = CalculateTargetTicks(stopTicks);
+            ApplyResearch4ActualBracket(id, tradeCandidate, ref stopTicks, ref targetTicks);
+
             double range = High[0] - Low[0];
             double closePos = range > 0 ? (Close[0] - Low[0]) / range : 0.5;
             double directionalClose = direction == MarketPosition.Long ? closePos : 1.0 - closePos;
@@ -1002,6 +1022,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Fmt(PriceDiffTicks(onh, pmh)),
                 priorRthBarCount,
                 priorRthReducedSession);
+        }
+
+        private void ApplyResearch4ActualBracket(string id, bool tradeCandidate, ref int stopTicks, ref int targetTicks)
+        {
+            // Research4 changes ACTUAL contextual trade exits only.
+            // Raw/shadow comparators retain the generic structural-stop / target calculation above.
+            if (!tradeCandidate)
+                return;
+
+            if (string.Equals(id, SigRthContext, StringComparison.OrdinalIgnoreCase))
+            {
+                stopTicks = Math.Max(1, RthActualStopTicks);
+                targetTicks = Math.Max(1, RthActualTargetTicks);
+            }
+            else if (string.Equals(id, SigPdcContext, StringComparison.OrdinalIgnoreCase))
+            {
+                stopTicks = Math.Max(1, PdcActualStopTicks);
+                targetTicks = Math.Max(1, PdcActualTargetTicks);
+            }
+            else if (string.Equals(id, SigPmhContext, StringComparison.OrdinalIgnoreCase))
+            {
+                stopTicks = Math.Max(1, PmhActualStopTicks);
+                targetTicks = Math.Max(1, PmhActualTargetTicks);
+            }
+            else if (string.Equals(id, SigOnhContext, StringComparison.OrdinalIgnoreCase))
+            {
+                stopTicks = Math.Max(1, OnhActualStopTicks);
+                targetTicks = Math.Max(1, OnhActualTargetTicks);
+            }
         }
 
         private int CalculateInitialStopTicks(MarketPosition direction)
@@ -1820,6 +1869,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             signal.IndexOf("ONH", StringComparison.OrdinalIgnoreCase) >= 0 ? FamilyOnh : FamilyRth;
             double level = family == FamilyPdc ? pdc : family == FamilyPmh ? pmh : family == FamilyOnh ? onh : rthOpen;
             int stopTicks = ClampTicks(FixedStopTicks);
+            int targetTicks = CalculateTargetTicks(stopTicks);
+            ApplyResearch4ActualBracket(signal, true, ref stopTicks, ref targetTicks);
 
             return new CandidateSignal
             {
@@ -1832,7 +1883,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Level = level,
                 LevelName = family,
                 StopTicks = stopTicks,
-                TargetTicks = CalculateTargetTicks(stopTicks),
+                TargetTicks = targetTicks,
                 Reason = "Fallback candidate built from execution callback",
                 TradingDate = currentTradingDate,
                 SignalBarStart = time,
@@ -2590,55 +2641,95 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(1, 10)]
-        [Display(Name = "Contracts", GroupName = "05. Risk", Order = 1)]
+        [Display(Name = "Contracts", GroupName = "05. Baseline / Raw Risk", Order = 1)]
         public int Contracts { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Stop mode", GroupName = "05. Risk", Order = 2)]
+        [Display(Name = "Stop mode", GroupName = "05. Baseline / Raw Risk", Order = 2)]
         public NinjexInitialStopMode StopMode { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 20)]
-        [Display(Name = "Stop buffer ticks", GroupName = "05. Risk", Order = 3)]
+        [Display(Name = "Stop buffer ticks", GroupName = "05. Baseline / Raw Risk", Order = 3)]
         public int StopBufferTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 100)]
-        [Display(Name = "Min stop ticks", GroupName = "05. Risk", Order = 4)]
+        [Display(Name = "Min stop ticks", GroupName = "05. Baseline / Raw Risk", Order = 4)]
         public int MinStopTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 200)]
-        [Display(Name = "Max stop ticks", GroupName = "05. Risk", Order = 5)]
+        [Display(Name = "Max stop ticks", GroupName = "05. Baseline / Raw Risk", Order = 5)]
         public int MaxStopTicks { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 200)]
-        [Display(Name = "Fixed stop ticks", GroupName = "05. Risk", Order = 6)]
+        [Display(Name = "Fixed stop ticks", GroupName = "05. Baseline / Raw Risk", Order = 6)]
         public int FixedStopTicks { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Target mode", GroupName = "05. Risk", Order = 7)]
+        [Display(Name = "Target mode", GroupName = "05. Baseline / Raw Risk", Order = 7)]
         public NinjexTargetMode TargetMode { get; set; }
 
         [NinjaScriptProperty]
         [Range(0.25, 10.0)]
-        [Display(Name = "Reward/risk", GroupName = "05. Risk", Order = 8)]
+        [Display(Name = "Reward/risk", GroupName = "05. Baseline / Raw Risk", Order = 8)]
         public double RewardRisk { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 400)]
-        [Display(Name = "Fixed profit ticks", GroupName = "05. Risk", Order = 9)]
+        [Display(Name = "Fixed profit ticks", GroupName = "05. Baseline / Raw Risk", Order = 9)]
         public int FixedProfitTicks { get; set; }
 
         [NinjaScriptProperty]
+        [Range(1, 200)]
+        [Display(Name = "RTH actual stop ticks", Description = "Research4 actual RTH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 1)]
+        public int RthActualStopTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 400)]
+        [Display(Name = "RTH actual target ticks", Description = "Research4 actual RTH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 2)]
+        public int RthActualTargetTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 200)]
+        [Display(Name = "PDC actual stop ticks", Description = "Research4 actual PDC bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 3)]
+        public int PdcActualStopTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 400)]
+        [Display(Name = "PDC actual target ticks", Description = "Research4 actual PDC bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 4)]
+        public int PdcActualTargetTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 200)]
+        [Display(Name = "PMH actual stop ticks", Description = "Research4 actual PMH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 5)]
+        public int PmhActualStopTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 400)]
+        [Display(Name = "PMH actual target ticks", Description = "Research4 actual PMH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 6)]
+        public int PmhActualTargetTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 200)]
+        [Display(Name = "ONH actual stop ticks", Description = "Research4 actual ONH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 7)]
+        public int OnhActualStopTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 400)]
+        [Display(Name = "ONH actual target ticks", Description = "Research4 actual ONH bracket.", GroupName = "05A. Research4 Actual Brackets", Order = 8)]
+        public int OnhActualTargetTicks { get; set; }
+
+        [NinjaScriptProperty]
         [Range(1, 48)]
-        [Display(Name = "Max hold bars (5m)", Description = "12 bars = exactly 60 completed minutes after the signal bar.", GroupName = "05. Risk", Order = 10)]
+        [Display(Name = "Max hold bars (5m)", Description = "12 bars = exactly 60 completed minutes after the signal bar.", GroupName = "05. Baseline / Raw Risk", Order = 10)]
         public int MaxHoldBars { get; set; }
 
         [NinjaScriptProperty]
         [Range(0, 235959)]
-        [Display(Name = "Flatten at bar-close time", GroupName = "05. Risk", Order = 11)]
+        [Display(Name = "Flatten at bar-close time", GroupName = "05. Baseline / Raw Risk", Order = 11)]
         public int FlattenAtBarCloseTime { get; set; }
 
         [NinjaScriptProperty]
@@ -2663,7 +2754,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(1, 10)]
-        [Display(Name = "Max trades per family per day", Description = "Safety cap; Research3 has one actual-trade model per level family.", GroupName = "06. Daily Limits", Order = 5)]
+        [Display(Name = "Max trades per family per day", Description = "Safety cap; Research4 has one actual-trade model per level family.", GroupName = "06. Daily Limits", Order = 5)]
         public int MaxTradesPerFamilyPerDay { get; set; }
 
         [NinjaScriptProperty]
