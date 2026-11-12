@@ -64,8 +64,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || researchTelemetryFaulted
                 || researchPerturbationOutputFaulted
                 || snapshot == null
-                || !IsFinite(actualEntryPrice))
+                || !IsFinite(actualEntryPrice)
+                || string.Equals(
+                    snapshot.Signal,
+                    PmhContinuationEntrySignal,
+                    StringComparison.Ordinal))
             {
+                // The PMH continuation baseline uses a dynamic retest-structure
+                // stop and 2R target. The legacy fixed-stop perturbation grid is
+                // intentionally not applied to it.
                 return;
             }
 
