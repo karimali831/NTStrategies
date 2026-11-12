@@ -275,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             researchPreviousEmaSlow = previousEmaSlow;
         }
 
-        private void CaptureFourModelResearchCandidates(
+        private void CaptureBaselineResearchCandidates(
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
             int minutesFromOpen, double overnightWidthTicks)
         {
@@ -312,9 +312,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             var pmlEmaOk = IsFinite(last5mEmaFast) && close > last5mEmaFast;
             var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;
 
-            var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
+            var qualifiedCount =
+                (priorQualified ? 1 : 0)
+                + (pmhQualified ? 1 : 0)
+                + (pmhContinuationReady ? 1 : 0)
+                + (rthQualified ? 1 : 0)
+                + (pmlQualified ? 1 : 0);
+
             var selectedSignal = priorQualified ? PriorCloseEntrySignal
                 : pmhQualified ? PremarketHighEntrySignal
+                : pmhContinuationReady ? PmhContinuationEntrySignal
                 : rthQualified ? RthOpenEntrySignal
                 : pmlQualified ? PremarketLowEntrySignal
                 : string.Empty;
