@@ -2,8 +2,8 @@
 // Version: 1.3.0-research4
 //
 // Research4 goals:
-//   - Validate the three Research2 winners: contextual RTH, contextual PDC and contextual PMH.
-//   - Validate a NEW ONH contextual hypothesis: ATR(14) 30..55 ticks AND RTH-PDC <= +40 ticks.
+//   - Preserve all four Research3-validated contextual entry models and filters unchanged.
+//   - Validate model-specific actual exit brackets selected from the Research3 Playback matrix.
 //   - PDC baseline remains SHADOW ONLY; it can never submit an actual order.
 //   - The FIRST qualified signal for each trade model consumes that model for the trading day,
 //     whether the portfolio trades it or a portfolio/risk gate blocks it. Later same-day retests
@@ -342,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RequiredBreakTicks = 1;
                 PmhOnhConfluenceToleranceTicks = 1;
 
-                // Research4 validation contexts (deliberately broader than best in-sample).
+                // Research3-validated context filters; intentionally unchanged in Research4.
                 PdcContextMaxRthVsPdcTicks = 80;
                 PdcContextMaxOnhMinusPmhTicks = 60;
 
@@ -357,7 +357,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RthContextMaxRthVsPdcTicks = 0;
                 RthContextMaxOnhMinusPmhTicks = 60;
 
-                // Initial risk: kept comparable to Research2.
+                // Generic/raw comparator risk; actual contextual trades use the Research4 brackets below.
                 Contracts = 1;
                 StopMode = NinjexInitialStopMode.SignalBarExtremeCapped;
                 StopBufferTicks = 1;
@@ -1869,6 +1869,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             signal.IndexOf("ONH", StringComparison.OrdinalIgnoreCase) >= 0 ? FamilyOnh : FamilyRth;
             double level = family == FamilyPdc ? pdc : family == FamilyPmh ? pmh : family == FamilyOnh ? onh : rthOpen;
             int stopTicks = ClampTicks(FixedStopTicks);
+            int targetTicks = CalculateTargetTicks(stopTicks);
+            ApplyResearch4ActualBracket(signal, true, ref stopTicks, ref targetTicks);
 
             return new CandidateSignal
             {
@@ -1881,7 +1883,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Level = level,
                 LevelName = family,
                 StopTicks = stopTicks,
-                TargetTicks = CalculateTargetTicks(stopTicks),
+                TargetTicks = targetTicks,
                 Reason = "Fallback candidate built from execution callback",
                 TradingDate = currentTradingDate,
                 SignalBarStart = time,
