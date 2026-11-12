@@ -9,6 +9,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const string PortfolioRiskStateVersion = "2";
 
         private bool portfolioRiskReady;
+        private bool portfolioRiskStateFaulted;
         private string portfolioRiskStatePath = string.Empty;
         private string portfolioRiskAuditPath = string.Empty;
         private bool portfolioRiskAuditFaulted;
@@ -22,6 +23,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void InitializePortfolioRiskGuard()
         {
             portfolioRiskReady = State != State.Realtime;
+            portfolioRiskStateFaulted = false;
             portfolioRiskStatePath = string.Empty;
             portfolioRiskAuditPath = string.Empty;
             portfolioRiskAuditFaulted = false;
@@ -87,6 +89,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State != State.Realtime)
                 return true;
 
+            if (portfolioRiskStateFaulted)
+                return false;
+
             if (portfolioRiskReady)
                 return true;
 
@@ -99,11 +104,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double maxDrawdown;
                 DateTime lastEvent;
 
+                var stateFileExists =
+                    !string.IsNullOrEmpty(portfolioRiskStatePath)
+                    && File.Exists(portfolioRiskStatePath);
+
                 var loaded = TryReadPortfolioRiskState(
                     out realized,
                     out peak,
                     out maxDrawdown,
                     out lastEvent);
+
+                if (stateFileExists && !loaded)
+                    throw new InvalidDataException(
+                        "Existing portfolio risk state is invalid or unreadable.");
 
                 if (loaded
                     && lastEvent != Core.Globals.MinDate
@@ -157,6 +170,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 portfolioRiskReady = false;
+                portfolioRiskStateFaulted = true;
 
                 Diagnostic(
                     eventTime,
@@ -438,9 +452,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Directory.CreateDirectory(directory);
 
+            bool isPlayback;
+            TryDetectPlaybackRecoveryContext(
+                out isPlayback);
+
+            var mode =
+                MirrorVerifiedLiveExecutions
+                    ? "rerun"
+                    : isPlayback
+                        ? "research"
+                        : "live";
+
             return Path.Combine(
                 directory,
                 "portfolio_risk_"
+                + mode
+                + "_"
                 + SanitizeLiveStateFileName(
                     GetLiveRecoveryAccountName())
                 + ".state");
@@ -602,6 +629,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 portfolioRiskReady = false;
+                portfolioRiskStateFaulted = true;
 
                 Diagnostic(
                     eventTime,
