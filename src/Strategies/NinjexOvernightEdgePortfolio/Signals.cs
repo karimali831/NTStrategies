@@ -57,14 +57,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 currentBarOpen,
                 close);
 
-            // Integrated PMH evaluation advances its own causal reclaim/retest
-            // state before the current bar can register a new parent signal.
-            PreparePmhRegimeEvaluationCompletedBar(
-                signalTime, signalOpen, high, low, close);
-
-            // V2 advances from completed bars even when the original portfolio
-            // is blocked by an active position, daily cap, or entry filter.
-            AdvanceFailedPmhV2CompletedBar(
+            // Advance the baseline PMH continuation state before the current
+            // completed bar can register a new PMH parent signal.
+            PreparePmhRegimeCompletedBar(
                 signalTime, signalOpen, high, low, close);
 
             // Observational export runs before the trade-window and model gates.
@@ -99,9 +94,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 GetOvernightWidthTicks();
 
 
-            // Capture four-model candidates before portfolio-state gating so
+            // Capture baseline candidates before portfolio-state gating so
             // research can see signals displaced by an active trade or daily cap.
-            CaptureFourModelResearchCandidates(
+            CaptureBaselineResearchCandidates(
                 signalTime,
                 signalOpen,
                 high,
@@ -111,10 +106,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 minutesFromOpen,
                 overnightWidthTicks);
 
-            // Research-only continuation model: observes qualified PMH signals
-            // before daily caps without submitting or modifying real orders.
-            ProcessFailedPmhContinuationBar(signalTime, close);
-            RegisterFailedPmhV2Parent(signalTime);
             RegisterPmhRegimeParentIfQualified(
                 signalTime,
                 high,
@@ -125,14 +116,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     signalTime,
                     false))
             {
-                RecordPmhRegimeReadyBlocked(
+                var blockReason =
+                    GetResearchPortfolioBlockReason(false);
+
+                RecordPmhContinuationReadyBlocked(
                     signalTime,
-                    GetPmhRegimePortfolioBlockReason());
+                    string.IsNullOrEmpty(blockReason)
+                        ? "PortfolioState"
+                        : blockReason);
                 return;
             }
 
 
-            ProcessFourModelSignals(
+            ProcessBaselineSignals(
                 signalTime,
                 high,
                 low,
@@ -143,7 +139,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        private void ProcessFourModelSignals(
+        private void ProcessBaselineSignals(
             DateTime signalTime,
             double high,
             double low,
@@ -226,7 +222,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
 
             var premarketHighQualified =
-                IsPmhRegimeStrictShortQualified(
+                IsPmhStrictShortQualified(
                     premarketHighBaseQualified,
                     close);
 
@@ -239,7 +235,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Qualified={0} PMH={1} High={2} Close={3} " +
                     "MinutesFromOpen={4} MaxMinutes={5} " +
                     "ATR5={6:0.0}t MinATR={7:0.0}t " +
-                    "BaseQualified={8} RegimeMode={9}",
+                    "BaseQualified={8}",
                     premarketHighQualified,
                     premarketHigh,
                     high,
@@ -248,8 +244,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PremarketHighMaximumMinutesFromOpen,
                     last5mAtrTicks,
                     PremarketHighMinimumAtr5mTicks,
-                    premarketHighBaseQualified,
-                    EnablePmhRegimeSplitEvaluation);
+                    premarketHighBaseQualified);
             }
 
 
@@ -326,7 +321,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var qualifiedCount =
                 (priorCloseQualified ? 1 : 0)
                 + (premarketHighQualified ? 1 : 0)
-                + (EnablePmhRegimeSplitEvaluation && pmhRegimeLongReady ? 1 : 0)
+                + (pmhContinuationReady ? 1 : 0)
                 + (rthOpenQualified ? 1 : 0)
                 + (premarketLowQualified ? 1 : 0);
 
@@ -380,7 +375,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-            if (TryArmPmhRegimeContinuationLong(
+            if (TryArmPmhContinuationLong(
                     signalTime,
                     high,
                     low,
@@ -636,7 +631,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int minutesFromOpen,
             double overnightWidthTicks)
         {
-            ResetPendingPmhRegimeBracket();
+            ResetPendingPmhContinuationBracket();
 
             pendingDirection =
                 direction;

@@ -275,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             researchPreviousEmaSlow = previousEmaSlow;
         }
 
-        private void CaptureFourModelResearchCandidates(
+        private void CaptureBaselineResearchCandidates(
             DateTime signalTime, double signalOpen, double high, double low, double close, double previousClose,
             int minutesFromOpen, double overnightWidthTicks)
         {
@@ -295,8 +295,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             var pmhSweep = IsFinite(premarketHigh) && high > premarketHigh && close < premarketHigh;
             var pmhTimeOk = minutesFromOpen >= 0 && minutesFromOpen <= PremarketHighMaximumMinutesFromOpen;
-            var pmhAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
-            var pmhQualified = pmhSweep && pmhTimeOk && pmhAtrOk;
+            var pmhMinAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks >= PremarketHighMinimumAtr5mTicks;
+            var pmhMaxAtrOk = IsFinite(last5mAtrTicks) && last5mAtrTicks < PmhShortMaximumAtrTicks;
+            var pmhEmaOk = TickSize > 0
+                && IsFinite(last5mEmaFast)
+                && (close - last5mEmaFast) / TickSize <= PmhShortMaximumFastEmaDistanceTicks;
+            var pmhQualified = pmhSweep && pmhTimeOk && pmhMinAtrOk && pmhMaxAtrOk && pmhEmaOk;
 
             var rthCross = IsFinite(rthOpen) && rthOpenDate == signalTime.Date && previousClose >= rthOpen && close < rthOpen;
             var rthTimeOk = minutesFromOpen >= RthOpenMinimumMinutesFromOpen;
@@ -308,9 +312,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             var pmlEmaOk = IsFinite(last5mEmaFast) && close > last5mEmaFast;
             var pmlQualified = pmlCross && pmlAtrOk && pmlEmaOk;
 
-            var qualifiedCount = (priorQualified ? 1 : 0) + (pmhQualified ? 1 : 0) + (rthQualified ? 1 : 0) + (pmlQualified ? 1 : 0);
+            var qualifiedCount =
+                (priorQualified ? 1 : 0)
+                + (pmhQualified ? 1 : 0)
+                + (pmhContinuationReady ? 1 : 0)
+                + (rthQualified ? 1 : 0)
+                + (pmlQualified ? 1 : 0);
+
             var selectedSignal = priorQualified ? PriorCloseEntrySignal
                 : pmhQualified ? PremarketHighEntrySignal
+                : pmhContinuationReady ? PmhContinuationEntrySignal
                 : rthQualified ? RthOpenEntrySignal
                 : pmlQualified ? PremarketLowEntrySignal
                 : string.Empty;
@@ -324,8 +335,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pmhSweep)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
                     PremarketHighModelName, PremarketHighEntrySignal, PendingDirection.Short, pmhQualified, selectedSignal == PremarketHighEntrySignal,
-                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, null, pmhTimeOk, null, null, pmhAtrOk,
-                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks);
+                    IsResearchPortfolioEligible(), GetResearchPortfolioBlockReason(false), qualifiedCount, null, pmhTimeOk, null, null, pmhMinAtrOk && pmhMaxAtrOk,
+                    TickSize > 0 ? (premarketHigh - close) / TickSize : double.NaN, range1mTicks, bodyTicks, pmhEmaOk);
 
             if (rthCross)
                 WriteCandidateResearchRow(signalTime, signalOpen, high, low, close, previousClose, minutesFromOpen, overnightWidthTicks, premarketWidthTicks,
@@ -510,9 +521,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradingDate = time.Date,
                 Instrument = Instrument == null ? string.Empty : Instrument.FullName,
                 StrategyVersion = StrategyVersion,
-                PortfolioMode = EnablePmhRegimeSplitEvaluation
-                    ? "PmhRegimeIntegratedEvaluation"
-                    : "Run8FourModel",
+                PortfolioMode = "PmhRegimeBaseline",
                 Model = modelName ?? string.Empty,
                 Signal = signalName ?? string.Empty,
                 Direction = direction.ToString(),

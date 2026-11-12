@@ -43,7 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// updates during Playback/live data. It never submits, changes, cancels,
         /// or adopts NinjaTrader orders and never modifies the real portfolio state.
         ///
-        /// Qualified four-model candidates are taken from the existing telemetry
+        /// Qualified baseline candidates are taken from the existing telemetry
         /// snapshots, including candidates blocked by a live position or daily cap.
         /// Each candidate is then scored independently with the validated Run 8
         /// mechanics: first causal tick, fixed stop/target, 60-minute max hold and
@@ -72,8 +72,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Perturbation research is intentionally independent of the
             // shadow CSV sink. A shadow-output fault must not stop it.
             ProcessResearchPerturbationTick(time, price);
-            ProcessFailedPmhContinuationTick(time, price);
-            ProcessFailedPmhV2Tick(time, price);
 
             if (researchShadowOutputFaulted)
                 return;

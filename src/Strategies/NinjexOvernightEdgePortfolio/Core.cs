@@ -19,16 +19,11 @@ namespace NinjaTrader.NinjaScript.Strategies
     ///     BIP 1 = 1-minute signal series
     ///     BIP 2 = 1-tick causal execution series
     ///
-    /// Run 8 four-model portfolio:
-    ///     - LONG prior-day-close reclaim, 1-minute range <= 30 ticks,
-    ///       Overnight width >= 200 ticks. During the first 60 minutes,
-    ///       Premarket width must be >= 140 ticks by default.
-    ///     - SHORT premarket-high sweep/rejection in the first 120 minutes,
-    ///       completed 5-minute ATR >= 30 ticks.
-    ///     - SHORT RTH-open breakdown from 120 minutes after the open,
-    ///       Premarket width >= 140 ticks.
-    ///     - SHORT premarket-low breakdown, completed 5-minute ATR >= 20 ticks.
-    ///       Requires close > completed 5-minute EMA(9).
+    /// Baseline portfolio:
+    ///     - LONG prior-day-close reclaim.
+    ///     - PMH regime family: strict rejection SHORT or confirmed continuation LONG.
+    ///     - SHORT RTH-open breakdown.
+    ///     - SHORT premarket-low breakdown.
     ///
     /// Execution:
     ///     - First causal tick after the completed 1-minute signal.
@@ -44,7 +39,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.4.0-run8-production";
+        private const string StrategyVersion = "1.5.0-pmh-regime-baseline";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -261,7 +256,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Ninjex Overnight Edge Portfolio";
 
                 Description =
-                    "Run 8 ES overnight-edge portfolio: PDC reclaim, PMH rejection, RTH-open breakdown and PML breakdown.";
+                    "ES overnight-edge baseline: PDC reclaim, PMH regime split, RTH-open breakdown, PML breakdown and prospective drawdown guard.";
 
                 Calculate =
                     Calculate.OnEachTick;
@@ -319,7 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                 //
-                // Four-model portfolio
+                // Entry models
                 //
                 PriorCloseMaximumRangeTicks = 30.0;
                 PriorCloseMinimumOvernightWidthTicks = 200.0;
@@ -328,69 +323,47 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 PremarketHighMaximumMinutesFromOpen = 120;
                 PremarketHighMinimumAtr5mTicks = 30.0;
+                PmhShortMaximumAtrTicks = 45.0;
+                PmhShortMaximumFastEmaDistanceTicks = 0.0;
+                PmhContinuationReclaimMinutes = 10;
+                PmhContinuationReclaimTicks = 2;
+                PmhContinuationReclaimCloses = 2;
+                PmhContinuationRetestMinutes = 10;
+                PmhContinuationRetestTouchTicks = 6;
+                PmhContinuationMaxBreachTicks = 6;
+                PmhContinuationFollowThroughMinutes = 7;
+                PmhContinuationFollowThroughTicks = 0;
+                PmhContinuationMinEmaSpreadTicks = 0.0;
+                PmhContinuationMinFastSlopeTicks = 0.0;
+                PmhContinuationStructureBufferTicks = 2;
+                PmhContinuationMaxStopTicks = 30;
 
                 RthOpenMinimumMinutesFromOpen = 120;
                 RthOpenMinimumPremarketWidthTicks = 140.0;
-
                 PremarketLowMinimumAtr5mTicks = 20.0;
 
                 //
-                // Risk
+                // Portfolio risk
                 //
                 OrderQuantity = 1;
-
                 StopLossTicks = 20;
                 ProfitTargetTicks = 40;
-
                 MaxHoldMinutes = 60;
-
                 MaxTradesPerDay = 3;
                 MaxWinnersPerDay = 2;
-
                 MaxLossesPerDay = 2;
-
+                MaximumProspectiveDrawdownDollars = 1650.0;
 
                 //
-                // Diagnostics
+                // Operations / research
                 //
-                EnableDiagnostics = true;
-                EnableFileLogging = true;
-                EnableResearchTelemetry = false;
-                EnableResearchPerturbationScenarios = false;
-                EnableResearchSessionExport = false;
-                EnableFailedPmhContinuationResearch = false;
-                EnableFailedPmhV2Research = false;
-                EnablePmhRegimeSplitEvaluation = false;
-                PmhRegimeShortMaximumAtrTicks = 45.0;
-                PmhRegimeShortMaximumFastEmaDistanceTicks = 0.0;
-                FailedPmhV2ReclaimMinutes = 10;
-                FailedPmhV2ReclaimTicks = 2;
-                FailedPmhV2ReclaimCloses = 2;
-                FailedPmhV2RetestMinutes = 10;
-                FailedPmhV2RetestTouchTicks = 6;
-                FailedPmhV2MaxBreachTicks = 6;
-                FailedPmhV2FollowThroughMinutes = 7;
-                FailedPmhV2FollowThroughTicks = 0;
-                FailedPmhV2MinEmaSpreadTicks = 0;
-                FailedPmhV2MinFastSlopeTicks = 0;
-                FailedPmhV2AtrStopFactor = 0.60;
-                FailedPmhV2StructureBufferTicks = 2;
-                FailedPmhV2MaxStopTicks = 30;
-                FailedPmhV2MaxHoldMinutes = 60;
-                FailedPmhConfirmationMinutes = 10;
-                FailedPmhConfirmCloses = 2;
-                FailedPmhReclaimTicks = 2;
-                FailedPmhRequireBullishEma = true;
-                FailedPmhMaxHoldMinutes = 60;
-
-                // Safety function. Persist and restore the authoritative
-                // daily trade counters across strategy/NT/VPS restarts. Applies
-                // to genuine live trading and Playback live-restart simulation.
                 EnableRestartRecovery = true;
-
-                // Disabled by default. Forensic Replay/Historical mirror
-                // for independently verified live discrepancies only.
+                EnableFileLogging = true;
+                EnableDiagnostics = false;
                 MirrorVerifiedLiveExecutions = false;
+                EnableResearchTelemetry = false;
+                EnableResearchSessionExport = false;
+                EnableResearchPerturbationScenarios = false;
             }
             else if (State == State.Configure)
             {
@@ -432,17 +405,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         EmaSlowPeriod);
 
                 InitializeResearchSessionExport();
-                InitializePmhRegimeEvaluation();
+                InitializePortfolioRiskGuard();
                 InitializeResearchTelemetry();
-                InitializeFailedPmhContinuationResearch();
-                InitializeFailedPmhV2Research();
+                InitializePmhRegime();
 
                 Diagnostic(
                     DateTime.Now,
                     "READY Version={0} Stop={1}t Target={2}t MaxHold={3}m " +
                     "Caps={4}/{5}/{6} PdcEarlyMaxMinutes={7} " +
                     "PdcEarlyMinPmWidth={8:0.0}t MirrorVerifiedLive={9} " +
-                    "ResearchTelemetry={10} Perturbation={11} RestartRecovery={12}",
+                    "ResearchTelemetry={10} Perturbation={11} RestartRecovery={12} " +
+                    "ProspectiveDDLimit={13:0.00}",
                     StrategyVersion,
                     StopLossTicks,
                     ProfitTargetTicks,
@@ -455,18 +428,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MirrorVerifiedLiveExecutions,
                     EnableResearchTelemetry,
                     EnableResearchPerturbationScenarios,
-                    EnableRestartRecovery);
+                    EnableRestartRecovery,
+                    MaximumProspectiveDrawdownDollars);
             }
             else if (State == State.Realtime)
             {
-                ValidatePmhRegimeEvaluationEnvironment(DateTime.Now);
+                ResetPortfolioRiskPersistenceOnRealtimeTransition();
                 ResetLiveDailyStateRecoveryOnRealtimeTransition();
             }
             else if (State == State.Terminated)
             {
-                DisposePmhRegimeEvaluation();
-                DisposeFailedPmhV2Research();
-                DisposeFailedPmhContinuationResearch();
+                DisposePortfolioRiskGuard();
                 DisposeResearchTelemetry();
                 DisposeResearchSessionExport();
                 CloseDiagnosticFile();
