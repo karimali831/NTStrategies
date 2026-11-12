@@ -729,10 +729,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private static string CsvPortfolioRisk(
             string value)
         {
-            return """
+            return "\""
                 + (value ?? string.Empty)
-                    .Replace(""", """")
-                + """;
+                    .Replace("\"", "\"\"")
+                + "\"";
         }
     }
 }
