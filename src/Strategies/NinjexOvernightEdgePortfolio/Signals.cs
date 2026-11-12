@@ -94,9 +94,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 GetOvernightWidthTicks();
 
 
-            // Capture four-model candidates before portfolio-state gating so
+            // Capture baseline candidates before portfolio-state gating so
             // research can see signals displaced by an active trade or daily cap.
-            CaptureFourModelResearchCandidates(
+            CaptureBaselineResearchCandidates(
                 signalTime,
                 signalOpen,
                 high,
