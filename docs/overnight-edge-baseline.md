@@ -1,6 +1,6 @@
 # Ninjex Overnight Edge Portfolio — PMH regime baseline
 
-Strategy version: `1.5.0-pmh-regime-baseline`.
+Strategy version: `1.5.1-pmh-regime-baseline`.
 
 The baseline is the integrated portfolio validated after the ES 12-26 PMH
 deterioration review. Legacy failed-PMH V1/V2 shadow engines and the temporary
@@ -49,36 +49,26 @@ plus a 2-tick buffer, minimum 8 ticks, maximum 30 ticks. Target is 2R.
 - daily caps: 3 trades / 2 winners / 2 losses
 - flatten: 16:00 ET
 
-### Prospective drawdown guard
+### Drawdown handling
 
-Before every order submission, after the actual initial stop distance is known:
+The strategy itself does **not** block entries based on a portfolio trailing-
+drawdown threshold. This restores the validated PMH-regime baseline that
+produced approximately **$25,600 gross across 256 trades** in the accepted
+five-contract replay.
 
-`prospective DD = current peak-to-realized strategy DD + full initial stop risk`
+That replay's stitched peak-to-trough **intratrade** drawdown was approximately
+**$1,925 gross**. Closed-trade drawdown was approximately **$1,575**.
 
-The trade is blocked when prospective DD would exceed
-`Maximum Prospective Drawdown Dollars`. Baseline is **$1,650 gross**, leaving
-a $150 cushion below the research hard target of $1,800 for commissions,
-slippage and live differences.
+Account-level scaling near a prop-firm drawdown boundary is intentionally an
+operator decision (for example, switching from ES to MES). The strategy remains
+configured for one ES contract and does not automatically switch instruments
+or size down.
 
-The equity watermark ratchets on actual open-equity ticks. It is persisted
-across days, NinjaTrader/VPS restarts and ES contract changes. State is keyed
-separately for:
-
-- live accounts;
-- clean Playback research;
-- verified-live forensic reruns.
-
-A Playback rewind to an earlier timestamp automatically resets that Playback
-risk path. Existing but unreadable/corrupt risk state fails closed.
-
-With a one-contract ES minimum, the prospective guard is a capital-preservation
-lock: if remaining risk budget is smaller than the minimum allowed trade risk,
-new entries remain blocked rather than risking the account. A genuinely new or
-reset account must begin with a clean risk-state file/account identity.
-
-Research telemetry writes
-`overnight_edge_portfolio_risk_<instrument>_<RunId>.csv`, including risk-pass,
-risk-block, entry/exit, new peak and new maximum intratrade DD observations.
+When `Enable Research Telemetry = True`, the strategy passively records
+intratrade portfolio equity/drawdown to
+`overnight_edge_portfolio_drawdown_<instrument>_<RunId>.csv`. This recorder
+is observational only: it has no persistence and cannot gate, size, submit,
+cancel or modify an order.
 
 ## Three base templates
 
@@ -103,7 +93,7 @@ live trading. It is reserved for the forensic rerun template.
 - generic independent candidate shadow execution;
 - optional perturbation scenarios for standard fixed-bracket models;
 - PMH regime lifecycle events;
-- portfolio-risk / intratrade-DD audit.
+- passive portfolio intratrade-DD audit.
 
 The perturbation grid intentionally excludes `PMH-CONT-L` because its real
 bracket is structure-derived rather than fixed 20/40.
