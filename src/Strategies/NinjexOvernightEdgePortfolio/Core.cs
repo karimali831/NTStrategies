@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// </summary>
     public partial class NinjexOvernightEdgePortfolio : Strategy
     {
-        private const string StrategyVersion = "1.5.0-pmh-regime-baseline";
+        private const string StrategyVersion = "1.5.1-pmh-regime-baseline";
 
         private const int ContextSeriesIndex = 0;
         private const int SignalSeriesIndex = 1;
@@ -256,7 +256,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "Ninjex Overnight Edge Portfolio";
 
                 Description =
-                    "ES overnight-edge baseline: PDC reclaim, PMH regime split, RTH-open breakdown, PML breakdown and prospective drawdown guard.";
+                    "ES overnight-edge baseline: PDC reclaim, PMH regime split, RTH-open breakdown and PML breakdown.";
 
                 Calculate =
                     Calculate.OnEachTick;
@@ -352,7 +352,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaxTradesPerDay = 3;
                 MaxWinnersPerDay = 2;
                 MaxLossesPerDay = 2;
-                MaximumProspectiveDrawdownDollars = 1650.0;
 
                 //
                 // Operations / research
@@ -405,8 +404,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         EmaSlowPeriod);
 
                 InitializeResearchSessionExport();
-                InitializePortfolioRiskGuard();
                 InitializeResearchTelemetry();
+                InitializeResearchPortfolioDrawdown();
                 InitializePmhRegime();
 
                 Diagnostic(
@@ -414,8 +413,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "READY Version={0} Stop={1}t Target={2}t MaxHold={3}m " +
                     "Caps={4}/{5}/{6} PdcEarlyMaxMinutes={7} " +
                     "PdcEarlyMinPmWidth={8:0.0}t MirrorVerifiedLive={9} " +
-                    "ResearchTelemetry={10} Perturbation={11} RestartRecovery={12} " +
-                    "ProspectiveDDLimit={13:0.00}",
+                    "ResearchTelemetry={10} Perturbation={11} RestartRecovery={12}",
                     StrategyVersion,
                     StopLossTicks,
                     ProfitTargetTicks,
@@ -428,17 +426,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MirrorVerifiedLiveExecutions,
                     EnableResearchTelemetry,
                     EnableResearchPerturbationScenarios,
-                    EnableRestartRecovery,
-                    MaximumProspectiveDrawdownDollars);
+                    EnableRestartRecovery);
             }
             else if (State == State.Realtime)
             {
-                ResetPortfolioRiskPersistenceOnRealtimeTransition();
                 ResetLiveDailyStateRecoveryOnRealtimeTransition();
             }
             else if (State == State.Terminated)
             {
-                DisposePortfolioRiskGuard();
+                DisposeResearchPortfolioDrawdown();
                 DisposeResearchTelemetry();
                 DisposeResearchSessionExport();
                 CloseDiagnosticFile();
