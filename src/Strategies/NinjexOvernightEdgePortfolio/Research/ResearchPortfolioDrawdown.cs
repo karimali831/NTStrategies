@@ -265,10 +265,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private static string CsvResearchDrawdown(string value)
         {
-            return """
+            return "\""
                 + (value ?? string.Empty)
-                    .Replace(""", """")
-                + """;
+                    .Replace("\"", "\"\"")
+                + "\"";
         }
     }
 }
