@@ -271,15 +271,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Maximum Losing Trades Per Day", Description = "0 disables.", GroupName = "6. Portfolio Risk", Order = 6)]
         public int MaxLossesPerDay { get; set; }
 
-        [NinjaScriptProperty]
-        [Range(0.0, 10000.0)]
-        [Display(
-            Name = "Maximum Prospective Drawdown Dollars",
-            Description = "Before entry, block the trade if current peak-to-realized drawdown plus its full initial stop risk would exceed this gross strategy limit. 0 disables. Baseline 1650 leaves a cushion below the 1800 account target.",
-            GroupName = "6. Portfolio Risk",
-            Order = 7)]
-        public double MaximumProspectiveDrawdownDollars { get; set; }
-
         #endregion
 
         #region 7. Operations
