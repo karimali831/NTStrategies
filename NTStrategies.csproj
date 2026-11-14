@@ -191,7 +191,7 @@
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Orders.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Parameters.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\PmhRegime.cs" />
-        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\PortfolioRisk.cs" />
+        <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchPortfolioDrawdown.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchPerturbation.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchShadow.cs" />
         <Compile Include="src\Strategies\NinjexOvernightEdgePortfolio\Research\ResearchTelemetry.cs" />
