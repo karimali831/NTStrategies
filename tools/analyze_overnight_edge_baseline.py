@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarise cleaned Overnight Edge baseline research runs.
 
-Reads actual strategy TradeExit rows plus the persistent portfolio-risk audit.
+Reads actual strategy TradeExit rows plus passive research-only intratrade drawdown telemetry.
 Use --run-id once per verified contract to avoid mixing overlapping replays.
 """
 import argparse
@@ -65,14 +65,14 @@ def main():
     for path in args.input.glob("overnight_edge_research_*.csv"):
         research.extend(read_rows(path))
 
-    risk = []
-    for path in args.input.glob("overnight_edge_portfolio_risk_*.csv"):
-        risk.extend(read_rows(path))
+    drawdown = []
+    for path in args.input.glob("overnight_edge_portfolio_drawdown_*.csv"):
+        drawdown.extend(read_rows(path))
 
     if args.run_id:
         selected = set(args.run_id)
         research = [r for r in research if r.get("RunId") in selected]
-        risk = [r for r in risk if r.get("RunId") in selected]
+        drawdown = [r for r in drawdown if r.get("RunId") in selected]
 
     research = [
         r for r in research
@@ -98,9 +98,9 @@ def main():
     if not exits:
         ap.error("No PmhRegimeBaseline TradeExit rows found.")
 
-    risk_by_key = defaultdict(list)
-    for row in risk:
-        risk_by_key[(row.get("Instrument", ""), row.get("RunId", ""))].append(row)
+    drawdown_by_key = defaultdict(list)
+    for row in drawdown:
+        drawdown_by_key[(row.get("Instrument", ""), row.get("RunId", ""))].append(row)
 
     output = []
     groups = defaultdict(list)
@@ -108,13 +108,10 @@ def main():
         groups[(row["Instrument"], row["RunId"])].append(row)
 
     for (instrument, run_id), trades in sorted(groups.items()):
-        audit = risk_by_key[(instrument, run_id)]
+        audit = drawdown_by_key[(instrument, run_id)]
         max_intratrade = max(
             [number(r.get("MaxIntratradeDrawdown")) or 0.0 for r in audit]
             or [0.0]
-        )
-        blocks = sum(
-            1 for r in audit if r.get("EventType") == "ProspectiveRiskBlock"
         )
 
         summary = {
@@ -125,7 +122,6 @@ def main():
         }
         summary.update(summarise(trades))
         summary["MaxIntratradeDrawdown"] = round(max_intratrade, 2)
-        summary["ProspectiveRiskBlocks"] = blocks
         output.append(summary)
 
         by_signal = defaultdict(list)
@@ -141,7 +137,6 @@ def main():
             }
             row.update(summarise(signal_trades))
             row["MaxIntratradeDrawdown"] = ""
-            row["ProspectiveRiskBlocks"] = ""
             output.append(row)
 
     total = {
@@ -153,13 +148,10 @@ def main():
     total.update(summarise(exits))
     total["MaxIntratradeDrawdown"] = round(
         max(
-            [number(r.get("MaxIntratradeDrawdown")) or 0.0 for r in risk]
+            [number(r.get("MaxIntratradeDrawdown")) or 0.0 for r in drawdown]
             or [0.0]
         ),
         2,
-    )
-    total["ProspectiveRiskBlocks"] = sum(
-        1 for r in risk if r.get("EventType") == "ProspectiveRiskBlock"
     )
     output.append(total)
 
@@ -175,8 +167,7 @@ def main():
                 f'{row["Instrument"]:<10} trades={row["Trades"]:<3} '
                 f'gross={row["GrossPnl"]:+9.2f} '
                 f'closedDD={row["ClosedTradeDrawdown"]:>8.2f} '
-                f'maxDD={row["MaxIntratradeDrawdown"]:>8.2f} '
-                f'blocks={row["ProspectiveRiskBlocks"]}'
+                f'maxDD={row["MaxIntratradeDrawdown"]:>8.2f}'
             )
     print("Saved", args.output)
 
