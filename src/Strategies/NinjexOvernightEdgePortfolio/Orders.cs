@@ -29,9 +29,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // the same durable recovery path before a new entry can be submitted.
             EnsureLiveDailyStateReady(time);
 
-            // Track actual strategy equity on every causal tick for the
-            // trailing drawdown watermark and research audit.
-            RecordPortfolioRiskTick(time, price);
+            // Passive research-only equity/drawdown telemetry. Never gates orders.
+            RecordResearchPortfolioDrawdownTick(time, price);
 
 
             var timeValue =
@@ -175,50 +174,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            //
-            // Verified live reruns may replace the bracket with independently
-            // confirmed prices. Use the actual prospective stop distance for
-            // the portfolio drawdown check.
-            //
             VerifiedLiveBracketOverrideEntry verifiedLiveBracket;
             var verifiedLiveBracketApplied =
                 TryGetVerifiedLiveBracketOverride(
                     pendingSignalTime,
                     signalName,
                     out verifiedLiveBracket);
-
-            var prospectiveStopTicks =
-                resolvedStopTicks;
-
-            if (verifiedLiveBracketApplied
-                && TickSize > 0)
-            {
-                prospectiveStopTicks =
-                    Math.Max(
-                        1,
-                        (int)Math.Ceiling(
-                            Math.Abs(
-                                verifiedLiveBracket.VerifiedEntryPrice
-                                - verifiedLiveBracket.StopPrice)
-                            / TickSize));
-            }
-
-            string riskBlockReason;
-
-            if (!CanPassProspectiveDrawdownGuard(
-                    time,
-                    prospectiveStopTicks,
-                    signalName,
-                    out riskBlockReason))
-            {
-                ClearPendingEntry(
-                    time,
-                    string.IsNullOrEmpty(riskBlockReason)
-                        ? "ProspectiveDrawdownLimit"
-                        : riskBlockReason);
-
-                return;
-            }
 
             submittedSignalTime =
                 pendingSignalTime;
@@ -456,7 +417,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         time,
                         GetActiveAverageEntryPrice());
 
-                    RecordPortfolioRiskEntryFill(
+                    RecordResearchPortfolioDrawdownEntryFill(
                         time,
                         GetActiveAverageEntryPrice());
                 }
@@ -579,7 +540,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 false,
                 "TradeComplete");
 
-            RecordPortfolioRiskTradeCompleted(
+            RecordResearchPortfolioDrawdownTradeCompleted(
                 time,
                 exitPrice,
                 activeTradeGrossPnl);
