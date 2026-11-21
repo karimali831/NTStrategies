@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightStructurePortfolio : Strategy
     {
-        private const string Version = "1.0.0-research1";
+        private const string Version = "1.0.1-research1";
         private const int ContextBip = 0;
         private const int SignalBip = 1;
         private const int ExecutionBip = 2;
@@ -458,12 +458,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             pending = null;
             pendingExpires = Core.Globals.MinDate;
             LogEvent(now, "NEW_RTH_DATE " + date.ToString("yyyy-MM-dd"));
+            LogResearchOrderGate(now);
         }
 
         private string PortfolioBlockReason(DateTime time, bool ignoreCurrentPending)
         {
-            if (!CanSubmitResearchOrders())
-                return "ResearchOnlyNoOrders";
+            // Report the exact permission failure rather than merging every
+            // cause into ResearchOnlyNoOrders. Never weaken the broker guard.
+            var gateReason = ResearchOrderPermissionBlockReason();
+            if (!string.IsNullOrEmpty(gateReason))
+                return gateReason;
+
             if ((!ignoreCurrentPending && pending != null)
                 || entrySubmitted || manualExitPending
                 || activeTrade || Position.MarketPosition != MarketPosition.Flat)
@@ -477,37 +482,87 @@ namespace NinjaTrader.NinjaScript.Strategies
             return string.Empty;
         }
 
-        private bool CanSubmitResearchOrders()
+        private string ResearchOrderPermissionBlockReason()
         {
-            // This first research build is ES-only on a 5-minute primary
-            // chart. Never submit using a mismatched symbol/timeframe.
-            if (Instrument == null || Instrument.MasterInstrument == null
-                || !string.Equals(Instrument.MasterInstrument.Name,
-                    "ES", StringComparison.OrdinalIgnoreCase)
-                || BarsPeriod == null
-                || BarsPeriod.BarsPeriodType != BarsPeriodType.Minute
-                || BarsPeriod.Value != 5)
-                return false;
+            // Only ES on a five-minute primary series may submit. Explicitly
+            // inspect the PRIMARY BarsPeriod rather than the calling BIP.
+            if (Instrument == null || Instrument.MasterInstrument == null)
+                return "MissingInstrument";
+            if (!string.Equals(Instrument.MasterInstrument.Name,
+                "ES", StringComparison.OrdinalIgnoreCase))
+                return "UnsupportedInstrument:" + Instrument.MasterInstrument.Name;
+            if (BarsPeriods == null || BarsPeriods.Length <= ContextBip
+                || BarsPeriods[ContextBip] == null)
+                return "MissingPrimarySeries";
+            var primary = BarsPeriods[ContextBip];
+            if (primary.BarsPeriodType != BarsPeriodType.Minute || primary.Value != 5)
+                return "PrimarySeriesMustBeES5Minute";
 
             if (State == State.Historical)
-                return EnableHistoricalBacktestOrders;
-            if (State != State.Realtime || !EnablePlaybackOrders)
-                return false;
+                return EnableHistoricalBacktestOrders
+                    ? string.Empty : "HistoricalOrdersDisabled";
+            if (State != State.Realtime)
+                return "NotRealtime:" + State;
+            if (!EnablePlaybackOrders)
+                return "PlaybackOrdersDisabled";
+
             try
             {
-                var name = Account == null ? "" : Account.Name ?? "";
-                if (name.StartsWith("Playback", StringComparison.OrdinalIgnoreCase))
-                    return true;
-                var connection = Account != null && Account.Connection != null
+                if (Account == null)
+                    return "MissingStrategyAccount";
+
+                var accountName = Account.Name ?? string.Empty;
+                if (accountName.StartsWith("Playback",
+                    StringComparison.OrdinalIgnoreCase))
+                    return string.Empty;
+
+                var connectionName = Account.Connection != null
                     && Account.Connection.Options != null
-                        ? Account.Connection.Options.Name : "";
-                return !string.IsNullOrEmpty(connection)
-                    && connection.IndexOf("Playback", StringComparison.OrdinalIgnoreCase) >= 0;
+                        ? Account.Connection.Options.Name ?? string.Empty
+                        : string.Empty;
+                return connectionName.IndexOf("Playback",
+                    StringComparison.OrdinalIgnoreCase) >= 0
+                        ? string.Empty : "AccountNotPlayback";
             }
-            catch
+            catch (Exception ex)
             {
-                return false;
+                return "AccountCheckError:" + ex.GetType().Name;
             }
+        }
+
+        private void LogResearchOrderGate(DateTime time)
+        {
+            var primary = BarsPeriods != null && BarsPeriods.Length > ContextBip
+                && BarsPeriods[ContextBip] != null
+                    ? BarsPeriods[ContextBip].BarsPeriodType + " "
+                      + BarsPeriods[ContextBip].Value
+                    : "missing";
+            string accountName = "missing", connectionName = "missing";
+            try
+            {
+                if (Account != null)
+                {
+                    accountName = Account.Name ?? string.Empty;
+                    if (Account.Connection != null
+                        && Account.Connection.Options != null)
+                        connectionName = Account.Connection.Options.Name ?? string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                connectionName = "Error:" + ex.GetType().Name;
+            }
+
+            var reason = ResearchOrderPermissionBlockReason();
+            LogEvent(time, "EXECUTION_GATE State=" + State
+                + " Primary=" + primary
+                + " Master=" + (Instrument == null || Instrument.MasterInstrument == null
+                    ? "missing" : Instrument.MasterInstrument.Name)
+                + " Account=" + accountName
+                + " Connection=" + connectionName
+                + " PlaybackOrders=" + EnablePlaybackOrders
+                + " HistoricalOrders=" + EnableHistoricalBacktestOrders
+                + " Result=" + (reason == string.Empty ? "Allowed" : reason));
         }
 
         private void ProcessExecutionTick()

@@ -106,6 +106,35 @@ Daily log files, including strategy version and date:
 
 No strategy order decisions should depend on whether research export succeeds.
 
+## Playback permission diagnosis (Research 1.0.1)
+
+The first ES 12-26 test exported 106 candidate crossings, including
+38 qualified setups, but no actual trade. The recorded disposition for
+all 38 was the generic `ResearchOnlyNoOrders`. Realtime callbacks were
+present, so the prior export did **not** establish which individual safety
+condition rejected orders.
+
+Research 1.0.1 keeps the Playback-only safety policy but logs the precise
+cause on every RTH date in the daily file:
+
+`EXECUTION_GATE State=... Primary=... Master=... Account=... Connection=... PlaybackOrders=... HistoricalOrders=... Result=...`
+
+Candidate dispositions now identify specific failures such as
+`PlaybackOrdersDisabled`, `AccountNotPlayback`,
+`PrimarySeriesMustBeES5Minute` or `HistoricalOrdersDisabled`.
+This is diagnostics only; it is not permission to place live orders.
+
+**Do not enable Historical Backtest Orders just because the Playback
+controller is set to Historical.** Playback historical-tick data can still
+arrive through Realtime callbacks; verify `State` and
+`Enable Playback Orders` from the log. Keep a normal live broker
+account disallowed.
+
+For an efficient verification, replay the 20 Nov 2026 RTH session with
+sufficient historical warmup. The prior CSV recorded a qualified
+`ONH-DISP-BREAK-L` at 09:58 ET on that date. If settings and
+account are valid, it should no longer be rejected by the execution gate.
+
 ## Required first smoke test (before 13-contract replay)
 
 1. Import into NinjaTrader and compile the C# project.
