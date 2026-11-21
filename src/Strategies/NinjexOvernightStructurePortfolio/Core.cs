@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightStructurePortfolio : Strategy
     {
-        private const string Version = "1.0.0-research1";
+        private const string Version = "1.0.1-research1";
         private const int ContextBip = 0;
         private const int SignalBip = 1;
         private const int ExecutionBip = 2;
