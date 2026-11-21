@@ -77,6 +77,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private Candidate pending;
         private DateTime pendingExpires = Core.Globals.MinDate;
+        private DateTime submittedSignalEnd = Core.Globals.MinDate;
+        private DateTime activeSignalEnd = Core.Globals.MinDate;
         private bool entrySubmitted, manualExitPending;
         private string activeSignal = string.Empty;
         private bool activeLong, activeTrade;
@@ -328,6 +330,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pending != null && end > pendingExpires)
             {
                 LogEvent(end, "PENDING_EXPIRED " + pending.Signal);
+                WriteCandidate(pending, "PendingExpired");
                 pending = null;
             }
 
@@ -541,12 +544,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pending != null && time > pendingExpires)
             {
                 LogEvent(time, "PENDING_EXPIRED " + pending.Signal);
+                WriteCandidate(pending, "PendingExpired");
                 pending = null;
             }
             if (pending == null || time < pending.Time)
                 return;
             if (time.Date != pending.Time.Date || Clock(time) >= EntryEndTime)
             {
+                WriteCandidate(pending, "EntryWindowClosed");
                 pending = null;
                 return;
             }
@@ -554,13 +559,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (block != "")
             {
                 LogEvent(time, "SIGNAL_DROP " + pending.Signal + " Reason=" + block);
+                WriteCandidate(pending, "ExecutionBlocked:" + block);
                 pending = null;
                 return;
             }
 
             var c = pending;
             pending = null;
+            submittedSignalEnd = c.Time;
             entrySubmitted = true;
+            WriteCandidate(c, "EntrySubmitted");
             SetStopLoss(c.Signal, CalculationMode.Ticks, c.StopTicks, false);
             SetProfitTarget(c.Signal, CalculationMode.Ticks, c.TargetTicks);
             LogEvent(time, "ENTRY_SUBMIT " + c.Signal + " Qty=" + OrderQuantity
@@ -599,7 +607,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || orderState == OrderState.Cancelled)
             {
                 if (!activeTrade)
+                {
                     entrySubmitted = false;
+                    submittedSignalEnd = Core.Globals.MinDate;
+                }
                 LogEvent(time, "ORDER_ERROR " + order.Name + " State="
                     + orderState + " Code=" + error + " Comment=" + comment);
             }
@@ -618,6 +629,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     activeTrade = true;
                     activeSignal = order.Name;
+                    activeSignalEnd = submittedSignalEnd;
                     activeLong = activeSignal != OnlSignal;
                     entryTime = time;
                     deadline = MaximumHoldMinutes > 0
@@ -669,6 +681,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 + " Losses=" + lossesToday);
             activeTrade = false;
             activeSignal = "";
+            activeSignalEnd = Core.Globals.MinDate;
+            submittedSignalEnd = Core.Globals.MinDate;
             activeLong = false;
             entryFillQty = exitFillQty = 0;
             entryPriceTotal = 0;
