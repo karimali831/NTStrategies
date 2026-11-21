@@ -264,9 +264,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 atrTicks = TickSize > 0 ? atr5m[1] / TickSize : double.NaN;
                 emaSlowSlopeTicks = TickSize > 0
                     ? (slowEma[1] - slowEma[2]) / TickSize : double.NaN;
-                WriteContextBar(end, Opens[ContextBip][1], high, low,
-                    Closes[ContextBip][1], Volumes[ContextBip][1]);
             }
+
+            // Export every completed 5m OHLCV including the overnight warmup.
+            // EMA/ATR columns remain blank until their context is ready.
+            WriteContextBar(end, Opens[ContextBip][1], high, low,
+                Closes[ContextBip][1], Volumes[ContextBip][1]);
         }
 
         private void ProcessCompletedMinute()
