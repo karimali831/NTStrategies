@@ -190,10 +190,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Num(width), compressionHistoryCount.ToString(CultureInfo.InvariantCulture),
                         Num(compressionThreshold), compressedToday ? "1":"0",
                         rthBars.ToString(CultureInfo.InvariantCulture),
-                        tradesToday.ToString(CultureInfo.InvariantCulture),
-                        winnersToday.ToString(CultureInfo.InvariantCulture),
-                        lossesToday.ToString(CultureInfo.InvariantCulture),
-                        Num(dailyGross), Csv(State.ToString()) }));
+                        (ev == "RthSummary" ? tradesToday : 0).ToString(CultureInfo.InvariantCulture),
+                        (ev == "RthSummary" ? winnersToday : 0).ToString(CultureInfo.InvariantCulture),
+                        (ev == "RthSummary" ? lossesToday : 0).ToString(CultureInfo.InvariantCulture),
+                        Num(ev == "RthSummary" ? dailyGross : 0.0),
+                        Csv(State.ToString()) }));
                     sessionWriter.Flush();
                 }
                 catch (Exception ex) { DisableResearch("Session", ex); }
