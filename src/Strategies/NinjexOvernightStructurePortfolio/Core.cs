@@ -326,6 +326,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            if (pending != null && end > pendingExpires)
+            {
+                LogEvent(end, "PENDING_EXPIRED " + pending.Signal);
+                pending = null;
+            }
+
             evaluatedThisBar.Clear();
             var minutesFromOpen = MinutesFromOpen(clock);
             var referencePrevious = Valid(previousRthMinuteClose)
@@ -395,7 +401,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (c.Qualified && selected == null)
                     selected = c;
             }
-            var block = PortfolioBlockReason(end);
+            var block = PortfolioBlockReason(end, false);
             foreach (var c in evaluatedThisBar)
             {
                 var outcome = !c.Qualified ? c.FilterReason
@@ -449,11 +455,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             LogEvent(now, "NEW_RTH_DATE " + date.ToString("yyyy-MM-dd"));
         }
 
-        private string PortfolioBlockReason(DateTime time)
+        private string PortfolioBlockReason(DateTime time, bool ignoreCurrentPending)
         {
             if (!CanSubmitResearchOrders())
                 return "ResearchOnlyNoOrders";
-            if (pending != null || entrySubmitted || manualExitPending
+            if ((!ignoreCurrentPending && pending != null)
+                || entrySubmitted || manualExitPending
                 || activeTrade || Position.MarketPosition != MarketPosition.Flat)
                 return "PositionOrOrderActive";
             if (MaximumTradesPerDay > 0 && tradesToday >= MaximumTradesPerDay)
@@ -522,14 +529,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (pending == null || time < pending.Time || time > pendingExpires)
+            if (pending != null && time > pendingExpires)
+            {
+                LogEvent(time, "PENDING_EXPIRED " + pending.Signal);
+                pending = null;
+            }
+            if (pending == null || time < pending.Time)
                 return;
             if (time.Date != pending.Time.Date || Clock(time) >= EntryEndTime)
             {
                 pending = null;
                 return;
             }
-            var block = PortfolioBlockReason(time);
+            var block = PortfolioBlockReason(time, true);
             if (block != "")
             {
                 LogEvent(time, "SIGNAL_DROP " + pending.Signal + " Reason=" + block);
@@ -555,7 +567,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             double stopPrice, int quantity, int filled, double averageFillPrice,
             OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
-            if (order == null || !IsOurEntry(order.Name))
+            if (order == null)
+                return;
+            if (order.Name == FlatExit || order.Name == TimeExit)
+            {
+                if (orderState == OrderState.Rejected
+                    || orderState == OrderState.Cancelled)
+                {
+                    manualExitPending = false;
+                    LogEvent(time, "EXIT_ORDER_ERROR " + order.Name
+                        + " State=" + orderState + " Code=" + error);
+                }
+                return;
+            }
+            if (!IsOurEntry(order.Name))
                 return;
 
             if (orderState == OrderState.Submitted || orderState == OrderState.Accepted
@@ -628,6 +653,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (exitGross > 0) winnersToday++;
             else if (exitGross < 0) lossesToday++;
             WriteTrade(time, order.Name, price);
+            WriteEquity(time, price, 0, cumulativeGross,
+                Math.Max(0.0, equityPeak - cumulativeGross));
             LogEvent(time, "TRADE_COMPLETE " + activeSignal + " Gross=" + Num(exitGross)
                 + " DayTrades=" + tradesToday + " Wins=" + winnersToday
                 + " Losses=" + lossesToday);
