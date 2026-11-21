@@ -72,14 +72,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double priorRthClose = double.NaN;
         private DateTime priorRthDate = Core.Globals.MinDate;
         private bool onlAttempted, onhAttempted;
-        private DateTime lastSignalDate = Core.Globals.MinDate;
         private double previousRthMinuteClose = double.NaN;
         private readonly List<Candidate> evaluatedThisBar = new List<Candidate>();
 
         private Candidate pending;
         private DateTime pendingExpires = Core.Globals.MinDate;
         private bool entrySubmitted, manualExitPending;
-        private Order workingEntry;
         private string activeSignal = string.Empty;
         private bool activeLong, activeTrade;
         private double entryPriceTotal, exitGross, entryAverage;
@@ -596,7 +594,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (orderState == OrderState.Submitted || orderState == OrderState.Accepted
                 || orderState == OrderState.Working || orderState == OrderState.PartFilled)
-                workingEntry = order;
+                LogEvent(time, "ENTRY_ORDER_STATE " + order.Name + " " + orderState);
             else if (orderState == OrderState.Rejected
                 || orderState == OrderState.Cancelled)
             {
@@ -677,7 +675,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryTime = Core.Globals.MinDate;
             deadline = Core.Globals.MinDate;
             manualExitPending = false;
-            workingEntry = null;
         }
 
         private void UpdateStructureEquity(DateTime time, double price)
