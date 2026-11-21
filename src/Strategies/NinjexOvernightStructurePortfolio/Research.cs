@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     + "CompressionThresholdTicks,Compressed,EMA5Fast,EMA5Slow,"
                     + "SlowSlopeTicks,ATR5Ticks,ProcessingState");
                 tradeWriter = CsvWriter(prefix + "trades.csv",
-                    "RunId,Instrument,Date,Signal,EntryTimeET,EntryPrice,Quantity,"
+                    "RunId,Instrument,Date,Signal,SignalEndET,EntryTimeET,EntryPrice,Quantity,"
                     + "ExitTimeET,ExitPrice,ExitName,StopTicks,TargetTicks,MaxHoldMinutes,"
                     + "MfeTicks,MaeTicks,GrossPnl,DayTrades,DayWinners,DayLosses,"
                     + "CumulativeGross,ProcessingState");
@@ -240,7 +240,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     tradeWriter.WriteLine(string.Join(",", new[] {
                         Csv(structureRunId), Csv(Instrument.FullName), Day(entryTime.Date),
-                        Csv(activeSignal), Stamp(entryTime), Num(entryAverage),
+                        Csv(activeSignal), Stamp(activeSignalEnd),
+                        Stamp(entryTime), Num(entryAverage),
                         entryFillQty.ToString(CultureInfo.InvariantCulture),
                         Stamp(exitTime), Num(exitPrice), Csv(exitName),
                         activeStopTicks.ToString(CultureInfo.InvariantCulture),
