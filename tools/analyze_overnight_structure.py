@@ -153,8 +153,8 @@ def main():
         print("\nSaved:", pth)
         for x in rows:
             if x["Scope"] == "Contract":
-                print("{Instrument:<10} {Trades:>3} trades  gross {Gross:>10.2f}"
-                      "  closed DD {ClosedDD:>8.2f}  intratrade DD {MaxIntratradeDD:>8.2f}"
+                print(("{Instrument:<10} {Trades:>3} trades  gross {Gross:>10.2f}"
+                       "  closed DD {ClosedDD:>8.2f}  intratrade DD {MaxIntratradeDD:>8.2f}")
                       .format(**x))
 
 
