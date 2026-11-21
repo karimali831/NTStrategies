@@ -93,6 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double dailyGross, cumulativeGross;
         private double equityPeak, maxDrawdown;
         private DateTime maxDrawdownAt = Core.Globals.MinDate;
+        private DateTime lastEquityTickTime = Core.Globals.MinDate;
 
         protected override void OnStateChange()
         {
@@ -681,8 +682,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void UpdateStructureEquity(DateTime time, double price)
         {
-            if (!Valid(price))
+            if (!Valid(price)
+                || (lastEquityTickTime != Core.Globals.MinDate
+                    && time < lastEquityTickTime)
+                || (activeTrade && entryTime != Core.Globals.MinDate
+                    && time < entryTime))
                 return;
+            lastEquityTickTime = time;
             var unrealized = 0.0;
             if (activeTrade && entryFillQty > exitFillQty && entryTime <= time)
             {
