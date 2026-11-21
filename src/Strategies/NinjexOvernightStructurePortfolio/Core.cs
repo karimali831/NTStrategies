@@ -474,6 +474,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool CanSubmitResearchOrders()
         {
+            // This first research build is ES-only on a 5-minute primary
+            // chart. Never submit using a mismatched symbol/timeframe.
+            if (Instrument == null || Instrument.MasterInstrument == null
+                || !string.Equals(Instrument.MasterInstrument.Name,
+                    "ES", StringComparison.OrdinalIgnoreCase)
+                || BarsPeriod == null
+                || BarsPeriod.BarsPeriodType != BarsPeriodType.Minute
+                || BarsPeriod.Value != 5)
+                return false;
+
             if (State == State.Historical)
                 return EnableHistoricalBacktestOrders;
             if (State != State.Realtime || !EnablePlaybackOrders)
