@@ -18,6 +18,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private StreamWriter equityWriter;
         private bool researchFaulted;
         private int minuteFlushCounter;
+        private int equityFlushCounter;
         private DateTime lastWrittenSummary = Core.Globals.MinDate;
 
         private void InitializeStructureResearch()
@@ -270,8 +271,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Num(last), Num(cumulativeGross), Num(unrealized),
                         Num(eq), Num(equityPeak), Num(dd), Num(maxDrawdown),
                         Csv(activeSignal), Csv(State.ToString()) }));
-                    if ((equityWriter.BaseStream.Position % 32768) < 150)
+                    if (++equityFlushCounter >= 100)
+                    {
                         equityWriter.Flush();
+                        equityFlushCounter = 0;
+                    }
                 }
                 catch (Exception ex) { DisableResearch("Equity", ex); }
             }
