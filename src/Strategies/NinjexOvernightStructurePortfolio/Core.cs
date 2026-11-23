@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightStructurePortfolio : Strategy
     {
-        private const string Version = "1.0.2-research1";
+        private const string Version = "1.0.3-research1";
         private const int ContextBip = 0;
         private const int SignalBip = 1;
         private const int ExecutionBip = 2;
@@ -131,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnablePdcReclaim = true;
                 CompressionLookbackSessions = 20;
                 CompressionPercentile = 35;
-                CompressionHistoryGroup = "R102-Default";
+                CompressionHistoryGroup = "R103-Default";
                 OnlMaximumMinutesFromOpen = 150;
                 OnlStopTicks = 30;
                 OnlTargetTicks = 75;
@@ -243,6 +243,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 var snapshot = NinjexOvernightStructureCompressionHistory.Observe(
                     CompressionStudyKey(),
+                    structureRunId,
                     pmDate,
                     Instrument == null ? string.Empty : Instrument.FullName,
                     width,
@@ -271,6 +272,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     + " CurrentConflict=" + compressionCurrentSessionConflict
                     + " RewindReset=" + compressionRewindDetected
                     + " Group=" + CompressionHistoryGroup
+                    + " Instance=" + structureRunId
                     + " Compressed=" + compressedToday + " Bars=" + pmBarCount);
             }
 
