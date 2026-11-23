@@ -42,12 +42,34 @@ When the current day's premarket range finalizes at 09:30 ET, the model:
 2. Compares the current day's width with that threshold.
 3. Only **then** adds the current width to the rolling history.
 
-The first 20 valid sessions **within each strategy instance/contract** are a
-warmup: ONL compression cannot qualify yet. This is a deliberate limitation of
-Research 1, not a use of future data. For fair cross-contract comparisons,
-include adequate historical warmup bars and explicitly audit the
-\`InsufficientPremarketHistory\` candidates. Contract transitions should not
-silently use future or duplicated sessions.
+**Research 1.0.2** stores completed premarket widths in a shared, date-keyed
+memory ledger. All ES contract instances in the same NinjaTrader process can
+carry the most recent 20 **distinct** valid sessions across rollovers without
+restarting a 20-session warmup at every contract change. Only dates strictly
+before the current PM date can contribute to its threshold. The current PM
+width is published **after** its threshold has been evaluated.
+
+The ledger also:
+- excludes duplicate calendar dates;
+- quarantines dates with conflicting widths from different import/contract
+  streams, rather than silently selecting one;
+- rejects lookback widths older than 50 calendar days;
+- drops later cached dates when a multi-session Realtime Playback rewind
+  is detected.
+
+**Compression history group** must match for all contracts belonging to the
+same continuous replay. Set a **new group name for every independent replay**,
+such as \`R102-2023-2026-A\`, to prevent studies from sharing stale in-memory
+history. All 13 contract strategy instances should use that identical group.
+The ledger does not persist across NinjaTrader restarts. A full research replay
+is intended to run chronologically in one NT session; if interrupted after an
+NT restart, either restart with adequate preceding sessions or treat the
+initial post-restart ONL warmup as incomplete.
+
+The first 20 valid sessions of an entirely new history group still require
+warmup; this is expected. Check \`CrossContract\`, \`Available\`,
+\`Conflicts\` and \`RewindReset\` in the daily PM_FINAL diagnostics to confirm
+rollover continuity and absence of future-data leakage.
 
 The overnight and premarket reference levels use the same existing
 \`NinjexPremarketRangeEngine\` implementation that was used in Overnight Edge,
@@ -82,7 +104,7 @@ and it must not be promoted to live on the basis of a short positive run.
 
 With \`Enable Research Export=True\` (default), files go to:
 
-\`Documents\NinjaTrader 8\NinjexResearch\OvernightStructurePortfolio\1.0.0-research1\<RunId>\`
+\`Documents\NinjaTrader 8\NinjexResearch\OvernightStructurePortfolio\1.0.2-research1\<RunId>\`
 
 Six CSVs per instance:
 
@@ -102,7 +124,7 @@ Six CSVs per instance:
 
 Daily log files, including strategy version and date:
 
-\`Documents\NinjaTrader 8\NinjexLogs\OvernightStructurePortfolio\1.0.0-research1\`
+\`Documents\NinjaTrader 8\NinjexLogs\OvernightStructurePortfolio\1.0.2-research1\`
 
 No strategy order decisions should depend on whether research export succeeds.
 
@@ -134,6 +156,32 @@ For an efficient verification, replay the 20 Nov 2026 RTH session with
 sufficient historical warmup. The prior CSV recorded a qualified
 `ONH-DISP-BREAK-L` at 09:58 ET on that date. If settings and
 account are valid, it should no longer be rejected by the execution gate.
+
+## Research 1.0.2 — end-of-day file finalisation
+
+The current RTH session is now finalised when its last completed one-minute
+RTH candle has been observed and trading is flat, **or** at the first
+subsequent completed post-RTH minute on the same date. An in-flight 16:00
+flatten exit is included before the daily totals are committed.
+
+The output files are flushed at session finalisation, not just when the next
+morning arrives or the strategy is disabled. A normal completed RTH day writes
+exactly one \`RthSummary\` row. A severely incomplete session writes
+\`RthPartial\` instead. The per-run CSVs include the history-group name,
+available session count, number of cross-contract lookback sessions and any
+conflicted days.
+
+**Still disable the strategy before creating the final ZIP**. Reading an open
+CSV while its writer is actively appending cannot guarantee that an
+intermediate line is complete. When all instances are disabled, the writers
+are disposed and the final files are safe to archive.
+
+Minimal rollover smoke test: run a few valid sessions of the outgoing ES
+contract, followed by the first few sessions of the next contract, with both
+instances using the same \`Compression history group\`. Verify that the
+incoming contract's first \`PM_FINAL\` shows the inherited 20-session history
+and a nonzero \`CrossContract\` count. Verify there are no two
+\`RthSummary\` rows for one (Instrument, RunId, Date).
 
 ## Required first smoke test (before 13-contract replay)
 
