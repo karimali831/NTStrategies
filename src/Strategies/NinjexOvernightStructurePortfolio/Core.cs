@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class NinjexOvernightStructurePortfolio : Strategy
     {
-        private const string Version = "1.0.1-research1";
+        private const string Version = "1.0.2-research1";
         private const int ContextBip = 0;
         private const int SignalBip = 1;
         private const int ExecutionBip = 2;
@@ -57,13 +57,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double emaSlow = double.NaN, emaFast = double.NaN;
         private double emaSlowSlopeTicks = double.NaN, atrTicks = double.NaN;
 
-        // The history is only populated by earlier, *completed* premarket
-        // sessions. The current session never contributes to its own percentile.
-        private readonly Queue<double> priorPmWidths = new Queue<double>();
+        // Premarket width observations are shared between strategy instances
+        // by study group and trading date. Today's width is never used to
+        // calculate today's threshold.
         private DateTime compressionDate = Core.Globals.MinDate;
         private double compressionThreshold = double.NaN;
         private bool compressedToday;
         private int compressionHistoryCount;
+        private int compressionAvailableSessions;
+        private int compressionCrossContractSessions;
+        private int compressionConflictingPriorSessions;
+        private bool compressionCurrentSessionConflict;
+        private bool compressionRewindDetected;
 
         private DateTime rthDate = Core.Globals.MinDate;
         private double rthOpen = double.NaN;
@@ -125,6 +130,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnablePdcReclaim = true;
                 CompressionLookbackSessions = 20;
                 CompressionPercentile = 35;
+                CompressionHistoryGroup = "R102-Default";
                 OnlMaximumMinutesFromOpen = 150;
                 OnlStopTicks = 30;
                 OnlTargetTicks = 75;
@@ -231,28 +237,40 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pmReady = Valid(pmHigh) && Valid(pmLow) && pmHigh > pmLow
                     && pmBarCount >= MinimumPremarketFiveMinuteBars;
 
-                // Calculate before enqueuing today's PM width — no lookahead.
                 var width = Valid(pmHigh) && Valid(pmLow) && TickSize > 0
                     ? (pmHigh - pmLow) / TickSize : double.NaN;
-                compressionHistoryCount = priorPmWidths.Count;
-                compressionThreshold = compressionHistoryCount >= CompressionLookbackSessions
-                    ? Percentile(priorPmWidths, CompressionPercentile) : double.NaN;
-                compressedToday = pmReady && Valid(compressionThreshold)
-                    && width <= compressionThreshold;
+
+                var snapshot = NinjexOvernightStructureCompressionHistory.Observe(
+                    CompressionStudyKey(),
+                    pmDate,
+                    Instrument == null ? string.Empty : Instrument.FullName,
+                    width,
+                    pmReady,
+                    CompressionLookbackSessions,
+                    CompressionPercentile,
+                    State == State.Realtime);
+
+                compressionHistoryCount = snapshot.SelectedSessions;
+                compressionAvailableSessions = snapshot.AvailableSessions;
+                compressionThreshold = snapshot.ThresholdTicks;
+                compressedToday = snapshot.Compressed;
+                compressionCrossContractSessions = snapshot.CrossContractSessions;
+                compressionConflictingPriorSessions = snapshot.ConflictingPriorSessions;
+                compressionCurrentSessionConflict = snapshot.ConflictingCurrentSession;
+                compressionRewindDetected = snapshot.RewindDetected;
                 compressionDate = pmDate;
 
                 WriteStructureSessionSnapshot(end, width);
                 LogEvent(end, "PM_FINAL Date=" + pmDate.ToString("yyyy-MM-dd")
                     + " WidthTicks=" + Num(width) + " Threshold=" + Num(compressionThreshold)
                     + " Count=" + compressionHistoryCount
+                    + " Available=" + compressionAvailableSessions
+                    + " CrossContract=" + compressionCrossContractSessions
+                    + " Conflicts=" + compressionConflictingPriorSessions
+                    + " CurrentConflict=" + compressionCurrentSessionConflict
+                    + " RewindReset=" + compressionRewindDetected
+                    + " Group=" + CompressionHistoryGroup
                     + " Compressed=" + compressedToday + " Bars=" + pmBarCount);
-
-                if (pmReady && Valid(width))
-                {
-                    priorPmWidths.Enqueue(width);
-                    while (priorPmWidths.Count > CompressionLookbackSessions)
-                        priorPmWidths.Dequeue();
-                }
             }
 
             if (CurrentBars[ContextBip] >= Math.Max(30,
@@ -795,14 +813,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
         }
 
-        private static double Percentile(IEnumerable<double> history, int percentile)
+        private string CompressionStudyKey()
         {
-            var a = new List<double>(history);
-            if (a.Count == 0) return double.NaN;
-            a.Sort();
-            var index = Math.Max(0, Math.Min(a.Count - 1,
-                (int)Math.Ceiling(a.Count * (percentile / 100.0)) - 1));
-            return a[index];
+            // All contract instances in one chronological research replay use
+            // the same group. A new group ID isolates a new independent run.
+            // Include relevant context settings to prevent silent mixing of
+            // incompatible range histories.
+            return "OvernightStructure|"
+                + (CompressionHistoryGroup ?? string.Empty).Trim()
+                + "|ES|PMStart=" + PremarketStartTime
+                + "|Open=" + MarketOpenTime
+                + "|MinBars=" + MinimumPremarketFiveMinuteBars
+                + "|Lookback=" + CompressionLookbackSessions
+                + "|Percentile=" + CompressionPercentile;
         }
 
         private bool IsOurEntry(string name)
