@@ -73,6 +73,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Compression percentile", Description = "Nearest-rank percentile of preceding premarket widths.", GroupName = "2. Regime & indicators", Order = 4)]
         public int CompressionPercentile { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Compression history group", Description = "Use the SAME group name on every ES contract in one continuous Replay, and a NEW group for unrelated runs. Shares completed premarket widths across contract instances without persistent files.", GroupName = "2. Regime & indicators", Order = 5)]
+        public string CompressionHistoryGroup { get; set; }
+
         #endregion
 
         #region 3. ONL breakout short
