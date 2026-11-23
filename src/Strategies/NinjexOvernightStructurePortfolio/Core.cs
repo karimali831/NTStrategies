@@ -74,6 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double rthOpen = double.NaN;
         private double rthLastClose = double.NaN;
         private int rthMinuteBars;
+        private DateTime lastRthCompletedMinuteEnd = Core.Globals.MinDate;
         private double priorRthClose = double.NaN;
         private DateTime priorRthDate = Core.Globals.MinDate;
         private bool onlAttempted, onhAttempted;
@@ -303,8 +304,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             var previous = Closes[SignalBip][2];
             var clock = Clock(end);
 
-            if (rthDate != Core.Globals.MinDate && end.Date > rthDate)
+            // Finalize on the next date OR on the same date's post-RTH
+            // minute stream. The latter ensures the last replay day gets a
+            // complete session record while the strategy remains enabled.
+            if (rthDate != Core.Globals.MinDate
+                && (end.Date > rthDate
+                    || (end.Date == rthDate && clock > FlattenTime
+                        && !activeTrade && !entrySubmitted
+                        && !manualExitPending)))
+            {
                 FinalizeRthReference(end);
+            }
 
             if (clock < MarketOpenTime || clock > FlattenTime)
             {
@@ -319,6 +329,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 rthOpen = open;
                 rthLastClose = double.NaN;
                 rthMinuteBars = 0;
+                lastRthCompletedMinuteEnd = Core.Globals.MinDate;
                 onlAttempted = false;
                 onhAttempted = false;
                 previousRthMinuteClose = double.NaN;
@@ -327,7 +338,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             rthMinuteBars++;
             rthLastClose = close;
+            lastRthCompletedMinuteEnd = end;
             WriteMinuteBar(end, open, high, low, close, Volumes[SignalBip][1]);
+
+            // Completed 16:00 RTH bar is enough to finalize when flat.
+            // If a flatten order is still in flight, finish after the exit
+            // execution or at the next post-RTH completed bar.
+            if (clock >= FlattenTime
+                && !activeTrade && !entrySubmitted && !manualExitPending
+                && Position.MarketPosition == MarketPosition.Flat)
+            {
+                FinalizeRthReference(end);
+                return;
+            }
 
             if (clock < EntryStartTime || clock >= EntryEndTime)
             {
@@ -459,6 +482,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 priorRthDate = rthDate;
             }
             FlushStructureDailySummary();
+            LogEvent(now, "RTH_FINALIZED Date=" + rthDate.ToString("yyyy-MM-dd")
+                + " RthBars=" + rthMinuteBars
+                + " Trades=" + tradesToday
+                + " Gross=" + Num(dailyGross));
             rthDate = Core.Globals.MinDate;
         }
 
