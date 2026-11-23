@@ -792,6 +792,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryTime = Core.Globals.MinDate;
             deadline = Core.Globals.MinDate;
             manualExitPending = false;
+
+            // A 16:00 flatten may fill after the completed-minute callback.
+            // Finalize only after the closing RTH minute is processed and the
+            // complete exit has been counted in the daily gross result.
+            if (marketPosition == MarketPosition.Flat
+                && rthDate == time.Date
+                && lastRthCompletedMinuteEnd.Date == rthDate
+                && Clock(lastRthCompletedMinuteEnd) >= FlattenTime)
+            {
+                FinalizeRthReference(time);
+            }
         }
 
         private void UpdateStructureEquity(DateTime time, double price)
