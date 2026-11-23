@@ -54,8 +54,10 @@ The ledger also:
 - quarantines dates with conflicting widths from different import/contract
   streams, rather than silently selecting one;
 - rejects lookback widths older than 50 calendar days;
-- drops later cached dates when a multi-session Realtime Playback rewind
-  is detected.
+- drops later cached dates only when a **single strategy instance**
+  genuinely moves its own Realtime Playback clock backwards by multiple days.
+  A different contract instance processing earlier historical/preload dates
+  does not count as a global Playback rewind.
 
 **Compression history group** must match for all contracts belonging to the
 same continuous replay. Set a **new group name for every independent replay**,
@@ -104,7 +106,7 @@ and it must not be promoted to live on the basis of a short positive run.
 
 With \`Enable Research Export=True\` (default), files go to:
 
-\`Documents\NinjaTrader 8\NinjexResearch\OvernightStructurePortfolio\1.0.2-research1\<RunId>\`
+\`Documents\NinjaTrader 8\NinjexResearch\OvernightStructurePortfolio\1.0.3-research1\<RunId>\`
 
 Six CSVs per instance:
 
@@ -124,7 +126,7 @@ Six CSVs per instance:
 
 Daily log files, including strategy version and date:
 
-\`Documents\NinjaTrader 8\NinjexLogs\OvernightStructurePortfolio\1.0.2-research1\`
+\`Documents\NinjaTrader 8\NinjexLogs\OvernightStructurePortfolio\1.0.3-research1\`
 
 No strategy order decisions should depend on whether research export succeeds.
 
@@ -156,6 +158,49 @@ For an efficient verification, replay the 20 Nov 2026 RTH session with
 sufficient historical warmup. The prior CSV recorded a qualified
 `ONH-DISP-BREAK-L` at 09:58 ET on that date. If settings and
 account are valid, it should no longer be rejected by the execution gate.
+
+## Research 1.0.3 — instance-aware Playback rewind correction
+
+The 1.0.2 rollover test used a valid ES 09-26 front-month dataset ending
+11 September 2026 and ES 12-26 active from the Sunday session on
+13 September at 18:00 ET. The December contract's earlier Historical
+or partial Realtime preload on 31 August/1 September does **not** mean
+its live trading began there. Nor does the ES 09-26 trade of 2 September
+belong to ES 12-26.
+
+However, the shared 1.0.2 `LatestRealtimeDate` incorrectly treated the
+December instance's earlier preload callback as a user Playback rewind and
+discarded the outgoing ES 09-26 history. The shared session ledger now uses
+`LatestRealtimeByInstance[RunId]`, where `RunId` is generated uniquely
+for each strategy's DataLoaded lifecycle. Only a backwards Realtime move
+of **that same instance** can trigger cache pruning.
+
+The key regression test is
+`RunMixedContractInitializationTest`. It reproduces ES 09-26 accumulating
+ten valid PM sessions through 11 September, followed by ES 12-26
+initialising with partial 1 September data. Expected research output:
+
+| ES 12-26 PM date | Available previous valid sessions | Cross-contract sessions |
+|---|---:|---:|
+| 14 September 2026 | 10 | 0 (lookback not complete) |
+| 28 September 2026 | 20 | 10 |
+
+`CompressionRewindReset` must remain `0` for the cross-instance
+initialisation sequence, and `CompressionPriorConflicts` should remain 0
+when the inactive December pre-rollover PM ranges are invalid.
+The first full 20-date ONL percentile therefore becomes available on
+28 September, rather than 9 October.
+
+The regression suite still tests **genuine** same-instance Playback rewinds
+as well as strict-before-today percentiles, duplicate-date quarantine,
+group isolation, and cross-contract provenance.
+
+**Run the Windows regression test and a short real NT8 Playback rollover
+smoke test before beginning the 13-contract history.** If the two
+strategy instances emit PM_FINAL callbacks out of chronological sequence
+or the September 14 count is not ten, send the 1.0.3 `sessions.csv` and
+daily logs; this study cannot assume that merely sharing a static ledger
+guarantees every source instance has already published its prior dates.
 
 ## Research 1.0.2 — end-of-day file finalisation
 
