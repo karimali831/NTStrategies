@@ -44,7 +44,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             public readonly SortedDictionary<DateTime, PremarketRecord>
                 Sessions = new SortedDictionary<DateTime, PremarketRecord>();
 
-            public DateTime LatestRealtimeDate = DateTime.MinValue;
+            // A newer contract's historic preload is not a rewind of an
+            // older contract's Playback clock. Track each strategy RunId
+            // separately; the shared sessions remain study-wide.
+            public readonly Dictionary<string, DateTime> LatestRealtimeByInstance =
+                new Dictionary<string, DateTime>(StringComparer.Ordinal);
         }
 
         private static readonly object Gate = new object();
@@ -53,6 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         internal static Observation Observe(
             string studyKey,
+            string instanceId,
             DateTime tradingDate,
             string instrument,
             double widthTicks,
@@ -63,6 +68,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (string.IsNullOrWhiteSpace(studyKey))
                 throw new ArgumentException("Study key must not be empty.", "studyKey");
+            if (string.IsNullOrWhiteSpace(instanceId))
+                throw new ArgumentException("Instance ID must not be empty.", "instanceId");
             if (tradingDate == DateTime.MinValue)
                 throw new ArgumentException("Trading date must be valid.", "tradingDate");
             if (lookbackSessions < 1 || percentile < 1 || percentile > 99)
@@ -82,29 +89,43 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Studies.Add(studyKey, study);
                 }
 
-                // If Playback is moved backwards by multiple sessions, do
-                // not let the previous run's later samples remain in this
-                // group's causal path. Historical preload is never treated as
-                // proof of the current Playback clock advancing.
-                if (isRealtime
-                    && study.LatestRealtimeDate != DateTime.MinValue
-                    && tradingDate < study.LatestRealtimeDate.AddDays(-2))
+                // A REAL rewind is a backward jump within the SAME strategy
+                // instance's Realtime clock, not from one contract strategy
+                // loading an earlier date after another contract advanced.
+                // All instances share the dated widths, but never share a
+                // latest-Realtime-date marker.
+                if (isRealtime)
                 {
-                    var remove = new List<DateTime>();
-                    foreach (var date in study.Sessions.Keys)
+                    DateTime priorRealtimeDate;
+                    if (study.LatestRealtimeByInstance.TryGetValue(
+                            instanceId, out priorRealtimeDate)
+                        && tradingDate < priorRealtimeDate.AddDays(-2))
                     {
-                        if (date >= tradingDate)
-                            remove.Add(date);
+                        // In a genuine Replay rewind, purge future session
+                        // samples gathered on the superseded timeline.
+                        var remove = new List<DateTime>();
+                        foreach (var date in study.Sessions.Keys)
+                        {
+                            if (date >= tradingDate)
+                                remove.Add(date);
+                        }
+                        foreach (var date in remove)
+                            study.Sessions.Remove(date);
+
+                        // Other contract instance clocks are also ahead of
+                        // the rewound global Playback cursor. Reset those
+                        // cursors so they don't trigger a second false purge
+                        // when their next callbacks arrive on the new timeline.
+                        study.LatestRealtimeByInstance.Clear();
+                        outcome.RewindDetected = true;
                     }
-                    foreach (var date in remove)
-                        study.Sessions.Remove(date);
 
-                    study.LatestRealtimeDate = DateTime.MinValue;
-                    outcome.RewindDetected = true;
+                    DateTime lastDate;
+                    if (!study.LatestRealtimeByInstance.TryGetValue(
+                            instanceId, out lastDate)
+                        || tradingDate > lastDate)
+                        study.LatestRealtimeByInstance[instanceId] = tradingDate;
                 }
-
-                if (isRealtime && tradingDate > study.LatestRealtimeDate)
-                    study.LatestRealtimeDate = tradingDate;
 
                 // Restrict records to recent, distinct and already completed
                 // sessions. This also refuses stale history after large gaps.
