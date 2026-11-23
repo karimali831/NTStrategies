@@ -176,6 +176,19 @@ CSV while its writer is actively appending cannot guarantee that an
 intermediate line is complete. When all instances are disabled, the writers
 are disposed and the final files are safe to archive.
 
+The ledger's date-ordering, nearest-rank percentile, duplicate-date
+conflict quarantine, cross-contract provenance and Playback rewind handling
+have standalone C# regression cases under
+\`tests/OvernightStructureCompressionHistory.Tests.cs\`. On a Windows/.NET
+Framework machine with the repository checked out, run:
+
+\`\`\`powershell
+.\tools\test_overnight_structure_compression_history.ps1
+\`\`\`
+
+These tests compile only the pure history coordinator; they do **not**
+replace an actual NT8 compile or Playback execution test.
+
 Minimal rollover smoke test: run a few valid sessions of the outgoing ES
 contract, followed by the first few sessions of the next contract, with both
 instances using the same \`Compression history group\`. Verify that the
