@@ -171,11 +171,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (study.Sessions.TryGetValue(tradingDate, out existing))
                     {
                         if (Math.Abs(existing.WidthTicks - widthTicks) >= 0.125)
-                        {
                             existing.Conflicted = true;
-                            outcome.ConflictingCurrentSession = true;
-                        }
+
+                        outcome.ConflictingCurrentSession = existing.Conflicted;
                         outcome.Published = !existing.Conflicted;
+
+                        if (existing.Conflicted)
+                            outcome.Compressed = false;
                     }
                     else
                     {
