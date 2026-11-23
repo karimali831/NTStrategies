@@ -53,13 +53,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "RunId,Instrument,Date,Event,OvernightReady,PremarketReady,"
                     + "ONH,ONL,PMH,PML,OvernightBars,PremarketBars,PMWidthTicks,"
                     + "PriorHistoryCount,CompressionThresholdTicks,Compressed,"
-                    + "RTHMinuteBars,Trades,Winners,Losses,GrossPnl,ProcessingState");
+                    + "RTHMinuteBars,Trades,Winners,Losses,GrossPnl,ProcessingState,"
+                    + "CompressionGroup,CompressionAvailable,CompressionCrossContract,"
+                    + "CompressionPriorConflicts,CompressionCurrentConflict,CompressionRewindReset");
                 candidateWriter = CsvWriter(prefix + "candidates.csv",
                     "RunId,Instrument,Date,SignalEndET,Signal,Family,Direction,Level,"
                     + "Open,High,Low,Close,StopTicks,TargetTicks,Qualified,Disposition,"
                     + "ONH,ONL,PMH,PML,PDC,RTHOpen,PMWidthTicks,HistoryCount,"
                     + "CompressionThresholdTicks,Compressed,EMA5Fast,EMA5Slow,"
-                    + "SlowSlopeTicks,ATR5Ticks,ProcessingState");
+                    + "SlowSlopeTicks,ATR5Ticks,ProcessingState,"
+                    + "CompressionGroup,CompressionCrossContract,CompressionPriorConflicts");
                 tradeWriter = CsvWriter(prefix + "trades.csv",
                     "RunId,Instrument,Date,Signal,SignalEndET,EntryTimeET,EntryPrice,Quantity,"
                     + "ExitTimeET,ExitPrice,ExitName,StopTicks,TargetTicks,MaxHoldMinutes,"
@@ -156,7 +159,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || rthDate == lastWrittenSummary)
                 return;
             var time = rthDate.AddHours(16);
-            WriteSession(time, "RthSummary",
+            var eventName = rthMinuteBars >= 200
+                ? "RthSummary" : "RthPartial";
+            WriteSession(time, eventName,
                 Valid(pmHigh) && Valid(pmLow) && TickSize > 0
                     ? (pmHigh - pmLow) / TickSize : double.NaN,
                 rthMinuteBars);
@@ -182,7 +187,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     sessionWriter.WriteLine(string.Join(",", new[] {
                         Csv(structureRunId), Csv(Instrument.FullName),
-                        Day(ev == "RthSummary" ? rthDate : pmDate),
+                        Day(ev.StartsWith("Rth", StringComparison.Ordinal)
+                            ? rthDate : pmDate),
                         Csv(ev), onReady ? "1":"0", pmReady ? "1":"0",
                         Num(onHigh), Num(onLow), Num(pmHigh), Num(pmLow),
                         onBarCount.ToString(CultureInfo.InvariantCulture),
@@ -190,11 +196,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Num(width), compressionHistoryCount.ToString(CultureInfo.InvariantCulture),
                         Num(compressionThreshold), compressedToday ? "1":"0",
                         rthBars.ToString(CultureInfo.InvariantCulture),
-                        (ev == "RthSummary" ? tradesToday : 0).ToString(CultureInfo.InvariantCulture),
-                        (ev == "RthSummary" ? winnersToday : 0).ToString(CultureInfo.InvariantCulture),
-                        (ev == "RthSummary" ? lossesToday : 0).ToString(CultureInfo.InvariantCulture),
-                        Num(ev == "RthSummary" ? dailyGross : 0.0),
-                        Csv(State.ToString()) }));
+                        (ev.StartsWith("Rth", StringComparison.Ordinal) ? tradesToday : 0).ToString(CultureInfo.InvariantCulture),
+                        (ev.StartsWith("Rth", StringComparison.Ordinal) ? winnersToday : 0).ToString(CultureInfo.InvariantCulture),
+                        (ev.StartsWith("Rth", StringComparison.Ordinal) ? lossesToday : 0).ToString(CultureInfo.InvariantCulture),
+                        Num(ev.StartsWith("Rth", StringComparison.Ordinal) ? dailyGross : 0.0),
+                        Csv(State.ToString()),
+                        Csv(CompressionHistoryGroup),
+                        compressionAvailableSessions.ToString(CultureInfo.InvariantCulture),
+                        compressionCrossContractSessions.ToString(CultureInfo.InvariantCulture),
+                        compressionConflictingPriorSessions.ToString(CultureInfo.InvariantCulture),
+                        compressionCurrentSessionConflict ? "1" : "0",
+                        compressionRewindDetected ? "1" : "0" }));
                     sessionWriter.Flush();
                 }
                 catch (Exception ex) { DisableResearch("Session", ex); }
@@ -224,7 +236,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         c.HistoryCount.ToString(CultureInfo.InvariantCulture),
                         Num(c.CompressionThreshold), compressedToday ? "1" : "0",
                         Num(emaFast), Num(emaSlow), Num(emaSlowSlopeTicks),
-                        Num(atrTicks), Csv(State.ToString()) }));
+                        Num(atrTicks), Csv(State.ToString()),
+                        Csv(CompressionHistoryGroup),
+                        compressionCrossContractSessions.ToString(CultureInfo.InvariantCulture),
+                        compressionConflictingPriorSessions.ToString(CultureInfo.InvariantCulture) }));
                     candidateWriter.Flush();
                 }
                 catch (Exception ex) { DisableResearch("Candidate", ex); }
@@ -311,6 +326,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (minuteWriter != null) minuteWriter.Flush();
                     if (contextWriter != null) contextWriter.Flush();
+                    if (sessionWriter != null) sessionWriter.Flush();
                     if (candidateWriter != null) candidateWriter.Flush();
                     if (tradeWriter != null) tradeWriter.Flush();
                     if (equityWriter != null) equityWriter.Flush();
