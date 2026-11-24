@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Globalization;
 using System.Web.Script.Serialization;
 using NinjaTrader.Data;
@@ -26,6 +27,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private AiPublisherDiskSpool spool;
         private DateTime previousCapturedBar = DateTime.MinValue;
         private long barCount;
+        private long eligible;
+        private long failed;
+        private double worstCaptureMs;
 
         [NinjaScriptProperty]
         [Display(Name = "Enable publishing", Order = 1, GroupName = "Ninjex AI")]
@@ -61,7 +65,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Terminated)
             {
-                if (spool != null) { spool.Dispose(); spool = null; }
+                if (spool != null)
+                {
+                    Print("[NinjexAI] FINAL captured=" + spool.Captured +
+                        " eligible=" + eligible + " captureFailures=" + failed +
+                        " pendingUpload=" + spool.Pending +
+                        " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
+                        " spool=" + spool.Folder);
+                    spool.Dispose();
+                    spool = null;
+                }
             }
         }
 
@@ -90,6 +103,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 messages.Enqueue("[NinjexAI] Backend URL must be HTTPS.");
                 return;
             }
+            eligible++;
+            var captureTimer = Stopwatch.StartNew();
             try
             {
                 // Use a disk-first append operation. Upload speed cannot drop
@@ -109,15 +124,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 };
                 var json = new JavaScriptSerializer { MaxJsonLength = 1_000_000 }.Serialize(payload);
                 spool.Capture(json, barEnd);
+                captureTimer.Stop();
+                if (captureTimer.Elapsed.TotalMilliseconds > worstCaptureMs)
+                    worstCaptureMs = captureTimer.Elapsed.TotalMilliseconds;
                 previousCapturedBar = barEnd;
                 barCount++;
                 if (barCount % 12 == 0)
-                    messages.Enqueue("[NinjexAI] Captured this instance=" + spool.Captured +
-                        " pending upload=" + spool.Pending +
+                    messages.Enqueue("[NinjexAI] eligible=" + eligible +
+                        " captured=" + spool.Captured + " captureFailures=" + failed +
+                        " pendingUpload=" + spool.Pending +
+                        " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
                         " last UTC=" + barEnd.ToString("o", CultureInfo.InvariantCulture));
             }
             catch (Exception ex)
             {
+                failed++;
                 messages.Enqueue("[NinjexAI] CAPTURE FAILED (inspect before high-speed replay): " +
                     ex.GetType().Name + " " + ex.Message);
             }
