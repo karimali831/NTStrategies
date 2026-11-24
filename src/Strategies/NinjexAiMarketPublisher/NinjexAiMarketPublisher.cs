@@ -109,12 +109,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Use a disk-first append operation. Upload speed cannot drop
                 // observations. High Playback speeds may incur disk backpressure,
                 // but the record is saved before OnBarUpdate returns.
-                if (spool == null)
-                    spool = new AiPublisherDiskSpool(BackendUrl, key, name.Trim(),
-                        m => messages.Enqueue(m));
                 var barEnd = ConvertEtToUtc(Times[0][0]);
                 if (barEnd == previousCapturedBar) return;
                 eligible++;
+                if (spool == null)
+                    spool = new AiPublisherDiskSpool(BackendUrl, key, name.Trim(),
+                        m => messages.Enqueue(m));
                 var instrument = name.Substring(0, 2).ToUpperInvariant();
                 var payload = new Dictionary<string, object>
                 {
