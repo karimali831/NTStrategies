@@ -3,11 +3,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Globalization;
-using System.Net.Http;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using NinjaTrader.Data;
 #endregion
@@ -17,20 +14,22 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// <summary>
     /// Publishes fully closed 5m/15m/60m bars to Ninjex's observe-only
     /// regime service. NO trading calls exist anywhere in this strategy.
-    /// Only sends in State.Realtime, never during historical processing.
+    /// Only captures in State.Realtime, never during historical processing.
+    /// Every captured observation is first written to a local replay spool.
     /// Configured NT chart timezone must be Eastern Standard Time (ET).
     /// </summary>
     public sealed class NinjexAiMarketPublisher : Strategy
     {
         private const int BarCount = 100;
         private const string SecretEnvironmentVariable = "NINJEX_AI_PUBLISHER_KEY";
-        private static readonly HttpClient Client = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(8)
-        };
         private readonly ConcurrentQueue<string> messages = new ConcurrentQueue<string>();
         private TimeZoneInfo exchangeTimeZone;
-        private int sending;
+        private AiPublisherDiskSpool spool;
+        private DateTime previousCapturedBar = DateTime.MinValue;
+        private long barCount;
+        private long eligible;
+        private long failed;
+        private double worstCaptureMs;
 
         [NinjaScriptProperty]
         [Display(Name = "Enable publishing", Order = 1, GroupName = "Ninjex AI")]
@@ -52,7 +51,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = BarCount;
                 IsInstantiatedOnEachOptimizationIteration = false;
                 EnablePublishing = false;
-                BackendUrl = "https://api.ninjex.co";
+                BackendUrl = "https://localhost:7016";
             }
             else if (State == State.Configure)
             {
@@ -63,6 +62,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // NT Tools > Options > General > Time zone MUST be set to ET.
                 exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+            }
+            else if (State == State.Terminated)
+            {
+                if (spool != null)
+                {
+                    Print("[NinjexAI] FINAL captured=" + spool.Captured +
+                        " eligible=" + eligible + " captureFailures=" + failed +
+                        " pendingUpload=" + spool.Pending +
+                        " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
+                        " spool=" + spool.Folder);
+                    spool.Dispose();
+                    spool = null;
+                }
             }
         }
 
@@ -91,10 +103,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 messages.Enqueue("[NinjexAI] Backend URL must be HTTPS.");
                 return;
             }
-            if (Interlocked.CompareExchange(ref sending, 1, 0) != 0) return;
-            string json;
+            var captureTimer = Stopwatch.StartNew();
             try
             {
+                // Use a disk-first append operation. Upload speed cannot drop
+                // observations. High Playback speeds may incur disk backpressure,
+                // but the record is saved before OnBarUpdate returns.
+                var barEnd = ConvertEtToUtc(Times[0][0]);
+                if (barEnd == previousCapturedBar) return;
+                eligible++;
+                if (spool == null)
+                    spool = new AiPublisherDiskSpool(BackendUrl, key, name.Trim(),
+                        m => messages.Enqueue(m));
                 var instrument = name.Substring(0, 2).ToUpperInvariant();
                 var payload = new Dictionary<string, object>
                 {
@@ -102,39 +122,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                     { "contract", name.Trim() },
                     { "frames", new[] { BuildFrame(0, 5), BuildFrame(1, 15), BuildFrame(2, 60) } }
                 };
-                json = new JavaScriptSerializer { MaxJsonLength = 1_000_000 }.Serialize(payload);
+                var json = new JavaScriptSerializer { MaxJsonLength = 1_000_000 }.Serialize(payload);
+                spool.Capture(json, barEnd);
+                captureTimer.Stop();
+                if (captureTimer.Elapsed.TotalMilliseconds > worstCaptureMs)
+                    worstCaptureMs = captureTimer.Elapsed.TotalMilliseconds;
+                previousCapturedBar = barEnd;
+                barCount++;
+                if (barCount % 12 == 0)
+                    messages.Enqueue("[NinjexAI] eligible=" + eligible +
+                        " captured=" + spool.Captured + " captureFailures=" + failed +
+                        " pendingUpload=" + spool.Pending +
+                        " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
+                        " last UTC=" + barEnd.ToString("o", CultureInfo.InvariantCulture));
             }
             catch (Exception ex)
             {
-                messages.Enqueue("[NinjexAI] Invalid source bars: " + ex.Message);
-                Interlocked.Exchange(ref sending, 0);
-                return;
+                failed++;
+                messages.Enqueue("[NinjexAI] CAPTURE FAILED (inspect before high-speed replay): " +
+                    ex.GetType().Name + " " + ex.Message);
             }
+        }
 
-            // Pure serialized snapshot crosses the thread boundary; no NinjaTrader
-            // series or account objects are accessed by the HTTP worker.
-            var url = BackendUrl.TrimEnd('/') + "/api/trading/ai-market/observe";
-            Task.Run(async () =>
-            {
-                try
-                {
-                    using (var req = new HttpRequestMessage(HttpMethod.Post, url))
-                    {
-                        req.Headers.TryAddWithoutValidation("X-Ninjex-AI-Key", key);
-                        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                        using (var response = await Client.SendAsync(req).ConfigureAwait(false))
-                        {
-                            messages.Enqueue("[NinjexAI] HTTP " + (int)response.StatusCode +
-                                (response.IsSuccessStatusCode ? " observation submitted" : " publish rejected"));
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    messages.Enqueue("[NinjexAI] Transport failed: " + ex.GetType().Name);
-                }
-                finally { Interlocked.Exchange(ref sending, 0); }
-            });
+        private DateTime ConvertEtToUtc(DateTime time)
+        {
+            var local = DateTime.SpecifyKind(time, DateTimeKind.Unspecified);
+            if (exchangeTimeZone.IsAmbiguousTime(local) || exchangeTimeZone.IsInvalidTime(local))
+                throw new InvalidOperationException("Ambiguous/invalid ET candle timestamp.");
+            return TimeZoneInfo.ConvertTimeToUtc(local, exchangeTimeZone);
         }
 
         private Dictionary<string, object> BuildFrame(int series, int minutes)
@@ -142,10 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var bars = new List<object>(BarCount);
             for (var back = BarCount - 1; back >= 0; back--)
             {
-                DateTime local = DateTime.SpecifyKind(Times[series][back], DateTimeKind.Unspecified);
-                if (exchangeTimeZone.IsAmbiguousTime(local) || exchangeTimeZone.IsInvalidTime(local))
-                    throw new InvalidOperationException("Ambiguous/invalid ET candle time; skipping observation.");
-                var utc = TimeZoneInfo.ConvertTimeToUtc(local, exchangeTimeZone);
+                var utc = ConvertEtToUtc(Times[series][back]);
                 bars.Add(new Dictionary<string, object>
                 {
                     { "endUtc", utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture) },

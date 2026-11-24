@@ -1,0 +1,17 @@
+name: AI market publisher spool checks
+on:
+  pull_request:
+    paths:
+      - 'src/Strategies/NinjexAiMarketPublisher/**'
+      - 'tests/AiPublisherSpoolChecks/**'
+      - '.github/workflows/ai-publisher-spool-checks.yml'
+  workflow_dispatch:
+jobs:
+  disk-spool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project tests/AiPublisherSpoolChecks
