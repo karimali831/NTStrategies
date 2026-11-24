@@ -121,13 +121,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             else File.Move(tmp, path);
         }
 
-        private sealed class Receipt
-        {
-            public int processed { get; set; }
-            public int accepted { get; set; }
-            public int duplicates { get; set; }
-        }
-
         private bool Upload(Batch batch)
         {
             var payload = "{\"observations\":[" + string.Join(",", batch.Messages) + "]}";
@@ -145,9 +138,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         return false;
                     }
                     var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    var receipt = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Receipt>(result);
-                    if (receipt == null || receipt.processed != batch.Messages.Length ||
-                        receipt.accepted + receipt.duplicates != receipt.processed)
+                    var receipt = new System.Web.Script.Serialization.JavaScriptSerializer()
+                        .Deserialize<System.Collections.Generic.Dictionary<string, object>>(result);
+                    if (receipt == null || !receipt.ContainsKey("processed") ||
+                        !receipt.ContainsKey("accepted") || !receipt.ContainsKey("duplicates"))
+                        throw new InvalidDataException("Missing batch receipt fields; retaining data.");
+                    var processed = Convert.ToInt32(receipt["processed"], CultureInfo.InvariantCulture);
+                    var accepted = Convert.ToInt32(receipt["accepted"], CultureInfo.InvariantCulture);
+                    var duplicates = Convert.ToInt32(receipt["duplicates"], CultureInfo.InvariantCulture);
+                    if (processed != batch.Messages.Length || accepted < 0 || duplicates < 0 ||
+                        accepted + duplicates != processed)
                         throw new InvalidDataException("Unexpected batch receipt; retaining data for retry.");
                     lock (sync)
                     {
@@ -160,8 +160,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Interlocked.Add(ref pending, -batch.Messages.Length);
                         }
                     }
-                    log("[NinjexAI] Batch HTTP 200 processed=" + receipt.processed +
-                        " inserted=" + receipt.accepted + " duplicates=" + receipt.duplicates +
+                    log("[NinjexAI] Batch HTTP 200 processed=" + processed +
+                        " inserted=" + accepted + " duplicates=" + duplicates +
                         " pending=" + Pending);
                     return true;
                 }
