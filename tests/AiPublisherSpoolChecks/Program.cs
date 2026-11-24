@@ -22,7 +22,7 @@ static class Program
             Check(first.Instance.Captured == 600, "All high-speed simulated bars captured");
             Check(first.Instance.Pending >= 600, "Pending until server acknowledges");
             var docs = Directory.GetFiles(folder, "*.jsonl");
-            Check(docs.Length == 2, "Day-partitioned spool files");
+            Check(docs.Length == 3, "Day-partitioned spool files");
             Check(docs.Sum(doc => File.ReadLines(doc).Count()) == 600, "All 600 records durable");
             Check(docs.All(doc => !File.ReadAllText(doc).Contains(secret)), "Secret never stored in spool");
         }
