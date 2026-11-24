@@ -16,16 +16,18 @@ static class Program
         using (var first = new SpoolLifetime(url, secret))
         {
             folder = first.Instance.Folder;
-            first.Instance.Capture("{\"instrument\":\"ES\",\"n\":1}", new DateTime(2026, 10, 1, 14, 0, 0, DateTimeKind.Utc));
-            first.Instance.Capture("{\"instrument\":\"ES\",\"n\":2}", new DateTime(2026, 10, 1, 14, 5, 0, DateTimeKind.Utc));
-            Check(first.Instance.Captured == 2, "Two records captured");
-            Check(first.Instance.Pending >= 2, "Pending until server acknowledges");
+            for (var i = 0; i < 600; i++)
+                first.Instance.Capture("{\"instrument\":\"ES\",\"n\":" + i + "}",
+                    new DateTime(2026, 10, 1, 14, 0, 0, DateTimeKind.Utc).AddMinutes(i * 5));
+            Check(first.Instance.Captured == 600, "All high-speed simulated bars captured");
+            Check(first.Instance.Pending >= 600, "Pending until server acknowledges");
             var docs = Directory.GetFiles(folder, "*.jsonl");
-            Check(docs.Length == 1 && File.ReadLines(docs[0]).Count() == 2, "Durable JSONL spool");
-            Check(!File.ReadAllText(docs[0]).Contains(secret), "Secret never stored in spool");
+            Check(docs.Length == 2, "Day-partitioned spool files");
+            Check(docs.Sum(doc => File.ReadLines(doc).Count()) == 600, "All 600 records durable");
+            Check(docs.All(doc => !File.ReadAllText(doc).Contains(secret)), "Secret never stored in spool");
         }
         using (var recovered = new SpoolLifetime(url, secret))
-            Check(recovered.Instance.Pending >= 2, "Unacknowledged observations survive restart");
+            Check(recovered.Instance.Pending >= 600, "Unacknowledged observations survive restart");
         Console.WriteLine("AI publisher spool compile/durability checks passed.");
     }
     static void Check(bool ok, string message)
