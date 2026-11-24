@@ -103,7 +103,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 messages.Enqueue("[NinjexAI] Backend URL must be HTTPS.");
                 return;
             }
-            eligible++;
             var captureTimer = Stopwatch.StartNew();
             try
             {
@@ -115,6 +114,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         m => messages.Enqueue(m));
                 var barEnd = ConvertEtToUtc(Times[0][0]);
                 if (barEnd == previousCapturedBar) return;
+                eligible++;
                 var instrument = name.Substring(0, 2).ToUpperInvariant();
                 var payload = new Dictionary<string, object>
                 {
