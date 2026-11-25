@@ -29,6 +29,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private long barCount;
         private long eligible;
         private long failed;
+        private long skipped;
         private double worstCaptureMs;
 
         [NinjaScriptProperty]
@@ -69,6 +70,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print("[NinjexAI] FINAL captured=" + spool.Captured +
                         " eligible=" + eligible + " captureFailures=" + failed +
+                        " skippedFrameUnavailable=" + skipped +
+                        " rejectedQuarantined=" + spool.Quarantined +
                         " pendingUpload=" + spool.Pending +
                         " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
                         " spool=" + spool.Folder);
@@ -115,12 +118,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (spool == null)
                     spool = new AiPublisherDiskSpool(BackendUrl, key, name.Trim(),
                         m => messages.Enqueue(m));
+                // Select fully as-of bars from each higher timeframe. A new
+                // ETH session can briefly leave 15m/60m bars stale while 5m
+                // candles resume. Never label those using future/stale data.
+                var frame15 = SelectClosedFrame(1, 15, barEnd);
+                var frame60 = SelectClosedFrame(2, 60, barEnd);
                 var instrument = name.Substring(0, 2).ToUpperInvariant();
                 var payload = new Dictionary<string, object>
                 {
                     { "instrument", instrument },
                     { "contract", name.Trim() },
-                    { "frames", new[] { BuildFrame(0, 5), BuildFrame(1, 15), BuildFrame(2, 60) } }
+                    { "frames", new[] { BuildFrame(0, 5, 0), frame15, frame60 } }
                 };
                 var json = new JavaScriptSerializer { MaxJsonLength = 1_000_000 }.Serialize(payload);
                 spool.Capture(json, barEnd);
@@ -129,12 +137,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                     worstCaptureMs = captureTimer.Elapsed.TotalMilliseconds;
                 previousCapturedBar = barEnd;
                 barCount++;
-                if (barCount % 12 == 0)
-                    messages.Enqueue("[NinjexAI] eligible=" + eligible +
-                        " captured=" + spool.Captured + " captureFailures=" + failed +
-                        " pendingUpload=" + spool.Pending +
-                        " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
-                        " last UTC=" + barEnd.ToString("o", CultureInfo.InvariantCulture));
+                if (eligible % 12 == 0) QueueSummary(barEnd);
+            }
+            catch (HigherFrameUnavailableException ex)
+            {
+                // Explicit data-quality gap, not a successful observation.
+                // Preserve an audit record with its precise UTC 5m close.
+                skipped++;
+                try
+                {
+                    spool.RecordSkip(ConvertEtToUtc(Times[0][0]), ex.Message);
+                    previousCapturedBar = ConvertEtToUtc(Times[0][0]);
+                    if (skipped == 1 || skipped % 12 == 0)
+                        messages.Enqueue("[NinjexAI] SKIPPED as-of frame #" + skipped + ": " + ex.Message);
+                    if (eligible % 12 == 0) QueueSummary(previousCapturedBar);
+                }
+                catch (Exception saveError)
+                {
+                    failed++;
+                    messages.Enqueue("[NinjexAI] Failed to save skip audit: " + saveError.Message);
+                }
             }
             catch (Exception ex)
             {
@@ -152,20 +174,62 @@ namespace NinjaTrader.NinjaScript.Strategies
             return TimeZoneInfo.ConvertTimeToUtc(local, exchangeTimeZone);
         }
 
-        private Dictionary<string, object> BuildFrame(int series, int minutes)
+        private sealed class HigherFrameUnavailableException : Exception
+        {
+            public HigherFrameUnavailableException(string message) : base(message) { }
+        }
+
+        private void QueueSummary(DateTime lastUtc)
+        {
+            messages.Enqueue("[NinjexAI] eligible=" + eligible +
+                " captured=" + spool.Captured +
+                " skippedFrameUnavailable=" + skipped +
+                " captureFailures=" + failed +
+                " rejectedQuarantined=" + spool.Quarantined +
+                " pendingUpload=" + spool.Pending +
+                " worstCaptureMs=" + worstCaptureMs.ToString("F1", CultureInfo.InvariantCulture) +
+                " last UTC=" + lastUtc.ToString("o", CultureInfo.InvariantCulture));
+        }
+
+        private Dictionary<string, object> SelectClosedFrame(int series, int minutes, DateTime decisionUtc)
+        {
+            // Times[series][0] can be ahead of the primary as-of bar in
+            // multi-series Playback. Locate the latest higher bar ending
+            // at/before the primary 5m close, without looking ahead.
+            var maxAgo = Math.Min(8, CurrentBars[series] - (BarCount - 1));
+            DateTime latest = DateTime.MinValue;
+            for (var ago = 0; ago <= maxAgo; ago++)
+            {
+                latest = ConvertEtToUtc(Times[series][ago]);
+                if (latest > decisionUtc) continue;
+                var age = decisionUtc - latest;
+                if (age > TimeSpan.FromMinutes(minutes * 2))
+                    throw new HigherFrameUnavailableException(minutes + "m STALE; asOf5m=" +
+                        decisionUtc.ToString("o", CultureInfo.InvariantCulture) +
+                        " lastFrameUtc=" + latest.ToString("o", CultureInfo.InvariantCulture) +
+                        " ageMinutes=" + age.TotalMinutes.ToString("F1", CultureInfo.InvariantCulture));
+                return BuildFrame(series, minutes, ago);
+            }
+            throw new HigherFrameUnavailableException(minutes +
+                "m FUTURE/UNAVAILABLE; asOf5m=" + decisionUtc.ToString("o", CultureInfo.InvariantCulture) +
+                " lastCandidateUtc=" + latest.ToString("o", CultureInfo.InvariantCulture));
+        }
+
+        private Dictionary<string, object> BuildFrame(int series, int minutes, int newestBarsAgo)
         {
             var bars = new List<object>(BarCount);
             for (var back = BarCount - 1; back >= 0; back--)
             {
-                var utc = ConvertEtToUtc(Times[series][back]);
+                var actualBarsAgo = newestBarsAgo + back;
+                var utc = ConvertEtToUtc(Times[series][actualBarsAgo]);
                 bars.Add(new Dictionary<string, object>
                 {
                     { "endUtc", utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture) },
-                    { "open", Opens[series][back] },
-                    { "high", Highs[series][back] },
-                    { "low", Lows[series][back] },
-                    { "close", Closes[series][back] },
-                    { "volume", Convert.ToInt64(Volumes[series][back]) }
+                    { "open", Opens[series][actualBarsAgo] },
+                    { "high", Highs[series][actualBarsAgo] },
+                    { "low", Lows[series][actualBarsAgo] },
+                    { "close", Closes[series][actualBarsAgo] },
+                    { "volume", Convert.ToInt64(Volumes[series][actualBarsAgo]) }
                 });
             }
             return new Dictionary<string, object> { { "minutes", minutes }, { "bars", bars } };

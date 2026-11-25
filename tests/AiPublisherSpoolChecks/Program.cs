@@ -25,9 +25,31 @@ static class Program
             Check(docs.Length == 3, "Day-partitioned spool files");
             Check(docs.Sum(doc => File.ReadLines(doc).Count()) == 600, "All 600 records durable");
             Check(docs.All(doc => !File.ReadAllText(doc).Contains(secret)), "Secret never stored in spool");
+
+            // A poison observation must be written to Quarantine before the
+            // spool ACK advances; valid records must not be blocked behind it.
+            var firstFile = docs.OrderBy(x => x).First();
+            var firstTwo = File.ReadLines(firstFile).Take(2).ToArray();
+            first.Instance.AcknowledgeReceipt(firstFile, 0, firstTwo,
+                "{\"processed\":2,\"accepted\":1,\"duplicates\":0,\"rejected\":1," +
+                "\"rejections\":[{\"index\":1,\"reason\":\"15m STALE test record\"}]}");
+            Check(first.Instance.Pending == 598, "Mixed batch ACK advances 2 entries");
+            Check(File.ReadAllText(firstFile + ".ack").Trim() == "2", "ACK persisted");
+            var quarantined = Directory.GetFiles(Path.Combine(folder, "Quarantine"), "*.rejected.jsonl");
+            Check(quarantined.Length == 1, "Invalid record quarantined");
+            var quarantinedText = File.ReadAllText(quarantined[0]);
+            using (var quarantinedDocument = System.Text.Json.JsonDocument.Parse(quarantinedText.Trim()))
+            {
+                var root = quarantinedDocument.RootElement;
+                Check(root.GetProperty("reason").GetString().Contains("15m STALE") &&
+                    root.GetProperty("originalJson").GetString() == firstTwo[1] &&
+                    root.GetProperty("sourceLineIndex").GetInt64() == 1,
+                    "Quarantine preserves exact original record, offset and rejection reason");
+            }
+            Check(File.ReadLines(firstFile).Count() > 2, "Original spool remains intact");
         }
         using (var recovered = new SpoolLifetime(url, secret))
-            Check(recovered.Instance.Pending >= 600, "Unacknowledged observations survive restart");
+            Check(recovered.Instance.Pending >= 598, "Unacknowledged observations survive restart");
         Console.WriteLine("AI publisher spool compile/durability checks passed.");
     }
     static void Check(bool ok, string message)
