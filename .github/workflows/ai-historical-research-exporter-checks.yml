@@ -1,0 +1,17 @@
+name: AI historical research exporter checks
+on:
+  pull_request:
+    paths:
+      - 'src/Strategies/NinjexAiHistoricalResearchExporter/**'
+      - 'tests/AiHistoricalResearchExporterChecks/**'
+      - '.github/workflows/ai-historical-research-exporter-checks.yml'
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project tests/AiHistoricalResearchExporterChecks
