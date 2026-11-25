@@ -48,3 +48,34 @@ the processed files may be archived outside the live spool folder.
 **No guarantees at Max without empirical validation.** 3-year ML history
 still needs an incremental OHLCV research exporter rather than storing
 three overlapping 100-bar windows for every 5-minute observation.
+
+
+## Session-boundary recovery (November 2026)
+
+The 2026-10-01 17:00 ET session boundary caused the API to reject stale
+or future higher-timeframe frames. The previous batch endpoint rejected
+the entire batch, blocking all later stored records. Updated code pairs:
+
+* NinjexApp API: validates items individually, returns \`rejected\`
+  and indexed \`rejections\` with the exact 5m and higher-frame timestamps.
+* NT publisher: chooses the latest 15m/60m frame ending no later than the
+  current 5m close. If nothing sufficiently fresh exists, it writes an
+  explicit entry under \`Spool/<host>/Skipped\`, logs a skip and does NOT
+  manufacture a market classification for that bar.
+* Existing bad JSONL observations: are uploaded again; the backend
+  quarantines invalid entries individually, while valid newer items
+  are allowed through. Each raw invalid observation and reason are
+  preserved under \`Spool/<host>/Quarantine\` **before** local ACK advances.
+
+Review \`skippedFrameUnavailable\`, \`rejectedQuarantined\`,
+\`captureFailures\` and \`pendingUpload\` separately. Only successful
+server insertions/duplicates contribute to observation completeness.
+Never delete original spool files before auditing.
+
+**Recovery instructions:** Stop the old NT publisher; retain/bakcup the
+current \`%LOCALAPPDATA%/Ninjex/AiMarket/Spool/localhost_7016\`.
+Update and restart the **backend first**. Update NinjaScript and recompile,
+then enable it on a chart. Previously pending files will be retried; they
+may include invalid rows in Quarantine. Inspect those reasons and only
+then rerun the skipped part of Playback on the updated publisher.
+Do not run simultaneous publisher instances pointing to the same spool.

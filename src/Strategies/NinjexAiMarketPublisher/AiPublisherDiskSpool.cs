@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -10,6 +11,22 @@ using System.Threading.Tasks;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
+    // Public parameterless types for .NET Framework's JavaScriptSerializer.
+    public sealed class AiBatchReceipt
+    {
+        public int processed { get; set; }
+        public int accepted { get; set; }
+        public int duplicates { get; set; }
+        public int rejected { get; set; }
+        public AiBatchRejection[] rejections { get; set; }
+    }
+
+    public sealed class AiBatchRejection
+    {
+        public int index { get; set; }
+        public string reason { get; set; }
+    }
+
     /// <summary>
     /// Disk-first at-least-once publisher. Capture runs on NT's OnBarClose thread;
     /// network upload runs independently. A failed POST retains data on disk.
@@ -30,10 +47,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool stopping;
         private long captured;
         private long pending;
+        private long quarantined;
+        private int consecutiveFailures;
 
         public string Folder { get { return folder; } }
         public long Captured { get { return Interlocked.Read(ref captured); } }
         public long Pending { get { return Interlocked.Read(ref pending); } }
+        public long Quarantined { get { return Interlocked.Read(ref quarantined); } }
 
         public AiPublisherDiskSpool(string baseUrl, string publisherKey, string contract, Action<string> logger)
         {
@@ -78,6 +98,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Interlocked.Increment(ref pending);
             }
             wake.Set();
+        }
+
+        // These are intentional, timestamped data-quality gaps. They are not
+        // claimed as captured or stored market classifications.
+        public void RecordSkip(DateTime utcBarEnd, string reason)
+        {
+            var skipFolder = Path.Combine(folder, "Skipped");
+            Directory.CreateDirectory(skipFolder);
+            var record = new System.Web.Script.Serialization.JavaScriptSerializer()
+                .Serialize(new Dictionary<string, object>
+                {
+                    { "barEndUtc", utcBarEnd.ToString("o", CultureInfo.InvariantCulture) },
+                    { "reason", reason }
+                });
+            var file = Path.Combine(skipFolder,
+                prefix + utcBarEnd.ToString("yyyyMMdd", CultureInfo.InvariantCulture) + ".skipped.jsonl");
+            lock (sync)
+                File.AppendAllText(file, record + Environment.NewLine, new UTF8Encoding(false));
         }
 
         private sealed class Batch
@@ -132,40 +170,73 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (!response.IsSuccessStatusCode)
                     {
-                        var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                        log("[NinjexAI] Batch HTTP " + (int)response.StatusCode +
-                            " rejected; retained on disk: " + body.Substring(0, Math.Min(body.Length, 180)));
+                        var failures = Interlocked.Increment(ref consecutiveFailures);
+                        if (failures == 1 || failures == 5 || failures % 30 == 0)
+                        {
+                            var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                            log("[NinjexAI] Batch HTTP " + (int)response.StatusCode +
+                                " refused; original spool retained; failure #" + failures +
+                                ": " + body.Substring(0, Math.Min(body.Length, 180)));
+                        }
                         return false;
                     }
                     var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    var receipt = new System.Web.Script.Serialization.JavaScriptSerializer()
-                        .Deserialize<System.Collections.Generic.Dictionary<string, object>>(result);
-                    if (receipt == null || !receipt.ContainsKey("processed") ||
-                        !receipt.ContainsKey("accepted") || !receipt.ContainsKey("duplicates"))
-                        throw new InvalidDataException("Missing batch receipt fields; retaining data.");
-                    var processed = Convert.ToInt32(receipt["processed"], CultureInfo.InvariantCulture);
-                    var accepted = Convert.ToInt32(receipt["accepted"], CultureInfo.InvariantCulture);
-                    var duplicates = Convert.ToInt32(receipt["duplicates"], CultureInfo.InvariantCulture);
-                    if (processed != batch.Messages.Length || accepted < 0 || duplicates < 0 ||
-                        accepted + duplicates != processed)
-                        throw new InvalidDataException("Unexpected batch receipt; retaining data for retry.");
-                    lock (sync)
-                    {
-                        var current = ReadAcknowledged(batch.File);
-                        // One worker per NinjaTrader instance; if another publisher
-                        // advanced this file, avoid regressing its checkpoint.
-                        if (current == batch.Offset)
-                        {
-                            SaveAcknowledged(batch.File, current + batch.Messages.Length);
-                            Interlocked.Add(ref pending, -batch.Messages.Length);
-                        }
-                    }
-                    log("[NinjexAI] Batch HTTP 200 processed=" + processed +
-                        " inserted=" + accepted + " duplicates=" + duplicates +
-                        " pending=" + Pending);
+                    ProcessReceipt(batch, result);
+                    Interlocked.Exchange(ref consecutiveFailures, 0);
                     return true;
                 }
             }
+        }
+
+        private void ProcessReceipt(Batch batch, string responseJson)
+        {
+            var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
+            var receipt = serializer.Deserialize<AiBatchReceipt>(responseJson);
+            if (receipt == null || receipt.processed != batch.Messages.Length ||
+                receipt.accepted < 0 || receipt.duplicates < 0 || receipt.rejected < 0 ||
+                receipt.accepted + receipt.duplicates + receipt.rejected != receipt.processed)
+                throw new InvalidDataException("Unexpected batch receipt; retaining raw data.");
+
+            var bad = receipt.rejections ?? new AiBatchRejection[0];
+            if (bad.Length != receipt.rejected)
+                throw new InvalidDataException("Inconsistent rejection details; retaining data.");
+            var uniqueIndexes = new HashSet<int>();
+            foreach (var rejection in bad)
+                if (rejection == null || rejection.index < 0 || rejection.index >= batch.Messages.Length ||
+                    !uniqueIndexes.Add(rejection.index) || string.IsNullOrWhiteSpace(rejection.reason))
+                    throw new InvalidDataException("Invalid rejection index/reason; retaining raw data.");
+
+            lock (sync)
+            {
+                var current = ReadAcknowledged(batch.File);
+                if (current != batch.Offset) return; // Another worker checkpointed it.
+                if (bad.Length > 0)
+                {
+                    // Never pretend a rejected observation was stored in SQL.
+                    // Durable quarantine write ALWAYS precedes ACK advancement.
+                    var rejectedFolder = Path.Combine(folder, "Quarantine");
+                    Directory.CreateDirectory(rejectedFolder);
+                    var quarantinePath = Path.Combine(rejectedFolder,
+                        Path.GetFileName(batch.File) + ".rejected.jsonl");
+                    var records = bad.Select(item => serializer.Serialize(new Dictionary<string, object>
+                    {
+                        { "sourceFile", Path.GetFileName(batch.File) },
+                        { "sourceLineIndex", batch.Offset + item.index },
+                        { "reason", item.reason },
+                        { "originalJson", batch.Messages[item.index] }
+                    }));
+                    File.AppendAllText(quarantinePath,
+                        string.Join(Environment.NewLine, records) + Environment.NewLine,
+                        new UTF8Encoding(false));
+                }
+                SaveAcknowledged(batch.File, current + batch.Messages.Length);
+                Interlocked.Add(ref pending, -batch.Messages.Length);
+                Interlocked.Add(ref quarantined, receipt.rejected);
+            }
+            log("[NinjexAI] Batch HTTP 200 processed=" + receipt.processed +
+                " inserted=" + receipt.accepted + " duplicates=" + receipt.duplicates +
+                " REJECTED_QUARANTINED=" + receipt.rejected +
+                " pending=" + Pending);
         }
 
         private void Work()
