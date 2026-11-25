@@ -1,0 +1,17 @@
+name: AI research data quality gate
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_research_audit.py'
+      - 'tests/ai_market_research_audit/**'
+      - '.github/workflows/ai-research-quality-gate.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests/ai_market_research_audit -v
