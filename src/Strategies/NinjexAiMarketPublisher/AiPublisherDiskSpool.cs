@@ -181,18 +181,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         return false;
                     }
                     var result = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    ProcessReceipt(batch, result);
+                    AcknowledgeReceipt(batch.File, batch.Offset, batch.Messages, result);
                     Interlocked.Exchange(ref consecutiveFailures, 0);
                     return true;
                 }
             }
         }
 
-        private void ProcessReceipt(Batch batch, string responseJson)
+        // Internal so portable tests can verify durable quarantine + ACK order.
+        internal void AcknowledgeReceipt(string sourceFile, long sourceOffset, string[] messages, string responseJson)
         {
             var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
             var receipt = serializer.Deserialize<AiBatchReceipt>(responseJson);
-            if (receipt == null || receipt.processed != batch.Messages.Length ||
+            if (receipt == null || receipt.processed != messages.Length ||
                 receipt.accepted < 0 || receipt.duplicates < 0 || receipt.rejected < 0 ||
                 receipt.accepted + receipt.duplicates + receipt.rejected != receipt.processed)
                 throw new InvalidDataException("Unexpected batch receipt; retaining raw data.");
@@ -202,14 +203,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 throw new InvalidDataException("Inconsistent rejection details; retaining data.");
             var uniqueIndexes = new HashSet<int>();
             foreach (var rejection in bad)
-                if (rejection == null || rejection.index < 0 || rejection.index >= batch.Messages.Length ||
+                if (rejection == null || rejection.index < 0 || rejection.index >= messages.Length ||
                     !uniqueIndexes.Add(rejection.index) || string.IsNullOrWhiteSpace(rejection.reason))
                     throw new InvalidDataException("Invalid rejection index/reason; retaining raw data.");
 
             lock (sync)
             {
-                var current = ReadAcknowledged(batch.File);
-                if (current != batch.Offset) return; // Another worker checkpointed it.
+                var current = ReadAcknowledged(sourceFile);
+                if (current != sourceOffset) return; // Another worker checkpointed it.
                 if (bad.Length > 0)
                 {
                     // Never pretend a rejected observation was stored in SQL.
@@ -217,20 +218,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     var rejectedFolder = Path.Combine(folder, "Quarantine");
                     Directory.CreateDirectory(rejectedFolder);
                     var quarantinePath = Path.Combine(rejectedFolder,
-                        Path.GetFileName(batch.File) + ".rejected.jsonl");
+                        Path.GetFileName(sourceFile) + ".rejected.jsonl");
                     var records = bad.Select(item => serializer.Serialize(new Dictionary<string, object>
                     {
-                        { "sourceFile", Path.GetFileName(batch.File) },
-                        { "sourceLineIndex", batch.Offset + item.index },
+                        { "sourceFile", Path.GetFileName(sourceFile) },
+                        { "sourceLineIndex", sourceOffset + item.index },
                         { "reason", item.reason },
-                        { "originalJson", batch.Messages[item.index] }
+                        { "originalJson", messages[item.index] }
                     }));
                     File.AppendAllText(quarantinePath,
                         string.Join(Environment.NewLine, records) + Environment.NewLine,
                         new UTF8Encoding(false));
                 }
-                SaveAcknowledged(batch.File, current + batch.Messages.Length);
-                Interlocked.Add(ref pending, -batch.Messages.Length);
+                SaveAcknowledged(sourceFile, current + messages.Length);
+                Interlocked.Add(ref pending, -messages.Length);
                 Interlocked.Add(ref quarantined, receipt.rejected);
             }
             log("[NinjexAI] Batch HTTP 200 processed=" + receipt.processed +
