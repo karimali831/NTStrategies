@@ -38,9 +38,14 @@ static class Program
             var quarantined = Directory.GetFiles(Path.Combine(folder, "Quarantine"), "*.rejected.jsonl");
             Check(quarantined.Length == 1, "Invalid record quarantined");
             var quarantinedText = File.ReadAllText(quarantined[0]);
-            Check(quarantinedText.Contains("15m STALE") &&
-                  quarantinedText.Contains(firstTwo[1]) == false &&
-                  quarantinedText.Contains("originalJson"), "Quarantine holds reason + raw JSON");
+            using (var quarantinedDocument = System.Text.Json.JsonDocument.Parse(quarantinedText.Trim()))
+            {
+                var root = quarantinedDocument.RootElement;
+                Check(root.GetProperty("reason").GetString().Contains("15m STALE") &&
+                    root.GetProperty("originalJson").GetString() == firstTwo[1] &&
+                    root.GetProperty("sourceLineIndex").GetInt64() == 1,
+                    "Quarantine preserves exact original record, offset and rejection reason");
+            }
             Check(File.ReadLines(firstFile).Count() > 2, "Original spool remains intact");
         }
         using (var recovered = new SpoolLifetime(url, secret))
