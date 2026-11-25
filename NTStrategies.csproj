@@ -166,6 +166,8 @@
         <Compile Include="src\Strategies\NinjexEsMarketResearchCollector\Core.cs" />
         <Compile Include="src\Strategies\NinjexAiMarketPublisher\NinjexAiMarketPublisher.cs" />
         <Compile Include="src\Strategies\NinjexAiMarketPublisher\AiPublisherDiskSpool.cs" />
+        <Compile Include="src\Strategies\NinjexAiHistoricalResearchExporter\AiHistoricalCsvSink.cs" />
+        <Compile Include="src\Strategies\NinjexAiHistoricalResearchExporter\NinjexAiHistoricalResearchExporter.cs" />
         <Compile Include="src\Strategies\NinjexEsOrbResearchCollector\Core.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Bracket.cs" />
         <Compile Include="src\Strategies\NinjexOpeningRangeFvgBreakout\Core.cs" />
