@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.ai_market_batch_audit import (
-    audit_batch, expected, roll_monday, window, write_summary,
+    audit_batch, expected, roll_monday, window, write_summary, export_started_utc,
 )
 
 START = dt.date(2023, 9, 10)
@@ -59,6 +59,49 @@ class BulkAuditTests(unittest.TestCase):
                                  only=["ES 12-23"])
             self.assertEqual(report["summary"]["duplicates"], 1)
             self.assertEqual(report["contracts"][0]["result"], "DUPLICATE_RUNS")
+
+    def test_folder_start_utc_parser_and_reused_pilot_tag(self):
+        older = "ES_12-23_20261126T131203414_ab1c26107f014c61967a3e660f0a3a24"
+        newer = "ES_12-23_20261126T133337762_3ae52bac241c406ab348339647b69ded"
+        self.assertEqual(
+            export_started_utc(Path(newer)),
+            dt.datetime(2026, 11, 26, 13, 33, 37, 762000,
+                        tzinfo=dt.timezone.utc))
+        self.assertIsNone(export_started_utc(Path("ES_12-23_manual")))
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in (older, newer):
+                directory = root / name
+                directory.mkdir()
+                (directory / "manifest.json").write_text(json.dumps(
+                    {"datasetTag": "reused-pilot", "contract": "ES 12-23"}))
+            # By default we refuse duplicate source versions.
+            unfiltered = audit_batch(root, "reused-pilot", "ES", START, END,
+                                     only=["ES 12-23"])
+            self.assertEqual(unfiltered["contracts"][0]["result"], "DUPLICATE_RUNS")
+            cutoff = dt.datetime.fromisoformat("2026-11-26T13:30:00+00:00")
+            mock_details = {
+                "result": "PASS_WITH_MANUAL_CALENDAR_REVIEW",
+                "frames": {str(n) + "m": {"observedInWindow": 10,
+                          "missing": 0, "offCalendar": 0,
+                          "missingByEasternDate": {}} for n in (1, 5, 15, 60)},
+                "crossFrame": {"1mTo5m": {"mismatchCount": 0}},
+                "missingMinuteForensics": {"missing1mCount": 0},
+                "errors": [], "warnings": []
+            }
+            with patch("tools.ai_market_batch_audit.audit", return_value=mock_details):
+                filtered = audit_batch(root, "reused-pilot", "ES", START, END,
+                                       only=["ES 12-23"], run_after_utc=cutoff)
+            self.assertEqual(filtered["summary"]["pass"], 1)
+            self.assertEqual(filtered["summary"]["duplicates"], 0)
+            self.assertEqual(filtered["contracts"][0]["folders"], [str(root / newer)])
+            self.assertEqual(filtered["runAfterUtc"], cutoff.isoformat())
+
+    def test_cutoff_rejects_naive_datetime(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, "UTC offset"):
+                audit_batch(Path(temp), "pilot", "ES", START, END,
+                            run_after_utc=dt.datetime(2026, 11, 26, 13, 35))
 
     def test_single_export_invokes_existing_strict_auditor(self):
         with tempfile.TemporaryDirectory() as temp:
