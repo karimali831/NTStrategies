@@ -98,8 +98,8 @@ class AuditTests(unittest.TestCase):
         # exactly accounted for by the other four 1m bars.
         file1 = self.folder / "bars_1m.csv"
         source = file1.read_text().splitlines()
-        file1.write_text("\\n".join(
-            line for line in source if "2026-09-28T19:11:00.000" not in line) + "\\n")
+        file1.write_text("\n".join(
+            line for line in source if "2026-09-28T19:11:00.000" not in line) + "\n")
         file5 = self.folder / "bars_5m.csv"
         lines = file5.read_text().splitlines()
         adjusted = []
@@ -109,7 +109,7 @@ class AuditTests(unittest.TestCase):
                 cells[-2] = "4"
                 line = ",".join(cells)
             adjusted.append(line)
-        file5.write_text("\\n".join(adjusted) + "\\n")
+        file5.write_text("\n".join(adjusted) + "\n")
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "FAIL", "No automatic gap acceptance")
         self.assertEqual(r["missingMinuteForensics"]["missing1mCount"], 1)
@@ -118,9 +118,9 @@ class AuditTests(unittest.TestCase):
 
     def test_missing_one_minute_with_volume_residual_is_unreconciled(self):
         file1 = self.folder / "bars_1m.csv"
-        file1.write_text("\\n".join(
+        file1.write_text("\n".join(
             line for line in file1.read_text().splitlines()
-            if "2026-09-28T19:11:00.000" not in line) + "\\n")
+            if "2026-09-28T19:11:00.000" not in line) + "\n")
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["missingMinuteForensics"]["volumeReconciledCandidate1mCount"], 0)
         self.assertEqual(r["missingMinuteForensics"]["unreconciled1mCount"], 1)
