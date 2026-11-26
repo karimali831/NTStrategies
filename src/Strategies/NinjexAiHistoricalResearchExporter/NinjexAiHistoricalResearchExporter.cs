@@ -35,6 +35,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Dataset tag", Order = 4, GroupName = "Ninjex AI Research")]
         public string DatasetTag { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Recover source 17:00 close", Order = 5, GroupName = "Ninjex AI Research")]
+        public bool RecoverTerminalSessionClose { get; set; }
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -50,6 +54,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FromEasternDate = "2023-09-01";
                 ThroughEasternDate = "2026-11-25";
                 DatasetTag = "research";
+                // Disabled by default until real NT8 runtime validation.
+                RecoverTerminalSessionClose = false;
             }
             else if (State == State.Configure)
             {
@@ -97,6 +103,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
+                    if (EnableExport && RecoverTerminalSessionClose && !invalidSetup)
+                        RecoverSourceTerminalCloses();
                     sink.Dispose();
                     Print("[NinjexAI-EXPORT] Finished: " + sink.Folder +
                         " valid=" + sink.Valid +
@@ -108,6 +116,78 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[NinjexAI-EXPORT] FINALIZATION FAILED: " + e.Message);
                 }
                 finally { sink = null; }
+            }
+        }
+
+        /// <summary>
+        /// A final 17:00 ET bar can exist in NinjaTrader's loaded historical
+        /// Bars series even when no later tick triggers its OnBarClose callback.
+        /// Recover only a bar actually present in the BarsArray on the
+        /// requested final ET date. Never synthesize, extrapolate or mutate NT.
+        /// Access might be unavailable at State.Terminated on some hosts:
+        /// this path deliberately fails safely and logs diagnostics.
+        /// </summary>
+        private void RecoverSourceTerminalCloses()
+        {
+            DateTime through;
+            if (!DateTime.TryParseExact(ThroughEasternDate, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out through))
+                return;
+
+            var minutesByBip = new[] { 5, 1, 15, 60 };
+            for (int bip = 0; bip < minutesByBip.Length; bip++)
+            {
+                var minutes = minutesByBip[bip];
+                try
+                {
+                    if (BarsArray == null || BarsArray.Length <= bip ||
+                        BarsArray[bip] == null || BarsArray[bip].Count == 0)
+                    {
+                        Print("[NinjexAI-EXPORT] Terminal " + minutes +
+                            "m: BarsArray unavailable; no bar reconstructed.");
+                        continue;
+                    }
+
+                    var bars = BarsArray[bip];
+                    var index = bars.Count - 1;
+                    // A Strategy Analyzer end date after our Through ET filter
+                    // may load next-session bars: walk backward to our last date.
+                    while (index >= 0 && bars.GetTime(index).Date > through.Date)
+                        index--;
+                    if (index < 0)
+                    {
+                        Print("[NinjexAI-EXPORT] Terminal " + minutes +
+                            "m: no bars on/before the requested through date.");
+                        continue;
+                    }
+
+                    DateTime actualClose = bars.GetTime(index);
+                    if (actualClose.Date != through.Date ||
+                        actualClose.TimeOfDay != TimeSpan.FromHours(17))
+                    {
+                        Print("[NinjexAI-EXPORT] Terminal " + minutes +
+                            "m: loaded last=" + actualClose.ToString("yyyy-MM-dd HH:mm:ss") +
+                            " ET, not requested 17:00 ET; skipping recovery.");
+                        continue;
+                    }
+
+                    var added = sink.TryAppendTerminalClose(minutes, actualClose,
+                        bars.GetOpen(index), bars.GetHigh(index),
+                        bars.GetLow(index), bars.GetClose(index),
+                        bars.GetVolume(index));
+                    Print("[NinjexAI-EXPORT] Terminal " + minutes +
+                        "m: source last=" + actualClose.ToString("yyyy-MM-dd HH:mm:ss") +
+                        " ET, volume=" + bars.GetVolume(index) +
+                        (added ? " RECOVERED_FROM_LOADED_BARS" :
+                                 " already present or rejected; no changes"));
+                }
+                catch (Exception e)
+                {
+                    errors++;
+                    Print("[NinjexAI-EXPORT] Terminal " + minutes +
+                        "m: unavailable (" + e.Message +
+                        "); no fabricated bars. Existing CSV preserved.");
+                }
             }
         }
 
