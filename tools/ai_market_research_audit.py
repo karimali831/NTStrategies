@@ -239,7 +239,7 @@ def audit(folder, begin_et, end_et, contract, calendar=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--folder", required=True, type=Path)
-    p.add_argument("--contract", default="ES 12-26")
+    p.add_argument("--contract", required=True, help="Explicit dated contract, e.g. ES 12-23")
     p.add_argument("--from-et", required=True, help="ISO Eastern timestamp, e.g. 2026-09-27T18:05")
     p.add_argument("--through-et", required=True, help="ISO Eastern timestamp, e.g. 2026-09-30T23:55")
     p.add_argument("--output", type=Path)
