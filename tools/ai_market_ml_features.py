@@ -34,7 +34,7 @@ FEATURE_COLUMNS = [
     "close", "atr14_5m", "ema20DistanceAtr", "ema50DistanceAtr",
     "ret3Atr", "ret12Atr", "efficiency12", "volumeVsPrior20",
     "prior12HighDistanceAtr", "prior12LowDistanceAtr",
-    "close15", "body15Atr", "close60", "body60Atr",
+    "close15", "body15Atr", "lastClosed15Utc", "close60", "body60Atr", "lastClosed60Utc",
     "fine1mComplete", "qualityFlags",
     "label30mCloseRetAtr", "label60mCloseRetAtr",
     "label30mMaxFavourableHighAtr", "label30mMaxAdverseLowAtr"
@@ -233,6 +233,17 @@ def contract_rows(folder, contract, output, counters):
         ny, asia, london, us, overlap, minute_of_day = session_flags(bar.end)
         label6 = label_return(five, i, 6, atr[i])
         label12 = label_return(five, i, 12, atr[i])
+        # Purge observations with outcomes in a later split, otherwise
+        # the final training rows would peek into the validation period.
+        current_split = split_for(ny.date())
+        if i + 6 < len(five) and label6 is not None:
+            if split_for(five[i+6].end.astimezone(NY).date()) != current_split:
+                label6 = None
+                counters["purgedCrossSplit30m"] += 1
+        if i + 12 < len(five) and label12 is not None:
+            if split_for(five[i+12].end.astimezone(NY).date()) != current_split:
+                label12 = None
+                counters["purgedCrossSplit60m"] += 1
         if label6 is None:
             counters["masked30mOutcome"] += 1
         if label12 is None:
@@ -264,8 +275,10 @@ def contract_rows(folder, contract, output, counters):
             "prior12HighDistanceAtr": format_float((bar.close - range_hi) / atr[i]),
             "prior12LowDistanceAtr": format_float((bar.close - range_lo) / atr[i]),
             "close15": format_float(b15.close),
+            "lastClosed15Utc": b15.end.isoformat(),
             "body15Atr": format_float((b15.close - b15.open) / atr[i]),
             "close60": format_float(b60.close),
+            "lastClosed60Utc": b60.end.isoformat(),
             "body60Atr": format_float((b60.close - b60.open) / atr[i]),
             "fine1mComplete": int(fine_complete),
             "qualityFlags": "|".join(quality) or "OK",
@@ -286,6 +299,11 @@ def run(audit_path, output):
     contracts = report.get("contracts", [])
     if not contracts:
         raise ValueError("No contracts in audit")
+    if report.get("status") not in ("NEEDS_REVIEW", "PASS_WITH_QUALIFICATIONS"):
+        raise ValueError("Unsupported basket audit status")
+    if any(entry.get("result") in ("NOT_EXPORTED", "DUPLICATE_RUNS")
+           for entry in contracts):
+        raise ValueError("Cannot construct a research dataset from missing/duplicate raw contracts")
     counters = defaultdict(int)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8", newline="") as stream:
