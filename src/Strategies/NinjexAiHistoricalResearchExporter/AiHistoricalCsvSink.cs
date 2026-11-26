@@ -20,6 +20,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly DateTime throughDate;
         private readonly Dictionary<int, StreamWriter> output = new Dictionary<int, StreamWriter>();
         private readonly Dictionary<int, DateTime> previousUtc = new Dictionary<int, DateTime>();
+        private readonly Dictionary<int, DateTime> latestRecordedEastern = new Dictionary<int, DateTime>();
+        private readonly Dictionary<int, long> terminalRecoveredCounts = new Dictionary<int, long>();
         private readonly Dictionary<int, long> counts = new Dictionary<int, long>();
         private readonly StreamWriter quality;
         private bool closed;
@@ -52,6 +54,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 writer.WriteLine("schemaVersion,contract,frameMinutes,endUtc,endEastern,utcOffsetMinutes,open,high,low,close,volume,flags");
                 output.Add(minutes, writer);
                 counts.Add(minutes, 0);
+                terminalRecoveredCounts.Add(minutes, 0);
             }
             quality = new StreamWriter(Path.Combine(Folder, "quality_issues.csv"),
                 false, new UTF8Encoding(false), 32768);
@@ -59,7 +62,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         public void Append(int minutes, DateTime easternEnd, double open,
-            double high, double low, double close, long volume)
+            double high, double low, double close, long volume, string provenance = null)
         {
             if (closed) throw new ObjectDisposedException("AiHistoricalCsvSink");
             if (!output.ContainsKey(minutes)) throw new ArgumentException("Unsupported timeframe");
@@ -102,6 +105,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Issue(minutes, et, "DST_OFFSET_ASSUMED", "First bar is within ambiguous ET hour; verify offset");
             var utc = choice.UtcDateTime;
             var flags = ambiguous ? "DST_OFFSET_RESOLVED" : "OK";
+            if (!string.IsNullOrEmpty(provenance))
+                flags += "|" + provenance;
             if (hasPrevious && (utc - previous).TotalMinutes > minutes * 1.01)
             {
                 flags += "|TIME_GAP";
@@ -126,7 +131,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
             output[minutes].WriteLine(string.Join(",", row.Select(Escape)));
             counts[minutes]++;
+            latestRecordedEastern[minutes] = et;
+            if (provenance == "TERMINAL_FROM_LOADED_BARS")
+                terminalRecoveredCounts[minutes]++;
             if (counts[minutes] % 1000 == 0) output[minutes].Flush();
+        }
+
+        // Strict recovery: ONLY a stored end-of-session bar from a dated
+        // historical BarsArray may be appended, never a synthetic bar.
+        // 17:00 ET is the normal ES/NQ session close. Holiday early closes
+        // must remain separately audited; we never infer them here.
+        public bool TryAppendTerminalClose(int minutes, DateTime easternEnd, double open,
+            double high, double low, double close, long volume)
+        {
+            var et = DateTime.SpecifyKind(easternEnd, DateTimeKind.Unspecified);
+            if (!output.ContainsKey(minutes) || et.Date != throughDate ||
+                et.TimeOfDay != TimeSpan.FromHours(17) ||
+                et.Date < fromDate) return false;
+            DateTime latest;
+            if (latestRecordedEastern.TryGetValue(minutes, out latest) && et <= latest)
+                return false;
+            var previousCount = counts[minutes];
+            Append(minutes, et, open, high, low, close, volume,
+                "TERMINAL_FROM_LOADED_BARS");
+            return counts[minutes] > previousCount;
         }
 
         private void Issue(int minutes, DateTime et, string reason, string details)
@@ -163,6 +191,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 { "valid", Valid },
                 { "qualityIssues", issues },
                 { "frameCounts", counts.ToDictionary(x => x.Key + "m", x => x.Value) },
+                { "terminalRecoveredCounts", terminalRecoveredCounts.ToDictionary(
+                    x => x.Key + "m", x => x.Value) },
                 { "warning", "Historical OHLCV, not tick-level quotes, trade labels, or a trained ML model." }
             };
             File.WriteAllText(Path.Combine(Folder, "manifest.json"),
