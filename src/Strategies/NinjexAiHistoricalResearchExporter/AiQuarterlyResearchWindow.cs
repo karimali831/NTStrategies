@@ -38,7 +38,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             return ThirdFriday(expiryMonth).AddDays(-4);
         }
 
-        public static Window Resolve(string instrument, DateTime globalFromEt,
+        // Null means the dated contract is outside the global research window.
+        // Basket tests legitimately enumerate unrelated contracts; do not
+        // report normal range exclusions as startup failures.
+        public static Window ResolveOrNull(string instrument, DateTime globalFromEt,
             DateTime globalThroughEt)
         {
             var match = ContractPattern.Match((instrument ?? "").Trim());
@@ -54,7 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (first < globalFromEt.Date) first = globalFromEt.Date;
             if (last > globalThroughEt.Date) last = globalThroughEt.Date;
             if (last < first)
-                throw new ArgumentException("No overlap between batch research window and " + instrument);
+                return null;
 
             return new Window
             {
@@ -64,6 +67,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PreviousQuarterRollMonday = RollMonday(previous),
                 CurrentQuarterRollMonday = RollMonday(expiry)
             };
+        }
+
+        public static Window Resolve(string instrument, DateTime globalFromEt,
+            DateTime globalThroughEt)
+        {
+            var window = ResolveOrNull(instrument, globalFromEt, globalThroughEt);
+            if (window == null)
+                throw new ArgumentException(
+                    "No overlap between batch research window and " + instrument);
+            return window;
         }
     }
 }
