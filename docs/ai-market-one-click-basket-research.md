@@ -86,3 +86,33 @@ No order execution and no ML training occurs in this collection step.
 Documentation:
 https://static.ninjatrader.com/support/helpGuides/nt8/basket_test.htm
 https://www.cmegroup.com/trading/equity-index/rolldates.html
+
+## ES 12-23 / ES 03-24 pilot: expected holiday closures
+
+The initial basket run produced both correct tagged datasets and the
+consolidated JSON and Markdown reports. It also tried eleven out-of-range
+instruments and logged STARTUP ERROR: No overlap. New basket runs instead
+record SKIPPED_OUTSIDE_RESEARCH_WINDOW without creating extra folders.
+
+The new shared calendar
+tools/ai_market_calendars/es_winter_2023_2024.json
+covers Christmas Day 2023, New Year's Day 2024, Martin Luther King Jr.
+Day 2024 and Presidents' Day 2024, including the source-supported
+early market halts at 13:00 ET. Existing --calendars argument loads
+all reviewed JSONs without changing the previously exported CSVs.
+
+ES 03-24 still has one independent missing five-minute close:
+Friday February 2, 2024 at 16:25 ET. The underlying export also lacks
+nine consecutive 1m closes from 16:19 through 16:27 ET; the containing
+15m bar reconciles with existing 1m/5m OHLCV. It may be a no-trade
+interval or source outage. Strict audit must continue to fail until the
+exception is reviewed; do not synthesize the missing bar for execution
+analysis or use one-minute feature/label windows overlapping it.
+
+The quality gate now records missingByEasternDate per timeframe, and
+the consolidated report shows missing5mByEasternDate for targeted checks.
+
+The pilot's existing tagged CSVs need NO re-export after calendar update:
+rerun the batch quality audit using the same tag and output parameters.
+Future ML ingestion can mask unresolved windows without discarding
+entire quarters of usable historical candles.

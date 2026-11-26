@@ -26,6 +26,12 @@ static class Program
         Check(u26.FirstEasternDate == new DateTime(2026, 6, 14) &&
               u26.LastEasternDate == new DateTime(2026, 9, 11),
               "ES 09-26 roll start/stop");
+        Check(AiQuarterlyResearchWindow.ResolveOrNull("ES 09-26", from,
+                  new DateTime(2024, 3, 8)) == null,
+              "Out-of-scope basket instrument skips without exception");
+        Check(AiQuarterlyResearchWindow.ResolveOrNull("ES 12-23", from,
+                  new DateTime(2024, 3, 8)) != null,
+              "In-scope basket instrument remains available");
         Check(AiQuarterlyResearchWindow.RollMonday(new DateTime(2026, 6, 1)) ==
               new DateTime(2026, 6, 15), "June 2026 special expiration still rolls Monday June 15");
         bool rejected = false;

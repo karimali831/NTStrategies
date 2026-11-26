@@ -153,12 +153,17 @@ def audit(folder, begin_et, end_et, contract, calendar=None, allow_sparse_1m=Fal
         observed = {t for t in rows if begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC)}
         missing = sorted(expected - observed)
         extra = sorted(observed - expected)
+        missing_by_eastern_date = {}
+        for t in missing:
+            day = t.astimezone(ET).date().isoformat()
+            missing_by_eastern_date[day] = missing_by_eastern_date.get(day, 0) + 1
         report["frames"][f"{frame}m"] = {
             "fileRows": len(rows), "expected": len(expected),
             "observedInWindow": len(observed), "missing": len(missing),
             "offCalendar": len(extra),
             "firstUtc": min(rows).isoformat() if rows else None,
             "lastUtc": max(rows).isoformat() if rows else None,
+            "missingByEasternDate": dict(sorted(missing_by_eastern_date.items())),
             "missingSampleUtc": [t.isoformat() for t in missing[:20]],
             "offCalendarSampleUtc": [t.isoformat() for t in extra[:20]]}
         if missing:
