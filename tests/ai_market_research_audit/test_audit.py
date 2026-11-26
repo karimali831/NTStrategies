@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from tools.ai_market_research_audit import audit, auditable_slots, ET
+from tools.ai_market_research_audit import audit, auditable_slots, ET, load_calendar
 
 class AuditTests(unittest.TestCase):
     def setUp(self):
@@ -74,6 +74,25 @@ class AuditTests(unittest.TestCase):
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "FAIL")
         self.assertTrue(any("manifest count" in e for e in r["errors"]))
+    def test_source_verified_holiday_calendar(self):
+        calendar = load_calendar(Path("tools/ai_market_calendars/es_2023_thanksgiving.json"))
+        # Thanksgiving: the 13:00 close is valid, 13:01-18:00 is halted.
+        start = dt.datetime(2023, 11, 23, 12, 55, tzinfo=ET)
+        end = dt.datetime(2023, 11, 23, 18, 5, tzinfo=ET)
+        minute = {x.astimezone(ET).strftime("%H:%M") for x in
+                  auditable_slots(start, end, 1, calendar)}
+        self.assertIn("13:00", minute)
+        self.assertNotIn("13:01", minute)
+        self.assertNotIn("18:00", minute)
+        self.assertIn("18:01", minute)
+        # Black Friday: 13:15 close is included, 13:20/14:00 are closed.
+        start = dt.datetime(2023, 11, 24, 12, 55, tzinfo=ET)
+        end = dt.datetime(2023, 11, 24, 17, 0, tzinfo=ET)
+        hourly = [x.astimezone(ET).strftime("%H:%M")
+                  for x in auditable_slots(start, end, 60, calendar)]
+        self.assertEqual(hourly, ["13:00", "13:15"])
+        self.assertNotIn("14:00", hourly)
+
     def test_session(self):
         self.assertFalse(list(auditable_slots(dt.datetime(2026,9,27,17,tzinfo=ET),
             dt.datetime(2026,9,27,18,tzinfo=ET), 5)))
