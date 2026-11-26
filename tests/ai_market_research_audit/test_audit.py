@@ -46,12 +46,15 @@ class AuditTests(unittest.TestCase):
         f.write_text(f.read_text().replace(",5000,5000,5000,5000,5,OK",
             ",5000,5000.25,5000,5000,5,OK", 1))
         r = audit(self.folder, self.start, self.end, "ES 12-26")
-        self.assertEqual(r["result"], "PASS_WITH_MANUAL_CALENDAR_REVIEW")
+        # Cross-frame 5m->15m detects the first mismatch even where the
+        # first 5m bar has insufficient preceding 1m history in this fixture.
+        self.assertEqual(r["result"], "FAIL")
+        self.assertGreater(r["crossFrame"]["5mTo15m"]["mismatchCount"], 0)
         f.write_text(f.read_text().replace(",5000,5000,5000,5000,5,OK",
             ",5000,5000.25,5000,5000,5,OK", 1))
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "FAIL")
-        self.assertTrue(r["oneToFive"]["mismatchSamples"])
+        self.assertGreater(r["crossFrame"]["1mTo5m"]["mismatchCount"], 0)
     def test_fifteen_minute_aggregation_mismatch(self):
         f = self.folder / "bars_15m.csv"
         content = f.read_text()
