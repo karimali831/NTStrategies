@@ -97,6 +97,8 @@ def audit_batch(root, tag, prefix, start, end, calendar=None, sparse=False, only
             item["crossFrameMismatches"] = sum(x["mismatchCount"]
                 for x in details["crossFrame"].values())
             item["missing1m"] = details["missingMinuteForensics"]["missing1mCount"]
+            item["missing5mByEasternDate"] = (
+                details["frames"]["5m"].get("missingByEasternDate", {}))
             item["errors"] = details["errors"][:25]
             item["warnings"] = details["warnings"][:15]
             if item["result"] == "PASS_WITH_MANUAL_CALENDAR_REVIEW":
@@ -124,6 +126,11 @@ def write_summary(report, path):
         period = item["fromEastern"][:10] + " to " + item["throughEastern"][:10]
         lines.append("| " + " | ".join([item["contract"], period] + misses +
                                    [item["result"]]) + " |")
+        if item.get("missing5mByEasternDate"):
+            lines.append("")
+            lines.append("  - 5m missing-day hotspots: " +
+                ", ".join(f"{day}: {count}" for day, count in
+                          item["missing5mByEasternDate"].items()))
     lines += ["", "## Anomalies", ""]
     for item in report["contracts"]:
         if item["result"] not in ("PASS_WITH_MANUAL_CALENDAR_REVIEW", "PASS_WITH_FLAGGED_SPARSE_1M"):
