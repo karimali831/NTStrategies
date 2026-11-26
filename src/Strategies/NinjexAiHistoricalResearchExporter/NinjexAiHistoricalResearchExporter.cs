@@ -44,6 +44,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Auto quarterly contract windows (basket)", Order = 6, GroupName = "Ninjex AI Research")]
         public bool AutoQuarterlyContractWindows { get; set; }
 
+        // Trim UI date strings before parsing. A stray pasted space must
+        // not cancel a multi-contract historical export.
+        internal static bool TryParseEasternDate(string text, out DateTime result)
+        {
+            return DateTime.TryParseExact((text ?? string.Empty).Trim(),
+                "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out result);
+        }
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -84,10 +93,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         throw new InvalidOperationException("Attach to an ES/NQ dated futures contract.");
 
                     DateTime first, last;
-                    if (!DateTime.TryParseExact(FromEasternDate, "yyyy-MM-dd",
-                        CultureInfo.InvariantCulture, DateTimeStyles.None, out first) ||
-                        !DateTime.TryParseExact(ThroughEasternDate, "yyyy-MM-dd",
-                        CultureInfo.InvariantCulture, DateTimeStyles.None, out last) || last < first)
+                    if (!TryParseEasternDate(FromEasternDate, out first) ||
+                        !TryParseEasternDate(ThroughEasternDate, out last) || last < first)
                         throw new InvalidOperationException("Dates must be valid inclusive yyyy-MM-dd ET dates.");
 
                     if (AutoQuarterlyContractWindows)
@@ -161,8 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             DateTime through = effectiveThroughDate;
             if (through == default(DateTime) &&
-                !DateTime.TryParseExact(ThroughEasternDate, "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture, DateTimeStyles.None, out through))
+                !TryParseEasternDate(ThroughEasternDate, out through))
                 return;
 
             var minutesByBip = new[] { 5, 1, 15, 60 };

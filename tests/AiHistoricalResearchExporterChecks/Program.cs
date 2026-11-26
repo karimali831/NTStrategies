@@ -6,6 +6,21 @@ using NinjaTrader.NinjaScript.Strategies;
 static class Program
 {
     static void Check(bool ok, string msg) { if (!ok) throw new Exception(msg); }
+    static void DateInputWhitespaceCheck()
+    {
+        DateTime date;
+        Check(NinjexAiHistoricalResearchExporter.TryParseEasternDate(
+            " 2023-09-10 ", out date) &&
+            date == new DateTime(2023, 9, 10),
+            "Research dates should trim surrounding spaces");
+        Check(NinjexAiHistoricalResearchExporter.TryParseEasternDate(
+            "\t2024-03-08\r\n", out date) &&
+            date == new DateTime(2024, 3, 8),
+            "Research date parser should trim pasted line whitespace");
+        Check(!NinjexAiHistoricalResearchExporter.TryParseEasternDate(
+            "2024-03-XX", out date), "Invalid dates must still fail");
+    }
+
     static void BasketWindowCheck()
     {
         var from = new DateTime(2023, 9, 10);
@@ -112,6 +127,7 @@ static class Program
         {
             var zone = TimeZoneInfo.FindSystemTimeZoneById(
                 OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+            DateInputWhitespaceCheck();
             BasketWindowCheck();
             TerminalRecoveryCheck(root, zone);
             string dir;
