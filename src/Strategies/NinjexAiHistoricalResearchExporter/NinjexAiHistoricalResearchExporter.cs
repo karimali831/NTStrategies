@@ -97,7 +97,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // research filter is automatically intersected with
                         // CME's conventional roll windows, so no individual
                         // expiry/date configuration is needed by the user.
-                        var window = AiQuarterlyResearchWindow.Resolve(contract, first, last);
+                        var window = AiQuarterlyResearchWindow.ResolveOrNull(contract, first, last);
+                        if (window == null)
+                        {
+                            Print("[NinjexAI-EXPORT] SKIPPED_OUTSIDE_RESEARCH_WINDOW: " +
+                                contract + " (normal basket exclusion; no export created)");
+                            return;
+                        }
                         first = window.FirstEasternDate;
                         last = window.LastEasternDate;
                         Print("[NinjexAI-EXPORT] BASKET contract=" + window.Contract +
