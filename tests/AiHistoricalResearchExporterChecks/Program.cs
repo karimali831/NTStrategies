@@ -6,6 +6,35 @@ using NinjaTrader.NinjaScript.Strategies;
 static class Program
 {
     static void Check(bool ok, string msg) { if (!ok) throw new Exception(msg); }
+    static void BasketWindowCheck()
+    {
+        var from = new DateTime(2023, 9, 10);
+        var to = new DateTime(2026, 11, 25);
+        var z23 = AiQuarterlyResearchWindow.Resolve("ES 12-23", from, to);
+        Check(z23.FirstEasternDate == new DateTime(2023, 9, 10) &&
+              z23.LastEasternDate == new DateTime(2023, 12, 8),
+              "ES 12-23 should start 2023-09-10 and finish 2023-12-08");
+        var h24 = AiQuarterlyResearchWindow.Resolve("ES 03-24", from, to);
+        Check(h24.FirstEasternDate == new DateTime(2023, 12, 10) &&
+              h24.LastEasternDate == new DateTime(2024, 3, 8),
+              "ES 03-24 quarterly window");
+        var z26 = AiQuarterlyResearchWindow.Resolve("ES 12-26", from, to);
+        Check(z26.FirstEasternDate == new DateTime(2026, 9, 13) &&
+              z26.LastEasternDate == new DateTime(2026, 11, 25),
+              "ES 12-26 clips to global research cutoff");
+        var u26 = AiQuarterlyResearchWindow.Resolve("ES 09-26", from, to);
+        Check(u26.FirstEasternDate == new DateTime(2026, 6, 14) &&
+              u26.LastEasternDate == new DateTime(2026, 9, 11),
+              "ES 09-26 roll start/stop");
+        Check(AiQuarterlyResearchWindow.RollMonday(new DateTime(2026, 6, 1)) ==
+              new DateTime(2026, 6, 15), "June 2026 special expiration still rolls Monday June 15");
+        bool rejected = false;
+        try { AiQuarterlyResearchWindow.Resolve("ES ##-25", from, to); }
+        catch (ArgumentException) { rejected = true; }
+        Check(rejected, "Bad dated futures contract must fail closed");
+        Console.WriteLine("Basket contract windows passed.");
+    }
+
     static void TerminalRecoveryCheck(string root, TimeZoneInfo zone)
     {
         string exported;
@@ -77,6 +106,7 @@ static class Program
         {
             var zone = TimeZoneInfo.FindSystemTimeZoneById(
                 OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+            BasketWindowCheck();
             TerminalRecoveryCheck(root, zone);
             string dir;
             using (var sink = new AiHistoricalCsvSink(root, "ES 12-26", "test",
