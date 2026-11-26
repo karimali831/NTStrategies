@@ -116,7 +116,7 @@ def load_rows(path, frame, contract, report):
     return rows
 
 
-def audit(folder, begin_et, end_et, contract, calendar=None):
+def audit(folder, begin_et, end_et, contract, calendar=None, allow_sparse_1m=False):
     report = {"schema": "ninjex-research-audit-v1", "contract": contract,
               "fromEastern": begin_et.isoformat(), "throughEastern": end_et.isoformat(),
               "frames": {}, "errors": [], "warnings": [], "result": "FAIL"}
@@ -285,7 +285,35 @@ def audit(folder, begin_et, end_et, contract, calendar=None):
         report["warnings"].append(
             f"{sum(x['missingCount'] for x in reconciled)} missing 1m slots across "
             f"{len(reconciled)} 5m bars exactly reconstruct OHLCV: check underlying Last ticks")
-    report["result"] = "PASS_WITH_MANUAL_CALENDAR_REVIEW" if not report["errors"] else "FAIL"
+    report["sparseMinutePolicy"] = {
+        "optedIn": allow_sparse_1m,
+        "sourceVerifiedNoTrade": False,
+        "fineGrainedFeatureUse": "MASK_WINDOW_IF_MISSING_MINUTE",
+        "rawDataModified": False,
+    }
+    # Optional explicit exception ONLY when:
+    #  - every missing 1m close perfectly reconstructs its parent 5m;
+    #  - all higher-timeframe candles exist and their OHLCV reconciles;
+    #  - the sole audit error is missing 1m close timestamps.
+    # This does not prove no Last trades; ML 1m windows crossing these
+    # dates must be masked and the source CSV stays unchanged.
+    expected_sparse_error = f"1m: missing {len(gaps_one)} expected closes"
+    sparse_only = (
+        allow_sparse_1m and len(gaps_one) > 0 and
+        report["missingMinuteForensics"]["unreconciled1mCount"] == 0 and
+        report["missingMinuteForensics"]["volumeReconciledCandidate1mCount"] == len(gaps_one) and
+        report["errors"] == [expected_sparse_error]
+    )
+    if sparse_only:
+        report["result"] = "PASS_WITH_FLAGGED_SPARSE_1M"
+        report["sparseMinutePolicy"]["acceptedWithCaution"] = True
+        report["warnings"].append(
+            "Sparse 1m minute timestamps accepted for ES/NQ higher-timeframe research ONLY. "
+            "Not verified as no-trade, not usable for exact tick execution; "
+            "mask 1m feature/outcome windows crossing any absent minute.")
+    else:
+        report["result"] = "PASS_WITH_MANUAL_CALENDAR_REVIEW" if not report["errors"] else "FAIL"
+        report["sparseMinutePolicy"]["acceptedWithCaution"] = False
     return report
 
 
@@ -298,11 +326,14 @@ def main():
     p.add_argument("--output", type=Path)
     p.add_argument("--calendar", type=Path,
                    help="Explicit sourced exchange holiday schedule/partial bars in JSON")
+    p.add_argument("--allow-sparse-1m", action="store_true",
+                   help="Opt-in conditional PASS only if missing 1m candles have exact 5m OHLCV residual zero and no other errors; mask affected 1m windows")
     a = p.parse_args()
     start, end = (dt.datetime.fromisoformat(x).replace(tzinfo=ET)
                   for x in (a.from_et, a.through_et))
     result = audit(a.folder, start, end, a.contract,
-                   load_calendar(a.calendar) if a.calendar else None)
+                   load_calendar(a.calendar) if a.calendar else None,
+                   allow_sparse_1m=a.allow_sparse_1m)
     document = json.dumps(result, indent=2)
     if a.output:
         a.output.write_text(document, encoding="utf-8")
