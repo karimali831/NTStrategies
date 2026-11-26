@@ -35,3 +35,36 @@ fill a separate regularly-spaced feature grid with zero-volume flags
 while keeping raw trade-time candles untouched. Never treat a
 fabricated zero-volume bar as tick evidence or use it for stop/target
 first-touch execution labelling.
+
+## Opt-in research acceptance without inventing minute candles
+
+A small number of absent 1-minute candle closes should not block
+higher-timeframe feature research when **all** missing minutes reconcile
+exactly to source 5m OHLC and volume and no other audit errors remain.
+
+Run the audit with `--allow-sparse-1m` to enable this narrow exception.
+The default mode remains strict `FAIL`.
+
+The result `PASS_WITH_FLAGGED_SPARSE_1M` means:
+- Every missing 1m close is covered by an otherwise complete 5m bar;
+- Remaining 1m bars explain its entire open/high/low/close/volume;
+- Every 5m, 15m and 60m bar expected by the dated session calendar
+  is present, valid and cross-frame-consistent;
+- Source absence is *candidate no-trade*, **not verified** against ticks;
+- The raw dataset is not modified or filled;
+- Model features requiring a 1m history crossing missing minute slots
+  must be *masked* or excluded, not forward-filled as observed bars;
+- 5m/15m/60m research can proceed, with an explicit quality caveat;
+- Tick-level order-execution research still requires real source ticks.
+
+Any other issue (incomplete final close, parent missing, mismatched
+volume, incorrect OHLC, bad offsets, holidays, duplicated bars) still
+returns `FAIL` and is not waived by this option. Use only with
+a known, reviewed dataset and preserve the audit JSON and provenance.
+
+Example:
+
+    python tools/ai_market_research_audit.py --contract "ES 12-23" --folder "YOUR_EXPORT_FOLDER" --from-et "2023-09-10T18:01:00" --through-et "2023-12-08T17:00:00" --calendar tools/ai_market_calendars/es_2023_thanksgiving.json --allow-sparse-1m --output ES_12-23_research_quality.json
+
+Note that this still FAILS until the genuinely existing 17:00 ET
+terminal source bars are captured or explicitly validated.
