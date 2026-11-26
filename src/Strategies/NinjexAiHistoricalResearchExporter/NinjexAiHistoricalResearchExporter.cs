@@ -18,6 +18,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private AiHistoricalCsvSink sink;
         private bool invalidSetup;
         private long errors;
+        private DateTime effectiveThroughDate;
 
         [NinjaScriptProperty]
         [Display(Name = "Enable export", Order = 1, GroupName = "Ninjex AI Research")]
@@ -39,6 +40,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Recover source 17:00 close", Order = 5, GroupName = "Ninjex AI Research")]
         public bool RecoverTerminalSessionClose { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Auto quarterly contract windows (basket)", Order = 6, GroupName = "Ninjex AI Research")]
+        public bool AutoQuarterlyContractWindows { get; set; }
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -56,6 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DatasetTag = "research";
                 // Disabled by default until real NT8 runtime validation.
                 RecoverTerminalSessionClose = false;
+                AutoQuarterlyContractWindows = false;
             }
             else if (State == State.Configure)
             {
@@ -84,6 +90,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         CultureInfo.InvariantCulture, DateTimeStyles.None, out last) || last < first)
                         throw new InvalidOperationException("Dates must be valid inclusive yyyy-MM-dd ET dates.");
 
+                    if (AutoQuarterlyContractWindows)
+                    {
+                        // This is one independent Strategy instance per dated
+                        // instrument in Strategy Analyzer Basket Testing. Its
+                        // research filter is automatically intersected with
+                        // CME's conventional roll windows, so no individual
+                        // expiry/date configuration is needed by the user.
+                        var window = AiQuarterlyResearchWindow.Resolve(contract, first, last);
+                        first = window.FirstEasternDate;
+                        last = window.LastEasternDate;
+                        Print("[NinjexAI-EXPORT] BASKET contract=" + window.Contract +
+                            " firstET=" + first.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
+                            " throughET=" + last.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
+                            " customaryNextRollMonday=" +
+                            window.CurrentQuarterRollMonday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    }
+
+                    effectiveThroughDate = last;
                     var zone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
                     var folder = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -129,9 +153,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void RecoverSourceTerminalCloses()
         {
-            DateTime through;
-            if (!DateTime.TryParseExact(ThroughEasternDate, "yyyy-MM-dd",
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out through))
+            DateTime through = effectiveThroughDate;
+            if (through == default(DateTime) &&
+                !DateTime.TryParseExact(ThroughEasternDate, "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out through))
                 return;
 
             var minutesByBip = new[] { 5, 1, 15, 60 };
