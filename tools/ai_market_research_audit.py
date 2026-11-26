@@ -232,6 +232,59 @@ def audit(folder, begin_et, end_et, contract, calendar=None):
         if int(manifest["valid"]) != total:
             report["errors"].append(
                 f"Manifest total valid={manifest['valid']} differs from CSV total={total}")
+    # Missing 1m candle does not necessarily imply lost tick trades: thin
+    # ES overnight markets can have minutes without any Last transactions.
+    # Reconstruct affected 5m bars using ONLY existing 1m constituents.
+    # A zero-residual match is a CANDIDATE no-trade minute, NOT source proof.
+    observed_one = frames.get(1, {})
+    observed_five = frames.get(5, {})
+    gaps_one = sorted(set(auditable_slots(begin_et, end_et, 1, calendar)) -
+                      set(observed_one))
+    grouped = {}
+    for minute in gaps_one:
+        offset = (-minute.minute) % 5
+        parent = minute + dt.timedelta(minutes=offset)
+        grouped.setdefault(parent, []).append(minute)
+    reconciled, unreconciled = [], []
+    for parent, missing_minutes in sorted(grouped.items()):
+        original = observed_five.get(parent)
+        offsets = [parent - dt.timedelta(minutes=j) for j in (4, 3, 2, 1, 0)]
+        existing = [observed_one.get(x) for x in offsets]
+        found = [x for x in existing if x is not None]
+        if original is None or not found:
+            mismatch = "Parent 5m or all 1m candles missing"
+            residual = None
+        else:
+            reconstructed = (found[0][0], max(x[1] for x in found),
+                             min(x[2] for x in found), found[-1][3],
+                             sum(x[4] for x in found))
+            residual = round(original[4] - reconstructed[4], 6)
+            mismatch = None if all(abs(x - y) <= 1e-6 for x, y
+                in zip(original, reconstructed)) else (
+                "Remaining 1m OHLCV does not reconstruct 5m")
+        record = {
+            "parent5mUtc": parent.isoformat(),
+            "missing1mUtc": [x.isoformat() for x in missing_minutes],
+            "missingCount": len(missing_minutes),
+            "volumeResidual": residual,
+            "reason": mismatch or "Exact 5m OHLCV; possible no-trade minutes"}
+        if mismatch:
+            unreconciled.append(record)
+        else:
+            reconciled.append(record)
+    report["missingMinuteForensics"] = {
+        "missing1mCount": len(gaps_one),
+        "volumeReconciledCandidate1mCount": sum(x["missingCount"] for x in reconciled),
+        "volumeReconciledParent5mCount": len(reconciled),
+        "unreconciled1mCount": sum(x["missingCount"] for x in unreconciled),
+        "unreconciledParent5mCount": len(unreconciled),
+        "candidateSamples": reconciled[:30],
+        "unreconciledSamples": unreconciled[:30],
+        "warning": "Volume-reconciled absent 1m candles are not certified as no-trade minutes until source Last tick data is checked. Missing timestamps still FAIL strict gate."}
+    if reconciled:
+        report["warnings"].append(
+            f"{sum(x['missingCount'] for x in reconciled)} missing 1m slots across "
+            f"{len(reconciled)} 5m bars exactly reconstruct OHLCV: check underlying Last ticks")
     report["result"] = "PASS_WITH_MANUAL_CALENDAR_REVIEW" if not report["errors"] else "FAIL"
     return report
 
