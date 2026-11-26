@@ -41,6 +41,8 @@ class AuditTests(unittest.TestCase):
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "FAIL")
         self.assertEqual(r["frames"]["5m"]["missing"], 1)
+        self.assertEqual(r["frames"]["5m"]["missingByEasternDate"],
+                         {"2026-09-28": 1})
     def test_price_mismatch(self):
         f = self.folder / "bars_5m.csv"
         f.write_text(f.read_text().replace(",5000,5000,5000,5000,5,OK",
@@ -92,6 +94,22 @@ class AuditTests(unittest.TestCase):
                   for x in auditable_slots(start, end, 60, calendar)]
         self.assertEqual(hourly, ["13:00", "13:15"])
         self.assertNotIn("14:00", hourly)
+
+    def test_winter_2023_2024_cme_equity_closures(self):
+        calendar = load_calendar(Path(
+            "tools/ai_market_calendars/es_winter_2023_2024.json"))
+        for date in ((2023, 12, 25), (2024, 1, 1)):
+            start = dt.datetime(*date, 0, 0, tzinfo=ET)
+            end = dt.datetime(*date, 18, 5, tzinfo=ET)
+            times = [x.astimezone(ET).strftime("%H:%M")
+                     for x in auditable_slots(start, end, 5, calendar)]
+            self.assertEqual(times, ["18:05"], str(date))
+        for date in ((2024, 1, 15), (2024, 2, 19)):
+            start = dt.datetime(*date, 12, 55, tzinfo=ET)
+            end = dt.datetime(*date, 18, 5, tzinfo=ET)
+            times = [x.astimezone(ET).strftime("%H:%M")
+                     for x in auditable_slots(start, end, 5, calendar)]
+            self.assertEqual(times, ["12:55", "13:00", "18:05"], str(date))
 
     def test_missing_one_minute_can_reconcile_with_five_minute(self):
         # Simulate a no-trade minute: absent 1m row, but 5m OHLCV is
