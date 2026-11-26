@@ -1,0 +1,28 @@
+{
+  "name": "ES/NQ CME US equity index winter closures: Dec 2023–Feb 2024",
+  "source": "https://www.ampfutures.com/news/christmas-holiday-trading-schedule-2023 ; https://www.ampfutures.com/news/new-year-holiday-trading-schedule-2023-2024 ; https://www.ampfutures.com/news/holiday-trading-schedule-martin-luther-king-day-2024 ; https://iqhelp.dtn.com/presidents-day-holiday-hours-2024/",
+  "sourceNotes": "The Christmas/New Year Globex day sessions were closed (reopening 18:00 ET); MLK/Presidents equity index futures halted at 13:00 ET and reopened at 18:00 ET. Times cross-checked against ES 03-24 supplied source candles; verify against archived official CME product schedule before certifying.",
+  "closedWindowsEastern": [
+    {
+      "from": "2023-12-24T18:01:00",
+      "through": "2023-12-25T17:00:00",
+      "reason": "Christmas holiday closed during Sunday evening and Monday day; reopening Monday 18:00 ET"
+    },
+    {
+      "from": "2023-12-31T18:01:00",
+      "through": "2024-01-01T17:00:00",
+      "reason": "New Year holiday closed Sunday evening and Monday day; reopening Monday 18:00 ET"
+    },
+    {
+      "from": "2024-01-15T13:01:00",
+      "through": "2024-01-15T17:00:00",
+      "reason": "Martin Luther King Jr. Day early Globex halt 13:00 ET, reopening 18:00 ET"
+    },
+    {
+      "from": "2024-02-19T13:01:00",
+      "through": "2024-02-19T17:00:00",
+      "reason": "Presidents Day early Globex halt 13:00 ET, reopening 18:00 ET"
+    }
+  ],
+  "partialClosesEastern": []
+}
