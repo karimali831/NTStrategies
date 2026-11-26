@@ -1,0 +1,24 @@
+{
+  "name": "CME Equity Index Futures — Thanksgiving 2023 (Eastern Time)",
+  "source": "https://www.cmegroup.com/trading-hours/files/thanksgiving-day-2023.pdf",
+  "closedWindowsEastern": [
+    {
+      "from": "2023-11-23T13:01:00",
+      "through": "2023-11-23T18:00:00",
+      "reason": "Thanksgiving day halt after 13:00 ET; reopen 18:00 ET"
+    },
+    {
+      "from": "2023-11-24T13:16:00",
+      "through": "2023-11-24T17:00:00",
+      "reason": "Early Friday close 13:15 ET"
+    }
+  ],
+  "partialClosesEastern": [
+    {
+      "frameMinutes": 60,
+      "close": "2023-11-24T13:15:00",
+      "startsAfter": "2023-11-24T13:00:00",
+      "reason": "15-minute truncated 60m candle, official Friday early close"
+    }
+  ]
+}
