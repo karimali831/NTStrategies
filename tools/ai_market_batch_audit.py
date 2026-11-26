@@ -3,6 +3,7 @@
 import argparse
 import datetime as dt
 import json
+import re
 from pathlib import Path
 
 try:
@@ -58,14 +59,37 @@ def calendars_in(directory):
     return result
 
 
-def audit_batch(root, tag, prefix, start, end, calendar=None, sparse=False, only=None):
+def export_started_utc(path):
+    # Exporter folder names have a stable UTC timestamp and random UUID:
+    # ES_12-23_20261126T133337762_3ae52bac241c406ab348339647b69ded.
+    # Do NOT use file modification time: copying or zipping changes that.
+    match = re.search(r"_(\d{8}T\d{9})_[0-9a-f]{32}$", path.name)
+    if not match:
+        return None
+    return dt.datetime.strptime(match.group(1), "%Y%m%dT%H%M%S%f").replace(tzinfo=dt.timezone.utc)
+
+
+def audit_batch(root, tag, prefix, start, end, calendar=None, sparse=False, only=None,
+                run_after_utc=None):
     wanted = expected(prefix, start, end)
     if only:
         wanted = [row for row in wanted if row[0] in only]
         if len(wanted) != len(set(only)):
             raise ValueError("One or more chosen contracts are outside research window")
+    if run_after_utc is not None and run_after_utc.tzinfo is None:
+        raise ValueError("run_after_utc must carry an explicit UTC offset")
+    if run_after_utc is not None:
+        run_after_utc = run_after_utc.astimezone(dt.timezone.utc)
     indexed = {}
+    invalid_folder_timestamps = []
     for manifest_file in root.glob("*/manifest.json"):
+        if run_after_utc is not None:
+            run_time = export_started_utc(manifest_file.parent)
+            if run_time is None:
+                invalid_folder_timestamps.append(str(manifest_file.parent))
+                continue
+            if run_time < run_after_utc:
+                continue
         try:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8-sig"))
         except (ValueError, OSError):
@@ -75,6 +99,8 @@ def audit_batch(root, tag, prefix, start, end, calendar=None, sparse=False, only
     result = {"schema": "ninjex-basket-audit-v1", "datasetTag": tag, "requested": len(wanted),
               "contracts": [], "summary": {"pass": 0, "flagged": 0, "fail": 0, "missing": 0, "duplicates": 0},
               "rawFilesModified": False,
+              "runAfterUtc": run_after_utc.isoformat() if run_after_utc else None,
+              "invalidFolderTimestamps": invalid_folder_timestamps,
               "policy": "CME third-Friday-week Monday customary roll. Holiday and provenance review still required."}
     for name, (from_et, through_et) in wanted:
         folders = indexed.get(name, [])
@@ -149,13 +175,17 @@ def main():
     p.add_argument("--from-et", default="2023-09-10")
     p.add_argument("--through-et", default="2026-11-25")
     p.add_argument("--contract", action="append")
+    p.add_argument("--run-after-utc", type=str,
+                   help="Include only exporter folders created after this UTC instant, e.g. 2026-11-26T13:35:00Z; protects old pilot files even when a tag was reused")
     p.add_argument("--calendars", type=Path)
     p.add_argument("--allow-sparse-1m", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     a = p.parse_args()
     report = audit_batch(a.root, a.tag, a.instrument, dt.date.fromisoformat(a.from_et),
                          dt.date.fromisoformat(a.through_et), calendars_in(a.calendars),
-                         a.allow_sparse_1m, a.contract)
+                         a.allow_sparse_1m, a.contract,
+                         (dt.datetime.fromisoformat(a.run_after_utc.replace("Z","+00:00"))
+                          if a.run_after_utc else None))
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     write_summary(report, a.output.with_suffix(".md"))
