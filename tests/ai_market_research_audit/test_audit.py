@@ -30,6 +30,10 @@ class AuditTests(unittest.TestCase):
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "PASS_WITH_MANUAL_CALENDAR_REVIEW", r["errors"])
         self.assertEqual(r["oneToFive"]["comparisons"], 11)
+        self.assertEqual(r["frames"]["15m"]["expected"], 4)
+        self.assertEqual(r["frames"]["60m"]["expected"], 1)
+        self.assertEqual(r["crossFrame"]["1mTo5m"]["mismatchCount"], 0)
+        self.assertEqual(r["crossFrame"]["5mTo15m"]["mismatchCount"], 0)
     def test_missing(self):
         f = self.folder / "bars_5m.csv"
         lines = f.read_text().splitlines()
@@ -48,6 +52,25 @@ class AuditTests(unittest.TestCase):
         r = audit(self.folder, self.start, self.end, "ES 12-26")
         self.assertEqual(r["result"], "FAIL")
         self.assertTrue(r["oneToFive"]["mismatchSamples"])
+    def test_fifteen_minute_aggregation_mismatch(self):
+        f = self.folder / "bars_15m.csv"
+        content = f.read_text()
+        original = ",5000,5000,5000,5000,15,OK"
+        self.assertIn(original, content)
+        f.write_text(content.replace(original,
+            ",5000,5000.25,5000,5000,15,OK", 1))
+        r = audit(self.folder, self.start, self.end, "ES 12-26")
+        self.assertEqual(r["result"], "FAIL")
+        self.assertTrue(r["crossFrame"]["1mTo15m"]["mismatchCount"] > 0 or
+                        r["crossFrame"]["5mTo15m"]["mismatchCount"] > 0)
+    def test_manifest_count_mismatch(self):
+        p = self.folder / "manifest.json"
+        manifest = json.loads(p.read_text())
+        manifest["frameCounts"] = {"5m": 9999}
+        p.write_text(json.dumps(manifest))
+        r = audit(self.folder, self.start, self.end, "ES 12-26")
+        self.assertEqual(r["result"], "FAIL")
+        self.assertTrue(any("manifest count" in e for e in r["errors"]))
     def test_session(self):
         self.assertFalse(list(auditable_slots(dt.datetime(2026,9,27,17,tzinfo=ET),
             dt.datetime(2026,9,27,18,tzinfo=ET), 5)))
