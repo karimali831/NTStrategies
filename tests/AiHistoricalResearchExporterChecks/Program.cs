@@ -6,6 +6,69 @@ using NinjaTrader.NinjaScript.Strategies;
 static class Program
 {
     static void Check(bool ok, string msg) { if (!ok) throw new Exception(msg); }
+    static void TerminalRecoveryCheck(string root, TimeZoneInfo zone)
+    {
+        string exported;
+        var terminal = new DateTime(2023, 12, 8, 17, 0, 0);
+        using (var sink = new AiHistoricalCsvSink(root, "ES 12-23",
+            "source-bar-recovery-test", zone,
+            new DateTime(2023, 12, 8), new DateTime(2023, 12, 8)))
+        {
+            exported = sink.Folder;
+            // History finishes just before Friday's 17:00 ET close.
+            // The terminal candles are present in BarsArray but not emitted
+            // through OnBarUpdate. Recover exactly those original source bars.
+            sink.Append(1, new DateTime(2023, 12, 8, 16, 59, 0),
+                4607.75, 4607.75, 4607.25, 4607.25, 11602);
+            sink.Append(5, new DateTime(2023, 12, 8, 16, 55, 0),
+                4607.50, 4608, 4607.25, 4607.75, 100);
+            sink.Append(15, new DateTime(2023, 12, 8, 16, 45, 0),
+                4607.50, 4608, 4607.25, 4607.75, 100);
+            sink.Append(60, new DateTime(2023, 12, 8, 16, 0, 0),
+                4607.50, 4608.50, 4605, 4607.75, 100);
+
+            var strategy = new NinjexAiHistoricalResearchExporter {
+                EnableExport = true,
+                RecoverTerminalSessionClose = true,
+                ThroughEasternDate = "2023-12-08"
+            };
+            strategy.SetBarsForTests(new [] {
+                new FakeBars { Data = new[] {
+                    new FakeBar(terminal,4607.75,4608.00,4607.25,4607.25,33482) } },
+                new FakeBars { Data = new[] {
+                    new FakeBar(terminal,4607.50,4607.75,4607.25,4607.25,12208) } },
+                new FakeBars { Data = new[] {
+                    new FakeBar(terminal,4607.75,4608.00,4607.25,4607.25,35305) } },
+                new FakeBars { Data = new[] {
+                    new FakeBar(terminal,4608.25,4608.50,4605.00,4607.25,78892) } }
+            });
+            var privateSink = typeof(NinjexAiHistoricalResearchExporter).GetField(
+                "sink", System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            privateSink.SetValue(strategy, sink);
+            var recover = typeof(NinjexAiHistoricalResearchExporter).GetMethod(
+                "RecoverSourceTerminalCloses", System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            recover.Invoke(strategy, null);
+            Check(sink.Valid == 8, "Four source terminal bars appended");
+            recover.Invoke(strategy, null);
+            Check(sink.Valid == 8, "Source terminal recovery is idempotent");
+
+            // Mismatching through date must never create a terminal candle.
+            strategy.ThroughEasternDate = "2023-12-09";
+            recover.Invoke(strategy, null);
+            Check(sink.Valid == 8, "Do not extrapolate beyond source data");
+        }
+        foreach (var period in new[] { 1, 5, 15, 60 })
+        {
+            var text = File.ReadAllText(Path.Combine(exported, "bars_" + period + "m.csv"));
+            Check(text.Contains("TERMINAL_FROM_LOADED_BARS"), period + "m terminal provenance saved");
+            Check(text.Split("2023-12-08T22:00:00").Length == 2, period + "m terminal UTC recorded once");
+        }
+        var manifest = File.ReadAllText(Path.Combine(exported, "manifest.json"));
+        Check(manifest.Contains("terminalRecoveredCounts"), "Recovery metadata in manifest");
+    }
+
     static void Main()
     {
         var root = Path.Combine(Path.GetTempPath(), "ninjex-ai-" + Guid.NewGuid().ToString("N"));
@@ -14,6 +77,7 @@ static class Program
         {
             var zone = TimeZoneInfo.FindSystemTimeZoneById(
                 OperatingSystem.IsWindows() ? "Eastern Standard Time" : "America/New_York");
+            TerminalRecoveryCheck(root, zone);
             string dir;
             using (var sink = new AiHistoricalCsvSink(root, "ES 12-26", "test",
                 zone, new DateTime(2026, 10, 1), new DateTime(2026, 11, 1)))
