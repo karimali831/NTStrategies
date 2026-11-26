@@ -125,6 +125,50 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(r["missingMinuteForensics"]["volumeReconciledCandidate1mCount"], 0)
         self.assertEqual(r["missingMinuteForensics"]["unreconciled1mCount"], 1)
 
+    def test_explicit_sparse_policy_allows_only_reconciled_one_minute(self):
+        # Missing one 1m row with zero unexplained OHLC or volume:
+        # adjust each containing higher timeframe by the same unit.
+        one = self.folder / "bars_1m.csv"
+        one.write_text("\n".join(x for x in one.read_text().splitlines()
+            if "2026-09-28T19:11:00.000" not in x) + "\n")
+        for frame, timestamp, new_volume in [
+            (5, "2026-09-28T19:15:00.000", "4"),
+            (15, "2026-09-28T19:15:00.000", "14"),
+            (60, "2026-09-28T20:00:00.000", "59")]:
+            path = self.folder / f"bars_{frame}m.csv"
+            updated = []
+            seen = False
+            for line in path.read_text().splitlines():
+                if timestamp in line:
+                    cells = line.split(",")
+                    cells[-2] = new_volume
+                    line = ",".join(cells)
+                    seen = True
+                updated.append(line)
+            self.assertTrue(seen, timestamp)
+            path.write_text("\n".join(updated) + "\n")
+        strict = audit(self.folder, self.start, self.end, "ES 12-26")
+        self.assertEqual(strict["result"], "FAIL")
+        permitted = audit(self.folder, self.start, self.end, "ES 12-26",
+                          allow_sparse_1m=True)
+        self.assertEqual(permitted["result"], "PASS_WITH_FLAGGED_SPARSE_1M",
+                         permitted["errors"])
+        self.assertEqual(permitted["missingMinuteForensics"]["missing1mCount"], 1)
+        self.assertEqual(permitted["missingMinuteForensics"]["unreconciled1mCount"], 0)
+        self.assertEqual(permitted["crossFrame"]["5mTo15m"]["mismatchCount"], 0)
+        self.assertTrue(permitted["sparseMinutePolicy"]["acceptedWithCaution"])
+        self.assertFalse(permitted["sparseMinutePolicy"]["sourceVerifiedNoTrade"])
+
+    def test_sparse_policy_does_not_hide_bad_volume_or_missing_5m(self):
+        one = self.folder / "bars_1m.csv"
+        one.write_text("\n".join(x for x in one.read_text().splitlines()
+            if "2026-09-28T19:11:00.000" not in x) + "\n")
+        report = audit(self.folder, self.start, self.end, "ES 12-26",
+                       allow_sparse_1m=True)
+        self.assertEqual(report["result"], "FAIL")
+        self.assertFalse(report["sparseMinutePolicy"]["acceptedWithCaution"])
+        self.assertEqual(report["missingMinuteForensics"]["unreconciled1mCount"], 1)
+
     def test_session(self):
         self.assertFalse(list(auditable_slots(dt.datetime(2026,9,27,17,tzinfo=ET),
             dt.datetime(2026,9,27,18,tzinfo=ET), 5)))
