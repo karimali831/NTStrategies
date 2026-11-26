@@ -28,7 +28,7 @@ def exchange_close(et, frame):
     return (hh * 60 + mm) % frame == 0
 
 
-def auditable_slots(start, end, frame):
+def auditable_slots(start, end, frame, calendar=None):
     # Iterating in UTC avoids fall-back duplicates in ET local time.
     utc = start.astimezone(UTC)
     end_utc = end.astimezone(UTC)
@@ -39,9 +39,42 @@ def auditable_slots(start, end, frame):
     if remainder:
         utc += dt.timedelta(minutes=frame - remainder)
     while utc <= end_utc:
-        if exchange_close(utc.astimezone(ET), frame):
+        if exchange_close(utc.astimezone(ET), frame) and not (
+            calendar and any(first <= utc <= last
+                             for first, last in calendar["closures"])):
             yield utc
         utc += dt.timedelta(minutes=frame)
+    if calendar:
+        for (special_frame, special_close), _ in calendar["partial"].items():
+            if special_frame == frame and start.astimezone(UTC) <= special_close <= end_utc:
+                yield special_close
+
+
+def load_calendar(path):
+    """Explicit, sourced historical special hours. No inferred holiday closures."""
+    source = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    closures = []
+    partial = {}
+    def utc_time(value):
+        wall = dt.datetime.fromisoformat(value)
+        if wall.tzinfo is not None:
+            return wall.astimezone(UTC)
+        return wall.replace(tzinfo=ET).astimezone(UTC)
+    for item in source.get("closedWindowsEastern", []):
+        first, last = utc_time(item["from"]), utc_time(item["through"])
+        if last < first:
+            raise ValueError("Inverted holiday closure range")
+        closures.append((first, last))
+    for item in source.get("partialClosesEastern", []):
+        frame = int(item["frameMinutes"])
+        close = utc_time(item["close"])
+        previous = utc_time(item["startsAfter"])
+        if frame not in FRAMES or close <= previous:
+            raise ValueError("Invalid partial candle specification")
+        partial[(frame, close)] = previous
+    return {"closures": closures, "partial": partial,
+            "calendarName": source.get("name", Path(path).name),
+            "source": source.get("source", "Unspecified")}
 
 
 def load_rows(path, frame, contract, report):
@@ -83,12 +116,16 @@ def load_rows(path, frame, contract, report):
     return rows
 
 
-def audit(folder, begin_et, end_et, contract):
+def audit(folder, begin_et, end_et, contract, calendar=None):
     report = {"schema": "ninjex-research-audit-v1", "contract": contract,
               "fromEastern": begin_et.isoformat(), "throughEastern": end_et.isoformat(),
               "frames": {}, "errors": [], "warnings": [], "result": "FAIL"}
     if end_et < begin_et:
         raise ValueError("End before start")
+    if calendar:
+        report["calendar"] = {"name": calendar["calendarName"], "source": calendar["source"],
+                              "closures": len(calendar["closures"]),
+                              "partialCloses": len(calendar["partial"])}
     manpath = folder / "manifest.json"
     try:
         manifest = json.loads(manpath.read_text(encoding="utf-8-sig"))
@@ -112,7 +149,7 @@ def audit(folder, begin_et, end_et, contract):
         if expected_count is not None and int(expected_count) != len(rows):
             report["errors"].append(
                 f"{frame}m manifest count {expected_count} differs from CSV {len(rows)}")
-        expected = set(auditable_slots(begin_et, end_et, frame))
+        expected = set(auditable_slots(begin_et, end_et, frame, calendar))
         observed = {t for t in rows if begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC)}
         missing = sorted(expected - observed)
         extra = sorted(observed - expected)
@@ -150,8 +187,20 @@ def audit(folder, begin_et, end_et, contract):
         for t, (op, hi, lo, cl, vol) in target.items():
             if not begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC):
                 continue
+            if calendar and (higher, t) in calendar["partial"]:
+                special_start = calendar["partial"][(higher, t)]
+                # The candle ends early at a documented exchange close;
+                # compare ONLY lower bars after its true start.
+                duration = int((t - special_start).total_seconds() / 60)
+                if duration % lower:
+                    report["errors"].append(
+                        f"Invalid partial close {t.isoformat()} for {lower}m components")
+                    continue
+                members_count = duration // lower
+            else:
+                members_count = constituents
             members = [source.get(t - dt.timedelta(minutes=lower * j))
-                       for j in range(constituents - 1, -1, -1)]
+                       for j in range(members_count - 1, -1, -1)]
             if any(x is None for x in members):
                 continue
             tested += 1
@@ -194,10 +243,13 @@ def main():
     p.add_argument("--from-et", required=True, help="ISO Eastern timestamp, e.g. 2026-09-27T18:05")
     p.add_argument("--through-et", required=True, help="ISO Eastern timestamp, e.g. 2026-09-30T23:55")
     p.add_argument("--output", type=Path)
+    p.add_argument("--calendar", type=Path,
+                   help="Explicit sourced exchange holiday schedule/partial bars in JSON")
     a = p.parse_args()
     start, end = (dt.datetime.fromisoformat(x).replace(tzinfo=ET)
                   for x in (a.from_et, a.through_et))
-    result = audit(a.folder, start, end, a.contract)
+    result = audit(a.folder, start, end, a.contract,
+                   load_calendar(a.calendar) if a.calendar else None)
     document = json.dumps(result, indent=2)
     if a.output:
         a.output.write_text(document, encoding="utf-8")
