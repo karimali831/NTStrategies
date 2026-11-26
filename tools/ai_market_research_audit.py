@@ -32,6 +32,12 @@ def auditable_slots(start, end, frame):
     # Iterating in UTC avoids fall-back duplicates in ET local time.
     utc = start.astimezone(UTC)
     end_utc = end.astimezone(UTC)
+    # Align every timeframe independently. A 18:05 ET start is on a 5m
+    # boundary but NOT a 15m/60m boundary; otherwise those timeframes
+    # produce zero expected slots and falsely fail valid exports.
+    remainder = (utc.hour * 60 + utc.minute) % frame
+    if remainder:
+        utc += dt.timedelta(minutes=frame - remainder)
     while utc <= end_utc:
         if exchange_close(utc.astimezone(ET), frame):
             yield utc
@@ -69,7 +75,7 @@ def load_rows(path, frame, contract, report):
                 if not all(math.isfinite(x) for x in prices + [vol]) or lo <= 0 or vol < 0 or hi < max(op, cl) or lo > min(op, cl):
                     raise ValueError("invalid OHLCV")
                 if not all(abs(price * 4 - round(price * 4)) < 1e-6 for price in prices):
-                    raise ValueError("non-ES 0.25 tick increment")
+                    raise ValueError("non-ES/NQ 0.25 tick increment")
                 rows[utc] = (op, hi, lo, cl, vol)
             except (ValueError, TypeError, OverflowError) as exc:
                 if len(report["errors"]) < 60:
@@ -102,6 +108,10 @@ def audit(folder, begin_et, end_et, contract):
             continue
         rows = load_rows(f, frame, contract, report)
         frames[frame] = rows
+        expected_count = manifest.get("frameCounts", {}).get(f"{frame}m")
+        if expected_count is not None and int(expected_count) != len(rows):
+            report["errors"].append(
+                f"{frame}m manifest count {expected_count} differs from CSV {len(rows)}")
         expected = set(auditable_slots(begin_et, end_et, frame))
         observed = {t for t in rows if begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC)}
         missing = sorted(expected - observed)
@@ -128,28 +138,51 @@ def audit(folder, begin_et, end_et, contract):
         if any(x.get("issue") in ("INVALID_OHLCV", "NON_MONOTONIC", "INVALID_ET_TIME") for x in issues):
             report["errors"].append("Historical exporter reported invalid, duplicate or DST-invalid bars")
         report["warnings"].append("Review TIME_GAP / holiday / early-close quality issues manually before ML")
-    # 1m -> 5m must reconstruct exactly when five 1m constituents exist.
-    one, five = frames[1], frames[5]
-    checked = 0
-    mismatches = []
-    for t, (op, hi, lo, cl, vol) in five.items():
-        if not begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC):
-            continue
-        members = [one.get(t - dt.timedelta(minutes=x)) for x in (4, 3, 2, 1, 0)]
-        if any(x is None for x in members):
-            continue
-        checked += 1
-        reconstructed = (members[0][0], max(x[1] for x in members),
-                         min(x[2] for x in members), members[-1][3],
-                         sum(x[4] for x in members))
-        if any(abs(a - b) > 1e-6 for a, b in zip(reconstructed, (op, hi, lo, cl, vol))):
-            if len(mismatches) < 20:
-                mismatches.append(t.isoformat())
-    report["oneToFive"] = {"comparisons": checked, "mismatchSamples": mismatches}
-    if mismatches:
-        report["errors"].append(f"1m->5m OHLCV mismatch at {len(mismatches)} sampled timestamps")
-    if checked < 10:
-        report["errors"].append("Insufficient 1m->5m comparison coverage")
+    # Reconcile every hierarchy, rather than only 1m->5m. As-of
+    # reconstruction is exact when all lower constituent bars exist.
+    report["crossFrame"] = {}
+    for lower, higher in ((1, 5), (1, 15), (1, 60), (5, 15), (15, 60)):
+        source, target = frames[lower], frames[higher]
+        tested = 0
+        mismatch_total = 0
+        samples = []
+        constituents = higher // lower
+        for t, (op, hi, lo, cl, vol) in target.items():
+            if not begin_et.astimezone(UTC) <= t <= end_et.astimezone(UTC):
+                continue
+            members = [source.get(t - dt.timedelta(minutes=lower * j))
+                       for j in range(constituents - 1, -1, -1)]
+            if any(x is None for x in members):
+                continue
+            tested += 1
+            reconstructed = (
+                members[0][0], max(x[1] for x in members),
+                min(x[2] for x in members), members[-1][3],
+                sum(x[4] for x in members))
+            if any(abs(x - y) > 1e-6
+                   for x, y in zip(reconstructed, (op, hi, lo, cl, vol))):
+                mismatch_total += 1
+                if len(samples) < 20:
+                    samples.append(t.isoformat())
+        key = f"{lower}mTo{higher}m"
+        report["crossFrame"][key] = {
+            "comparisons": tested, "mismatchCount": mismatch_total,
+            "mismatchSamplesUtc": samples}
+        if mismatch_total:
+            report["errors"].append(
+                f"{lower}m->{higher}m: {mismatch_total} OHLCV mismatches")
+        if (lower, higher) == (1, 5) and tested < 10:
+            report["errors"].append(
+                "Insufficient 1m->5m comparison coverage (fewer than 10 bars)")
+    # Preserve older clients' 1m->5m summary shape.
+    report["oneToFive"] = {
+        "comparisons": report["crossFrame"]["1mTo5m"]["comparisons"],
+        "mismatchSamples": report["crossFrame"]["1mTo5m"]["mismatchSamplesUtc"]}
+    if manifest.get("valid") is not None:
+        total = sum(len(x) for x in frames.values())
+        if int(manifest["valid"]) != total:
+            report["errors"].append(
+                f"Manifest total valid={manifest['valid']} differs from CSV total={total}")
     report["result"] = "PASS_WITH_MANUAL_CALENDAR_REVIEW" if not report["errors"] else "FAIL"
     return report
 
