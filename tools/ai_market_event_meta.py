@@ -149,10 +149,12 @@ def test_early_late(events, original_v4, output_dir):
     train_preds = np.maximum(
         long_model.predict(x.loc[train]), short_model.predict(x.loc[train]))
     cutoffs = np.quantile(train_preds, [.5, .8, .95])
-    scored["priorTrainForecastBand"] = pd.cut(
-        scored["predictedBest"],
-        [-np.inf, *cutoffs, np.inf],
-        labels=["LOW_50", "MID_50_80", "HIGH_80_95", "TOP_5"]).astype(str)
+    # Deterministic comparisons tolerate equal quantile cuts when
+    # an appropriately cautious model forecasts nearly constant loss.
+    score = scored["predictedBest"].to_numpy(float)
+    scored["priorTrainForecastBand"] = np.select(
+        [score <= cutoffs[0], score <= cutoffs[1], score <= cutoffs[2]],
+        ["LOW_50", "MID_50_80", "HIGH_80_95"], default="TOP_5")
     groups = {}
     for band, subset in scored.groupby("priorTrainForecastBand"):
         groups[str(band)] = {
