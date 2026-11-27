@@ -82,9 +82,13 @@ def simulate(candles, side, ticks_stop=STOP_TICKS, ticks_target=TARGET_TICKS):
         raise ValueError("Trade direction must be +1 or -1")
     if len(candles) != HOLD_MINUTES:
         raise ValueError("Require complete contiguous horizon, never fill holes")
-    entry = candles[0].open + side * SLIPPAGE_TICKS_PER_SIDE * ES_TICK_SIZE
-    stop = entry - side * ticks_stop * ES_TICK_SIZE
-    target = entry + side * ticks_target * ES_TICK_SIZE
+    # Bracket distances anchor to the next bar's unadjusted OPEN.
+    # Entry/exit then both receive adverse slippage independently;
+    # otherwise stop/target risk would silently absorb entry slippage.
+    reference = candles[0].open
+    entry = reference + side * SLIPPAGE_TICKS_PER_SIDE * ES_TICK_SIZE
+    stop = reference - side * ticks_stop * ES_TICK_SIZE
+    target = reference + side * ticks_target * ES_TICK_SIZE
     exit_mid = candles[-1].close
     exit_reason = "TIME"
     ambiguous = False
