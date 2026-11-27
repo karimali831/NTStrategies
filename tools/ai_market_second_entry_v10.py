@@ -350,8 +350,7 @@ def analyze(features,audit,output):
                 "efficiency12":float(entry["efficiency12"])
             })
             candidates.append(event)
-    if not candidates:
-        raise ValueError("No qualifying first/second-entry pattern detected")
+    # Zero candidates is a legitimate negative research finding.
     chosen,selection_rejected=fixed_selection(candidates)
     outcomes=[]
     execution_rejected=Counter()
@@ -436,7 +435,15 @@ def analyze(features,audit,output):
     output.mkdir(parents=True,exist_ok=True)
     (output/"es-second-entry-v10.json").write_text(
         json.dumps(result,indent=2),encoding="utf-8")
-    pd.DataFrame(outcomes).to_csv(output/"es-second-entry-v10-events.csv",index=False)
+    csv_columns=["type","side","decisionUtc","contract","easternDate","month","period",
+                 "clockEtMinute","entryTrigger","stopPrice","nominalStopTicks",
+                 "atr14","ema21","emaSlope5Atr","closeFromEmaAtr","bodyFraction",
+                 "closeLocation","pullbackBars","failedFirstDepthAtr",
+                 "volumeVsPrior20","efficiency12","filled","entryUtc","exitUtc",
+                 "entryFill","exitFill","netUsd","initialStopRiskUsd",
+                 "targetPrice","exitReason","bothTouched1m","gapEntry"]
+    pd.DataFrame(outcomes,columns=csv_columns).to_csv(
+        output/"es-second-entry-v10-events.csv",index=False)
     lines=["# Ninjex AI v10 — mechanical 21-EMA H1/H2 research",
            "","TRAIN ONLY. Mechanically defined hypothesis, not AI-discovered alpha.",
            "",
