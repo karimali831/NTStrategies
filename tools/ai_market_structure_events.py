@@ -226,6 +226,8 @@ def analyze(features, audit, output_dir):
             if current is None or "INVALID" in current.flags:
                 excluded["missingDecision5m"] += 1
                 continue
+            if abs(current.close - float(row["close"])) > 1e-7:
+                raise ValueError("Feature 5m close does not match raw source at " + decision.isoformat())
             preceding = prior_12_contiguous(source5, decision)
             if preceding is None:
                 excluded["incompletePrior12x5m"] += 1
