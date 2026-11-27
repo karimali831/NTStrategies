@@ -1,0 +1,23 @@
+name: Ninjex AI v10 second entry checks
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_second_entry_v10.py'
+      - 'tools/ai_market_second_entry_ml_v10.py'
+      - 'tests/ai_market_second_entry_v10/**'
+      - '.github/workflows/ai-market-second-entry-v10.yml'
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements-ai-market-ml.txt
+      - run: python -m unittest discover -s tests/ai_market_second_entry_v10 -v
+      - run: python tools/ai_market_second_entry_v10.py --help
+      - run: python -m tools.ai_market_second_entry_v10 --help
+      - run: python tools/ai_market_second_entry_ml_v10.py --help
+      - run: python -m tools.ai_market_second_entry_ml_v10 --help
