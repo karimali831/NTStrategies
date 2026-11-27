@@ -138,10 +138,17 @@ def collect_events(validation, basket, tag):
                     "longAmbiguous": long["bothTouched1m"],
                     "shortAmbiguous": short["bothTouched1m"]
                 })
-                # Do not use ANY selected event day as a clock baseline.
-                continue
-            excluded[why if event is None else "differentFirstEvent"] += 1
+            else:
+                excluded[why if event is None else "differentFirstEvent"] += 1
+            # At a comparison clock, exclude only days where the
+            # REJECT_SHORT first event is ALREADY known as-of that clock.
+            # An eventual afternoon/morning-later event cannot cause
+            # a retrospectively invalid removal of an earlier control.
+            event_at = (event[1] if event is not None and
+                        event[0] == FROZEN_EVENT else None)
             for clock in SIGNAL_CLOCKS:
+                if event_at is not None and utc_close(day, clock) >= event_at:
+                    continue
                 value = non_event_control(day, clock, day_rows, five, one)
                 if value is not None:
                     controls[(contract, clock)].append(float(value))
@@ -227,7 +234,7 @@ def research(features, audit, out):
             "maximumMinutes": HOLD_MINUTES,
             "adverseSlippageTicksPerSide": 1, "commissionRoundTripUsd": 5.,
             "sameOneMinuteStopAndTarget": "STOP FIRST",
-            "comparator": "all eligible OTHER validation days, same dated ES contract and same NY clock; 10+ peers. No control outcome influences signal selection"
+            "comparator": "all eligible OTHER day-clock observations, same dated ES contract and same NY clock, excluding REJECT_SHORT-first events known as-of that clock; 10+ peers. No control outcome influences signal selection"
         },
         "sourceSplitRows": {
             "trainingNotScored": counts["train"],
@@ -250,7 +257,7 @@ def research(features, audit, out):
             "REJECT_SHORT -> LONG was selected post hoc from v7 four event families and both sides.",
             "The Sep2025-Jun2026 validation period was ALREADY inspected in older studies. NOT independent replication.",
             "The final June15 2026+ holdout is completely unscored and no holdout raw OHLC is parsed.",
-            "Other-day clock baseline controls may be reused across events; bootstrap treats control means as fixed and understates uncertainty.",
+            "Other day-clock baseline controls may be reused across events; bootstrap treats control means as fixed and understates uncertainty.",
             "No model tuning or parameter changes. Only fixed signal outcomes in 1m OHLC are examined.",
             "The 12/24-tick 30m trade and $30 roundtrip assumed costs are not broker/tick execution verified.",
             "Closed-equity drawdown is NOT intraday unrealized trailing prop-firm drawdown.",
