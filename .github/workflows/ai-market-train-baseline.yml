@@ -1,0 +1,19 @@
+name: AI first offline ML benchmark tests
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_train_baseline.py'
+      - 'tools/requirements-ai-market-ml.txt'
+      - 'tests/ai_market_train_baseline/**'
+      - '.github/workflows/ai-market-train-baseline.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements-ai-market-ml.txt
+      - run: python -m unittest discover -s tests/ai_market_train_baseline -v
