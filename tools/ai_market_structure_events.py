@@ -26,13 +26,13 @@ import pandas as pd
 
 if __package__:
     from tools.ai_market_ml_features import NY, read_bars
-    from tools.ai_market_train_baseline import read_verified_csv
+    from tools.ai_market_train_baseline import BASE_FEATURES, read_verified_csv
     from tools.ai_market_bracket_research import (
         close_time, minute_window, simulate, summarize,
     )
 else:
     from ai_market_ml_features import NY, read_bars
-    from ai_market_train_baseline import read_verified_csv
+    from ai_market_train_baseline import BASE_FEATURES, read_verified_csv
     from ai_market_bracket_research import close_time, minute_window, simulate, summarize
 
 TICK = 0.25
@@ -249,7 +249,12 @@ def analyze(features, audit, output_dir):
             side = 1 if event.endswith("_LONG") else -1
             result = simulate(future, side, STOP_TICKS, TARGET_TICKS)
             opposite = simulate(future, -side, STOP_TICKS, TARGET_TICKS)
+            asof = {}
+            for feature in BASE_FEATURES + ("easternMinuteOfDay",):
+                number = pd.to_numeric(row[feature], errors="coerce")
+                asof["feature_" + feature] = float(number) if pd.notna(number) else float("nan")
             candidates.append({
+                **asof,
                 "decisionUtc": decision.isoformat(),
                 "easternDate": et_date.isoformat(), "month": et_date.strftime("%Y-%m"),
                 "period": "EARLY_TRAIN" if et_date < EARLY_END_DATE else "LATE_TRAIN",
@@ -321,6 +326,15 @@ def analyze(features, audit, output_dir):
         ]
     }
     output_dir.mkdir(parents=True, exist_ok=True)
+    # Additional v5 feature snapshot; old aggregate v4 outputs stay unchanged.
+    # All columns originate from completed as-of bars, never forward labels.
+    event_csv = output_dir / "es-structure-v4-train-events.csv"
+    if selected:
+        pd.DataFrame(selected).sort_values("decisionUtc").to_csv(
+            event_csv, index=False, float_format="%.10g")
+    else:
+        raise ValueError("No train-only structure events suitable for modelling")
+    result["trainEventRowsPath"] = str(event_csv)
     (output_dir / "es-structure-v4.json").write_text(
         json.dumps(result, indent=2), encoding="utf-8")
     md = [
