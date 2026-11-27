@@ -17,10 +17,20 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from tools.ai_market_train_baseline import (
-    ATR_THRESHOLD, MODEL_FEATURES, feature_frame, labels_from_returns,
-    read_verified_csv,
-)
+# Support both invocation forms:
+#   python tools/ai_market_validation_opportunities.py ...
+#   python -m tools.ai_market_validation_opportunities ...
+# Direct script execution puts tools/ (not the repository root) on sys.path.
+if __package__:
+    from tools.ai_market_train_baseline import (
+        ATR_THRESHOLD, MODEL_FEATURES, feature_frame, labels_from_returns,
+        read_verified_csv,
+    )
+else:
+    from ai_market_train_baseline import (
+        ATR_THRESHOLD, MODEL_FEATURES, feature_frame, labels_from_returns,
+        read_verified_csv,
+    )
 
 # Predeclared descriptive thresholds. Not optimized using validation data.
 THRESHOLDS = (0.45, 0.50, 0.55, 0.60, 0.65)
