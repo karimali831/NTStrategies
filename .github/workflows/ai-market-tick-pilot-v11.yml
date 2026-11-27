@@ -1,0 +1,20 @@
+name: Ninjex AI native tick-data pilot v11 checks
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_tick_pilot_v11.py'
+      - 'tests/ai_market_tick_pilot_v11/**'
+      - '.github/workflows/ai-market-tick-pilot-v11.yml'
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements-ai-market-ml.txt
+      - run: python -m unittest discover -s tests/ai_market_tick_pilot_v11 -v
+      - run: python tools/ai_market_tick_pilot_v11.py --help
+      - run: python -m tools.ai_market_tick_pilot_v11 --help
