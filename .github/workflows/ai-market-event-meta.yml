@@ -1,0 +1,22 @@
+name: Ninjex AI conditional expectancy v5 checks
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_event_meta.py'
+      - 'tools/ai_market_structure_events.py'
+      - 'tests/ai_market_event_meta/**'
+      - '.github/workflows/ai-market-event-meta.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements-ai-market-ml.txt
+      - run: python -m unittest discover -s tests/ai_market_structure_events -v
+      - run: python -m unittest discover -s tests/ai_market_event_meta -v
+      - run: python tools/ai_market_event_meta.py --help
+      - run: python -m tools.ai_market_event_meta --help
