@@ -106,6 +106,8 @@ class NativeLastTickTests(unittest.TestCase):
                               tick_line(t,5400.25))
             with self.assertRaisesRegex(ValueError,"reversed tick timestamp"):
                 ingest(source,"ES 06-24",root/"out",2)
+            self.assertFalse((root/"out"/"ES_06-24-2tick-train-v11.csv").exists())
+            self.assertFalse((root/"out"/"ES_06-24-2tick-audit-v11.json").exists())
 
     def test_explicit_pilot_limit_is_recorded(self):
         with tempfile.TemporaryDirectory() as tmp:
