@@ -42,7 +42,7 @@ BASE_FEATURES = (
 INPUT_COLUMNS = set(BASE_FEATURES) | {
     "decisionUtc", "decisionEastern", "researchSplit", "contract",
     "label30mCloseRetAtr", "fine1mComplete", "qualityFlags",
-    "easternMinuteOfDay"
+    "easternMinuteOfDay", "close"
 }
 MODEL_FEATURES = BASE_FEATURES + ("timeSin", "timeCos")
 

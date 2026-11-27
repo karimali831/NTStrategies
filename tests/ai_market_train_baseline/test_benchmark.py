@@ -19,7 +19,7 @@ ET = ZoneInfo("America/New_York")
 BASE = {
     "sessionAsia": 0, "sessionLondon": 0, "sessionNewYork": 1,
     "sessionLondonNewYorkOverlap": 0, "easternWeekday": 2,
-    "easternMinuteOfDay": 600, "atr14_5m": 10,
+    "easternMinuteOfDay": 600, "atr14_5m": 10, "close": 6000,
     "ema20DistanceAtr": 0.2, "ema50DistanceAtr": 0.4, "ret3Atr": 0.1,
     "ret12Atr": 0.5, "efficiency12": 0.3, "volumeVsPrior20": 1.2,
     "prior12HighDistanceAtr": -0.3, "prior12LowDistanceAtr": 0.7,
