@@ -101,9 +101,7 @@ def make_labels(features, bulk_audit, counters, detailed=None):
             long = simulate(future, 1)
             short = simulate(future, -1)
             record = {
-                "index": idx, "decisionUtc": asof.isoformat(),
-                "contract": contract,
-                "researchSplit": row["researchSplit"],
+                "index": idx,
                 "month": str(row["decisionEastern"])[:7],
                 "easternDate": str(row["decisionEastern"])[:10],
                 "pnlLongUsd": long["netUsd"],
