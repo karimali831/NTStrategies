@@ -134,8 +134,10 @@ def simulate(candles, side, ticks_stop=STOP_TICKS, ticks_target=TARGET_TICKS):
 
 def summarize(trades):
     if not trades:
-        return {"trades": 0, "netUsd": 0, "maxClosedEquityDrawdownUsd": 0,
-                "winRate": None, "profitFactor": None}
+        return {"trades": 0, "netUsd": 0, "meanPerTradeUsd": 0,
+                "maxClosedEquityDrawdownUsd": 0, "winRate": None,
+                "profitFactor": None, "months": {},
+                "ambiguousStops": 0, "stopGapExits": 0}
     ordered = sorted(trades, key=lambda row: row["decisionUtc"])
     pnl = np.asarray([item["netUsd"] for item in ordered], dtype=float)
     equity = np.cumsum(pnl)
