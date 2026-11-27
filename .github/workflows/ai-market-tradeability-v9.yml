@@ -1,0 +1,20 @@
+name: Ninjex AI tradeability/cost audit v9 checks
+on:
+  pull_request:
+    paths:
+      - 'tools/ai_market_tradeability_v9.py'
+      - 'tests/ai_market_tradeability_v9/**'
+      - '.github/workflows/ai-market-tradeability-v9.yml'
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements-ai-market-ml.txt
+      - run: python -m unittest discover -s tests/ai_market_tradeability_v9 -v
+      - run: python tools/ai_market_tradeability_v9.py --help
+      - run: python -m tools.ai_market_tradeability_v9 --help
