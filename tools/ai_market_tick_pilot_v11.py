@@ -179,6 +179,8 @@ def ingest(source, contract, output, ticks_per_bar=2000, limit_rows=None):
     safe = contract.replace(" ","_")
     csv_path = output / f"{safe}-{ticks_per_bar}tick-train-v11.csv"
     report_path = output / f"{safe}-{ticks_per_bar}tick-audit-v11.json"
+    # Never publish an incomplete CSV as a successful tick-bar artifact.
+    partial_csv_path = output / f"{safe}-{ticks_per_bar}tick-train-v11.partial"
     builder=TickBarBuilder(ticks_per_bar,contract,source.name)
     count=0
     short_rows=0
@@ -194,7 +196,7 @@ def ingest(source, contract, output, ticks_per_bar=2000, limit_rows=None):
     # Source is assumed chronological. On a boundary timestamp, check
     # the timestamp ONLY, never price/size; later source bytes are not
     # parsed or included in the accepted-record prefix hash.
-    with source.open("rb") as raw, csv_path.open("w",newline="",encoding="utf-8") as dest:
+    with source.open("rb") as raw, partial_csv_path.open("w",newline="",encoding="utf-8") as dest:
         writer=csv.DictWriter(dest,fieldnames=FIELDS)
         writer.writeheader()
         for line_num, binary in enumerate(raw, 1):
@@ -243,8 +245,11 @@ def ingest(source, contract, output, ticks_per_bar=2000, limit_rows=None):
                 pilot_limit=True
                 break
     if count==0:
-        csv_path.unlink(missing_ok=True)
+        partial_csv_path.unlink(missing_ok=True)
         raise ValueError("No TRAIN ticks in input; provide an older contract/sample")
+    # Source reached a valid last observation; now atomically publish the
+    # complete output. A parser failure leaves only the .partial artifact.
+    partial_csv_path.replace(csv_path)
     report={
         "schema":"ninjex-ai-tick-pilot-v11",
         "status":"SOURCE_TICKS_DECODED_NO_TRADING_MODEL",
