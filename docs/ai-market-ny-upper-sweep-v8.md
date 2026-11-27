@@ -34,12 +34,15 @@ multiply intraday drawdown exposure.
   stops before its first bar. No re-training or threshold adjustment.
 - At identical event timestamps show LONG and SHORT outcomes.
 - Separately compute a descriptive baseline: all OTHER eligible
-  days in the SAME dated ES contract, at the EXACT same NY
-  5-minute closing clock as the event; require 10+ eligible
-  comparison days, continuous opening range through that minute,
-  quality-checked source and a 30m 1m outcome. Non-event controls
-  cannot affect entry selection. Match the per-event clock,
-  not a conveniently chosen time after seeing the PnL.
+  day-clock observations in the SAME dated ES contract, at the
+  EXACT same NY 5-minute closing clock as the event; require 10+
+  eligible peers, continuous opening range through that minute,
+  quality-checked source and a 30m 1m outcome. Disallow any peer
+  clock at or AFTER a first REJECT_SHORT event on that date; a
+  LATER event must not remove an EARLIER peer observation based
+  on future knowledge. Controls do not affect entry selection.
+  Match the per-event clock, not a conveniently chosen time after
+  seeing the PnL.
 - Show event LONG mean minus same-clock LONG baseline mean and
   descriptive bootstrap interval. Controls are reused across
   events; interval treats them as fixed and understates uncertainty.
