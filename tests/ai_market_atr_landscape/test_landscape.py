@@ -89,7 +89,7 @@ class ATRLandscapeTests(unittest.TestCase):
         bars = [Bar(now+dt.timedelta(minutes=i),
                     6000,6000.25,5999.75,6000,1,"OK")
                 for i in range(1,61)]
-        bars[0] = Bar(bars[0].end,6000,6007,5996,6000,10,"OK")
+        bars[0] = Bar(bars[0].end,6000,6007,5993,6000,10,"OK")
         result = simulate(bars,1,12,24,30)
         self.assertEqual(result["exitReason"],"AMBIGUOUS_STOP_FIRST")
         self.assertEqual(result["netUsd"],-180)
