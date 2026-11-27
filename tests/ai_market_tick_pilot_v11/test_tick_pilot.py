@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 import pandas as pd
@@ -46,8 +47,8 @@ class NativeLastTickTests(unittest.TestCase):
     def test_tick_count_not_volume_and_ema_is_prior_plus_current(self):
         b=TickBarBuilder(2,"ES 06-24","pilot.txt")
         base=dt.datetime(2024,6,11,14,0,tzinfo=dt.timezone.utc)
-        self.assertIsNone(b.append(base,5400,100))
-        row=b.append(base+dt.timedelta(seconds=1),5400.25,200)
+        self.assertIsNone(b.append(base,Decimal("5400"),100))
+        row=b.append(base+dt.timedelta(seconds=1),Decimal("5400.25"),200)
         self.assertEqual(row["tickCount"],2)
         self.assertEqual(row["volume"],300)
         self.assertEqual(row["ema21"],5400.25)
